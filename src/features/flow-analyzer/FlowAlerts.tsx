@@ -1,12 +1,15 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { AlertCard } from "../../components/AlertCard";
 import {
   useFlowAlerts,
   useDismissAlert,
   useSendDiscordAlert,
 } from "../../api/flow";
+import apiClient from "../../api/client";
 import { Bell, Send, Trash2, Loader2 } from "lucide-react";
 
 export function FlowAlerts() {
+  const qc = useQueryClient();
   const { data: alerts, isLoading, error } = useFlowAlerts();
   const dismissMutation = useDismissAlert();
   const sendDiscordMutation = useSendDiscordAlert();
@@ -46,10 +49,11 @@ export function FlowAlerts() {
     );
   }
 
-  const handleDismissAll = () => {
-    actionableAlerts.forEach((alert) => {
-      dismissMutation.mutate(alert.id);
-    });
+  const handleDismissAll = async () => {
+    try {
+      await apiClient.post("/flow/alerts/dismiss-all");
+      qc.invalidateQueries({ queryKey: ["flow", "alerts"] });
+    } catch { /* ignore */ }
   };
 
   const handleSendAllToDiscord = () => {
