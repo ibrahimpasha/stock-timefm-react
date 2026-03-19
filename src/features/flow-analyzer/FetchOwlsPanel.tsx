@@ -43,6 +43,9 @@ export function FetchOwlsPanel() {
   const [results, setResults] = useState<
     { channel: string; msg: string; ok: boolean }[]
   >([]);
+  const [progress, setProgress] = useState<{
+    step: string; detail: string; pct: number; images_done: number; images_total: number;
+  } | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
   // Persist token to localStorage whenever it changes
@@ -66,10 +69,19 @@ export function FetchOwlsPanel() {
 
     setIsRunning(true);
     setResults([]);
+    setProgress(null);
 
     const newResults: { channel: string; msg: string; ok: boolean }[] = [];
 
     for (const channelId of activeChannels) {
+      // Start polling progress
+      const pollId = setInterval(async () => {
+        try {
+          const { data: p } = await apiClient.get("/flow/fetch-owls/progress");
+          if (p.running) setProgress(p);
+        } catch { /* ignore */ }
+      }, 1500);
+
       try {
         const { data } = await apiClient.post(
           "/flow/fetch-owls",
@@ -78,8 +90,9 @@ export function FetchOwlsPanel() {
             channel_id: channelId,
             webhook_url: webhook,
           },
-          { timeout: 600_000 } // 10 min — image analysis is slow
+          { timeout: 600_000 }
         );
+        clearInterval(pollId);
         const errors = data.errors || [];
         if (errors.length > 0 && data.images_downloaded === 0) {
           newResults.push({
@@ -95,14 +108,15 @@ export function FetchOwlsPanel() {
           });
         }
       } catch (err: unknown) {
+        clearInterval(pollId);
         const msg =
           err instanceof Error ? err.message : "Pipeline failed";
         newResults.push({ channel: channelId, msg, ok: false });
       }
-      // Update results as each channel completes
       setResults([...newResults]);
     }
 
+    setProgress(null);
     setIsRunning(false);
   };
 
@@ -231,6 +245,30 @@ export function FetchOwlsPanel() {
           )}
         </button>
       </div>
+
+      {/* Progress bar */}
+      {progress && isRunning && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-accent-blue font-semibold">{progress.step}</span>
+            <span className="text-text-muted font-mono">{progress.pct}%</span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-border overflow-hidden">
+            <div
+              className="h-full rounded-full bg-accent-blue transition-all duration-500"
+              style={{ width: `${progress.pct}%` }}
+            />
+          </div>
+          <div className="text-[10px] text-text-muted">
+            {progress.detail}
+            {progress.images_total > 0 && (
+              <span className="ml-2 font-mono">
+                ({progress.images_done}/{progress.images_total} images)
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Results */}
       {results.length > 0 && (
