@@ -17,6 +17,8 @@ interface ForecastChartProps {
   selectedModels: string[];
   isLoading: boolean;
   actualPrices?: { date: string; price: number }[];
+  /** Date the forecast was generated (YYYY-MM-DD). Forecasts anchor from this date, not today. */
+  forecastOrigin?: string;
   className?: string;
 }
 
@@ -58,6 +60,7 @@ export function ForecastChart({
   selectedModels,
   isLoading,
   actualPrices,
+  forecastOrigin,
   className = "",
 }: ForecastChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -173,8 +176,20 @@ export function ForecastChart({
     }
 
     // --- Forecast lines per model ---
-    const lastDate = historicalData[historicalData.length - 1].date;
-    const lastClose = historicalData[historicalData.length - 1].close;
+    // Anchor to forecastOrigin if provided (saved forecast), else last candle date
+    let originDate = historicalData[historicalData.length - 1].date;
+    if (forecastOrigin) {
+      // Find the closest trading day on or before the origin in our data
+      const match = historicalData
+        .filter((d) => d.date <= forecastOrigin)
+        .pop();
+      if (match) originDate = match.date;
+    }
+    const lastDate = originDate;
+    const lastClose = (
+      historicalData.find((d) => d.date === originDate) ||
+      historicalData[historicalData.length - 1]
+    ).close;
 
     const visibleForecasts = forecasts.filter((f) =>
       selectedModels.includes(f.model)
