@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, useCallback, useEffect } from "react";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { BarChart3 } from "lucide-react";
 import { useAppStore } from "../store/useAppStore";
 import {
@@ -29,7 +29,42 @@ export function ForecastPage() {
 
   const [settings, setSettings] = useState<ForecastSettings>(DEFAULT_SETTINGS);
   const [forecasts, setForecasts] = useState<ModelForecast[]>([]);
+  const [forecastOriginOverride, setForecastOriginOverride] = useState<string | undefined>();
   const [isRunning, setIsRunning] = useState(false);
+
+  // Load saved forecast snapshot for this ticker on mount / ticker change
+  const { data: snapshot } = useQuery({
+    queryKey: ["cc-snapshot", ticker],
+    queryFn: () => apiClient.get(`/command-center/snapshot?ticker=${ticker}`).then((r) => r.data),
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  // Auto-load saved forecasts when snapshot arrives
+  useEffect(() => {
+    if (snapshot && snapshot.ensemble?.models?.length > 0 && forecasts.length === 0) {
+      const models: ModelForecast[] = snapshot.ensemble.models.map((m: Record<string, unknown>) => ({
+        model: m.model as string,
+        prices: (m.prices as number[]) || [],
+        end_price: (m.end_price as number) || 0,
+        predictions: (m.predictions as Record<string, unknown>[]) || [],
+        current_price: (m.current_price as number) || 0,
+        latency_ms: 0,
+      }));
+      setForecasts(models);
+      // Set the origin to when the forecast was generated
+      const genAt = String(snapshot.generated_at || "").slice(0, 10);
+      if (genAt && genAt.length === 10) {
+        setForecastOriginOverride(genAt);
+      }
+    }
+  }, [snapshot, ticker]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset forecasts when ticker changes
+  useEffect(() => {
+    setForecasts([]);
+    setForecastOriginOverride(undefined);
+  }, [ticker]);
 
   // API data
   const { data: history, isLoading: historyLoading } = useMarketHistory(
@@ -45,6 +80,7 @@ export function ForecastPage() {
 
     setIsRunning(true);
     setForecasts([]);
+    setForecastOriginOverride(undefined); // New forecast uses config origin, not saved
 
     try {
       const isDaily = settings.forecastType === "daily";
@@ -154,7 +190,7 @@ export function ForecastPage() {
             forecasts={forecasts}
             selectedModels={settings.selectedModels}
             isLoading={historyLoading || isRunning}
-            forecastOrigin={settings.forecastOrigin}
+            forecastOrigin={forecastOriginOverride || settings.forecastOrigin}
             overlays={{
               showMA: settings.showMA,
               showBB: settings.showBB,
