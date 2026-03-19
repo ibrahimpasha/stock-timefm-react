@@ -4,7 +4,7 @@ import type { HealthCheck } from "../lib/types";
 /** Shared axios instance — all API calls go through Vite proxy at /api */
 const apiClient = axios.create({
   baseURL: "/api",
-  timeout: 30_000,
+  timeout: 60_000,
   headers: {
     "Content-Type": "application/json",
   },
