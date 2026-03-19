@@ -307,7 +307,7 @@ export function ForecastChart({
 
     // Fit content
     chart.timeScale().fitContent();
-  }, [historicalData, forecasts, selectedModels, actualPrices]);
+  }, [historicalData, forecasts, selectedModels, actualPrices, forecastOrigin]);
 
   // Build chart whenever data changes
   useEffect(() => {

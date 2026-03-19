@@ -155,6 +155,7 @@ export function ForecastPage() {
             forecasts={forecasts}
             selectedModels={settings.selectedModels}
             isLoading={historyLoading || isRunning}
+            forecastOrigin={settings.forecastOrigin}
           />
 
           {forecasts.length > 0 && (
