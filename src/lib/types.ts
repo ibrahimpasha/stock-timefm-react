@@ -94,10 +94,11 @@ export interface FlowEntry {
   strike: number;
   option_type: string;
   expiry: string;
+  dte?: number;
   premium: string;
-  size: string;
   side: string;
-  timestamp: string;
+  flow_date: string;
+  created_at?: string;
 }
 
 export interface FlowChatMessage {

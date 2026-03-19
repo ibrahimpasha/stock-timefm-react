@@ -17,6 +17,15 @@ interface ActionPanelProps {
   signal: Signal | null;
   currentPrice?: number;
   isLoading?: boolean;
+  option?: {
+    strike: number;
+    type: string;
+    expiry: string;
+    premium: number;
+    bid?: number;
+    ask?: number;
+    iv?: number;
+  };
 }
 
 /* ── Trade Setup Card ────────────────────────────────────── */
@@ -296,7 +305,7 @@ function SkeletonPanel() {
 
 /* ── Main ActionPanel ────────────────────────────────────── */
 
-export function ActionPanel({ signal, currentPrice, isLoading }: ActionPanelProps) {
+export function ActionPanel({ signal, currentPrice, isLoading, option }: ActionPanelProps) {
   if (isLoading) return <SkeletonPanel />;
 
   if (!signal) {
@@ -314,7 +323,7 @@ export function ActionPanel({ signal, currentPrice, isLoading }: ActionPanelProp
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <TradeSetupCard signal={signal} currentPrice={currentPrice} />
-      <OptionPickCard />
+      <OptionPickCard option={option} />
       <TargetsCard signal={signal} currentPrice={currentPrice} />
     </div>
   );

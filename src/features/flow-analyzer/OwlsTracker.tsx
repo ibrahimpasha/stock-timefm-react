@@ -139,7 +139,7 @@ function TickerDetail({
     if (!entries) return {};
     const groups: Record<string, FlowEntry[]> = {};
     entries.forEach((entry) => {
-      const date = entry.timestamp.split("T")[0] || entry.timestamp.split(" ")[0];
+      const date = entry.flow_date || (entry.created_at ?? "").split(" ")[0] || "unknown";
       if (!groups[date]) groups[date] = [];
       groups[date].push(entry);
     });

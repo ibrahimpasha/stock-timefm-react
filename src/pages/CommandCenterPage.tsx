@@ -1,8 +1,10 @@
 import { useState, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAppStore } from "../store/useAppStore";
 import { useMarketPrice } from "../api/forecast";
 import { useSignal, useGenerateSignal } from "../api/signals";
 import { useTrustScores } from "../api/eval";
+import apiClient from "../api/client";
 
 // Command Center feature components
 import { DecisionHero } from "../features/command-center/DecisionHero";
@@ -182,6 +184,12 @@ export function CommandCenterPage() {
   const { data: marketPrice, isLoading: priceLoading } = useMarketPrice(ticker);
   const { data: signalResult, isLoading: signalLoading } = useSignal(ticker);
   const { data: trustScores, isLoading: trustLoading } = useTrustScores(ticker);
+  const { data: snapshot } = useQuery({
+    queryKey: ["cc-snapshot", ticker],
+    queryFn: () => apiClient.get(`/command-center/snapshot?ticker=${ticker}`).then((r) => r.data),
+    staleTime: 60_000,
+    retry: 1,
+  });
 
   // Generate signal mutation
   const generateSignal = useGenerateSignal();
@@ -229,6 +237,15 @@ export function CommandCenterPage() {
             signal={signal}
             currentPrice={currentPrice}
             isLoading={isSignalLoading}
+            option={snapshot?.option ? {
+              strike: snapshot.option.strike,
+              type: snapshot.option.type,
+              expiry: snapshot.option.expiry_display || snapshot.option.expiry,
+              premium: snapshot.option.premium,
+              bid: snapshot.option.call_premium,
+              ask: snapshot.option.put_premium,
+              iv: snapshot.option.iv ? snapshot.option.iv / 100 : undefined,
+            } : undefined}
           />
         </div>
       </div>
