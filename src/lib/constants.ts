@@ -11,6 +11,8 @@ export const MODEL_COLORS: Record<string, string> = {
   arima: "#8b949e",
   deepar: "#da3633",
   tide: "#79c0ff",
+  chronos2: "#ffa500",
+  claude: "#cc785c",
   ensemble: "#ffffff",
 };
 
@@ -23,10 +25,12 @@ export const MODEL_LABELS: Record<string, string> = {
   timemixer: "TimeMixer",
   timexer: "TimeXer",
   timesnet: "TimesNet",
-  timesfm: "TimesFM",
+  timesfm: "TimesFM 2.5",
   arima: "ARIMA",
   deepar: "DeepAR",
   tide: "TiDE",
+  chronos2: "Chronos-2",
+  claude: "Claude Opus",
   ensemble: "Ensemble",
 };
 

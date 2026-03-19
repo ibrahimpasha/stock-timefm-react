@@ -16,6 +16,10 @@ const AVAILABLE_MODELS = [
   "timemixer",
   "timexer",
   "timesnet",
+  "tide",
+  "chronos2",
+  "timesfm",
+  "claude",
 ];
 
 const INTERVALS = ["15m", "30m", "1h", "4h"] as const;
