@@ -22,6 +22,7 @@ import { OwlsTracker } from "../features/flow-analyzer/OwlsTracker";
 
 // Paper Trading
 import { PaperTrading } from "../features/paper-trading/PaperTrading";
+import { FlowPaperTrading } from "../features/flow-analyzer/FlowPaperTrading";
 
 // OWLS Discord Pipeline
 import { FetchOwlsPanel } from "../features/flow-analyzer/FetchOwlsPanel";
@@ -40,7 +41,7 @@ import {
 
 /* ── Tab definitions ─────────────────────────────────────── */
 
-type FlowTab = "chat" | "picks" | "history" | "owls" | "paper";
+type FlowTab = "chat" | "picks" | "history" | "owls" | "paper" | "flow-trader";
 
 const FLOW_TABS: { id: FlowTab; label: string; icon: React.ElementType }[] = [
   { id: "chat", label: "Flow Chat", icon: MessageCircle },
@@ -48,6 +49,7 @@ const FLOW_TABS: { id: FlowTab; label: string; icon: React.ElementType }[] = [
   { id: "history", label: "History", icon: History },
   { id: "owls", label: "OWLS Tracker", icon: Eye },
   { id: "paper", label: "Paper Trading", icon: Wallet },
+  { id: "flow-trader", label: "Flow Trader", icon: Zap },
 ];
 
 /* ── Ticker Input + Analyze Bar ──────────────────────────── */
@@ -169,6 +171,8 @@ function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
       return <OwlsTracker />;
     case "paper":
       return <PaperTrading />;
+    case "flow-trader":
+      return <FlowPaperTrading />;
     default:
       return null;
   }
