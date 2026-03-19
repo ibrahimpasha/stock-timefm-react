@@ -74,17 +74,16 @@ export function ForecastPage() {
             .then((r) => {
               const d = r.data;
               // Normalize response to ModelForecast shape
+              const prices = d.prices ?? (d.predictions
+                ? d.predictions.map((p: { price: number }) => p.price)
+                : []);
               return {
                 model,
-                prices: d.predictions
-                  ? d.predictions.map(
-                      (p: { price: number }) => p.price
-                    )
-                  : [],
-                end_price: d.summary?.final_price ?? 0,
+                prices,
+                end_price: d.end_price ?? d.summary?.final_price ?? (prices.length ? prices[prices.length - 1] : 0),
                 predictions: d.predictions ?? [],
                 current_price: d.current_price ?? 0,
-                latency_ms: 0,
+                latency_ms: d.latency_ms ?? 0,
               } as ModelForecast;
             })
         )
