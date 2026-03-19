@@ -155,6 +155,14 @@ export function ForecastPage() {
             selectedModels={settings.selectedModels}
             isLoading={historyLoading || isRunning}
             forecastOrigin={settings.forecastOrigin}
+            overlays={{
+              showMA: settings.showMA,
+              showBB: settings.showBB,
+              showVWAP: settings.showVWAP,
+              showRSI: settings.showRSI,
+              showMACD: settings.showMACD,
+              showATR: settings.showATR,
+            }}
           />
 
           {forecasts.length > 0 && (

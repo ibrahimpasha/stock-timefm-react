@@ -11,14 +11,23 @@ import { BarChart3 } from "lucide-react";
 import type { OHLCV, ModelForecast } from "../../lib/types";
 import { MODEL_COLORS, MODEL_LABELS } from "../../lib/constants";
 
+interface ChartOverlays {
+  showMA: string[];       // e.g. ["MA20", "MA50"]
+  showBB: boolean;
+  showVWAP: boolean;
+  showRSI: boolean;
+  showMACD: boolean;
+  showATR: boolean;
+}
+
 interface ForecastChartProps {
   historicalData: OHLCV[] | undefined;
   forecasts: ModelForecast[];
   selectedModels: string[];
   isLoading: boolean;
   actualPrices?: { date: string; price: number }[];
-  /** Date the forecast was generated (YYYY-MM-DD). Forecasts anchor from this date, not today. */
   forecastOrigin?: string;
+  overlays?: ChartOverlays;
   className?: string;
 }
 
@@ -61,8 +70,12 @@ export function ForecastChart({
   isLoading,
   actualPrices,
   forecastOrigin,
+  overlays,
   className = "",
 }: ForecastChartProps) {
+  const showMA = overlays?.showMA ?? ["MA20", "MA50"];
+  const showBB = overlays?.showBB ?? false;
+  const showRSI = overlays?.showRSI ?? false;
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRefs = useRef<ISeriesApi<"Candlestick" | "Line" | "Histogram" | "Area">[]>([]);
@@ -145,34 +158,88 @@ export function ForecastChart({
     volumeSeries.setData(volumeData);
     seriesRefs.current.push(volumeSeries);
 
-    // --- MA20 line ---
-    const ma20Data = computeMA(historicalData, 20);
-    if (ma20Data.length > 0) {
-      const ma20Series = chart.addLineSeries({
-        color: "#ffa500",
-        lineWidth: 1,
-        lineStyle: LineStyle.Solid,
-        priceLineVisible: false,
-        lastValueVisible: false,
-        crosshairMarkerVisible: false,
-      });
-      ma20Series.setData(ma20Data);
-      seriesRefs.current.push(ma20Series);
+    // --- Moving Averages (configurable) ---
+    const maConfig: Record<string, { period: number; color: string }> = {
+      MA10: { period: 10, color: "#40e0d0" },
+      MA20: { period: 20, color: "#ffa500" },
+      MA50: { period: 50, color: "#bc8cff" },
+      MA100: { period: 100, color: "#58a6ff" },
+      MA200: { period: 200, color: "#f0c040" },
+    };
+    for (const maKey of showMA) {
+      const cfg = maConfig[maKey];
+      if (!cfg) continue;
+      const maData = computeMA(historicalData, cfg.period);
+      if (maData.length > 0) {
+        const maSeries = chart.addLineSeries({
+          color: cfg.color,
+          lineWidth: 1,
+          lineStyle: LineStyle.Solid,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+          title: maKey,
+        });
+        maSeries.setData(maData);
+        seriesRefs.current.push(maSeries);
+      }
     }
 
-    // --- MA50 line ---
-    const ma50Data = computeMA(historicalData, 50);
-    if (ma50Data.length > 0) {
-      const ma50Series = chart.addLineSeries({
-        color: "#bc8cff",
-        lineWidth: 1,
-        lineStyle: LineStyle.Solid,
-        priceLineVisible: false,
-        lastValueVisible: false,
-        crosshairMarkerVisible: false,
+    // --- Bollinger Bands (configurable) ---
+    if (showBB && historicalData.length >= 20) {
+      const bbPeriod = 20;
+      const bbStd = 2;
+      const bbUpper: { time: import("lightweight-charts").Time; value: number }[] = [];
+      const bbLower: { time: import("lightweight-charts").Time; value: number }[] = [];
+      for (let i = bbPeriod - 1; i < historicalData.length; i++) {
+        let sum = 0;
+        for (let j = 0; j < bbPeriod; j++) sum += historicalData[i - j].close;
+        const mean = sum / bbPeriod;
+        let sqSum = 0;
+        for (let j = 0; j < bbPeriod; j++) sqSum += (historicalData[i - j].close - mean) ** 2;
+        const std = Math.sqrt(sqSum / bbPeriod);
+        bbUpper.push({ time: toTime(historicalData[i].date), value: mean + bbStd * std });
+        bbLower.push({ time: toTime(historicalData[i].date), value: mean - bbStd * std });
+      }
+      const bbUpSeries = chart.addLineSeries({
+        color: "rgba(139,148,158,0.4)", lineWidth: 1, lineStyle: LineStyle.Dotted,
+        priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
       });
-      ma50Series.setData(ma50Data);
-      seriesRefs.current.push(ma50Series);
+      const bbLoSeries = chart.addLineSeries({
+        color: "rgba(139,148,158,0.4)", lineWidth: 1, lineStyle: LineStyle.Dotted,
+        priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+      });
+      bbUpSeries.setData(bbUpper);
+      bbLoSeries.setData(bbLower);
+      seriesRefs.current.push(bbUpSeries, bbLoSeries);
+    }
+
+    // --- RSI subplot (configurable) ---
+    if (showRSI && historicalData.length >= 15) {
+      const rsiPeriod = 14;
+      const rsiData: { time: import("lightweight-charts").Time; value: number }[] = [];
+      for (let i = rsiPeriod; i < historicalData.length; i++) {
+        let gains = 0, losses = 0;
+        for (let j = 0; j < rsiPeriod; j++) {
+          const diff = historicalData[i - j].close - historicalData[i - j - 1].close;
+          if (diff > 0) gains += diff; else losses -= diff;
+        }
+        const avgGain = gains / rsiPeriod;
+        const avgLoss = losses / rsiPeriod;
+        const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+        rsiData.push({ time: toTime(historicalData[i].date), value: 100 - 100 / (1 + rs) });
+      }
+      const rsiSeries = chart.addLineSeries({
+        color: "#58a6ff", lineWidth: 1, priceScaleId: "rsi",
+        priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false,
+        title: "RSI",
+      });
+      chart.priceScale("rsi").applyOptions({
+        scaleMargins: { top: 0.80, bottom: 0 },
+      });
+      rsiSeries.setData(rsiData);
+      seriesRefs.current.push(rsiSeries);
+
     }
 
     // --- Forecast lines per model ---
@@ -307,7 +374,7 @@ export function ForecastChart({
 
     // Fit content
     chart.timeScale().fitContent();
-  }, [historicalData, forecasts, selectedModels, actualPrices, forecastOrigin]);
+  }, [historicalData, forecasts, selectedModels, actualPrices, forecastOrigin, showMA, showBB, showRSI]);
 
   // Build chart whenever data changes
   useEffect(() => {
