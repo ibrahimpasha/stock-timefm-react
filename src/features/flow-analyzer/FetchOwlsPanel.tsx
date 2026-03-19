@@ -96,11 +96,17 @@ export function FetchOwlsPanel() {
         );
         clearInterval(pollId);
         const errors = data.errors || [];
-        if (errors.length > 0 && data.images_downloaded === 0) {
+        if (errors.length > 0 && data.images_downloaded === 0 && !data.skipped) {
           newResults.push({
             channel: channelId,
             msg: errors[0],
             ok: false,
+          });
+        } else if (data.skipped) {
+          newResults.push({
+            channel: channelId,
+            msg: `Already analyzed (${data.entries_stored ?? 0} entries from prior run) — skipped`,
+            ok: true,
           });
         } else {
           newResults.push({
