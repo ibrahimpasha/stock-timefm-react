@@ -34,9 +34,9 @@ apiClient.interceptors.response.use(
   }
 );
 
-/** Health check helper */
+/** Health check helper — /health is on root, not /api prefix */
 export async function fetchHealth(): Promise<HealthCheck> {
-  const { data } = await apiClient.get<HealthCheck>("/health");
+  const { data } = await axios.get<HealthCheck>("/health");
   return data;
 }
 

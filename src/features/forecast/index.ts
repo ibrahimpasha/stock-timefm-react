@@ -5,3 +5,5 @@ export { ConsensusBar } from "./ConsensusBar";
 export { MarketContextCards } from "./MarketContextCards";
 export { WatchlistSidebar } from "./WatchlistSidebar";
 export { ForecastActions } from "./ForecastActions";
+export { ForecastConfig, DEFAULT_SETTINGS } from "./ForecastConfig";
+export type { ForecastSettings } from "./ForecastConfig";

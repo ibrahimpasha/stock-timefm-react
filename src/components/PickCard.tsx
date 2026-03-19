@@ -21,7 +21,13 @@ export function PickCard({ pick, onClose }: PickCardProps) {
       : "var(--accent-red)";
   const convictionColor =
     CONVICTION_COLORS[pick.conviction] || "var(--text-secondary)";
-  const pnlColor = changeColor(pick.option_pnl_pct);
+  const pnlColor = changeColor(pick.option_pnl_pct ?? 0);
+  const strike = pick.strike ?? 0;
+  const volOi = pick.vol_oi_ratio ?? 0;
+  const askPct = pick.ask_pct ?? 0;
+  const optEntry = pick.option_entry_premium ?? 0;
+  const optCurrent = pick.option_current_premium ?? 0;
+  const optPnl = pick.option_pnl_pct ?? 0;
 
   return (
     <div className="card flex flex-col gap-3">
@@ -60,7 +66,7 @@ export function PickCard({ pick, onClose }: PickCardProps) {
 
       {/* Contract line */}
       <div className="font-mono text-sm text-text-secondary">
-        {pick.ticker} ${pick.strike} {pick.option_type} {pick.expiry}
+        {pick.ticker} ${strike} {pick.option_type} {pick.expiry}
       </div>
 
       {/* Metrics grid */}
@@ -68,35 +74,35 @@ export function PickCard({ pick, onClose }: PickCardProps) {
         <div>
           <div className="text-text-muted">Entry</div>
           <div className="font-mono text-text-primary">
-            {formatCurrency(pick.option_entry_premium)}
+            {formatCurrency(optEntry)}
           </div>
         </div>
         <div>
           <div className="text-text-muted">Current</div>
           <div className="font-mono text-text-primary">
-            {formatCurrency(pick.option_current_premium)}
+            {formatCurrency(optCurrent)}
           </div>
         </div>
         <div>
           <div className="text-text-muted">P/L</div>
           <div className="font-mono font-semibold" style={{ color: pnlColor }}>
-            {formatPercentRaw(pick.option_pnl_pct)}
+            {formatPercentRaw(optPnl)}
           </div>
         </div>
         <div>
           <div className="text-text-muted">Flow Size</div>
-          <div className="font-mono text-text-primary">{pick.flow_size}</div>
+          <div className="font-mono text-text-primary">{pick.flow_size || "—"}</div>
         </div>
         <div>
           <div className="text-text-muted">Vol/OI</div>
           <div className="font-mono text-text-primary">
-            {pick.vol_oi_ratio.toFixed(1)}x
+            {volOi > 0 ? `${volOi.toFixed(1)}x` : "—"}
           </div>
         </div>
         <div>
           <div className="text-text-muted">Ask %</div>
           <div className="font-mono text-text-primary">
-            {pick.ask_pct.toFixed(0)}%
+            {askPct > 0 ? `${askPct.toFixed(0)}%` : "—"}
           </div>
         </div>
       </div>

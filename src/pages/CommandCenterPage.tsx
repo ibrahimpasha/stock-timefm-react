@@ -21,6 +21,9 @@ import { OwlsTracker } from "../features/flow-analyzer/OwlsTracker";
 // Paper Trading
 import { PaperTrading } from "../features/paper-trading/PaperTrading";
 
+// OWLS Discord Pipeline
+import { FetchOwlsPanel } from "../features/flow-analyzer/FetchOwlsPanel";
+
 import {
   Command,
   Search,
@@ -150,7 +153,12 @@ function FlowTabBar({
 function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
   switch (activeTab) {
     case "chat":
-      return <FlowChat />;
+      return (
+        <div className="space-y-3">
+          <FetchOwlsPanel />
+          <FlowChat />
+        </div>
+      );
     case "picks":
       return <ActivePicks />;
     case "history":

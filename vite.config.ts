@@ -12,6 +12,14 @@ export default defineConfig({
         target: "http://localhost:8001",
         changeOrigin: true,
       },
+      "/health": {
+        target: "http://localhost:8001",
+        changeOrigin: true,
+      },
+      "/predict": {
+        target: "http://localhost:8001",
+        changeOrigin: true,
+      },
       "/ws": {
         target: "ws://localhost:8001",
         ws: true,
