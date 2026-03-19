@@ -39,6 +39,7 @@ export function FetchOwlsPanel() {
     store.webhookUrl || loadSaved(LS_WEBHOOK_KEY)
   );
   const [showToken, setShowToken] = useState(false);
+  const [fetchDate, setFetchDate] = useState(new Date().toISOString().split("T")[0]);
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<
     { channel: string; msg: string; ok: boolean }[]
@@ -89,6 +90,7 @@ export function FetchOwlsPanel() {
             token,
             channel_id: channelId,
             webhook_url: webhook,
+            date: fetchDate,
           },
           { timeout: 600_000 }
         );
@@ -166,6 +168,19 @@ export function FetchOwlsPanel() {
             {showToken ? <EyeOff size={12} /> : <Eye size={12} />}
           </button>
         </div>
+      </div>
+
+      {/* Fetch Date */}
+      <div>
+        <label className="text-[10px] uppercase tracking-wider text-text-muted mb-1 block">
+          Fetch Date
+        </label>
+        <input
+          type="date"
+          value={fetchDate}
+          onChange={(e) => setFetchDate(e.target.value)}
+          className="w-full bg-bg-primary border border-border rounded px-2 py-1.5 text-xs font-mono text-text-primary"
+        />
       </div>
 
       {/* Channel IDs */}
