@@ -187,7 +187,7 @@ export function CommandCenterPage() {
   // Data queries
   const { data: marketPrice, isLoading: priceLoading } = useMarketPrice(ticker);
   const { data: signalResult, isLoading: signalLoading } = useSignal(ticker);
-  const { data: trustScores, isLoading: trustLoading } = useTrustScores(ticker);
+  const { data: trustScores, isLoading: trustLoading } = useTrustScores();
   const { data: snapshot } = useQuery({
     queryKey: ["cc-snapshot", ticker],
     queryFn: () => apiClient.get(`/command-center/snapshot?ticker=${ticker}`).then((r) => r.data),
@@ -254,23 +254,7 @@ export function CommandCenterPage() {
         </div>
       </div>
 
-      {/* Flow Analyzer Section */}
-      <div className="card">
-        {/* Tab bar */}
-        <FlowTabBar activeTab={activeFlowTab} onTabChange={setActiveFlowTab} />
-
-        {/* Flow alerts - always visible above tab content */}
-        <div className="mt-3 mb-3">
-          <FlowAlerts />
-        </div>
-
-        {/* Tab content */}
-        <div className="mt-3">
-          <FlowTabContent activeTab={activeFlowTab} />
-        </div>
-      </div>
-
-      {/* Bottom row: Model Breakdown + Trust Scores + Intelligence */}
+      {/* Model Breakdown + Trust Scores + Intelligence */}
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-12 md:col-span-4">
           <ModelBreakdown
@@ -290,6 +274,19 @@ export function CommandCenterPage() {
             thesis={thesis ?? null}
             isLoading={isSignalLoading}
           />
+        </div>
+      </div>
+
+      {/* Options Flow Analyzer */}
+      <div className="card">
+        <FlowTabBar activeTab={activeFlowTab} onTabChange={setActiveFlowTab} />
+
+        <div className="mt-3 mb-3">
+          <FlowAlerts />
+        </div>
+
+        <div className="mt-3">
+          <FlowTabContent activeTab={activeFlowTab} />
         </div>
       </div>
     </div>
