@@ -273,6 +273,7 @@ export function CommandCenterPage() {
           <IntelligencePanel
             thesis={thesis ?? null}
             isLoading={isSignalLoading}
+            currentPrice={currentPrice}
           />
         </div>
       </div>
