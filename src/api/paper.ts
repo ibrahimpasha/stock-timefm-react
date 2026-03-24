@@ -11,6 +11,8 @@ import type {
 
 /* ── Queries ──────────────────────────────────────────────── */
 
+const POLL_INTERVAL = 30_000; // 30s auto-refresh
+
 export function usePortfolio() {
   return useQuery({
     queryKey: ["paper", "portfolio"],
@@ -21,6 +23,7 @@ export function usePortfolio() {
       return data;
     },
     staleTime: STALE_TIMES.flow,
+    refetchInterval: POLL_INTERVAL,
   });
 }
 
@@ -34,6 +37,7 @@ export function useWatchlist() {
       return data;
     },
     staleTime: STALE_TIMES.flow,
+    refetchInterval: POLL_INTERVAL,
   });
 }
 
@@ -47,6 +51,7 @@ export function usePositions(status: "open" | "closed" = "open") {
       return data;
     },
     staleTime: STALE_TIMES.flow,
+    refetchInterval: POLL_INTERVAL,
   });
 }
 
@@ -58,6 +63,7 @@ export function useTradeLog() {
       return data;
     },
     staleTime: STALE_TIMES.flow,
+    refetchInterval: POLL_INTERVAL,
   });
 }
 
@@ -71,6 +77,7 @@ export function usePortfolioHistory(days: number = 30) {
       return data;
     },
     staleTime: STALE_TIMES.flow,
+    refetchInterval: 60_000, // 1min for history
   });
 }
 
