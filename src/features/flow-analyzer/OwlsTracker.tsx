@@ -1,8 +1,11 @@
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTrackedTickers, useFlowEntries, useFlowPicks } from "../../api/flow";
+import apiClient from "../../api/client";
 import { BullBearBar } from "../../components/BullBearBar";
 import { PickCard } from "../../components/PickCard";
 import { formatDate, formatCurrency } from "../../lib/utils";
+import { STALE_TIMES } from "../../lib/constants";
 import {
   Eye,
   Search,
@@ -13,8 +16,31 @@ import {
   BarChart3,
   Clock,
   Loader2,
+  Calendar,
 } from "lucide-react";
 import type { TrackedTicker, FlowEntry } from "../../lib/types";
+
+/* ── OWLS date hooks ─────────────────────────────────────── */
+
+function useOwlsDates() {
+  return useQuery<{ dates: { date: string; entries: number; images: number; channels: string[] }[] }>({
+    queryKey: ["owls", "dates"],
+    queryFn: () => apiClient.get("/flow/owls/dates").then((r) => r.data),
+    staleTime: STALE_TIMES.flow,
+  });
+}
+
+function useOwlsSummary(date: string) {
+  return useQuery<{
+    date: string; total_entries: number; bull_count: number; bear_count: number;
+    net_sentiment: string; tickers: { ticker: string; count: number; bull: number; bear: number; total_premium: number }[];
+  }>({
+    queryKey: ["owls", "summary", date],
+    queryFn: () => apiClient.get(`/flow/owls/summary?date=${date}`).then((r) => r.data),
+    staleTime: STALE_TIMES.flow,
+    enabled: !!date,
+  });
+}
 
 /* ── Bias Filter ─────────────────────────────────────────── */
 
@@ -276,13 +302,40 @@ export function OwlsTracker() {
   const [minContracts, setMinContracts] = useState(2);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState<string>(""); // "" = all dates (DB), "2026-03-24" = OWLS date
 
-  const { data: tickers, isLoading } = useTrackedTickers(30, minContracts);
+  const { data: owlsDates } = useOwlsDates();
+  const { data: owlsSummary, isLoading: owlsLoading } = useOwlsSummary(dateFilter);
+  const { data: tickers, isLoading: tickersLoading } = useTrackedTickers(30, minContracts);
+
+  const isLoading = dateFilter ? owlsLoading : tickersLoading;
+
+  // When a date is selected, convert OWLS summary tickers into TrackedTicker shape
+  const activeTickers: TrackedTicker[] = useMemo(() => {
+    if (dateFilter && owlsSummary) {
+      return owlsSummary.tickers.map((t) => ({
+        ticker: t.ticker,
+        total_entries: t.count,
+        bullish: t.bull,
+        bearish: t.bear,
+        net_premium: t.total_premium > 1_000_000
+          ? `$${(t.total_premium / 1_000_000).toFixed(1)}M`
+          : t.total_premium > 1_000
+          ? `$${(t.total_premium / 1_000).toFixed(0)}K`
+          : `$${t.total_premium.toFixed(0)}`,
+      }));
+    }
+    return tickers ?? [];
+  }, [dateFilter, owlsSummary, tickers]);
 
   // Apply filters
   const filteredTickers = useMemo(() => {
-    if (!tickers) return [];
-    let filtered = [...tickers];
+    let filtered = [...activeTickers];
+
+    // Min entries filter (only for all-dates view)
+    if (!dateFilter) {
+      filtered = filtered.filter((t) => t.total_entries >= minContracts);
+    }
 
     // Bias filter
     if (biasFilter === "bullish") {
@@ -301,7 +354,7 @@ export function OwlsTracker() {
     filtered.sort((a, b) => b.total_entries - a.total_entries);
 
     return filtered;
-  }, [tickers, biasFilter, searchQuery, minContracts]);
+  }, [activeTickers, biasFilter, searchQuery, minContracts, dateFilter]);
 
   const selectedData = filteredTickers.find((t) => t.ticker === selectedTicker);
 
@@ -320,8 +373,35 @@ export function OwlsTracker() {
 
   return (
     <div>
-      {/* Search bar */}
-      <div className="flex items-center gap-2 mb-3">
+      {/* Date filter + Search bar */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <div className="flex items-center rounded-lg border border-border overflow-hidden">
+          <button
+            onClick={() => { setDateFilter(""); setSelectedTicker(null); }}
+            className="px-3 py-1.5 text-xs font-semibold transition-colors"
+            style={{
+              background: !dateFilter ? "rgba(88,166,255,0.15)" : "transparent",
+              color: !dateFilter ? "var(--accent-blue)" : "var(--text-muted)",
+            }}
+          >
+            All Dates
+          </button>
+          {(owlsDates?.dates ?? []).slice(0, 7).map((d) => (
+            <button
+              key={d.date}
+              onClick={() => { setDateFilter(d.date); setSelectedTicker(null); }}
+              className="px-2.5 py-1.5 text-xs font-mono transition-colors border-l border-border"
+              style={{
+                background: dateFilter === d.date ? "rgba(88,166,255,0.15)" : "transparent",
+                color: dateFilter === d.date ? "var(--accent-blue)" : "var(--text-muted)",
+              }}
+            >
+              {d.date.slice(5)}
+              <span className="ml-1 opacity-60">{d.entries}</span>
+            </button>
+          ))}
+        </div>
+
         <div className="flex items-center gap-2 rounded-lg border border-border bg-bg-primary px-3 py-1.5 flex-1 max-w-xs focus-within:border-accent-blue transition-colors">
           <Search size={14} className="text-text-muted" />
           <input
@@ -333,7 +413,12 @@ export function OwlsTracker() {
           />
         </div>
         <span className="text-xs text-text-muted">
-          {filteredTickers.length} tickers tracked
+          {filteredTickers.length} tickers
+          {dateFilter && owlsSummary && (
+            <> — <span style={{ color: owlsSummary.net_sentiment === "BULLISH" ? "var(--accent-green)" : owlsSummary.net_sentiment === "BEARISH" ? "var(--accent-red)" : "var(--accent-orange)" }}>
+              {owlsSummary.net_sentiment}
+            </span> ({owlsSummary.bull_count}B / {owlsSummary.bear_count}R)</>
+          )}
         </span>
       </div>
 
