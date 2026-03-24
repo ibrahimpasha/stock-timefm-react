@@ -137,7 +137,7 @@ function WatchlistSection({ items }: { items: WatchlistItem[] }) {
       </h4>
       <div className="space-y-1.5">
         {items.map((item) => {
-          const dipColor = changeColor(-Math.abs(item.dip_pct));
+          const dipColor = changeColor(item.dip_pct);
           return (
             <div
               key={item.id}
