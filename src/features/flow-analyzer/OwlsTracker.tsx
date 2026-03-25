@@ -42,6 +42,102 @@ function useOwlsSummary(date: string) {
   });
 }
 
+function useOwlsDateEntries(date: string) {
+  return useQuery<{ entries: any[]; total: number; raw_total: number }>({
+    queryKey: ["owls", "entries-all", date],
+    queryFn: () => apiClient.get(`/flow/owls/entries?date=${date}`).then((r) => r.data),
+    staleTime: STALE_TIMES.flow,
+    enabled: !!date,
+  });
+}
+
+/* ── Top Picks for a Date ─────────────────────────────────── */
+
+function DayTopPicks({ date }: { date: string }) {
+  const { data } = useOwlsDateEntries(date);
+  if (!data || !data.entries.length) return null;
+
+  // Score entries and pick top conviction ones
+  const scored = data.entries
+    .filter((e: any) => e.vol_oi_ratio > 0 || e.ask_pct > 0)
+    .map((e: any) => {
+      let score = 0;
+      const premium = parsePremium(e.premium || "$0");
+      const volOi = e.vol_oi_ratio || 0;
+      const askPct = e.ask_pct || 0;
+      const dte = e.dte || 0;
+      const side = e.side || "";
+      const optType = (e.type || e.option_type || "").toUpperCase();
+
+      // Premium
+      if (premium >= 5_000_000) score += 2.5;
+      else if (premium >= 1_000_000) score += 2.0;
+      else if (premium >= 500_000) score += 1.5;
+      else if (premium >= 200_000) score += 1.0;
+      // Ask%
+      if (askPct >= 90) score += 2.0;
+      else if (askPct >= 75) score += 1.5;
+      else if (askPct >= 50) score += 1.0;
+      // Vol/OI
+      if (volOi >= 100) score += 3.0;
+      else if (volOi >= 10) score += 2.0;
+      else if (volOi >= 5) score += 1.5;
+      else if (volOi >= 2) score += 1.0;
+      // Side match
+      if ((side === "Bear" && optType.includes("PUT")) || (side === "Bull" && optType.includes("CALL"))) score += 1.5;
+      // DTE
+      if (dte < 3) score -= 3.0;
+      else if (dte < 7) score -= 1.5;
+      else if (dte >= 90) score += 0.5;
+
+      return { ...e, _score: score };
+    })
+    .filter((e: any) => e._score >= 7.0)
+    .sort((a: any, b: any) => b._score - a._score)
+    .slice(0, 15);
+
+  if (scored.length === 0) return null;
+
+  return (
+    <div className="mb-4">
+      <h4 className="text-xs font-semibold text-accent-green uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        <TrendingUp size={12} />
+        Top Conviction Flow — {formatDate(date)} ({scored.length})
+      </h4>
+      <div className="space-y-1">
+        {scored.map((e: any, i: number) => {
+          const sideColor = (e.side || "").includes("Bull") ? "var(--accent-green)" : "var(--accent-red)";
+          const isMega = (parsePremium(e.premium || "$0") >= 1_000_000) && (e.vol_oi_ratio >= 10) && (e.ask_pct >= 95);
+          return (
+            <div key={i} className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
+                 style={{
+                   background: isMega ? "rgba(63,185,80,0.08)" : "rgba(48,54,61,0.12)",
+                   border: isMega ? "1px solid rgba(63,185,80,0.25)" : "1px solid transparent",
+                 }}>
+              <span className="font-mono text-[10px] font-bold text-accent-cyan w-6">{e._score.toFixed(1)}</span>
+              <span className="font-mono font-bold text-text-primary w-14">{e.ticker}</span>
+              <span className="font-mono text-text-primary">${e.strike} {e.type || e.option_type}</span>
+              <span style={{ color: sideColor }} className="font-semibold">{e.side}</span>
+              <span className="text-text-muted">{e.expiry}</span>
+              {e.vol_oi_ratio > 0 && <span className="text-accent-cyan font-mono">{e.vol_oi_ratio.toFixed(1)}x</span>}
+              {e.ask_pct > 0 && <span className="text-accent-orange font-mono">{e.ask_pct}%ask</span>}
+              <span className="text-text-secondary ml-auto font-mono">{e.premium}</span>
+              {isMega && <span className="text-[9px] font-bold text-accent-green">🔥MEGA</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function parsePremium(s: string): number {
+  const clean = s.replace("$", "").replace(/,/g, "").trim();
+  if (clean.toUpperCase().endsWith("M")) return parseFloat(clean) * 1_000_000;
+  if (clean.toUpperCase().endsWith("K")) return parseFloat(clean) * 1_000;
+  return parseFloat(clean) || 0;
+}
+
 /* ── Bias Filter ─────────────────────────────────────────── */
 
 type BiasFilter = "all" | "bullish" | "bearish";
@@ -243,11 +339,65 @@ function TickerDetail({
         <BullBearBar bull={trackedData.bullish} total={total} height={12} />
       </div>
 
-      {/* Flow entries grouped by date — with picks shown at top of each date */}
+      {/* Picks for this ticker */}
+      {(() => {
+        const allTickerPicks = [...(tickerPicks || []), ...(closedPicks ?? []).filter((p) => p.ticker === ticker)];
+        if (allTickerPicks.length === 0) return null;
+        return (
+          <div>
+            <h4 className="text-xs font-semibold text-accent-blue uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <BarChart3 size={12} />
+              Picks ({allTickerPicks.length})
+            </h4>
+            <div className="space-y-1">
+              {allTickerPicks.map((pick) => {
+                const pnlColor = (pick.option_pnl_pct ?? pick.pnl_pct ?? 0) >= 0 ? "var(--accent-green)" : "var(--accent-red)";
+                const pnl = pick.option_pnl_pct ?? pick.pnl_pct ?? 0;
+                const isOpen = pick.status === "open";
+                const isPickExpanded = expandedPick === pick.id;
+                return (
+                  <div key={pick.id}
+                    className="rounded-lg px-3 py-2 cursor-pointer transition-all"
+                    style={{
+                      background: isOpen ? "rgba(88,166,255,0.06)" : "rgba(48,54,61,0.12)",
+                      border: `1px solid ${isOpen ? "rgba(88,166,255,0.2)" : "var(--border)"}`,
+                    }}
+                    onClick={() => setExpandedPick(isPickExpanded ? null : pick.id)}
+                  >
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-bold" style={{ color: pick.direction === "bullish" ? "var(--accent-green)" : "var(--accent-red)" }}>
+                        {pick.direction === "bullish" ? "🐂" : "🐻"} {pick.conviction?.toUpperCase()}
+                      </span>
+                      <span className="font-mono text-text-primary">
+                        ${pick.strike} {pick.option_type}
+                      </span>
+                      <span className="text-text-muted">{pick.expiry}</span>
+                      <span className="ml-auto font-mono font-semibold" style={{ color: pnlColor }}>
+                        {pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}%
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${isOpen ? "bg-accent-blue/15 text-accent-blue" : "bg-text-muted/15 text-text-muted"}`}>
+                        {isOpen ? "OPEN" : "CLOSED"}
+                      </span>
+                    </div>
+                    {isPickExpanded && pick.rationale && (
+                      <div className="mt-2 text-[10px] text-text-secondary leading-relaxed"
+                           style={{ background: "rgba(13,17,23,0.5)", borderRadius: 6, padding: "6px 8px" }}>
+                        {pick.rationale}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Flow entries grouped by date */}
       <div>
         <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2 flex items-center gap-1.5">
           <Clock size={12} />
-          Flow History & Picks
+          Flow History
         </h4>
 
         {entriesLoading ? (
@@ -261,64 +411,11 @@ function TickerDetail({
           </p>
         ) : (
           <div className="space-y-3">
-            {dateKeys.map((date) => {
-              // Get picks for this ticker that were created on this date
-              const allTickerPicks = [...(tickerPicks || []), ...(closedPicks ?? []).filter((p) => p.ticker === ticker)];
-              const datePicks = allTickerPicks.filter((p) => {
-                const pickDate = p.entry_date || (p.created_at ?? "").split(" ")[0] || "";
-                return pickDate === date;
-              });
-
-              return (
+            {dateKeys.map((date) => (
               <div key={date}>
                 <div className="text-xs font-semibold text-text-secondary mb-1.5">
                   {formatDate(date)}
                 </div>
-
-                {/* Picks for this date */}
-                {datePicks.length > 0 && (
-                  <div className="mb-2 space-y-1">
-                    {datePicks.map((pick) => {
-                      const pnlColor = (pick.option_pnl_pct ?? pick.pnl_pct ?? 0) >= 0 ? "var(--accent-green)" : "var(--accent-red)";
-                      const pnl = pick.option_pnl_pct ?? pick.pnl_pct ?? 0;
-                      const isOpen = pick.status === "open";
-                      const isPickExpanded = expandedPick === pick.id;
-                      return (
-                        <div key={pick.id}
-                          className="rounded-lg px-3 py-2 cursor-pointer transition-all"
-                          style={{
-                            background: isOpen ? "rgba(88,166,255,0.06)" : "rgba(48,54,61,0.12)",
-                            border: `1px solid ${isOpen ? "rgba(88,166,255,0.2)" : "var(--border)"}`,
-                          }}
-                          onClick={() => setExpandedPick(isPickExpanded ? null : pick.id)}
-                        >
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="font-bold" style={{ color: pick.direction === "bullish" ? "var(--accent-green)" : "var(--accent-red)" }}>
-                              {pick.direction === "bullish" ? "🐂" : "🐻"} {pick.conviction?.toUpperCase()}
-                            </span>
-                            <span className="font-mono text-text-primary">
-                              ${pick.strike} {pick.option_type}
-                            </span>
-                            <span className="text-text-muted">{pick.expiry}</span>
-                            <span className="ml-auto font-mono font-semibold" style={{ color: pnlColor }}>
-                              {pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}%
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${isOpen ? "bg-accent-blue/15 text-accent-blue" : "bg-text-muted/15 text-text-muted"}`}>
-                              {isOpen ? "OPEN" : "CLOSED"}
-                            </span>
-                          </div>
-                          {isPickExpanded && pick.rationale && (
-                            <div className="mt-2 text-[10px] text-text-secondary leading-relaxed"
-                                 style={{ background: "rgba(13,17,23,0.5)", borderRadius: 6, padding: "6px 8px" }}>
-                              {pick.rationale}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
                 <div className="space-y-1 pl-2 border-l-2 border-border">
                   {groupedEntries[date].map((entry: any, idx: number) => {
                     const sideColor =
@@ -380,8 +477,7 @@ function TickerDetail({
                   })}
                 </div>
               </div>
-              );
-            })}
+            ))}
           </div>
         )}
       </div>
@@ -523,6 +619,9 @@ export function OwlsTracker() {
         minContracts={minContracts}
         onMinContractsChange={setMinContracts}
       />
+
+      {/* Top conviction picks for selected date */}
+      {dateFilter && <DayTopPicks date={dateFilter} />}
 
       <div className="grid grid-cols-12 gap-4">
         {/* Ticker grid */}
