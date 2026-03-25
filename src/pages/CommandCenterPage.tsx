@@ -45,9 +45,8 @@ type FlowTab = "chat" | "picks" | "history" | "owls" | "paper" | "flow-trader";
 
 const FLOW_TABS: { id: FlowTab; label: string; icon: React.ElementType }[] = [
   { id: "chat", label: "Flow Chat", icon: MessageCircle },
-  { id: "picks", label: "Active Picks", icon: Target },
-  { id: "history", label: "History", icon: History },
   { id: "owls", label: "OWLS Tracker", icon: Eye },
+  { id: "history", label: "History", icon: History },
   { id: "paper", label: "Paper Trading", icon: Wallet },
   { id: "flow-trader", label: "Flow Trader", icon: Zap },
 ];
