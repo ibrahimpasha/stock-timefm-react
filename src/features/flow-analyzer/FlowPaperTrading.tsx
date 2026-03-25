@@ -100,6 +100,7 @@ export function FlowPaperTrading() {
   const queryClient = useQueryClient();
   const { data: summary, isLoading } = useFlowPaperSummary();
   const [showAllWatchlist, setShowAllWatchlist] = useState(false);
+  const [expandedPos, setExpandedPos] = useState<number | null>(null);
 
   const scanMutation = useMutation({
     mutationFn: () => apiClient.post("/flow-paper/scan"),
@@ -328,12 +329,18 @@ export function FlowPaperTrading() {
                 pos.side === "Bull"
                   ? "var(--accent-green)"
                   : "var(--accent-red)";
+              const isExpanded = expandedPos === pos.id;
+              const pnlDollars = pos.pnl_dollars ?? ((pos.current_value ?? 0) - pos.cost_basis);
+              const stopTarget = pos.entry_premium * 0.7;
+              const tp1Target = pos.entry_premium * 1.5;
+              const tp2Target = pos.entry_premium * 2.0;
 
               return (
                 <div
                   key={pos.id}
-                  className="card"
+                  className="card cursor-pointer transition-all hover:brightness-110"
                   style={{ borderLeft: `3px solid ${sideColor}` }}
+                  onClick={() => setExpandedPos(isExpanded ? null : pos.id)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -374,6 +381,94 @@ export function FlowPaperTrading() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Expanded details */}
+                  {isExpanded && (
+                    <div className="mt-3 pt-3 border-t border-border space-y-2">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                        <div>
+                          <div className="text-text-muted">Side</div>
+                          <div className="font-mono font-semibold" style={{ color: sideColor }}>
+                            {pos.side === "Bull" ? "🐂 Bullish" : "🐻 Bearish"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted">Entry Premium</div>
+                          <div className="font-mono text-text-primary">${pos.entry_premium?.toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted">Current Premium</div>
+                          <div className="font-mono" style={{ color: pnlColor }}>
+                            ${pos.current_premium?.toFixed(2)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted">P/L $</div>
+                          <div className="font-mono font-semibold" style={{ color: pnlColor }}>
+                            {pnlDollars >= 0 ? "+" : ""}${pnlDollars.toFixed(0)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted">Entry Date</div>
+                          <div className="font-mono text-text-primary">{pos.entry_date}</div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted">Hold Days</div>
+                          <div className="font-mono text-text-primary">{pos.hold_days ?? "—"}</div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted">Expiry</div>
+                          <div className="font-mono text-text-primary">{pos.expiry}</div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted">Score</div>
+                          <div className="font-mono text-accent-blue">{(pos.score / 10).toFixed(1)}</div>
+                        </div>
+                      </div>
+
+                      {/* Exit targets */}
+                      <div className="flex items-center gap-3 text-[10px] font-mono pt-1">
+                        <span className="text-text-muted">Targets:</span>
+                        <span className="text-accent-red">
+                          Stop ${stopTarget.toFixed(2)} (-30%)
+                        </span>
+                        <span className="text-accent-orange">
+                          TP1 ${tp1Target.toFixed(2)} (+50%)
+                        </span>
+                        <span className="text-accent-green">
+                          TP2 ${tp2Target.toFixed(2)} (+100%)
+                        </span>
+                      </div>
+
+                      {/* Progress bar: stop ← current → TP2 */}
+                      <div className="relative h-2 rounded-full bg-border overflow-hidden">
+                        {(() => {
+                          const range = tp2Target - stopTarget;
+                          const pos_pct = range > 0
+                            ? Math.max(0, Math.min(100, ((pos.current_premium ?? pos.entry_premium) - stopTarget) / range * 100))
+                            : 50;
+                          const tp1_pct = range > 0 ? ((tp1Target - stopTarget) / range * 100) : 66;
+                          return (
+                            <>
+                              <div
+                                className="absolute h-full rounded-full transition-all"
+                                style={{
+                                  width: `${pos_pct}%`,
+                                  background: pos.pnl_pct >= 0
+                                    ? "var(--accent-green)"
+                                    : "var(--accent-red)",
+                                }}
+                              />
+                              <div
+                                className="absolute h-full w-px bg-accent-orange"
+                                style={{ left: `${tp1_pct}%` }}
+                              />
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
