@@ -150,6 +150,16 @@ function TickerGridCard({
 
 /* ── Ticker Detail Panel ─────────────────────────────────── */
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function useOwlsTickerEntries(ticker: string) {
+  return useQuery<{ entries: any[]; total: number }>({
+    queryKey: ["owls", "entries", "ticker", ticker],
+    queryFn: () => apiClient.get(`/flow/owls/entries?ticker=${ticker}`).then((r) => r.data),
+    staleTime: STALE_TIMES.flow,
+    enabled: !!ticker,
+  });
+}
+
 function TickerDetail({
   ticker,
   trackedData,
@@ -157,20 +167,32 @@ function TickerDetail({
   ticker: string;
   trackedData: TrackedTicker;
 }) {
-  const { data: entries, isLoading: entriesLoading } = useFlowEntries(ticker);
+  const { data: dbEntries, isLoading: dbLoading } = useFlowEntries(ticker);
+  const { data: owlsData, isLoading: owlsLoading } = useOwlsTickerEntries(ticker);
   const { data: allPicks } = useFlowPicks("open");
+  const [expandedEntry, setExpandedEntry] = useState<number | null>(null);
+
+  const entriesLoading = dbLoading || owlsLoading;
+
+  // Merge: prefer OWLS entries (have vol_oi, ask%, analysis), fallback to DB entries
+  const mergedEntries = useMemo(() => {
+    const owlsEntries = owlsData?.entries ?? [];
+    const fallback = dbEntries ?? [];
+    // Use OWLS if available, else DB
+    if (owlsEntries.length > 0) return owlsEntries;
+    return fallback;
+  }, [owlsData, dbEntries]);
 
   // Group entries by date
   const groupedEntries = useMemo(() => {
-    if (!entries) return {};
-    const groups: Record<string, FlowEntry[]> = {};
-    entries.forEach((entry) => {
-      const date = entry.flow_date || (entry.created_at ?? "").split(" ")[0] || "unknown";
+    const groups: Record<string, any[]> = {};
+    mergedEntries.forEach((entry: any) => {
+      const date = entry._date || entry.flow_date || (entry.created_at ?? "").split(" ")[0] || "unknown";
       if (!groups[date]) groups[date] = [];
       groups[date].push(entry);
     });
     return groups;
-  }, [entries]);
+  }, [mergedEntries]);
 
   const dateKeys = Object.keys(groupedEntries).sort().reverse();
 
@@ -258,30 +280,61 @@ function TickerDetail({
                   {formatDate(date)}
                 </div>
                 <div className="space-y-1 pl-2 border-l-2 border-border">
-                  {groupedEntries[date].map((entry) => {
+                  {groupedEntries[date].map((entry: any, idx: number) => {
                     const sideColor =
-                      entry.side.toLowerCase().includes("bull")
+                      (entry.side || "").toLowerCase().includes("bull")
                         ? "var(--accent-green)"
                         : "var(--accent-red)";
+                    const optType = entry.option_type || entry.type || "";
+                    const volOi = entry.vol_oi_ratio;
+                    const askPct = entry.ask_pct;
+                    const entryKey = `${date}-${idx}`;
+                    const isExpanded = expandedEntry === idx && dateKeys[0] === date;
+
                     return (
-                      <div
-                        key={entry.id}
-                        className="flex items-center gap-2 text-xs py-1 px-2 rounded hover:bg-bg-card-hover transition-colors"
-                      >
-                        <span
-                          className="font-mono font-semibold w-12 shrink-0"
-                          style={{ color: sideColor }}
+                      <div key={entryKey}>
+                        <div
+                          className="flex items-center gap-2 text-xs py-1.5 px-2 rounded hover:bg-bg-card-hover transition-colors cursor-pointer"
+                          onClick={() => setExpandedEntry(isExpanded ? null : idx)}
                         >
-                          {entry.side}
-                        </span>
-                        <span className="font-mono text-text-primary">
-                          ${entry.strike} {entry.option_type}
-                        </span>
-                        <span className="text-text-muted">{entry.expiry}</span>
-                        <span className="text-text-secondary ml-auto">
-                          {entry.premium}
-                        </span>
-                        <span className="text-text-muted">{entry.size}</span>
+                          <span
+                            className="font-mono font-semibold w-10 shrink-0"
+                            style={{ color: sideColor }}
+                          >
+                            {entry.side}
+                          </span>
+                          <span className="font-mono font-bold text-text-primary">
+                            ${entry.strike} {optType}
+                          </span>
+                          <span className="text-text-muted">{entry.expiry}</span>
+                          {volOi != null && volOi > 0 && (
+                            <span className="text-accent-cyan font-mono">
+                              {volOi.toFixed(1)}x
+                            </span>
+                          )}
+                          {askPct != null && askPct > 0 && (
+                            <span className="text-accent-orange font-mono">
+                              {askPct}%ask
+                            </span>
+                          )}
+                          <span className="text-text-secondary ml-auto font-mono">
+                            {entry.premium}
+                          </span>
+                        </div>
+                        {/* Expanded analysis */}
+                        {isExpanded && entry.analysis && (
+                          <div className="ml-12 mr-2 mb-2 px-2 py-1.5 rounded text-[10px] text-text-secondary leading-relaxed"
+                               style={{ background: "rgba(13,17,23,0.5)" }}>
+                            {entry.analysis}
+                            {entry.underlying_price && (
+                              <div className="mt-1 font-mono text-text-muted">
+                                Underlying: ${entry.underlying_price}
+                                {entry.avg_price ? ` · Avg fill: $${entry.avg_price}` : ""}
+                                {entry.dte ? ` · ${entry.dte} DTE` : ""}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
