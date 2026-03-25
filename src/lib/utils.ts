@@ -40,7 +40,14 @@ export function formatDate(
   date: string | Date,
   options?: Intl.DateTimeFormatOptions
 ): string {
-  const d = typeof date === "string" ? new Date(date) : date;
+  let d: Date;
+  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    // "YYYY-MM-DD" → parse as local date, not UTC (avoids off-by-one in US timezones)
+    const [y, m, day] = date.split("-").map(Number);
+    d = new Date(y, m - 1, day);
+  } else {
+    d = typeof date === "string" ? new Date(date) : date;
+  }
   return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
