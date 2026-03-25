@@ -57,7 +57,7 @@ export const DEFAULT_SETTINGS: ForecastSettings = {
   interval: "4h",
   historyDays: 365,
   historyPeriod: "60d",
-  selectedModels: ["dlinear", "itransformer", "timemixer", "timexer"],
+  selectedModels: ["dlinear", "patchtst", "itransformer", "timemixer", "timexer", "timesnet", "tide"],
   useCovariates: true,
   usePretrained: true,
   forecastOrigin: new Date().toISOString().split("T")[0],
