@@ -440,6 +440,14 @@ export function FlowPaperTrading() {
                         </span>
                       </div>
 
+                      {/* Analysis / Reasoning */}
+                      {pos.analysis && (
+                        <div className="text-[10px] text-text-secondary leading-relaxed rounded-md px-2 py-1.5"
+                             style={{ background: "rgba(13,17,23,0.5)" }}>
+                          {pos.analysis}
+                        </div>
+                      )}
+
                       {/* Progress bar: stop ← current → TP2 */}
                       <div className="relative h-2 rounded-full bg-border overflow-hidden">
                         {(() => {
