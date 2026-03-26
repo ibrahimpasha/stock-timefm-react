@@ -4,6 +4,7 @@ import { useAppStore } from "../store/useAppStore";
 import { useMarketPrice } from "../api/forecast";
 import { useSignal, useGenerateSignal } from "../api/signals";
 import { useTrustScores } from "../api/eval";
+import { useFlowAlerts } from "../api/flow";
 import apiClient from "../api/client";
 
 // Command Center feature components
@@ -31,6 +32,7 @@ import {
   MessageCircle,
   Target,
   Eye,
+  Bell,
 } from "lucide-react";
 
 /* ── Tab definitions ─────────────────────────────────────── */
@@ -145,6 +147,25 @@ function FlowTabBar({
 
 /* ── Flow Tab Content ────────────────────────────────────── */
 
+function AlertBellInner({ onClick, isOpen }: { onClick: () => void; isOpen: boolean }) {
+  const { data: alerts } = useFlowAlerts();
+  const count = alerts?.length ?? 0;
+  return (
+    <button
+      onClick={onClick}
+      className="relative p-1.5 rounded-lg transition-colors hover:bg-bg-card-hover"
+      style={{ color: count > 0 ? "var(--accent-orange)" : "var(--text-muted)" }}
+    >
+      <Bell size={16} fill={isOpen ? "currentColor" : "none"} />
+      {count > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-accent-orange text-bg-primary text-[10px] font-bold flex items-center justify-center">
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
 function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
   switch (activeTab) {
     case "chat":
@@ -168,6 +189,7 @@ function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
 export function CommandCenterPage() {
   const ticker = useAppStore((s) => s.activeTicker);
   const [activeFlowTab, setActiveFlowTab] = useState<FlowTab>("flow-trader");
+  const [showAlerts, setShowAlerts] = useState(false);
 
   // Data queries
   const { data: marketPrice, isLoading: priceLoading } = useMarketPrice(ticker);
@@ -251,11 +273,16 @@ export function CommandCenterPage() {
         {/* Right column: Flow Analyzer (wider, primary workspace) */}
         <div className="col-span-12 lg:col-span-8">
           <div className="card sticky top-4">
-            <FlowTabBar activeTab={activeFlowTab} onTabChange={setActiveFlowTab} />
-
-            <div className="mt-3 mb-3">
-              <FlowAlerts />
+            <div className="flex items-center justify-between">
+              <FlowTabBar activeTab={activeFlowTab} onTabChange={setActiveFlowTab} />
+              <AlertBellInner onClick={() => setShowAlerts(!showAlerts)} isOpen={showAlerts} />
             </div>
+
+            {showAlerts && (
+              <div className="mt-3 mb-3">
+                <FlowAlerts />
+              </div>
+            )}
 
             <div className="mt-3 max-h-[calc(100vh-180px)] overflow-y-auto pr-1">
               <FlowTabContent activeTab={activeFlowTab} />
