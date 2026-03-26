@@ -114,7 +114,7 @@ function DayTopPicks({ date }: { date: string }) {
                    background: isMega ? "rgba(63,185,80,0.08)" : "rgba(48,54,61,0.12)",
                    border: isMega ? "1px solid rgba(63,185,80,0.25)" : "1px solid transparent",
                  }}>
-              <span className="font-mono text-[10px] font-bold text-accent-cyan w-6">{e._score.toFixed(1)}</span>
+              <span className="font-mono text-xs font-bold text-accent-cyan w-6">{e._score.toFixed(1)}</span>
               <span className="font-mono font-bold text-text-primary w-14">{e.ticker}</span>
               <span className="font-mono text-text-primary">${e.strike} {e.type || e.option_type}</span>
               <span style={{ color: sideColor }} className="font-semibold">{e.side}</span>
@@ -122,7 +122,7 @@ function DayTopPicks({ date }: { date: string }) {
               {e.vol_oi_ratio > 0 && <span className="text-accent-cyan font-mono">{e.vol_oi_ratio.toFixed(1)}x</span>}
               {e.ask_pct > 0 && <span className="text-accent-orange font-mono">{e.ask_pct}%ask</span>}
               <span className="text-text-secondary ml-auto font-mono">{e.premium}</span>
-              {isMega && <span className="text-[9px] font-bold text-accent-green">🔥MEGA</span>}
+              {isMega && <span className="text-xs font-bold text-accent-green">🔥MEGA</span>}
             </div>
           );
         })}
@@ -375,12 +375,12 @@ function TickerDetail({
                       <span className="ml-auto font-mono font-semibold" style={{ color: pnlColor }}>
                         {pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}%
                       </span>
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${isOpen ? "bg-accent-blue/15 text-accent-blue" : "bg-text-muted/15 text-text-muted"}`}>
+                      <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${isOpen ? "bg-accent-blue/15 text-accent-blue" : "bg-text-muted/15 text-text-muted"}`}>
                         {isOpen ? "OPEN" : "CLOSED"}
                       </span>
                     </div>
                     {isPickExpanded && pick.rationale && (
-                      <div className="mt-2 text-[10px] text-text-secondary leading-relaxed"
+                      <div className="mt-2 text-xs text-text-secondary leading-relaxed"
                            style={{ background: "rgba(13,17,23,0.5)", borderRadius: 6, padding: "6px 8px" }}>
                         {pick.rationale}
                       </div>
@@ -460,7 +460,7 @@ function TickerDetail({
                         </div>
                         {/* Expanded analysis */}
                         {isExpanded && entry.analysis && (
-                          <div className="ml-12 mr-2 mb-2 px-2 py-1.5 rounded text-[10px] text-text-secondary leading-relaxed"
+                          <div className="ml-12 mr-2 mb-2 px-2 py-1.5 rounded text-xs text-text-secondary leading-relaxed"
                                style={{ background: "rgba(13,17,23,0.5)" }}>
                             {entry.analysis}
                             {entry.underlying_price && (

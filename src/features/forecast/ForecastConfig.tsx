@@ -96,7 +96,7 @@ export function ForecastConfig({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Forecast Type */}
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-text-muted mb-1 block">
+          <label className="text-xs uppercase tracking-wider text-text-muted mb-1 block">
             Type
           </label>
           <div className="flex gap-1">
@@ -118,7 +118,7 @@ export function ForecastConfig({
 
         {/* Horizon */}
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-text-muted mb-1 block">
+          <label className="text-xs uppercase tracking-wider text-text-muted mb-1 block">
             {settings.forecastType === "daily" ? "Horizon (days)" : "Minutes"}
           </label>
           {settings.forecastType === "daily" ? (
@@ -159,7 +159,7 @@ export function ForecastConfig({
 
         {/* History */}
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-text-muted mb-1 block">
+          <label className="text-xs uppercase tracking-wider text-text-muted mb-1 block">
             {settings.forecastType === "daily" ? "History (days)" : "Interval"}
           </label>
           {settings.forecastType === "daily" ? (
@@ -195,7 +195,7 @@ export function ForecastConfig({
 
         {/* Forecast Origin */}
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-text-muted mb-1 flex items-center gap-1">
+          <label className="text-xs uppercase tracking-wider text-text-muted mb-1 flex items-center gap-1">
             <Calendar size={10} /> Origin Date
           </label>
           <input
@@ -210,19 +210,19 @@ export function ForecastConfig({
       {/* Row 2: Models */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-[10px] uppercase tracking-wider text-text-muted">
+          <label className="text-xs uppercase tracking-wider text-text-muted">
             Models ({settings.selectedModels.length}/{AVAILABLE_MODELS.length})
           </label>
           <div className="flex gap-2">
             <button
               onClick={selectAll}
-              className="text-[10px] text-accent-blue hover:underline"
+              className="text-xs text-accent-blue hover:underline"
             >
               All
             </button>
             <button
               onClick={clearAll}
-              className="text-[10px] text-text-muted hover:underline"
+              className="text-xs text-text-muted hover:underline"
             >
               Clear
             </button>
@@ -333,7 +333,7 @@ export function ForecastConfig({
 
           {/* Chart Overlays */}
           <div>
-            <span className="text-[10px] uppercase tracking-wider text-text-muted block mb-1">
+            <span className="text-xs uppercase tracking-wider text-text-muted block mb-1">
               Overlays
             </span>
             <div className="flex flex-wrap gap-1">
@@ -346,7 +346,7 @@ export function ForecastConfig({
                       : [...settings.showMA, ma];
                     update({ showMA });
                   }}
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                  className={`px-1.5 py-0.5 rounded text-xs font-mono ${
                     settings.showMA.includes(ma)
                       ? "bg-accent-orange/20 text-accent-orange border border-accent-orange/30"
                       : "border border-border text-text-muted"
@@ -357,7 +357,7 @@ export function ForecastConfig({
               ))}
               <button
                 onClick={() => update({ showBB: !settings.showBB })}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                className={`px-1.5 py-0.5 rounded text-xs font-mono ${
                   settings.showBB
                     ? "bg-accent-purple/20 text-accent-purple border border-accent-purple/30"
                     : "border border-border text-text-muted"
@@ -367,7 +367,7 @@ export function ForecastConfig({
               </button>
               <button
                 onClick={() => update({ showVWAP: !settings.showVWAP })}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                className={`px-1.5 py-0.5 rounded text-xs font-mono ${
                   settings.showVWAP
                     ? "bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/30"
                     : "border border-border text-text-muted"
@@ -380,7 +380,7 @@ export function ForecastConfig({
 
           {/* Indicators */}
           <div>
-            <span className="text-[10px] uppercase tracking-wider text-text-muted block mb-1">
+            <span className="text-xs uppercase tracking-wider text-text-muted block mb-1">
               Indicators
             </span>
             <div className="flex flex-wrap gap-1">
@@ -392,7 +392,7 @@ export function ForecastConfig({
                 <button
                   key={key}
                   onClick={() => update({ [key]: !settings[key] })}
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                  className={`px-1.5 py-0.5 rounded text-xs font-mono ${
                     settings[key]
                       ? "bg-accent-blue/20 text-accent-blue border border-accent-blue/30"
                       : "border border-border text-text-muted"

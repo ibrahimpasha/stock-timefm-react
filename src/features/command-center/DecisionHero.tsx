@@ -149,7 +149,7 @@ export function DecisionHero({ signal, marketPrice, isLoading }: DecisionHeroPro
 
       {/* Agreement bar */}
       <div className="w-full text-center">
-        <span className="text-xs text-text-secondary">
+        <span className="text-sm text-text-secondary">
           {signal.agreeing}/{signal.total_models} models agree
         </span>
         <div

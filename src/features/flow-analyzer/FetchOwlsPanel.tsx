@@ -156,7 +156,7 @@ export function FetchOwlsPanel() {
 
       {/* Token */}
       <div>
-        <label className="text-[10px] uppercase tracking-wider text-text-muted mb-1 block">
+        <label className="text-xs uppercase tracking-wider text-text-muted mb-1 block">
           Discord Auth Token (saved in browser)
         </label>
         <div className="relative">
@@ -178,7 +178,7 @@ export function FetchOwlsPanel() {
 
       {/* Fetch Date */}
       <div>
-        <label className="text-[10px] uppercase tracking-wider text-text-muted mb-1 block">
+        <label className="text-xs uppercase tracking-wider text-text-muted mb-1 block">
           Fetch Date
         </label>
         <input
@@ -191,7 +191,7 @@ export function FetchOwlsPanel() {
 
       {/* Channel IDs */}
       <div>
-        <label className="text-[10px] uppercase tracking-wider text-text-muted mb-1 block">
+        <label className="text-xs uppercase tracking-wider text-text-muted mb-1 block">
           Channel IDs (fetches from all)
         </label>
         <div className="space-y-1.5">
@@ -224,7 +224,7 @@ export function FetchOwlsPanel() {
           {channels.length < 5 && (
             <button
               onClick={() => setChannels([...channels, ""])}
-              className="text-[10px] text-accent-blue hover:underline"
+              className="text-xs text-accent-blue hover:underline"
             >
               + Add channel
             </button>
@@ -234,7 +234,7 @@ export function FetchOwlsPanel() {
 
       {/* Webhook */}
       <div>
-        <label className="text-[10px] uppercase tracking-wider text-text-muted mb-1 block">
+        <label className="text-xs uppercase tracking-wider text-text-muted mb-1 block">
           Discord Webhook URL (for alerts)
         </label>
         <input
@@ -280,7 +280,7 @@ export function FetchOwlsPanel() {
               style={{ width: `${progress.pct}%` }}
             />
           </div>
-          <div className="text-[10px] text-text-muted">
+          <div className="text-xs text-text-muted">
             {progress.detail}
             {progress.images_total > 0 && (
               <span className="ml-2 font-mono">

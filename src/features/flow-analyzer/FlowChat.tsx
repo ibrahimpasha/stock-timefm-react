@@ -155,7 +155,7 @@ export function FlowChat() {
                 >
                   <div className="flex items-center gap-2">
                     <Loader2 size={14} className="animate-spin text-accent-purple" />
-                    <span className="text-xs text-text-secondary">
+                    <span className="text-sm text-text-secondary">
                       Analyzing flow data...
                     </span>
                   </div>

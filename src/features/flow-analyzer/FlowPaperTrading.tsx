@@ -178,7 +178,7 @@ function SourceTag({ source }: { source?: string }) {
         : "var(--text-muted)";
   return (
     <span
-      className="text-[9px] px-1 py-0.5 rounded uppercase tracking-wider font-semibold"
+      className="text-xs px-1 py-0.5 rounded uppercase tracking-wider font-semibold"
       style={{ color, background: `${color}18`, border: `1px solid ${color}30` }}
     >
       {source}
@@ -266,7 +266,7 @@ export function FlowPaperTrading() {
       <div className="card">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-text-muted">
+            <div className="text-xs uppercase tracking-wider text-text-muted">
               Flow Trader Portfolio
             </div>
             <div className="font-mono text-2xl font-extrabold text-text-primary">
@@ -274,7 +274,7 @@ export function FlowPaperTrading() {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-wider text-text-muted">
+            <div className="text-xs uppercase tracking-wider text-text-muted">
               Return
             </div>
             <div
@@ -378,7 +378,7 @@ export function FlowPaperTrading() {
               </span>
             </span>
             <span
-              className="text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider"
+              className="text-xs px-2 py-0.5 rounded font-semibold uppercase tracking-wider"
               style={{
                 color: macro.is_safe
                   ? "var(--accent-green)"
@@ -396,7 +396,7 @@ export function FlowPaperTrading() {
               {macro.is_safe ? "SAFE" : "UNSAFE"}
             </span>
           </div>
-          <span className="text-xs text-text-muted">{macro.market_status}</span>
+          <span className="text-sm text-text-muted">{macro.market_status}</span>
         </div>
       )}
 
@@ -428,7 +428,7 @@ export function FlowPaperTrading() {
                 />
               ))}
             </div>
-            <span className="text-text-muted font-mono text-[10px]">
+            <span className="text-text-muted font-mono text-xs">
               {slots.day_trade.used}/{slots.day_trade.max}
             </span>
           </div>
@@ -450,7 +450,7 @@ export function FlowPaperTrading() {
                 />
               ))}
             </div>
-            <span className="text-text-muted font-mono text-[10px]">
+            <span className="text-text-muted font-mono text-xs">
               {slots.swing.used}/{slots.swing.max}
             </span>
           </div>
@@ -463,7 +463,7 @@ export function FlowPaperTrading() {
           {/* WL-A — Auto-Entry */}
           {wla.length > 0 && (
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-accent-green font-semibold flex items-center gap-1 mb-2">
+              <div className="text-xs uppercase tracking-wider text-accent-green font-semibold flex items-center gap-1 mb-2">
                 <Zap size={10} />
                 WL-A — Auto-Entry ({wla.length})
               </div>
@@ -494,17 +494,17 @@ export function FlowPaperTrading() {
                         <span className="text-xs" style={{ color: optColor }}>
                           {w.option_type}
                         </span>
-                        <span className="text-[10px] text-accent-blue">
+                        <span className="text-xs text-accent-blue">
                           exp {w.expiry}
                         </span>
                         <SourceTag source={w.source} />
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-[10px] text-text-muted">
+                        <span className="text-sm text-text-muted">
                           ref ${typeof w.ref_premium === "number" ? w.ref_premium.toFixed(2) : w.ref_premium}
                         </span>
                         {w.gate_price != null && (
-                          <span className="font-mono text-[10px] text-accent-green font-semibold">
+                          <span className="font-mono text-xs text-accent-green font-semibold">
                             gate ${typeof w.gate_price === "number" ? w.gate_price.toFixed(2) : w.gate_price}
                           </span>
                         )}
@@ -519,7 +519,7 @@ export function FlowPaperTrading() {
           {/* WL-B — Analysis Only */}
           {wlb.length > 0 && (
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-accent-orange font-semibold flex items-center gap-1 mb-2">
+              <div className="text-xs uppercase tracking-wider text-accent-orange font-semibold flex items-center gap-1 mb-2">
                 <Eye size={10} />
                 WL-B — Analysis Only ({wlb.length})
               </div>
@@ -550,16 +550,16 @@ export function FlowPaperTrading() {
                         <span className="text-xs" style={{ color: optColor }}>
                           {w.option_type}
                         </span>
-                        <span className="text-[10px] text-accent-blue">
+                        <span className="text-xs text-accent-blue">
                           exp {w.expiry}
                         </span>
                         <SourceTag source={w.source} />
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-[10px] text-text-muted">
+                        <span className="text-sm text-text-muted">
                           ref ${typeof w.ref_premium === "number" ? w.ref_premium.toFixed(2) : w.ref_premium}
                         </span>
-                        <span className="text-[10px] text-text-muted italic">
+                        <span className="text-xs text-text-muted italic">
                           awaiting ML
                         </span>
                       </div>
@@ -575,7 +575,7 @@ export function FlowPaperTrading() {
       {/* Synthesis Report Panel */}
       {synthesis?.report && (
         <details className="card text-xs">
-          <summary className="text-[10px] uppercase tracking-wider text-accent-cyan font-semibold cursor-pointer mb-2 flex items-center gap-1 list-none">
+          <summary className="text-xs uppercase tracking-wider text-accent-cyan font-semibold cursor-pointer mb-2 flex items-center gap-1 list-none">
             <Activity size={10} />
             Daily Synthesis Report
             {synthesis.date && (
@@ -584,7 +584,7 @@ export function FlowPaperTrading() {
               </span>
             )}
           </summary>
-          <pre className="whitespace-pre-wrap text-text-secondary bg-bg-primary rounded-lg p-3 text-[10px] font-mono leading-relaxed mt-2">
+          <pre className="whitespace-pre-wrap text-text-secondary bg-bg-primary rounded-lg p-3 text-xs font-mono leading-relaxed mt-2">
             {synthesis.report}
           </pre>
         </details>
@@ -594,14 +594,14 @@ export function FlowPaperTrading() {
       {watchlist.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <div className="text-[10px] uppercase tracking-wider text-accent-orange font-semibold flex items-center gap-1">
+            <div className="text-xs uppercase tracking-wider text-accent-orange font-semibold flex items-center gap-1">
               <Eye size={10} />
               Watchlist — Top by Score ({watchlist.length})
             </div>
             {watchlist.length > 15 && (
               <button
                 onClick={() => setShowAllWatchlist(!showAllWatchlist)}
-                className="text-[10px] text-accent-blue hover:underline"
+                className="text-xs text-accent-blue hover:underline"
               >
                 {showAllWatchlist ? "Show less" : `Show all ${watchlist.length}`}
               </button>
@@ -645,12 +645,12 @@ export function FlowPaperTrading() {
                     <span className="text-xs" style={{ color: optColor }}>
                       {w.option_type}
                     </span>
-                    <span className="text-[10px] text-accent-blue">
+                    <span className="text-xs text-accent-blue">
                       exp {w.expiry}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-[10px] text-text-muted">
+                    <span className="text-sm text-text-muted">
                       ref ${w.ref_premium.toFixed(2)}
                     </span>
                     <span
@@ -670,7 +670,7 @@ export function FlowPaperTrading() {
       {/* Open Positions */}
       {positions.length > 0 && (
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-accent-blue font-semibold mb-2 flex items-center gap-1">
+          <div className="text-xs uppercase tracking-wider text-accent-blue font-semibold mb-2 flex items-center gap-1">
             <Zap size={10} />
             Open Positions
           </div>
@@ -722,7 +722,7 @@ export function FlowPaperTrading() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-text-muted text-[10px]">P/L</div>
+                        <div className="text-text-muted text-xs">P/L</div>
                         <div
                           className="font-mono text-sm font-extrabold"
                           style={{ color: pnlColor }}
@@ -779,7 +779,7 @@ export function FlowPaperTrading() {
                       </div>
 
                       {/* Exit targets */}
-                      <div className="flex items-center gap-3 text-[10px] font-mono pt-1">
+                      <div className="flex items-center gap-3 text-xs font-mono pt-1">
                         <span className="text-text-muted">Targets:</span>
                         <span className="text-accent-red">
                           Stop ${stopTarget.toFixed(2)} (-30%)
@@ -794,7 +794,7 @@ export function FlowPaperTrading() {
 
                       {/* Analysis / Reasoning */}
                       {pos.analysis && (
-                        <div className="text-[10px] text-text-secondary leading-relaxed rounded-md px-2 py-1.5"
+                        <div className="text-sm text-text-secondary leading-relaxed rounded-md px-2 py-1.5"
                              style={{ background: "rgba(13,17,23,0.5)" }}>
                           {pos.analysis}
                         </div>
@@ -839,7 +839,7 @@ export function FlowPaperTrading() {
       {/* Closed Positions */}
       {closed.length > 0 && (
         <details className="text-xs">
-          <summary className="text-[10px] uppercase tracking-wider text-text-muted font-semibold cursor-pointer mb-2">
+          <summary className="text-xs uppercase tracking-wider text-text-muted font-semibold cursor-pointer mb-2">
             Closed Positions ({closed.length})
           </summary>
           <div className="space-y-1 mt-2">

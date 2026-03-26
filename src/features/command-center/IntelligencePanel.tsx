@@ -228,7 +228,7 @@ function PredictionCard({ prediction, currentPrice }: { prediction: PricePredict
       {prediction.catalysts.length > 0 && (
         <div className="mb-1.5">
           {prediction.catalysts.map((c, i) => (
-            <div key={i} className="flex items-start gap-1.5 text-[10px] text-text-secondary leading-relaxed">
+            <div key={i} className="flex items-start gap-1.5 text-xs text-text-secondary leading-relaxed">
               <span className="text-accent-green mt-0.5 shrink-0">▲</span>
               <span>{c}</span>
             </div>
@@ -238,7 +238,7 @@ function PredictionCard({ prediction, currentPrice }: { prediction: PricePredict
       {prediction.risks.length > 0 && (
         <div>
           {prediction.risks.map((r, i) => (
-            <div key={i} className="flex items-start gap-1.5 text-[10px] text-text-secondary leading-relaxed">
+            <div key={i} className="flex items-start gap-1.5 text-xs text-text-secondary leading-relaxed">
               <span className="text-accent-red mt-0.5 shrink-0">▼</span>
               <span>{r}</span>
             </div>
@@ -361,7 +361,7 @@ export function IntelligencePanel({ thesis, isLoading, currentPrice }: Intellige
                 {section.title}
               </span>
             </div>
-            <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap">
+            <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
               {section.content}
             </p>
           </div>
