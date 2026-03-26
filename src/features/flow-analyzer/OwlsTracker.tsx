@@ -118,6 +118,7 @@ function DayTopPicks({ date }: { date: string }) {
               <span className="font-mono font-bold text-text-primary w-14">{e.ticker}</span>
               <span className="font-mono text-text-primary">${e.strike} {e.type || e.option_type}</span>
               <span style={{ color: sideColor }} className="font-semibold">{e.side}</span>
+              <span className="text-text-muted text-xs italic">{flowAction(e.side, e.type || e.option_type)}</span>
               <span className="text-text-muted">{e.expiry}</span>
               {e.vol_oi_ratio > 0 && <span className="text-accent-cyan font-mono">{e.vol_oi_ratio.toFixed(1)}x</span>}
               {e.ask_pct > 0 && <span className="text-accent-orange font-mono">{e.ask_pct}%ask</span>}
@@ -129,6 +130,16 @@ function DayTopPicks({ date }: { date: string }) {
       </div>
     </div>
   );
+}
+
+function flowAction(side: string, optType: string): string {
+  const s = (side || "").toLowerCase();
+  const t = (optType || "").toUpperCase();
+  if (s.includes("bull") && t.includes("CALL")) return "call buying";
+  if (s.includes("bull") && t.includes("PUT")) return "put selling";
+  if (s.includes("bear") && t.includes("PUT")) return "put buying";
+  if (s.includes("bear") && t.includes("CALL")) return "call selling";
+  return "";
 }
 
 function parsePremium(s: string): number {
@@ -439,6 +450,9 @@ function TickerDetail({
                             style={{ color: sideColor }}
                           >
                             {entry.side}
+                          </span>
+                          <span className="text-text-muted italic w-16 shrink-0">
+                            {flowAction(entry.side, optType)}
                           </span>
                           <span className="font-mono font-bold text-text-primary">
                             ${entry.strike} {optType}
