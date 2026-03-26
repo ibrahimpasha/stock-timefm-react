@@ -806,7 +806,7 @@ export function FlowPaperTrading() {
           </button>
         </div>
         {synthesis?.report ? (
-          <pre className="whitespace-pre-wrap text-text-secondary bg-bg-primary rounded-lg p-3 text-xs font-mono leading-relaxed">
+          <pre className="whitespace-pre-wrap text-text-primary bg-bg-primary rounded-lg p-4 text-sm font-mono leading-relaxed">
             {synthesis.report}
           </pre>
         ) : (
