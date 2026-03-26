@@ -20,8 +20,6 @@ import { ActivePicks } from "../features/flow-analyzer/ActivePicks";
 import { PickHistory } from "../features/flow-analyzer/PickHistory";
 import { OwlsTracker } from "../features/flow-analyzer/OwlsTracker";
 
-// Paper Trading
-import { PaperTrading } from "../features/paper-trading/PaperTrading";
 import { FlowPaperTrading } from "../features/flow-analyzer/FlowPaperTrading";
 
 // OWLS Discord Pipeline
@@ -36,18 +34,16 @@ import {
   Target,
   History,
   Eye,
-  Wallet,
 } from "lucide-react";
 
 /* ── Tab definitions ─────────────────────────────────────── */
 
-type FlowTab = "chat" | "picks" | "history" | "owls" | "paper" | "flow-trader";
+type FlowTab = "chat" | "picks" | "history" | "owls" | "flow-trader";
 
 const FLOW_TABS: { id: FlowTab; label: string; icon: React.ElementType }[] = [
   { id: "chat", label: "Flow Chat", icon: MessageCircle },
   { id: "owls", label: "OWLS Tracker", icon: Eye },
   { id: "history", label: "History", icon: History },
-  { id: "paper", label: "Paper Trading", icon: Wallet },
   { id: "flow-trader", label: "Flow Trader", icon: Zap },
 ];
 
@@ -168,8 +164,6 @@ function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
       return <PickHistory />;
     case "owls":
       return <OwlsTracker />;
-    case "paper":
-      return <PaperTrading />;
     case "flow-trader":
       return <FlowPaperTrading />;
     default:
