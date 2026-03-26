@@ -11,6 +11,9 @@ import {
   TrendingDown,
   Target,
   Zap,
+  Shield,
+  Activity,
+  Layers,
 } from "lucide-react";
 
 interface WatchlistItem {
@@ -64,12 +67,81 @@ interface FlowPaperSummary {
   watchlist: WatchlistItem[];
 }
 
+interface MacroData {
+  spy_price: number;
+  spy_change_pct: number;
+  vix: number;
+  market_status: string;
+  is_safe: boolean;
+}
+
+interface OwlsStatus {
+  portfolio: Record<string, unknown>;
+  macro: MacroData;
+  slots: {
+    day_trade: { used: number; max: number };
+    swing: { used: number; max: number };
+  };
+  watchlist: { wla_count: number; wlb_count: number };
+}
+
+interface OwlsWatchlistItem {
+  id?: number;
+  ticker: string;
+  strike: number | string;
+  option_type: string;
+  expiry: string;
+  side: string;
+  ref_premium: number;
+  gate_price?: number | null;
+  score: number;
+  source?: string;
+  list?: string;
+}
+
+interface OwlsWatchlist {
+  wla: OwlsWatchlistItem[];
+  wlb: OwlsWatchlistItem[];
+}
+
+interface OwlsSynthesis {
+  date: string;
+  report: string;
+}
+
 function useFlowPaperSummary() {
   return useQuery<FlowPaperSummary>({
     queryKey: ["flow-paper-summary"],
     queryFn: () => apiClient.get("/flow-paper/summary").then((r) => r.data),
     staleTime: 15_000,
     refetchInterval: 30_000,
+  });
+}
+
+function useOwlsTraderStatus() {
+  return useQuery<OwlsStatus>({
+    queryKey: ["owls-trader-status"],
+    queryFn: () => apiClient.get("/owls-trader/status").then((r) => r.data),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  });
+}
+
+function useOwlsTraderWatchlist() {
+  return useQuery<OwlsWatchlist>({
+    queryKey: ["owls-trader-watchlist"],
+    queryFn: () => apiClient.get("/owls-trader/watchlist").then((r) => r.data),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  });
+}
+
+function useOwlsSynthesis() {
+  return useQuery<OwlsSynthesis>({
+    queryKey: ["owls-synthesis"],
+    queryFn: () =>
+      apiClient.get("/owls-trader/synthesis").then((r) => r.data),
+    staleTime: 60_000,
   });
 }
 
@@ -96,9 +168,30 @@ function SideIcon({ side }: { side: string }) {
   return <TrendingDown size={12} className="text-accent-red" />;
 }
 
+function SourceTag({ source }: { source?: string }) {
+  if (!source) return null;
+  const color =
+    source === "synthesis"
+      ? "var(--accent-cyan)"
+      : source === "flash"
+        ? "var(--accent-orange)"
+        : "var(--text-muted)";
+  return (
+    <span
+      className="text-[9px] px-1 py-0.5 rounded uppercase tracking-wider font-semibold"
+      style={{ color, background: `${color}18`, border: `1px solid ${color}30` }}
+    >
+      {source}
+    </span>
+  );
+}
+
 export function FlowPaperTrading() {
   const queryClient = useQueryClient();
   const { data: summary, isLoading } = useFlowPaperSummary();
+  const { data: owlsStatus } = useOwlsTraderStatus();
+  const { data: owlsWatchlist } = useOwlsTraderWatchlist();
+  const { data: synthesis } = useOwlsSynthesis();
   const [showAllWatchlist, setShowAllWatchlist] = useState(false);
   const [expandedPos, setExpandedPos] = useState<number | null>(null);
 
@@ -134,6 +227,12 @@ export function FlowPaperTrading() {
   const displayWatchlist = showAllWatchlist
     ? sortedWatchlist
     : sortedWatchlist.slice(0, 15);
+
+  // OWLS macro
+  const macro = owlsStatus?.macro;
+  const slots = owlsStatus?.slots;
+  const wla = owlsWatchlist?.wla ?? [];
+  const wlb = owlsWatchlist?.wlb ?? [];
 
   return (
     <div className="space-y-4">
@@ -238,7 +337,260 @@ export function FlowPaperTrading() {
         </div>
       </div>
 
-      {/* Watchlist */}
+      {/* Macro Status Bar */}
+      {macro && (
+        <div
+          className="card flex items-center justify-between py-2 px-4"
+          style={{ borderLeft: "3px solid var(--accent-cyan)" }}
+        >
+          <div className="flex items-center gap-4 text-xs">
+            <div className="flex items-center gap-1 text-text-muted">
+              <Activity size={10} />
+              <span>Macro</span>
+            </div>
+            <span className="font-mono">
+              SPY ${macro.spy_price.toFixed(2)}{" "}
+              <span
+                style={{
+                  color:
+                    macro.spy_change_pct >= 0
+                      ? "var(--accent-green)"
+                      : "var(--accent-red)",
+                }}
+              >
+                {macro.spy_change_pct >= 0 ? "+" : ""}
+                {macro.spy_change_pct.toFixed(2)}%
+              </span>
+            </span>
+            <span className="font-mono">
+              VIX{" "}
+              <span
+                style={{
+                  color:
+                    macro.vix >= 35
+                      ? "var(--accent-red)"
+                      : macro.vix >= 25
+                        ? "var(--accent-orange)"
+                        : "var(--accent-green)",
+                }}
+              >
+                {macro.vix.toFixed(1)}
+              </span>
+            </span>
+            <span
+              className="text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider"
+              style={{
+                color: macro.is_safe
+                  ? "var(--accent-green)"
+                  : "var(--accent-red)",
+                background: macro.is_safe
+                  ? "rgba(63,185,80,0.12)"
+                  : "rgba(248,81,73,0.12)",
+                border: `1px solid ${macro.is_safe ? "rgba(63,185,80,0.3)" : "rgba(248,81,73,0.3)"}`,
+              }}
+            >
+              <Shield
+                size={9}
+                style={{ display: "inline", marginRight: 3, verticalAlign: "middle" }}
+              />
+              {macro.is_safe ? "SAFE" : "UNSAFE"}
+            </span>
+          </div>
+          <span className="text-xs text-text-muted">{macro.market_status}</span>
+        </div>
+      )}
+
+      {/* Slot Visualization */}
+      {slots && (
+        <div
+          className="card flex items-center gap-6 py-2 px-4"
+          style={{ borderLeft: "3px solid var(--border)" }}
+        >
+          <div className="flex items-center gap-1 text-xs text-text-muted">
+            <Layers size={10} />
+            <span>Slots</span>
+          </div>
+          {/* Day Trade slots */}
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-text-muted">DT:</span>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: slots.day_trade.max }, (_, i) => (
+                <div
+                  key={i}
+                  className="w-4 h-4 rounded"
+                  style={{
+                    background:
+                      i < slots.day_trade.used
+                        ? "var(--accent-blue)"
+                        : "transparent",
+                    border: "1px solid var(--border)",
+                  }}
+                />
+              ))}
+            </div>
+            <span className="text-text-muted font-mono text-[10px]">
+              {slots.day_trade.used}/{slots.day_trade.max}
+            </span>
+          </div>
+          {/* Swing slots */}
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-text-muted">SW:</span>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: slots.swing.max }, (_, i) => (
+                <div
+                  key={i}
+                  className="w-4 h-4 rounded"
+                  style={{
+                    background:
+                      i < slots.swing.used
+                        ? "var(--accent-purple)"
+                        : "transparent",
+                    border: "1px solid var(--border)",
+                  }}
+                />
+              ))}
+            </div>
+            <span className="text-text-muted font-mono text-[10px]">
+              {slots.swing.used}/{slots.swing.max}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* WL-A / WL-B Separated Watchlist */}
+      {(wla.length > 0 || wlb.length > 0) && (
+        <div className="space-y-3">
+          {/* WL-A — Auto-Entry */}
+          {wla.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-accent-green font-semibold flex items-center gap-1 mb-2">
+                <Zap size={10} />
+                WL-A — Auto-Entry ({wla.length})
+              </div>
+              <div className="space-y-1">
+                {wla.map((w, idx) => {
+                  const optColor =
+                    w.option_type === "CALL" || w.option_type === "C"
+                      ? "var(--accent-green)"
+                      : "var(--accent-red)";
+                  return (
+                    <div
+                      key={w.id ?? idx}
+                      className="flex items-center justify-between px-3 py-1.5 rounded-md"
+                      style={{
+                        background: "rgba(63,185,80,0.05)",
+                        borderLeft: "3px solid var(--accent-green)",
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <ScoreBadge score={w.score} />
+                        <SideIcon side={w.side} />
+                        <span className="font-mono text-sm font-bold text-text-primary">
+                          {w.ticker}
+                        </span>
+                        <span className="font-mono text-xs text-text-primary">
+                          ${w.strike}
+                        </span>
+                        <span className="text-xs" style={{ color: optColor }}>
+                          {w.option_type}
+                        </span>
+                        <span className="text-[10px] text-accent-blue">
+                          exp {w.expiry}
+                        </span>
+                        <SourceTag source={w.source} />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-text-muted">
+                          ref ${typeof w.ref_premium === "number" ? w.ref_premium.toFixed(2) : w.ref_premium}
+                        </span>
+                        {w.gate_price != null && (
+                          <span className="font-mono text-[10px] text-accent-green font-semibold">
+                            gate ${typeof w.gate_price === "number" ? w.gate_price.toFixed(2) : w.gate_price}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* WL-B — Analysis Only */}
+          {wlb.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-accent-orange font-semibold flex items-center gap-1 mb-2">
+                <Eye size={10} />
+                WL-B — Analysis Only ({wlb.length})
+              </div>
+              <div className="space-y-1">
+                {wlb.map((w, idx) => {
+                  const optColor =
+                    w.option_type === "CALL" || w.option_type === "C"
+                      ? "var(--accent-green)"
+                      : "var(--accent-red)";
+                  return (
+                    <div
+                      key={w.id ?? idx}
+                      className="flex items-center justify-between px-3 py-1.5 rounded-md"
+                      style={{
+                        background: "rgba(255,165,0,0.05)",
+                        borderLeft: "3px solid var(--accent-orange)",
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <ScoreBadge score={w.score} />
+                        <SideIcon side={w.side} />
+                        <span className="font-mono text-sm font-bold text-text-primary">
+                          {w.ticker}
+                        </span>
+                        <span className="font-mono text-xs text-text-primary">
+                          ${w.strike}
+                        </span>
+                        <span className="text-xs" style={{ color: optColor }}>
+                          {w.option_type}
+                        </span>
+                        <span className="text-[10px] text-accent-blue">
+                          exp {w.expiry}
+                        </span>
+                        <SourceTag source={w.source} />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-text-muted">
+                          ref ${typeof w.ref_premium === "number" ? w.ref_premium.toFixed(2) : w.ref_premium}
+                        </span>
+                        <span className="text-[10px] text-text-muted italic">
+                          awaiting ML
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Synthesis Report Panel */}
+      {synthesis?.report && (
+        <details className="card text-xs">
+          <summary className="text-[10px] uppercase tracking-wider text-accent-cyan font-semibold cursor-pointer mb-2 flex items-center gap-1 list-none">
+            <Activity size={10} />
+            Daily Synthesis Report
+            {synthesis.date && (
+              <span className="text-text-muted font-normal ml-1 normal-case tracking-normal">
+                — {synthesis.date}
+              </span>
+            )}
+          </summary>
+          <pre className="whitespace-pre-wrap text-text-secondary bg-bg-primary rounded-lg p-3 text-[10px] font-mono leading-relaxed mt-2">
+            {synthesis.report}
+          </pre>
+        </details>
+      )}
+
+      {/* Legacy flat watchlist (from flow-paper/summary) */}
       {watchlist.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-2">
