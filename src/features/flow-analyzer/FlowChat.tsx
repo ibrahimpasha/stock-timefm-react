@@ -5,7 +5,9 @@ import {
   useSendChatMessage,
   useClearChat,
 } from "../../api/flow";
-import { MessageCircle, Send, Trash2, Loader2, Bot, User } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import apiClient from "../../api/client";
+import { MessageCircle, Send, Trash2, Loader2, Bot, User, FileText } from "lucide-react";
 import type { FlowChatMessage } from "../../lib/types";
 
 /* ── Single Chat Message ─────────────────────────────────── */
@@ -54,9 +56,18 @@ export function FlowChat() {
   const chatMutation = useSendChatMessage();
   const clearMutation = useClearChat();
 
+  const qc = useQueryClient();
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const saveIntelMutation = useMutation({
+    mutationFn: (text: string) => apiClient.post("/flow/intel", { text, source: "gemini" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["flow", "chat"] });
+      qc.invalidateQueries({ queryKey: ["owls-synthesis"] });
+    },
+  });
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -91,7 +102,7 @@ export function FlowChat() {
     }
   };
 
-  const isPending = analyzeMutation.isPending || chatMutation.isPending;
+  const isPending = analyzeMutation.isPending || chatMutation.isPending || saveIntelMutation.isPending;
 
   return (
     <div className="card flex flex-col" style={{ height: "500px" }}>
@@ -175,7 +186,7 @@ export function FlowChat() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Paste flow data or ask about options flow..."
+            placeholder="Paste flow data, Gemini research, or ask about options flow..."
             rows={2}
             disabled={isPending}
             className="flex-1 bg-bg-primary border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted resize-none focus:outline-none focus:border-accent-blue transition-colors disabled:opacity-50 font-mono"
@@ -200,6 +211,23 @@ export function FlowChat() {
                 <Bot size={12} />
               )}
               Analyze
+            </button>
+            <button
+              onClick={() => {
+                if (input.trim()) {
+                  saveIntelMutation.mutate(input.trim());
+                  setInput("");
+                }
+              }}
+              disabled={saveIntelMutation.isPending || !input.trim()}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent-cyan/15 text-accent-cyan hover:bg-accent-cyan/25 transition-colors disabled:opacity-30"
+            >
+              {saveIntelMutation.isPending ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <FileText size={12} />
+              )}
+              Save Intel
             </button>
           </div>
         </div>
