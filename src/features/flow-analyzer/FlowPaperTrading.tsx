@@ -207,6 +207,14 @@ export function FlowPaperTrading() {
       queryClient.invalidateQueries({ queryKey: ["flow-paper-summary"] }),
   });
 
+  const synthesisMutation = useMutation({
+    mutationFn: () => apiClient.post("/owls-trader/scan", { type: "synthesis" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["owls-synthesis"] });
+      queryClient.invalidateQueries({ queryKey: ["flow-paper-summary"] });
+    },
+  });
+
   if (isLoading || !summary) {
     return (
       <div className="flex items-center justify-center py-12 text-text-muted text-sm gap-2">
@@ -457,6 +465,206 @@ export function FlowPaperTrading() {
         </div>
       )}
 
+      {/* Open Positions — moved to top */}
+      {positions.length > 0 && (
+        <div>
+          <div className="text-xs uppercase tracking-wider text-accent-blue font-semibold mb-2 flex items-center gap-1">
+            <Zap size={10} />
+            Open Positions ({positions.length})
+          </div>
+          <div className="space-y-2">
+            {positions.map((pos) => {
+              const pnlColor = changeColor(pos.pnl_pct);
+              const sideColor =
+                pos.side === "Bull"
+                  ? "var(--accent-green)"
+                  : "var(--accent-red)";
+              const isExpanded = expandedPos === pos.id;
+              const pnlDollars = pos.pnl_dollars ?? ((pos.current_value ?? 0) - pos.cost_basis);
+              const stopTarget = pos.entry_premium * 0.7;
+              const tp1Target = pos.entry_premium * 1.5;
+              const tp2Target = pos.entry_premium * 2.0;
+              const slotLabel = pos.slot_type === "day_trade" ? "DT" : "SW";
+
+              return (
+                <div
+                  key={pos.id}
+                  className="card cursor-pointer transition-all hover:brightness-110"
+                  style={{ borderLeft: `3px solid ${sideColor}` }}
+                  onClick={() => setExpandedPos(isExpanded ? null : pos.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono px-1 py-0.5 rounded" style={{
+                        background: pos.slot_type === "day_trade" ? "rgba(88,166,255,0.15)" : "rgba(188,140,255,0.15)",
+                        color: pos.slot_type === "day_trade" ? "var(--accent-blue)" : "var(--accent-purple)",
+                      }}>{slotLabel}</span>
+                      <span className="font-mono text-base font-extrabold text-text-primary">
+                        {pos.ticker}
+                      </span>
+                      <span className="font-mono text-sm text-text-primary">
+                        ${pos.strike} {pos.option_type}
+                      </span>
+                      <span className="text-text-muted text-xs">
+                        x{pos.contracts}
+                        {pos.scaled_out ? " (scaled)" : ""}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right text-xs">
+                        <div className="text-text-muted">Cost</div>
+                        <div className="font-mono text-text-primary">
+                          {formatCurrency(pos.cost_basis)}
+                        </div>
+                      </div>
+                      <div className="text-right text-xs">
+                        <div className="text-text-muted">Value</div>
+                        <div className="font-mono text-text-primary">
+                          {formatCurrency(pos.current_value ?? 0)}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-text-muted text-xs">P/L</div>
+                        <div
+                          className="font-mono text-sm font-extrabold"
+                          style={{ color: pnlColor }}
+                        >
+                          {pos.pnl_pct >= 0 ? "+" : ""}
+                          {pos.pnl_pct.toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="mt-3 pt-3 border-t border-border space-y-2">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                        <div>
+                          <div className="text-text-muted">Side</div>
+                          <div className="font-mono font-semibold" style={{ color: sideColor }}>
+                            {pos.side === "Bull" ? "Bullish" : "Bearish"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted">Entry</div>
+                          <div className="font-mono text-text-primary">${pos.entry_premium?.toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted">Current</div>
+                          <div className="font-mono" style={{ color: pnlColor }}>
+                            ${pos.current_premium?.toFixed(2)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted">P/L $</div>
+                          <div className="font-mono font-semibold" style={{ color: pnlColor }}>
+                            {pnlDollars >= 0 ? "+" : ""}${pnlDollars.toFixed(0)}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted">Entry Date</div>
+                          <div className="font-mono text-text-primary">{pos.entry_date}</div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted">Hold Days</div>
+                          <div className="font-mono text-text-primary">{pos.hold_days ?? "—"}</div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted">Expiry</div>
+                          <div className="font-mono text-text-primary">{pos.expiry}</div>
+                        </div>
+                        <div>
+                          <div className="text-text-muted">Slot</div>
+                          <div className="font-mono" style={{
+                            color: pos.slot_type === "day_trade" ? "var(--accent-blue)" : "var(--accent-purple)"
+                          }}>{pos.slot_type === "day_trade" ? "Day Trade" : "Swing"}</div>
+                        </div>
+                      </div>
+
+                      {pos.analysis && (
+                        <div className="text-xs text-text-secondary leading-relaxed rounded-md px-2 py-1.5"
+                             style={{ background: "rgba(13,17,23,0.5)" }}>
+                          {pos.analysis}
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-3 text-xs font-mono pt-1">
+                        <span className="text-text-muted">Targets:</span>
+                        <span className="text-accent-red">
+                          Stop ${stopTarget.toFixed(2)} (-30%)
+                        </span>
+                        <span className="text-accent-orange">
+                          TP1 ${tp1Target.toFixed(2)} (+50%)
+                        </span>
+                        <span className="text-accent-green">
+                          TP2 ${tp2Target.toFixed(2)} (+100%)
+                        </span>
+                      </div>
+
+                      <div className="relative h-2 rounded-full bg-border overflow-hidden">
+                        {(() => {
+                          const range = tp2Target - stopTarget;
+                          const pos_pct = range > 0
+                            ? Math.max(0, Math.min(100, ((pos.current_premium ?? pos.entry_premium) - stopTarget) / range * 100))
+                            : 50;
+                          const tp1_pct = range > 0 ? ((tp1Target - stopTarget) / range * 100) : 66;
+                          return (
+                            <>
+                              <div
+                                className="absolute h-full rounded-full transition-all"
+                                style={{
+                                  width: `${pos_pct}%`,
+                                  background: pos.pnl_pct >= 0
+                                    ? "var(--accent-green)"
+                                    : "var(--accent-red)",
+                                }}
+                              />
+                              <div
+                                className="absolute h-full w-px bg-accent-orange"
+                                style={{ left: `${tp1_pct}%` }}
+                              />
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Closed Positions */}
+      {closed.length > 0 && (
+        <details className="text-xs">
+          <summary className="text-xs uppercase tracking-wider text-text-muted font-semibold cursor-pointer mb-2">
+            Closed Positions ({closed.length})
+          </summary>
+          <div className="space-y-1 mt-2">
+            {closed.map((pos) => {
+              const pnlColor = changeColor(pos.pnl_pct);
+              return (
+                <div
+                  key={pos.id}
+                  className="flex items-center justify-between px-3 py-1.5 border-b border-border"
+                >
+                  <span className="font-mono text-text-muted">
+                    {pos.ticker} ${pos.strike} {pos.option_type} x
+                    {pos.contracts}
+                  </span>
+                  <span className="font-mono font-bold" style={{ color: pnlColor }}>
+                    {pos.pnl_pct >= 0 ? "+" : ""}
+                    {pos.pnl_pct.toFixed(1)}% — {pos.exit_reason}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </details>
+      )}
+
       {/* WL-A / WL-B Separated Watchlist */}
       {(wla.length > 0 || wlb.length > 0) && (
         <div className="space-y-3">
@@ -572,301 +780,44 @@ export function FlowPaperTrading() {
         </div>
       )}
 
-      {/* Synthesis Report Panel */}
-      {synthesis?.report && (
-        <details className="card text-xs">
-          <summary className="text-xs uppercase tracking-wider text-accent-cyan font-semibold cursor-pointer mb-2 flex items-center gap-1 list-none">
+      {/* Synthesis Report Panel + trigger */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-xs uppercase tracking-wider text-accent-cyan font-semibold flex items-center gap-1">
             <Activity size={10} />
-            Daily Synthesis Report
-            {synthesis.date && (
+            Daily Synthesis
+            {synthesis?.date && (
               <span className="text-text-muted font-normal ml-1 normal-case tracking-normal">
                 — {synthesis.date}
               </span>
             )}
-          </summary>
-          <pre className="whitespace-pre-wrap text-text-secondary bg-bg-primary rounded-lg p-3 text-xs font-mono leading-relaxed mt-2">
+          </div>
+          <button
+            onClick={() => synthesisMutation.mutate()}
+            disabled={synthesisMutation.isPending}
+            className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold bg-accent-cyan/15 text-accent-cyan hover:bg-accent-cyan/25 transition-colors disabled:opacity-40"
+          >
+            {synthesisMutation.isPending ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <RefreshCw size={12} />
+            )}
+            Generate
+          </button>
+        </div>
+        {synthesis?.report ? (
+          <pre className="whitespace-pre-wrap text-text-secondary bg-bg-primary rounded-lg p-3 text-xs font-mono leading-relaxed">
             {synthesis.report}
           </pre>
-        </details>
-      )}
-
-      {/* Legacy flat watchlist (from flow-paper/summary) */}
-      {watchlist.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs uppercase tracking-wider text-accent-orange font-semibold flex items-center gap-1">
-              <Eye size={10} />
-              Watchlist — Top by Score ({watchlist.length})
-            </div>
-            {watchlist.length > 15 && (
-              <button
-                onClick={() => setShowAllWatchlist(!showAllWatchlist)}
-                className="text-xs text-accent-blue hover:underline"
-              >
-                {showAllWatchlist ? "Show less" : `Show all ${watchlist.length}`}
-              </button>
-            )}
-          </div>
-          <div className="space-y-1">
-            {displayWatchlist.map((w) => {
-              const dip =
-                w.ref_premium > 0 && w.current_premium
-                  ? ((w.current_premium - w.ref_premium) / w.ref_premium) * 100
-                  : 0;
-              const dipColor =
-                dip < -5
-                  ? "var(--accent-green)"
-                  : dip < 0
-                    ? "var(--accent-orange)"
-                    : "var(--text-muted)";
-              const optColor =
-                w.option_type === "CALL" || w.option_type === "C"
-                  ? "var(--accent-green)"
-                  : "var(--accent-red)";
-
-              return (
-                <div
-                  key={w.id}
-                  className="flex items-center justify-between px-3 py-1.5 rounded-md"
-                  style={{
-                    background: "rgba(48,54,61,0.12)",
-                    borderLeft: `3px solid ${w.side === "Bull" ? "var(--accent-green)" : "var(--accent-red)"}`,
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <ScoreBadge score={w.score} />
-                    <SideIcon side={w.side} />
-                    <span className="font-mono text-sm font-bold text-text-primary">
-                      {w.ticker}
-                    </span>
-                    <span className="font-mono text-xs text-text-primary">
-                      ${w.strike}
-                    </span>
-                    <span className="text-xs" style={{ color: optColor }}>
-                      {w.option_type}
-                    </span>
-                    <span className="text-xs text-accent-blue">
-                      exp {w.expiry}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-text-muted">
-                      ref ${w.ref_premium.toFixed(2)}
-                    </span>
-                    <span
-                      className="font-mono text-xs font-bold"
-                      style={{ color: dipColor }}
-                    >
-                      {dip.toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Open Positions */}
-      {positions.length > 0 && (
-        <div>
-          <div className="text-xs uppercase tracking-wider text-accent-blue font-semibold mb-2 flex items-center gap-1">
-            <Zap size={10} />
-            Open Positions
-          </div>
-          <div className="space-y-2">
-            {positions.map((pos) => {
-              const pnlColor = changeColor(pos.pnl_pct);
-              const sideColor =
-                pos.side === "Bull"
-                  ? "var(--accent-green)"
-                  : "var(--accent-red)";
-              const isExpanded = expandedPos === pos.id;
-              const pnlDollars = pos.pnl_dollars ?? ((pos.current_value ?? 0) - pos.cost_basis);
-              const stopTarget = pos.entry_premium * 0.7;
-              const tp1Target = pos.entry_premium * 1.5;
-              const tp2Target = pos.entry_premium * 2.0;
-
-              return (
-                <div
-                  key={pos.id}
-                  className="card cursor-pointer transition-all hover:brightness-110"
-                  style={{ borderLeft: `3px solid ${sideColor}` }}
-                  onClick={() => setExpandedPos(isExpanded ? null : pos.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ScoreBadge score={pos.score} />
-                      <span className="font-mono text-base font-extrabold text-text-primary">
-                        {pos.ticker}
-                      </span>
-                      <span className="font-mono text-sm text-text-primary">
-                        ${pos.strike} {pos.option_type}
-                      </span>
-                      <span className="text-text-muted text-xs">
-                        x{pos.contracts}
-                        {pos.scaled_out ? " (scaled)" : ""}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right text-xs">
-                        <div className="text-text-muted">Cost</div>
-                        <div className="font-mono text-text-primary">
-                          {formatCurrency(pos.cost_basis)}
-                        </div>
-                      </div>
-                      <div className="text-right text-xs">
-                        <div className="text-text-muted">Value</div>
-                        <div className="font-mono text-text-primary">
-                          {formatCurrency(pos.current_value ?? 0)}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-text-muted text-xs">P/L</div>
-                        <div
-                          className="font-mono text-sm font-extrabold"
-                          style={{ color: pnlColor }}
-                        >
-                          {pos.pnl_pct >= 0 ? "+" : ""}
-                          {pos.pnl_pct.toFixed(1)}%
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Expanded details */}
-                  {isExpanded && (
-                    <div className="mt-3 pt-3 border-t border-border space-y-2">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                        <div>
-                          <div className="text-text-muted">Side</div>
-                          <div className="font-mono font-semibold" style={{ color: sideColor }}>
-                            {pos.side === "Bull" ? "🐂 Bullish" : "🐻 Bearish"}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-text-muted">Entry Premium</div>
-                          <div className="font-mono text-text-primary">${pos.entry_premium?.toFixed(2)}</div>
-                        </div>
-                        <div>
-                          <div className="text-text-muted">Current Premium</div>
-                          <div className="font-mono" style={{ color: pnlColor }}>
-                            ${pos.current_premium?.toFixed(2)}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-text-muted">P/L $</div>
-                          <div className="font-mono font-semibold" style={{ color: pnlColor }}>
-                            {pnlDollars >= 0 ? "+" : ""}${pnlDollars.toFixed(0)}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-text-muted">Entry Date</div>
-                          <div className="font-mono text-text-primary">{pos.entry_date}</div>
-                        </div>
-                        <div>
-                          <div className="text-text-muted">Hold Days</div>
-                          <div className="font-mono text-text-primary">{pos.hold_days ?? "—"}</div>
-                        </div>
-                        <div>
-                          <div className="text-text-muted">Expiry</div>
-                          <div className="font-mono text-text-primary">{pos.expiry}</div>
-                        </div>
-                        <div>
-                          <div className="text-text-muted">Score</div>
-                          <div className="font-mono text-accent-blue">{(pos.score / 10).toFixed(1)}</div>
-                        </div>
-                      </div>
-
-                      {/* Exit targets */}
-                      <div className="flex items-center gap-3 text-xs font-mono pt-1">
-                        <span className="text-text-muted">Targets:</span>
-                        <span className="text-accent-red">
-                          Stop ${stopTarget.toFixed(2)} (-30%)
-                        </span>
-                        <span className="text-accent-orange">
-                          TP1 ${tp1Target.toFixed(2)} (+50%)
-                        </span>
-                        <span className="text-accent-green">
-                          TP2 ${tp2Target.toFixed(2)} (+100%)
-                        </span>
-                      </div>
-
-                      {/* Analysis / Reasoning */}
-                      {pos.analysis && (
-                        <div className="text-sm text-text-secondary leading-relaxed rounded-md px-2 py-1.5"
-                             style={{ background: "rgba(13,17,23,0.5)" }}>
-                          {pos.analysis}
-                        </div>
-                      )}
-
-                      {/* Progress bar: stop ← current → TP2 */}
-                      <div className="relative h-2 rounded-full bg-border overflow-hidden">
-                        {(() => {
-                          const range = tp2Target - stopTarget;
-                          const pos_pct = range > 0
-                            ? Math.max(0, Math.min(100, ((pos.current_premium ?? pos.entry_premium) - stopTarget) / range * 100))
-                            : 50;
-                          const tp1_pct = range > 0 ? ((tp1Target - stopTarget) / range * 100) : 66;
-                          return (
-                            <>
-                              <div
-                                className="absolute h-full rounded-full transition-all"
-                                style={{
-                                  width: `${pos_pct}%`,
-                                  background: pos.pnl_pct >= 0
-                                    ? "var(--accent-green)"
-                                    : "var(--accent-red)",
-                                }}
-                              />
-                              <div
-                                className="absolute h-full w-px bg-accent-orange"
-                                style={{ left: `${tp1_pct}%` }}
-                              />
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Closed Positions */}
-      {closed.length > 0 && (
-        <details className="text-xs">
-          <summary className="text-xs uppercase tracking-wider text-text-muted font-semibold cursor-pointer mb-2">
-            Closed Positions ({closed.length})
-          </summary>
-          <div className="space-y-1 mt-2">
-            {closed.map((pos) => {
-              const pnlColor = changeColor(pos.pnl_pct);
-              return (
-                <div
-                  key={pos.id}
-                  className="flex items-center justify-between px-3 py-1.5 border-b border-border"
-                >
-                  <span className="font-mono text-text-muted">
-                    {pos.ticker} ${pos.strike} {pos.option_type} x
-                    {pos.contracts}
-                  </span>
-                  <span className="font-mono font-bold" style={{ color: pnlColor }}>
-                    {pos.pnl_pct >= 0 ? "+" : ""}
-                    {pos.pnl_pct.toFixed(1)}% — {pos.exit_reason}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </details>
-      )}
+        ) : (
+          <p className="text-xs text-text-muted text-center py-3">
+            No synthesis report yet — click Generate to create one
+          </p>
+        )}
+      </div>
 
       {/* Empty state */}
-      {positions.length === 0 && watchlist.length === 0 && (
+      {positions.length === 0 && wla.length === 0 && wlb.length === 0 && (
         <div className="text-center py-8 text-text-muted text-sm">
           Click <strong>Scan & Trade</strong> to analyze flow entries and start
           watching for dip-buy opportunities.
