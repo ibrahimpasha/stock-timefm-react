@@ -280,7 +280,7 @@ export function FlowPaperTrading() {
   });
 
   const synthesisMutation = useMutation({
-    mutationFn: () => apiClient.post("/owls-trader/scan", { type: "synthesis" }),
+    mutationFn: () => apiClient.post("/owls-trader/scan", { type: "synthesis" }, { timeout: 200_000 }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["owls-synthesis"] });
       queryClient.invalidateQueries({ queryKey: ["flow-paper-summary"] });
@@ -870,13 +870,24 @@ export function FlowPaperTrading() {
             className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold bg-accent-cyan/15 text-accent-cyan hover:bg-accent-cyan/25 transition-colors disabled:opacity-40"
           >
             {synthesisMutation.isPending ? (
-              <Loader2 size={12} className="animate-spin" />
+              <>
+                <Loader2 size={12} className="animate-spin" />
+                Generating with Claude...
+              </>
             ) : (
-              <RefreshCw size={12} />
+              <>
+                <RefreshCw size={12} />
+                Generate
+              </>
             )}
-            Generate
           </button>
         </div>
+        {synthesisMutation.isPending && (
+          <div className="flex items-center gap-2 py-3 text-sm text-accent-cyan">
+            <Loader2 size={14} className="animate-spin" />
+            Claude is analyzing flow data + research... this takes 30-60 seconds
+          </div>
+        )}
         {synthesis?.report ? (
           <SynthesisReport report={synthesis.report} />
         ) : (
