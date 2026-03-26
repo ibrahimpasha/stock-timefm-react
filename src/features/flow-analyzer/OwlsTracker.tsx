@@ -106,7 +106,8 @@ function DayTopPicks({ date }: { date: string }) {
       </h4>
       <div className="space-y-1">
         {scored.map((e: any, i: number) => {
-          const sideColor = (e.side || "").includes("Bull") ? "var(--accent-green)" : "var(--accent-red)";
+          const fa = flowAction(e.side, e.type || e.option_type, e.ask_pct);
+          const sideColor = fa.correctedSide === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
           const isMega = (parsePremium(e.premium || "$0") >= 1_000_000) && (e.vol_oi_ratio >= 10) && (e.ask_pct >= 95);
           return (
             <div key={i} className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
@@ -117,8 +118,8 @@ function DayTopPicks({ date }: { date: string }) {
               <span className="font-mono text-xs font-bold text-accent-cyan w-6">{e._score.toFixed(1)}</span>
               <span className="font-mono font-bold text-text-primary w-14">{e.ticker}</span>
               <span className="font-mono text-text-primary">${e.strike} {e.type || e.option_type}</span>
-              <span style={{ color: sideColor }} className="font-semibold">{e.side}</span>
-              <span className="text-text-muted text-xs italic">{flowAction(e.side, e.type || e.option_type)}</span>
+              <span style={{ color: sideColor }} className="font-semibold">{fa.correctedSide}</span>
+              <span className="text-text-muted text-xs italic">{fa.action}</span>
               <span className="text-text-muted">{e.expiry}</span>
               {e.vol_oi_ratio > 0 && <span className="text-accent-cyan font-mono">{e.vol_oi_ratio.toFixed(1)}x</span>}
               {e.ask_pct > 0 && <span className="text-accent-orange font-mono">{e.ask_pct}%ask</span>}
@@ -132,14 +133,26 @@ function DayTopPicks({ date }: { date: string }) {
   );
 }
 
-function flowAction(side: string, optType: string): string {
-  const s = (side || "").toLowerCase();
+function flowAction(side: string, optType: string, askPct?: number | null): { action: string; correctedSide: string } {
   const t = (optType || "").toUpperCase();
-  if (s.includes("bull") && t.includes("CALL")) return "call buying";
-  if (s.includes("bull") && t.includes("PUT")) return "put selling";
-  if (s.includes("bear") && t.includes("PUT")) return "put buying";
-  if (s.includes("bear") && t.includes("CALL")) return "call selling";
-  return "";
+  const ask = askPct ?? 50;
+
+  // ask >= 50% = buyers (lifting the ask) = aggressive entry
+  // ask < 50% = sellers (hitting the bid) = selling the contract
+  const isBuying = ask >= 50;
+
+  if (t.includes("CALL")) {
+    if (isBuying) return { action: "call buying", correctedSide: "Bull" };
+    return { action: "call selling", correctedSide: "Bear" };
+  }
+  if (t.includes("PUT")) {
+    if (isBuying) return { action: "put buying", correctedSide: "Bear" };
+    return { action: "put selling", correctedSide: "Bull" };
+  }
+
+  // Fallback to original side
+  const s = (side || "").toLowerCase();
+  return { action: "", correctedSide: s.includes("bull") ? "Bull" : "Bear" };
 }
 
 function parsePremium(s: string): number {
@@ -429,13 +442,11 @@ function TickerDetail({
                 </div>
                 <div className="space-y-1 pl-2 border-l-2 border-border">
                   {groupedEntries[date].map((entry: any, idx: number) => {
-                    const sideColor =
-                      (entry.side || "").toLowerCase().includes("bull")
-                        ? "var(--accent-green)"
-                        : "var(--accent-red)";
                     const optType = entry.option_type || entry.type || "";
                     const volOi = entry.vol_oi_ratio;
                     const askPct = entry.ask_pct;
+                    const fa = flowAction(entry.side, optType, askPct);
+                    const sideColor = fa.correctedSide === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
                     const entryKey = `${date}-${idx}`;
                     const isExpanded = expandedEntry === idx && dateKeys[0] === date;
 
@@ -449,10 +460,10 @@ function TickerDetail({
                             className="font-mono font-semibold w-10 shrink-0"
                             style={{ color: sideColor }}
                           >
-                            {entry.side}
+                            {fa.correctedSide}
                           </span>
                           <span className="text-text-muted italic w-16 shrink-0">
-                            {flowAction(entry.side, optType)}
+                            {fa.action}
                           </span>
                           <span className="font-mono font-bold text-text-primary">
                             ${entry.strike} {optType}
