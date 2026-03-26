@@ -253,40 +253,39 @@ export function CommandCenterPage() {
         </div>
       </div>
 
-      {/* Model Breakdown + Trust Scores + Intelligence */}
+      {/* Main content + Flow Analyzer side-by-side */}
       <div className="grid grid-cols-12 gap-4">
-        <div className="col-span-12 md:col-span-4">
+        {/* Left: Model Breakdown + Trust Scores + Intelligence */}
+        <div className="col-span-12 lg:col-span-5 space-y-4">
           <ModelBreakdown
             models={models}
             currentPrice={currentPrice}
             isLoading={isSignalLoading}
           />
-        </div>
-        <div className="col-span-12 md:col-span-4">
           <TrustScores
             scores={trustScores ?? []}
             isLoading={trustLoading}
           />
-        </div>
-        <div className="col-span-12 md:col-span-4">
           <IntelligencePanel
             thesis={thesis ?? null}
             isLoading={isSignalLoading}
             currentPrice={currentPrice}
           />
         </div>
-      </div>
 
-      {/* Options Flow Analyzer */}
-      <div className="card">
-        <FlowTabBar activeTab={activeFlowTab} onTabChange={setActiveFlowTab} />
+        {/* Right: Flow Analyzer */}
+        <div className="col-span-12 lg:col-span-7">
+          <div className="card sticky top-4">
+            <FlowTabBar activeTab={activeFlowTab} onTabChange={setActiveFlowTab} />
 
-        <div className="mt-3 mb-3">
-          <FlowAlerts />
-        </div>
+            <div className="mt-3 mb-3">
+              <FlowAlerts />
+            </div>
 
-        <div className="mt-3">
-          <FlowTabContent activeTab={activeFlowTab} />
+            <div className="mt-3 max-h-[calc(100vh-200px)] overflow-y-auto">
+              <FlowTabContent activeTab={activeFlowTab} />
+            </div>
+          </div>
         </div>
       </div>
     </div>
