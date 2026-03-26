@@ -223,19 +223,15 @@ export function CommandCenterPage() {
         <AnalyzeBar onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} />
       </div>
 
-      {/* Top row: Decision Hero + Action Panel */}
+      {/* Two-column layout: Left (analysis) + Right (flow engine) */}
       <div className="grid grid-cols-12 gap-4">
-        {/* Decision Hero - left column */}
-        <div className="col-span-12 md:col-span-4 lg:col-span-3">
+        {/* Left column: Signal + Models + Intelligence */}
+        <div className="col-span-12 lg:col-span-4 space-y-4">
           <DecisionHero
             signal={signal}
             marketPrice={marketPrice ?? null}
             isLoading={isSignalLoading}
           />
-        </div>
-
-        {/* Action Panel - right columns */}
-        <div className="col-span-12 md:col-span-8 lg:col-span-9">
           <ActionPanel
             signal={signal}
             currentPrice={currentPrice}
@@ -250,13 +246,6 @@ export function CommandCenterPage() {
               iv: snapshot.option.iv ? snapshot.option.iv / 100 : undefined,
             } : undefined}
           />
-        </div>
-      </div>
-
-      {/* Main content + Flow Analyzer side-by-side */}
-      <div className="grid grid-cols-12 gap-4">
-        {/* Left: Model Breakdown + Trust Scores + Intelligence */}
-        <div className="col-span-12 lg:col-span-5 space-y-4">
           <ModelBreakdown
             models={models}
             currentPrice={currentPrice}
@@ -273,8 +262,8 @@ export function CommandCenterPage() {
           />
         </div>
 
-        {/* Right: Flow Analyzer */}
-        <div className="col-span-12 lg:col-span-7">
+        {/* Right column: Flow Analyzer (wider, primary workspace) */}
+        <div className="col-span-12 lg:col-span-8">
           <div className="card sticky top-4">
             <FlowTabBar activeTab={activeFlowTab} onTabChange={setActiveFlowTab} />
 
@@ -282,7 +271,7 @@ export function CommandCenterPage() {
               <FlowAlerts />
             </div>
 
-            <div className="mt-3 max-h-[calc(100vh-200px)] overflow-y-auto">
+            <div className="mt-3 max-h-[calc(100vh-180px)] overflow-y-auto pr-1">
               <FlowTabContent activeTab={activeFlowTab} />
             </div>
           </div>
