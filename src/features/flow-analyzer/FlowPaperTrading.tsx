@@ -187,91 +187,70 @@ function SourceTag({ source }: { source?: string }) {
 }
 
 function SynthesisReport({ report }: { report: string }) {
+  // Render markdown-like content: # headers, **bold**, emojis preserved
+  function renderLine(text: string) {
+    // Convert **bold** to <strong>
+    return text.split(/(\*\*[^*]+\*\*)/).map((part, j) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={j} className="text-text-primary">{part.slice(2, -2)}</strong>;
+      }
+      return <span key={j}>{part}</span>;
+    });
+  }
+
   const lines = report.split("\n");
 
   return (
-    <div className="space-y-3 text-sm leading-relaxed">
+    <div className="space-y-2 text-sm leading-relaxed">
       {lines.map((line, i) => {
         const trimmed = line.trim();
-        if (!trimmed) return null;
+        if (!trimmed) return <div key={i} className="h-1" />;
 
-        // Title line (first line or "TOMORROW'S PLAN")
-        if (i === 0 || trimmed.startsWith("OWLS Trading Plan")) {
+        // # Title
+        if (trimmed.startsWith("# ")) {
           return (
-            <h3 key={i} className="text-base font-bold text-text-primary flex items-center gap-2">
-              📋 {trimmed}
+            <h3 key={i} className="text-lg font-bold text-text-primary pb-1 border-b border-border">
+              {renderLine(trimmed.slice(2))}
             </h3>
           );
         }
 
-        // Section headers (ALL CAPS lines or lines with ---)
-        if (trimmed === "---") {
-          return <hr key={i} className="border-border my-2" />;
-        }
-
-        if (/^(PORTFOLIO|TOMORROW|OPEN|CLOSED|PRIORITY|EXITS|WL-[AB]|MARKET|FLOW|SCORES|THEMES|STATS|CRON)/.test(trimmed)) {
-          const emoji = trimmed.startsWith("PORTFOLIO") ? "💰"
-            : trimmed.startsWith("TOMORROW") ? "🎯"
-            : trimmed.startsWith("Open") ? "📊"
-            : trimmed.startsWith("Closed") ? "✅"
-            : trimmed.startsWith("Priority") ? "⚡"
-            : trimmed.startsWith("Exits") ? "👁"
-            : trimmed.startsWith("WL-A") ? "🟢"
-            : trimmed.startsWith("WL-B") ? "🟡"
-            : trimmed.startsWith("Market") ? "📈"
-            : trimmed.startsWith("Flow") ? "🌊"
-            : trimmed.startsWith("Scores") ? "🏆"
-            : trimmed.startsWith("Themes") ? "🔗"
-            : trimmed.startsWith("Stats") ? "📊"
-            : trimmed.startsWith("Cron") ? "🤖"
-            : "📌";
+        // ## Section header
+        if (trimmed.startsWith("## ")) {
           return (
-            <div key={i} className="font-bold text-text-primary mt-2">
-              {emoji} {trimmed}
-            </div>
+            <h4 key={i} className="text-base font-semibold text-text-primary mt-3 mb-1">
+              {renderLine(trimmed.slice(3))}
+            </h4>
           );
         }
 
-        // Position lines (indented with ticker info)
-        if (trimmed.match(/^\s*\d*\.?\s*[A-Z]{1,5}\s+\$/)) {
-          const hasPnl = trimmed.includes("+") || trimmed.includes("-");
-          const isPositive = trimmed.includes("+") && !trimmed.includes("-");
+        // Lines starting with medal emojis (priority queue)
+        if (/^[🥇🥈🥉]/.test(trimmed)) {
           return (
-            <div key={i} className="font-mono text-sm pl-4 py-0.5 rounded"
-                 style={{
-                   background: "rgba(48,54,61,0.15)",
-                   borderLeft: `3px solid ${isPositive ? "var(--accent-green)" : hasPnl ? "var(--accent-red)" : "var(--border)"}`,
-                 }}>
-              <span className={hasPnl ? (isPositive ? "text-accent-green" : "text-accent-red") : "text-text-primary"}>
-                {trimmed}
-              </span>
-            </div>
-          );
-        }
-
-        // Priority queue items (numbered with scores)
-        if (trimmed.match(/^\d+\.\s/)) {
-          return (
-            <div key={i} className="font-mono text-sm pl-4 py-1 rounded flex items-start gap-2"
+            <div key={i} className="pl-3 py-1.5 rounded-md text-sm"
                  style={{ background: "rgba(88,166,255,0.06)", borderLeft: "3px solid var(--accent-blue)" }}>
-              <span className="text-text-primary">{trimmed}</span>
+              {renderLine(trimmed)}
             </div>
           );
         }
 
-        // Slot/exit info lines
-        if (trimmed.startsWith("Slot") || trimmed.includes("slot")) {
+        // Lines starting with status emojis (positions, exits)
+        if (/^[🟢🔵🟡🔴🔥⚠️🎉❌🚫✅]/.test(trimmed)) {
+          const isGreen = trimmed.startsWith("🟢") || trimmed.startsWith("🔵") || trimmed.startsWith("🎉") || trimmed.startsWith("🔥");
+          const isRed = trimmed.startsWith("🔴") || trimmed.startsWith("❌") || trimmed.startsWith("⚠️");
+          const borderColor = isGreen ? "var(--accent-green)" : isRed ? "var(--accent-red)" : "var(--border)";
           return (
-            <div key={i} className="text-accent-orange font-semibold pl-2">
-              🔄 {trimmed}
+            <div key={i} className="pl-3 py-1 rounded-md text-sm"
+                 style={{ background: "rgba(48,54,61,0.12)", borderLeft: `3px solid ${borderColor}` }}>
+              {renderLine(trimmed)}
             </div>
           );
         }
 
-        // Regular text
+        // Regular text with emojis
         return (
-          <div key={i} className="text-text-secondary pl-1">
-            {trimmed}
+          <div key={i} className="text-text-secondary text-sm">
+            {renderLine(trimmed)}
           </div>
         );
       })}
