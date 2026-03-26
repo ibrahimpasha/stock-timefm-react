@@ -16,8 +16,6 @@ import { IntelligencePanel } from "../features/command-center/IntelligencePanel"
 // Flow Analyzer feature components
 import { FlowAlerts } from "../features/flow-analyzer/FlowAlerts";
 import { FlowChat } from "../features/flow-analyzer/FlowChat";
-import { ActivePicks } from "../features/flow-analyzer/ActivePicks";
-import { PickHistory } from "../features/flow-analyzer/PickHistory";
 import { OwlsTracker } from "../features/flow-analyzer/OwlsTracker";
 
 import { FlowPaperTrading } from "../features/flow-analyzer/FlowPaperTrading";
@@ -32,19 +30,17 @@ import {
   Zap,
   MessageCircle,
   Target,
-  History,
   Eye,
 } from "lucide-react";
 
 /* ── Tab definitions ─────────────────────────────────────── */
 
-type FlowTab = "chat" | "picks" | "history" | "owls" | "flow-trader";
+type FlowTab = "chat" | "picks" | "owls" | "flow-trader";
 
 const FLOW_TABS: { id: FlowTab; label: string; icon: React.ElementType }[] = [
-  { id: "chat", label: "Flow Chat", icon: MessageCircle },
-  { id: "owls", label: "OWLS Tracker", icon: Eye },
-  { id: "history", label: "History", icon: History },
   { id: "flow-trader", label: "Flow Trader", icon: Zap },
+  { id: "owls", label: "OWLS Tracker", icon: Eye },
+  { id: "chat", label: "Flow Chat", icon: MessageCircle },
 ];
 
 /* ── Ticker Input + Analyze Bar ──────────────────────────── */
@@ -158,10 +154,6 @@ function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
           <FlowChat />
         </div>
       );
-    case "picks":
-      return <ActivePicks />;
-    case "history":
-      return <PickHistory />;
     case "owls":
       return <OwlsTracker />;
     case "flow-trader":
@@ -175,7 +167,7 @@ function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
 
 export function CommandCenterPage() {
   const ticker = useAppStore((s) => s.activeTicker);
-  const [activeFlowTab, setActiveFlowTab] = useState<FlowTab>("chat");
+  const [activeFlowTab, setActiveFlowTab] = useState<FlowTab>("flow-trader");
 
   // Data queries
   const { data: marketPrice, isLoading: priceLoading } = useMarketPrice(ticker);
