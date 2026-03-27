@@ -10,11 +10,12 @@ import {
 import { MODEL_LABELS, MODEL_COLORS } from "../../lib/constants";
 
 const AVAILABLE_MODELS = [
-  "dlinear",
-  "patchtst",
+  "ensemble",
+  "timexer",
   "itransformer",
   "timemixer",
-  "timexer",
+  "dlinear",
+  "patchtst",
   "timesnet",
   "tide",
   "chronos2",
@@ -57,7 +58,7 @@ export const DEFAULT_SETTINGS: ForecastSettings = {
   interval: "4h",
   historyDays: 365,
   historyPeriod: "60d",
-  selectedModels: ["dlinear", "patchtst", "itransformer", "timemixer", "timexer", "timesnet", "tide"],
+  selectedModels: ["ensemble", "timexer", "itransformer", "timemixer"],
   useCovariates: true,
   usePretrained: true,
   forecastOrigin: new Date().toISOString().split("T")[0],

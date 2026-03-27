@@ -13,7 +13,7 @@ export const MODEL_COLORS: Record<string, string> = {
   tide: "#79c0ff",
   chronos2: "#ffa500",
   claude: "#cc785c",
-  ensemble: "#ffffff",
+  ensemble: "#f0c040",
 };
 
 /** Human-readable model labels */
@@ -31,7 +31,7 @@ export const MODEL_LABELS: Record<string, string> = {
   tide: "TiDE",
   chronos2: "Chronos-2",
   claude: "Claude Opus",
-  ensemble: "Ensemble",
+  ensemble: "Ensemble (3-model)",
 };
 
 /** Quantile band colors (fill) */
