@@ -17,6 +17,7 @@ import {
   Clock,
   Loader2,
   Calendar,
+  Download,
 } from "lucide-react";
 import type { TrackedTicker, FlowEntry } from "../../lib/types";
 
@@ -635,6 +636,34 @@ export function OwlsTracker() {
             </span> ({owlsSummary.bull_count}B / {owlsSummary.bear_count}R)</>
           )}
         </span>
+        {dateFilter && (
+          <button
+            onClick={() => {
+              // Fetch entries and download as CSV
+              apiClient.get(`/flow/owls/entries?date=${dateFilter}`).then(({ data }) => {
+                const entries = data.entries || [];
+                if (!entries.length) return;
+                const headers = ["ticker","strike","type","side","expiry","dte","premium","vol_oi_ratio","ask_pct","underlying_price","avg_price","analysis"];
+                const rows = entries.map((e: any) => headers.map(h => {
+                  const val = e[h] ?? "";
+                  return typeof val === "string" && val.includes(",") ? `"${val}"` : val;
+                }).join(","));
+                const csv = [headers.join(","), ...rows].join("\n");
+                const blob = new Blob([csv], { type: "text/csv" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `owls-flow-${dateFilter}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              });
+            }}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-accent-blue hover:bg-accent-blue/15 transition-colors"
+          >
+            <Download size={12} />
+            CSV
+          </button>
+        )}
       </div>
 
       {/* Bias + min contracts filter */}
