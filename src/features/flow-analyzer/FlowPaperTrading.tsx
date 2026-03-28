@@ -75,7 +75,7 @@ interface MacroData {
   is_safe: boolean;
 }
 
-interface OwlsStatus {
+interface IFlowStatus {
   portfolio: Record<string, unknown>;
   macro: MacroData;
   slots: {
@@ -85,7 +85,7 @@ interface OwlsStatus {
   watchlist: { wla_count: number; wlb_count: number };
 }
 
-interface OwlsWatchlistItem {
+interface IFlowWatchlistItem {
   id?: number;
   ticker: string;
   strike: number | string;
@@ -99,12 +99,12 @@ interface OwlsWatchlistItem {
   list?: string;
 }
 
-interface OwlsWatchlist {
-  wla: OwlsWatchlistItem[];
-  wlb: OwlsWatchlistItem[];
+interface IFlowWatchlist {
+  wla: IFlowWatchlistItem[];
+  wlb: IFlowWatchlistItem[];
 }
 
-interface OwlsSynthesis {
+interface IFlowSynthesis {
   date: string;
   report: string;
 }
@@ -118,29 +118,29 @@ function useFlowPaperSummary() {
   });
 }
 
-function useOwlsTraderStatus() {
-  return useQuery<OwlsStatus>({
-    queryKey: ["owls-trader-status"],
-    queryFn: () => apiClient.get("/owls-trader/status").then((r) => r.data),
+function useIFlowTraderStatus() {
+  return useQuery<IFlowStatus>({
+    queryKey: ["iflow-trader-status"],
+    queryFn: () => apiClient.get("/iflow-trader/status").then((r) => r.data),
     staleTime: 15_000,
     refetchInterval: 30_000,
   });
 }
 
-function useOwlsTraderWatchlist() {
-  return useQuery<OwlsWatchlist>({
-    queryKey: ["owls-trader-watchlist"],
-    queryFn: () => apiClient.get("/owls-trader/watchlist").then((r) => r.data),
+function useIFlowTraderWatchlist() {
+  return useQuery<IFlowWatchlist>({
+    queryKey: ["iflow-trader-watchlist"],
+    queryFn: () => apiClient.get("/iflow-trader/watchlist").then((r) => r.data),
     staleTime: 15_000,
     refetchInterval: 30_000,
   });
 }
 
-function useOwlsSynthesis() {
-  return useQuery<OwlsSynthesis>({
-    queryKey: ["owls-synthesis"],
+function useIFlowSynthesis() {
+  return useQuery<IFlowSynthesis>({
+    queryKey: ["iflow-synthesis"],
     queryFn: () =>
-      apiClient.get("/owls-trader/synthesis").then((r) => r.data),
+      apiClient.get("/iflow-trader/synthesis").then((r) => r.data),
     staleTime: 60_000,
   });
 }
@@ -261,9 +261,9 @@ function SynthesisReport({ report }: { report: string }) {
 export function FlowPaperTrading() {
   const queryClient = useQueryClient();
   const { data: summary, isLoading } = useFlowPaperSummary();
-  const { data: owlsStatus } = useOwlsTraderStatus();
-  const { data: owlsWatchlist } = useOwlsTraderWatchlist();
-  const { data: synthesis } = useOwlsSynthesis();
+  const { data: iflowStatus } = useIFlowTraderStatus();
+  const { data: iflowWatchlist } = useIFlowTraderWatchlist();
+  const { data: synthesis } = useIFlowSynthesis();
   const [showAllWatchlist, setShowAllWatchlist] = useState(false);
   const [expandedPos, setExpandedPos] = useState<number | null>(null);
 
@@ -280,9 +280,9 @@ export function FlowPaperTrading() {
   });
 
   const synthesisMutation = useMutation({
-    mutationFn: () => apiClient.post("/owls-trader/scan", { type: "synthesis" }, { timeout: 200_000 }),
+    mutationFn: () => apiClient.post("/iflow-trader/scan", { type: "synthesis" }, { timeout: 200_000 }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["owls-synthesis"] });
+      queryClient.invalidateQueries({ queryKey: ["iflow-synthesis"] });
       queryClient.invalidateQueries({ queryKey: ["flow-paper-summary"] });
     },
   });
@@ -308,11 +308,11 @@ export function FlowPaperTrading() {
     ? sortedWatchlist
     : sortedWatchlist.slice(0, 15);
 
-  // OWLS macro
-  const macro = owlsStatus?.macro;
-  const slots = owlsStatus?.slots;
-  const wla = owlsWatchlist?.wla ?? [];
-  const wlb = owlsWatchlist?.wlb ?? [];
+  // iFlow macro
+  const macro = iflowStatus?.macro;
+  const slots = iflowStatus?.slots;
+  const wla = iflowWatchlist?.wla ?? [];
+  const wlb = iflowWatchlist?.wlb ?? [];
 
   return (
     <div className="space-y-4">

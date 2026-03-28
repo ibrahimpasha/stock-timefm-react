@@ -21,32 +21,32 @@ import {
 } from "lucide-react";
 import type { TrackedTicker, FlowEntry } from "../../lib/types";
 
-/* ── OWLS date hooks ─────────────────────────────────────── */
+/* ── iFlow date hooks ────────────────────────────────────── */
 
-function useOwlsDates() {
+function useIFlowDates() {
   return useQuery<{ dates: { date: string; entries: number; images: number; channels: string[] }[] }>({
-    queryKey: ["owls", "dates"],
-    queryFn: () => apiClient.get("/flow/owls/dates").then((r) => r.data),
+    queryKey: ["iflow", "dates"],
+    queryFn: () => apiClient.get("/flow/iflow/dates").then((r) => r.data),
     staleTime: STALE_TIMES.flow,
   });
 }
 
-function useOwlsSummary(date: string) {
+function useIFlowSummary(date: string) {
   return useQuery<{
     date: string; total_entries: number; bull_count: number; bear_count: number;
     net_sentiment: string; tickers: { ticker: string; count: number; bull: number; bear: number; total_premium: number }[];
   }>({
-    queryKey: ["owls", "summary", date],
-    queryFn: () => apiClient.get(`/flow/owls/summary?date=${date}`).then((r) => r.data),
+    queryKey: ["iflow", "summary", date],
+    queryFn: () => apiClient.get(`/flow/iflow/summary?date=${date}`).then((r) => r.data),
     staleTime: STALE_TIMES.flow,
     enabled: !!date,
   });
 }
 
-function useOwlsDateEntries(date: string) {
+function useIFlowDateEntries(date: string) {
   return useQuery<{ entries: any[]; total: number; raw_total: number }>({
-    queryKey: ["owls", "entries-all", date],
-    queryFn: () => apiClient.get(`/flow/owls/entries?date=${date}`).then((r) => r.data),
+    queryKey: ["iflow", "entries-all", date],
+    queryFn: () => apiClient.get(`/flow/iflow/entries?date=${date}`).then((r) => r.data),
     staleTime: STALE_TIMES.flow,
     enabled: !!date,
   });
@@ -55,7 +55,7 @@ function useOwlsDateEntries(date: string) {
 /* ── Top Picks for a Date ─────────────────────────────────── */
 
 function DayTopPicks({ date }: { date: string }) {
-  const { data } = useOwlsDateEntries(date);
+  const { data } = useIFlowDateEntries(date);
   if (!data || !data.entries.length) return null;
 
   // Score entries and pick top conviction ones
@@ -272,10 +272,10 @@ function TickerGridCard({
 /* ── Ticker Detail Panel ─────────────────────────────────── */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function useOwlsTickerEntries(ticker: string) {
+function useIFlowTickerEntries(ticker: string) {
   return useQuery<{ entries: any[]; total: number }>({
-    queryKey: ["owls", "entries", "ticker", ticker],
-    queryFn: () => apiClient.get(`/flow/owls/entries?ticker=${ticker}`).then((r) => r.data),
+    queryKey: ["iflow", "entries", "ticker", ticker],
+    queryFn: () => apiClient.get(`/flow/iflow/entries?ticker=${ticker}`).then((r) => r.data),
     staleTime: STALE_TIMES.flow,
     enabled: !!ticker,
   });
@@ -289,22 +289,22 @@ function TickerDetail({
   trackedData: TrackedTicker;
 }) {
   const { data: dbEntries, isLoading: dbLoading } = useFlowEntries(ticker);
-  const { data: owlsData, isLoading: owlsLoading } = useOwlsTickerEntries(ticker);
+  const { data: iflowData, isLoading: iflowLoading } = useIFlowTickerEntries(ticker);
   const { data: allPicks } = useFlowPicks("open");
   const { data: closedPicks } = useFlowPicks("closed");
   const [expandedEntry, setExpandedEntry] = useState<number | null>(null);
   const [expandedPick, setExpandedPick] = useState<number | null>(null);
 
-  const entriesLoading = dbLoading || owlsLoading;
+  const entriesLoading = dbLoading || iflowLoading;
 
-  // Merge: prefer OWLS entries (have vol_oi, ask%, analysis), fallback to DB entries
+  // Merge: prefer iFlow entries (have vol_oi, ask%, analysis), fallback to DB entries
   const mergedEntries = useMemo(() => {
-    const owlsEntries = owlsData?.entries ?? [];
+    const iflowEntries = iflowData?.entries ?? [];
     const fallback = dbEntries ?? [];
-    // Use OWLS if available, else DB
-    if (owlsEntries.length > 0) return owlsEntries;
+    // Use iFlow if available, else DB
+    if (iflowEntries.length > 0) return iflowEntries;
     return fallback;
-  }, [owlsData, dbEntries]);
+  }, [iflowData, dbEntries]);
 
   // Group entries by date
   const groupedEntries = useMemo(() => {
@@ -511,25 +511,25 @@ function TickerDetail({
   );
 }
 
-/* ── Main OwlsTracker ────────────────────────────────────── */
+/* ── Main IFlowTracker ───────────────────────────────────── */
 
-export function OwlsTracker() {
+export function IFlowTracker() {
   const [biasFilter, setBiasFilter] = useState<BiasFilter>("all");
   const [minContracts, setMinContracts] = useState(2);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateFilter, setDateFilter] = useState<string>(""); // "" = all dates (DB), "2026-03-24" = OWLS date
+  const [dateFilter, setDateFilter] = useState<string>(""); // "" = all dates (DB), "2026-03-24" = iFlow date
 
-  const { data: owlsDates } = useOwlsDates();
-  const { data: owlsSummary, isLoading: owlsLoading } = useOwlsSummary(dateFilter);
+  const { data: iflowDates } = useIFlowDates();
+  const { data: iflowSummary, isLoading: iflowLoading } = useIFlowSummary(dateFilter);
   const { data: tickers, isLoading: tickersLoading } = useTrackedTickers(30, minContracts);
 
-  const isLoading = dateFilter ? owlsLoading : tickersLoading;
+  const isLoading = dateFilter ? iflowLoading : tickersLoading;
 
-  // When a date is selected, convert OWLS summary tickers into TrackedTicker shape
+  // When a date is selected, convert iFlow summary tickers into TrackedTicker shape
   const activeTickers: TrackedTicker[] = useMemo(() => {
-    if (dateFilter && owlsSummary) {
-      return owlsSummary.tickers.map((t) => ({
+    if (dateFilter && iflowSummary) {
+      return iflowSummary.tickers.map((t) => ({
         ticker: t.ticker,
         total_entries: t.count,
         bullish: t.bull,
@@ -542,7 +542,7 @@ export function OwlsTracker() {
       }));
     }
     return tickers ?? [];
-  }, [dateFilter, owlsSummary, tickers]);
+  }, [dateFilter, iflowSummary, tickers]);
 
   // Apply filters
   const filteredTickers = useMemo(() => {
@@ -602,7 +602,7 @@ export function OwlsTracker() {
           >
             All Dates
           </button>
-          {(owlsDates?.dates ?? []).slice(0, 7).map((d) => (
+          {(iflowDates?.dates ?? []).slice(0, 7).map((d) => (
             <button
               key={d.date}
               onClick={() => { setDateFilter(d.date); setSelectedTicker(null); }}
@@ -630,17 +630,17 @@ export function OwlsTracker() {
         </div>
         <span className="text-xs text-text-muted">
           {filteredTickers.length} tickers
-          {dateFilter && owlsSummary && (
-            <> — <span style={{ color: owlsSummary.net_sentiment === "BULLISH" ? "var(--accent-green)" : owlsSummary.net_sentiment === "BEARISH" ? "var(--accent-red)" : "var(--accent-orange)" }}>
-              {owlsSummary.net_sentiment}
-            </span> ({owlsSummary.bull_count}B / {owlsSummary.bear_count}R)</>
+          {dateFilter && iflowSummary && (
+            <> — <span style={{ color: iflowSummary.net_sentiment === "BULLISH" ? "var(--accent-green)" : iflowSummary.net_sentiment === "BEARISH" ? "var(--accent-red)" : "var(--accent-orange)" }}>
+              {iflowSummary.net_sentiment}
+            </span> ({iflowSummary.bull_count}B / {iflowSummary.bear_count}R)</>
           )}
         </span>
         {dateFilter && (
           <button
             onClick={() => {
               // Fetch entries and download as CSV
-              apiClient.get(`/flow/owls/entries?date=${dateFilter}`).then(({ data }) => {
+              apiClient.get(`/flow/iflow/entries?date=${dateFilter}`).then(({ data }) => {
                 const entries = data.entries || [];
                 if (!entries.length) return;
                 const headers = ["ticker","strike","type","side","expiry","dte","premium","vol_oi_ratio","ask_pct","underlying_price","avg_price","analysis"];
@@ -653,7 +653,7 @@ export function OwlsTracker() {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;
-                a.download = `owls-flow-${dateFilter}.csv`;
+                a.download = `iflow-${dateFilter}.csv`;
                 a.click();
                 URL.revokeObjectURL(url);
               });

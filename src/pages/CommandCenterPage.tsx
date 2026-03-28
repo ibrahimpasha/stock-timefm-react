@@ -17,12 +17,12 @@ import { IntelligencePanel } from "../features/command-center/IntelligencePanel"
 // Flow Analyzer feature components
 import { FlowAlerts } from "../features/flow-analyzer/FlowAlerts";
 import { FlowChat } from "../features/flow-analyzer/FlowChat";
-import { OwlsTracker } from "../features/flow-analyzer/OwlsTracker";
+import { IFlowTracker } from "../features/flow-analyzer/IFlowTracker";
 
 import { FlowPaperTrading } from "../features/flow-analyzer/FlowPaperTrading";
 
-// OWLS Discord Pipeline
-import { FetchOwlsPanel } from "../features/flow-analyzer/FetchOwlsPanel";
+// iFlow Discord Pipeline
+import { FetchIFlowPanel } from "../features/flow-analyzer/FetchIFlowPanel";
 
 import {
   Command,
@@ -37,11 +37,11 @@ import {
 
 /* ── Tab definitions ─────────────────────────────────────── */
 
-type FlowTab = "chat" | "picks" | "owls" | "flow-trader";
+type FlowTab = "chat" | "picks" | "iflow" | "flow-trader";
 
 const FLOW_TABS: { id: FlowTab; label: string; icon: React.ElementType }[] = [
   { id: "flow-trader", label: "Flow Trader", icon: Zap },
-  { id: "owls", label: "OWLS Tracker", icon: Eye },
+  { id: "iflow", label: "iFlow Tracker", icon: Eye },
   { id: "chat", label: "Flow Chat", icon: MessageCircle },
 ];
 
@@ -171,12 +171,12 @@ function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
     case "chat":
       return (
         <div className="space-y-3">
-          <FetchOwlsPanel />
+          <FetchIFlowPanel />
           <FlowChat />
         </div>
       );
-    case "owls":
-      return <OwlsTracker />;
+    case "iflow":
+      return <IFlowTracker />;
     case "flow-trader":
       return <FlowPaperTrading />;
     default:

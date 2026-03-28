@@ -65,7 +65,7 @@ export function FlowChat() {
     mutationFn: (text: string) => apiClient.post("/flow/intel", { text, source: "gemini" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["flow", "chat"] });
-      qc.invalidateQueries({ queryKey: ["owls-synthesis"] });
+      qc.invalidateQueries({ queryKey: ["iflow-synthesis"] });
     },
   });
 

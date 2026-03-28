@@ -3,8 +3,8 @@ import { Download, Loader2, Eye, EyeOff, Hash } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import apiClient from "../../api/client";
 
-const LS_TOKEN_KEY = "owls_discord_token";
-const LS_WEBHOOK_KEY = "owls_discord_webhook";
+const LS_TOKEN_KEY = "iflow_discord_token";
+const LS_WEBHOOK_KEY = "iflow_discord_webhook";
 
 const DEFAULT_CHANNELS = [
   { id: "1344031856211005460", label: "Channel 1" },
@@ -27,7 +27,7 @@ function savePersist(key: string, value: string) {
   }
 }
 
-export function FetchOwlsPanel() {
+export function FetchIFlowPanel() {
   const store = useAppStore();
   const [token, setToken] = useState(
     store.discordToken || loadSaved(LS_TOKEN_KEY)
@@ -78,14 +78,14 @@ export function FetchOwlsPanel() {
       // Start polling progress
       const pollId = setInterval(async () => {
         try {
-          const { data: p } = await apiClient.get("/flow/fetch-owls/progress");
+          const { data: p } = await apiClient.get("/flow/fetch-iflow/progress");
           if (p.running) setProgress(p);
         } catch { /* ignore */ }
       }, 1500);
 
       try {
         const { data } = await apiClient.post(
-          "/flow/fetch-owls",
+          "/flow/fetch-iflow",
           {
             token,
             channel_id: channelId,
@@ -135,7 +135,7 @@ export function FetchOwlsPanel() {
         className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs text-text-secondary hover:text-accent-blue hover:border-accent-blue/40 transition-all"
       >
         <Download size={14} />
-        Fetch OWLS
+        Fetch iFlow
       </button>
     );
   }
@@ -144,7 +144,7 @@ export function FetchOwlsPanel() {
     <div className="card space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-text-primary">
-          OWLS Discord Pipeline
+          iFlow Discord Pipeline
         </h3>
         <button
           onClick={() => setIsOpen(false)}
