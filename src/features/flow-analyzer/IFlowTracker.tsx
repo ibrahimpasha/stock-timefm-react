@@ -465,17 +465,22 @@ function TickerDetail({
                     const underlyingAtFill = entry.underlying_price || 0;
                     const strike = entry.strike || 0;
                     const isPut = optType.toUpperCase().includes("P");
+                    const isSelling = fa.action.includes("selling"); // put selling or call selling
                     let estimatedPnl: number | null = null;
-                    if (currentStockPrice > 0 && underlyingAtFill > 0 && strike > 0) {
+                    if (currentStockPrice > 0 && underlyingAtFill > 0 && strike > 0 && entry.avg_price) {
                       const stockMovePct = (currentStockPrice - underlyingAtFill) / underlyingAtFill;
                       // Delta approximation: ATM ~0.5, ITM ~0.7, OTM ~0.3
                       const moneyness = isPut
                         ? (strike - currentStockPrice) / strike
                         : (currentStockPrice - strike) / strike;
                       const delta = moneyness > 0.05 ? 0.65 : moneyness > -0.05 ? 0.5 : 0.3;
-                      const leverage = currentStockPrice / (entry.avg_price || 1);
-                      const optPnl = isPut ? -stockMovePct * delta * leverage * 100 : stockMovePct * delta * leverage * 100;
-                      estimatedPnl = Math.round(optPnl);
+                      const leverage = Math.min(currentStockPrice / (entry.avg_price || 1), 200);
+                      let optPnl = isPut
+                        ? -stockMovePct * delta * leverage * 100
+                        : stockMovePct * delta * leverage * 100;
+                      // Sellers profit when options lose value (inverted P/L)
+                      if (isSelling) optPnl = -optPnl;
+                      estimatedPnl = Math.round(Math.max(-100, Math.min(optPnl, 1000)));
                     }
 
                     return (
