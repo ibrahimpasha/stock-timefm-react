@@ -69,7 +69,7 @@ export const DEFAULT_TICKER = "INTC";
 /** React Query stale times */
 export const STALE_TIMES = {
   price: 30_000, // 30s
-  forecast: 5 * 60_000, // 5min
+  forecast: 60_000, // 1min — forecasts should refresh frequently
   intel: 10 * 60_000, // 10min
   eval: 5 * 60_000, // 5min
   flow: 60_000, // 1min

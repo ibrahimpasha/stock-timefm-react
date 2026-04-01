@@ -39,7 +39,8 @@ export function useForecast(
       );
       return data;
     },
-    staleTime: STALE_TIMES.forecast,
+    staleTime: 0, // Always fresh -- forecasts run ML inference, don't serve stale
+    gcTime: 0,    // Don't persist across component unmounts
     enabled,
   });
 }
@@ -59,7 +60,8 @@ export function useEnsembleForecast(
       );
       return data;
     },
-    staleTime: STALE_TIMES.forecast,
+    staleTime: 0,
+    gcTime: 0,
     enabled,
   });
 }
