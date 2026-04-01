@@ -295,6 +295,16 @@ function TickerDetail({
   const [expandedEntry, setExpandedEntry] = useState<number | null>(null);
   const [expandedPick, setExpandedPick] = useState<number | null>(null);
 
+  // Fetch current stock price for P/L calculation
+  const { data: priceData } = useQuery({
+    queryKey: ["market-price", ticker],
+    queryFn: () => apiClient.get(`/market/price?ticker=${ticker}`).then((r) => r.data),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    enabled: !!ticker,
+  });
+  const currentStockPrice = priceData?.price || 0;
+
   const entriesLoading = dbLoading || iflowLoading;
 
   // Merge: prefer iFlow entries (have vol_oi, ask%, analysis), fallback to DB entries
@@ -451,6 +461,23 @@ function TickerDetail({
                     const entryKey = `${date}-${idx}`;
                     const isExpanded = expandedEntry === idx && dateKeys[0] === date;
 
+                    // Estimate P/L from underlying price movement
+                    const underlyingAtFill = entry.underlying_price || 0;
+                    const strike = entry.strike || 0;
+                    const isPut = optType.toUpperCase().includes("P");
+                    let estimatedPnl: number | null = null;
+                    if (currentStockPrice > 0 && underlyingAtFill > 0 && strike > 0) {
+                      const stockMovePct = (currentStockPrice - underlyingAtFill) / underlyingAtFill;
+                      // Delta approximation: ATM ~0.5, ITM ~0.7, OTM ~0.3
+                      const moneyness = isPut
+                        ? (strike - currentStockPrice) / strike
+                        : (currentStockPrice - strike) / strike;
+                      const delta = moneyness > 0.05 ? 0.65 : moneyness > -0.05 ? 0.5 : 0.3;
+                      const leverage = currentStockPrice / (entry.avg_price || 1);
+                      const optPnl = isPut ? -stockMovePct * delta * leverage * 100 : stockMovePct * delta * leverage * 100;
+                      estimatedPnl = Math.round(optPnl);
+                    }
+
                     return (
                       <div key={entryKey}>
                         <div
@@ -480,6 +507,14 @@ function TickerDetail({
                               {askPct}%ask
                             </span>
                           )}
+                          {estimatedPnl !== null && (
+                            <span
+                              className="font-mono font-bold shrink-0"
+                              style={{ color: estimatedPnl >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}
+                            >
+                              {estimatedPnl >= 0 ? "+" : ""}{estimatedPnl}%
+                            </span>
+                          )}
                           <span className="text-text-secondary ml-auto font-mono">
                             {entry.premium}
                           </span>
@@ -489,11 +524,14 @@ function TickerDetail({
                           <div className="ml-12 mr-2 mb-2 px-2 py-1.5 rounded text-xs text-text-secondary leading-relaxed"
                                style={{ background: "rgba(13,17,23,0.5)" }}>
                             {entry.analysis}
-                            {entry.underlying_price && (
+                            {(entry.underlying_price || entry.avg_price) && (
                               <div className="mt-1 font-mono text-text-muted">
-                                Underlying: ${entry.underlying_price}
-                                {entry.avg_price ? ` · Avg fill: $${entry.avg_price}` : ""}
-                                {entry.dte ? ` · ${entry.dte} DTE` : ""}
+                                {entry.underlying_price ? `Underlying @ fill: $${entry.underlying_price}` : ""}
+                                {currentStockPrice > 0 ? ` | Now: $${currentStockPrice.toFixed(2)}` : ""}
+                                {entry.underlying_price && currentStockPrice > 0 ? ` (${((currentStockPrice - entry.underlying_price) / entry.underlying_price * 100).toFixed(1)}%)` : ""}
+                                {entry.avg_price ? ` | Opt fill: $${entry.avg_price}` : ""}
+                                {entry.dte ? ` | ${entry.dte} DTE` : ""}
+                                {estimatedPnl !== null ? ` | Est P/L: ${estimatedPnl >= 0 ? "+" : ""}${estimatedPnl}%` : ""}
                               </div>
                             )}
                           </div>
