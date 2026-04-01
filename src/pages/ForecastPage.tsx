@@ -40,9 +40,18 @@ export function ForecastPage() {
     retry: 1,
   });
 
-  // Auto-load saved forecasts when snapshot arrives
+  // Auto-load saved forecasts when snapshot arrives (only if fresh -- within 24h)
   useEffect(() => {
     if (snapshot && snapshot.ensemble?.models?.length > 0 && forecasts.length === 0) {
+      const genAt = String(snapshot.generated_at || "").slice(0, 10);
+      // Skip stale snapshots (older than 24h)
+      const now = new Date();
+      const genDate = genAt ? new Date(genAt) : null;
+      const ageHours = genDate ? (now.getTime() - genDate.getTime()) / (1000 * 60 * 60) : 999;
+      if (ageHours > 24) {
+        return; // Don't auto-load stale forecasts
+      }
+
       const models: ModelForecast[] = snapshot.ensemble.models.map((m: Record<string, unknown>) => ({
         model: m.model as string,
         prices: (m.prices as number[]) || [],
@@ -52,8 +61,6 @@ export function ForecastPage() {
         latency_ms: 0,
       }));
       setForecasts(models);
-      // Set the origin to when the forecast was generated
-      const genAt = String(snapshot.generated_at || "").slice(0, 10);
       if (genAt && genAt.length === 10) {
         setForecastOriginOverride(genAt);
       }
