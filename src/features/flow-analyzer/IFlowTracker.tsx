@@ -31,13 +31,17 @@ function useIFlowDates() {
   });
 }
 
-function useIFlowSummary(date: string) {
+function useIFlowSummary(date: string, dteFilter: DteFilter = "all") {
+  const dteParams = dteFilter === "lotto" ? "&dte_min=1&dte_max=14"
+    : dteFilter === "swing" ? "&dte_min=15&dte_max=60"
+    : dteFilter === "leap" ? "&dte_min=61"
+    : "";
   return useQuery<{
     date: string; total_entries: number; bull_count: number; bear_count: number;
     net_sentiment: string; tickers: { ticker: string; count: number; bull: number; bear: number; total_premium: number }[];
   }>({
-    queryKey: ["iflow", "summary", date],
-    queryFn: () => apiClient.get(`/flow/iflow/summary?date=${date}`).then((r) => r.data),
+    queryKey: ["iflow", "summary", date, dteFilter],
+    queryFn: () => apiClient.get(`/flow/iflow/summary?date=${date}${dteParams}`).then((r) => r.data),
     staleTime: STALE_TIMES.flow,
     enabled: !!date,
   });
@@ -608,7 +612,7 @@ export function IFlowTracker() {
   const [dateFilter, setDateFilter] = useState<string>(""); // "" = all dates (DB), "2026-03-24" = iFlow date
 
   const { data: iflowDates } = useIFlowDates();
-  const { data: iflowSummary, isLoading: iflowLoading } = useIFlowSummary(dateFilter);
+  const { data: iflowSummary, isLoading: iflowLoading } = useIFlowSummary(dateFilter, dteFilter);
   const { data: tickers, isLoading: tickersLoading } = useTrackedTickers(30, minContracts);
 
   const isLoading = dateFilter ? iflowLoading : tickersLoading;
