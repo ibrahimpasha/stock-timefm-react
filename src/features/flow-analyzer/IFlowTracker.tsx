@@ -54,7 +54,7 @@ function useIFlowDateEntries(date: string) {
 
 /* ── Top Picks for a Date ─────────────────────────────────── */
 
-function DayTopPicks({ date }: { date: string }) {
+function DayTopPicks({ date, dteFilter = "all" }: { date: string; dteFilter?: DteFilter }) {
   const { data } = useIFlowDateEntries(date);
   if (!data || !data.entries.length) return null;
 
@@ -94,6 +94,14 @@ function DayTopPicks({ date }: { date: string }) {
       return { ...e, _score: score };
     })
     .filter((e: any) => e._score >= 7.0)
+    .filter((e: any) => {
+      if (dteFilter === "all") return true;
+      const dte = e.dte || 0;
+      if (dteFilter === "lotto") return dte > 0 && dte <= 14;
+      if (dteFilter === "swing") return dte > 14 && dte <= 60;
+      if (dteFilter === "leap") return dte > 60;
+      return true;
+    })
     .sort((a: any, b: any) => b._score - a._score)
     .slice(0, 15);
 
@@ -122,10 +130,17 @@ function DayTopPicks({ date }: { date: string }) {
               <span style={{ color: sideColor }} className="font-semibold">{fa.correctedSide}</span>
               <span className="text-text-muted text-xs italic">{fa.action}</span>
               <span className="text-text-muted">{e.expiry}</span>
+              {(() => {
+                const dte = e.dte || 0;
+                if (dte > 0 && dte <= 14) return <span className="font-mono text-accent-orange px-1 rounded" style={{ background: "rgba(227,127,46,0.12)" }}>LOTTO</span>;
+                if (dte > 14 && dte <= 60) return <span className="font-mono text-accent-blue px-1 rounded" style={{ background: "rgba(88,166,255,0.12)" }}>SWING</span>;
+                if (dte > 60) return <span className="font-mono text-accent-cyan px-1 rounded" style={{ background: "rgba(56,211,168,0.12)" }}>LEAP</span>;
+                return null;
+              })()}
               {e.vol_oi_ratio > 0 && <span className="text-accent-cyan font-mono">{e.vol_oi_ratio.toFixed(1)}x</span>}
               {e.ask_pct > 0 && <span className="text-accent-orange font-mono">{e.ask_pct}%ask</span>}
               <span className="text-text-secondary ml-auto font-mono">{e.premium}</span>
-              {isMega && <span className="text-xs font-bold text-accent-green">🔥MEGA</span>}
+              {isMega && <span className="text-xs font-bold text-accent-green">MEGA</span>}
             </div>
           );
         })}
@@ -166,29 +181,41 @@ function parsePremium(s: string): number {
 /* ── Bias Filter ─────────────────────────────────────────── */
 
 type BiasFilter = "all" | "bullish" | "bearish";
+type DteFilter = "all" | "lotto" | "swing" | "leap";
 
 function BiasFilterBar({
   value,
   onChange,
+  dteFilter,
+  onDteFilterChange,
   minContracts,
   onMinContractsChange,
 }: {
   value: BiasFilter;
   onChange: (v: BiasFilter) => void;
+  dteFilter: DteFilter;
+  onDteFilterChange: (v: DteFilter) => void;
   minContracts: number;
   onMinContractsChange: (v: number) => void;
 }) {
-  const options: { label: string; value: BiasFilter; color: string }[] = [
+  const biasOptions: { label: string; value: BiasFilter; color: string }[] = [
     { label: "All", value: "all", color: "var(--text-secondary)" },
     { label: "Bullish", value: "bullish", color: "var(--accent-green)" },
     { label: "Bearish", value: "bearish", color: "var(--accent-red)" },
   ];
 
+  const dteOptions: { label: string; value: DteFilter; color: string }[] = [
+    { label: "All DTE", value: "all", color: "var(--text-secondary)" },
+    { label: "Lotto", value: "lotto", color: "var(--accent-orange)" },
+    { label: "Swing", value: "swing", color: "var(--accent-blue)" },
+    { label: "Leap", value: "leap", color: "var(--accent-cyan)" },
+  ];
+
   return (
-    <div className="flex items-center gap-3 mb-4">
+    <div className="flex items-center gap-3 mb-4 flex-wrap">
       <Filter size={13} className="text-text-muted" />
       <div className="flex items-center rounded-lg border border-border overflow-hidden">
-        {options.map((opt) => (
+        {biasOptions.map((opt) => (
           <button
             key={opt.value}
             onClick={() => onChange(opt.value)}
@@ -196,6 +223,22 @@ function BiasFilterBar({
             style={{
               background: value === opt.value ? `${opt.color}15` : "transparent",
               color: value === opt.value ? opt.color : "var(--text-muted)",
+              borderRight: "1px solid var(--border)",
+            }}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center rounded-lg border border-border overflow-hidden">
+        {dteOptions.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => onDteFilterChange(opt.value)}
+            className="px-3 py-1 text-xs font-semibold transition-colors"
+            style={{
+              background: dteFilter === opt.value ? `${opt.color}15` : "transparent",
+              color: dteFilter === opt.value ? opt.color : "var(--text-muted)",
               borderRight: "1px solid var(--border)",
             }}
           >
@@ -558,6 +601,7 @@ function TickerDetail({
 
 export function IFlowTracker() {
   const [biasFilter, setBiasFilter] = useState<BiasFilter>("all");
+  const [dteFilter, setDteFilter] = useState<DteFilter>("all");
   const [minContracts, setMinContracts] = useState(2);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -713,12 +757,14 @@ export function IFlowTracker() {
       <BiasFilterBar
         value={biasFilter}
         onChange={setBiasFilter}
+        dteFilter={dteFilter}
+        onDteFilterChange={setDteFilter}
         minContracts={minContracts}
         onMinContractsChange={setMinContracts}
       />
 
       {/* Top conviction picks for selected date */}
-      {dateFilter && <DayTopPicks date={dateFilter} />}
+      {dateFilter && <DayTopPicks date={dateFilter} dteFilter={dteFilter} />}
 
       <div className="grid grid-cols-12 gap-4">
         {/* Ticker grid */}
