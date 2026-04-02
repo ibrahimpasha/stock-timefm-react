@@ -40,23 +40,35 @@ export function ForecastPage() {
     retry: 1,
   });
 
-  // Auto-load saved forecasts when snapshot arrives (only if fresh -- within 24h)
+  // Detect stale snapshot (older than 24h)
+  const snapshotStale = (() => {
+    if (!snapshot?.generated_at) return false;
+    const genAt = String(snapshot.generated_at).slice(0, 10);
+    const genDate = genAt ? new Date(genAt) : null;
+    if (!genDate) return false;
+    const ageHours = (Date.now() - genDate.getTime()) / (1000 * 60 * 60);
+    return ageHours > 24;
+  })();
+
+  // Auto-load saved forecasts when snapshot arrives (regardless of age)
   useEffect(() => {
     if (snapshot && snapshot.ensemble?.models?.length > 0 && forecasts.length === 0) {
       const genAt = String(snapshot.generated_at || "").slice(0, 10);
-      // Skip stale snapshots (older than 24h)
-      const now = new Date();
-      const genDate = genAt ? new Date(genAt) : null;
-      const ageHours = genDate ? (now.getTime() - genDate.getTime()) / (1000 * 60 * 60) : 999;
-      if (ageHours > 24) {
-        return; // Don't auto-load stale forecasts
-      }
 
       const models: ModelForecast[] = snapshot.ensemble.models.map((m: Record<string, unknown>) => ({
-        model: m.model as string,
+        model: (m.model as string) || "",
         prices: (m.prices as number[]) || [],
         end_price: (m.end_price as number) || 0,
-        predictions: (m.predictions as Record<string, unknown>[]) || [],
+        predictions: ((m.predictions as Record<string, unknown>[]) || []).map((p) => ({
+          timestamp: (p.date as string) || "",
+          price: (p.price as number) || 0,
+          change: 0,
+          pct_change: 0,
+          q10: (p.q10 as number) || 0,
+          q25: (p.q25 as number) || 0,
+          q75: (p.q75 as number) || 0,
+          q90: (p.q90 as number) || 0,
+        })),
         current_price: (m.current_price as number) || 0,
         latency_ms: 0,
       }));
@@ -165,6 +177,13 @@ export function ForecastPage() {
           )}
         </div>
       </div>
+
+      {/* Stale snapshot indicator */}
+      {snapshotStale && forecasts.length > 0 && !isRunning && (
+        <div className="rounded-md border border-yellow-600/40 bg-yellow-900/20 px-3 py-2 text-sm text-yellow-400">
+          Showing saved forecast from {String(snapshot?.generated_at || "").slice(0, 10)} (older than 24h). Run a new forecast for fresh results.
+        </div>
+      )}
 
       {/* Forecast Configuration — always visible */}
       <ForecastConfig
