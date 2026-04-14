@@ -1,150 +1,285 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useTrackedTickers, useFlowEntries, useFlowPicks } from "../../api/flow";
+import { useFlowPicks, useTrackedTickers } from "../../api/flow";
 import apiClient from "../../api/client";
 import { BullBearBar } from "../../components/BullBearBar";
 import { PickCard } from "../../components/PickCard";
-import { formatDate, formatCurrency } from "../../lib/utils";
+import { formatDate } from "../../lib/utils";
 import { STALE_TIMES } from "../../lib/constants";
 import {
-  Eye,
-  Search,
-  Filter,
-  ChevronRight,
-  TrendingUp,
-  TrendingDown,
-  BarChart3,
-  Clock,
-  Loader2,
-  Calendar,
-  Download,
+  Eye, Search, Filter, TrendingUp, TrendingDown, Download,
 } from "lucide-react";
-import type { TrackedTicker, FlowEntry } from "../../lib/types";
+import type { TrackedTicker } from "../../lib/types";
 
-/* ── iFlow date hooks ────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   TYPES & UTILS
+   ═══════════════════════════════════════════════════════════ */
+type BiasFilter = "all" | "bullish" | "bearish";
+type DteFilter = "all" | "lotto" | "swing" | "leap";
 
+function classifySide(optType: string, askPct?: number | null, volOi?: number | null, fallback?: string) {
+  const t = (optType || "").toUpperCase();
+  const ask = askPct ?? 50;
+  const voi = volOi ?? 0;
+  const buying = ask >= 55 ? true : ask < 40 ? false : voi >= 1.5;
+  if (t.includes("CALL")) return buying ? { side: "Bull" as const, action: "call buying" } : { side: "Bear" as const, action: "call selling" };
+  if (t.includes("PUT")) return buying ? { side: "Bear" as const, action: "put buying" } : { side: "Bull" as const, action: "put selling" };
+  return { side: ((fallback || "").toLowerCase().includes("bull") ? "Bull" : "Bear") as "Bull" | "Bear", action: "" };
+}
+
+function parsePremium(s: string): number {
+  const c = (s || "").replace("$", "").replace(/,/g, "").trim();
+  if (c.toUpperCase().endsWith("M")) return parseFloat(c) * 1e6;
+  if (c.toUpperCase().endsWith("K")) return parseFloat(c) * 1e3;
+  return parseFloat(c) || 0;
+}
+
+function fmtPremium(n: number) {
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
+  return `$${n.toFixed(0)}`;
+}
+
+function matchesDte(dte: number | null | undefined, f: DteFilter) {
+  if (f === "all") return true;
+  const d = dte || 0;
+  if (d <= 0) return false;
+  if (f === "lotto") return d <= 14;
+  if (f === "swing") return d > 14 && d <= 60;
+  if (f === "leap") return d > 60;
+  return true;
+}
+
+function dteTag(dte: number | null | undefined) {
+  const d = dte || 0;
+  if (d > 0 && d <= 14) return { text: "LOTTO", color: "var(--accent-orange)", bg: "rgba(227,127,46,0.12)" };
+  if (d > 14 && d <= 60) return { text: "SWING", color: "var(--accent-blue)", bg: "rgba(88,166,255,0.12)" };
+  if (d > 60) return { text: "LEAP", color: "var(--accent-cyan)", bg: "rgba(56,211,168,0.12)" };
+  return null;
+}
+
+function scoreEntry(e: any) {
+  let s = 0;
+  const prem = parsePremium(e.premium || "$0"), voi = e.vol_oi_ratio || 0, ask = e.ask_pct || 0, dte = e.dte || 0;
+  const { side } = classifySide(e.type || e.option_type, e.ask_pct, e.vol_oi_ratio, e.side);
+  const t = (e.type || e.option_type || "").toUpperCase();
+  if (prem >= 5e6) s += 2.5; else if (prem >= 1e6) s += 2; else if (prem >= 5e5) s += 1.5; else if (prem >= 2e5) s += 1;
+  if (ask >= 90) s += 2; else if (ask >= 75) s += 1.5; else if (ask >= 50) s += 1;
+  if (voi >= 100) s += 3; else if (voi >= 10) s += 2; else if (voi >= 5) s += 1.5; else if (voi >= 2) s += 1;
+  if ((side === "Bear" && t.includes("PUT")) || (side === "Bull" && t.includes("CALL"))) s += 1.5;
+  if (dte < 3) s -= 3; else if (dte < 7) s -= 1.5; else if (dte >= 90) s += 0.5;
+  return s;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   API HOOKS
+   ═══════════════════════════════════════════════════════════ */
 function useIFlowDates() {
-  return useQuery<{ dates: { date: string; entries: number; images: number; channels: string[] }[] }>({
+  return useQuery<{ dates: { date: string; entries: number }[] }>({
     queryKey: ["iflow", "dates"],
     queryFn: () => apiClient.get("/flow/iflow/dates").then((r) => r.data),
     staleTime: STALE_TIMES.flow,
   });
 }
 
-function useIFlowSummary(date: string, dteFilter: DteFilter = "all") {
-  const dteParams = dteFilter === "lotto" ? "&dte_min=1&dte_max=14"
-    : dteFilter === "swing" ? "&dte_min=15&dte_max=60"
-    : dteFilter === "leap" ? "&dte_min=61"
-    : "";
-  return useQuery<{
-    date: string; total_entries: number; bull_count: number; bear_count: number;
-    net_sentiment: string; tickers: { ticker: string; count: number; bull: number; bear: number; total_premium: number }[];
-  }>({
-    queryKey: ["iflow", "summary", date, dteFilter],
-    queryFn: () => apiClient.get(`/flow/iflow/summary?date=${date}${dteParams}`).then((r) => r.data),
+function useIFlowSummary(date: string, dte: DteFilter) {
+  const p = dte === "lotto" ? "&dte_min=1&dte_max=14" : dte === "swing" ? "&dte_min=15&dte_max=60" : dte === "leap" ? "&dte_min=61" : "";
+  return useQuery<{ total_entries: number; bull_count: number; bear_count: number; net_sentiment: string; tickers: { ticker: string; count: number; bull: number; bear: number; total_premium: number }[] }>({
+    queryKey: ["iflow", "summary", date, dte],
+    queryFn: () => apiClient.get(`/flow/iflow/summary?date=${date}${p}`).then((r) => r.data),
     staleTime: STALE_TIMES.flow,
     enabled: !!date,
   });
 }
 
-function useIFlowDateEntries(date: string) {
-  return useQuery<{ entries: any[]; total: number; raw_total: number }>({
-    queryKey: ["iflow", "entries-all", date],
-    queryFn: () => apiClient.get(`/flow/iflow/entries?date=${date}`).then((r) => r.data),
+function useIFlowEntries(date: string, ticker?: string) {
+  const t = ticker ? `&ticker=${ticker}` : "";
+  return useQuery<{ entries: any[] }>({
+    queryKey: ["iflow", "entries", date, ticker || ""],
+    queryFn: () => apiClient.get(`/flow/iflow/entries?date=${date}${t}`).then((r) => r.data),
     staleTime: STALE_TIMES.flow,
     enabled: !!date,
   });
 }
 
-/* ── Top Picks for a Date ─────────────────────────────────── */
+function useIFlowHistory(ticker: string) {
+  return useQuery<{ by_date: Record<string, { entries: any[]; entry_count: number }> }>({
+    queryKey: ["iflow", "history", ticker],
+    queryFn: () => apiClient.get(`/flow/iflow/history?ticker=${ticker}&days=30`).then((r) => r.data),
+    staleTime: STALE_TIMES.flow,
+    enabled: !!ticker,
+  });
+}
 
-function DayTopPicks({ date, dteFilter = "all" }: { date: string; dteFilter?: DteFilter }) {
-  const { data } = useIFlowDateEntries(date);
-  if (!data || !data.entries.length) return null;
+function useStockPrice(ticker: string) {
+  return useQuery<{ price: number }>({
+    queryKey: ["market-price", ticker],
+    queryFn: () => apiClient.get(`/market/price?ticker=${ticker}`).then((r) => r.data),
+    staleTime: 30_000, refetchInterval: 60_000, enabled: !!ticker,
+  });
+}
 
-  // Score entries and pick top conviction ones
+/* ═══════════════════════════════════════════════════════════
+   ENTRY ROW — reusable for TopPicks and TickerDetail
+   ═══════════════════════════════════════════════════════════ */
+/**
+ * Estimate option P/L % using delta approximation + time decay.
+ *
+ * Given: underlying at fill, current underlying, option fill price, strike, DTE at fill, option type
+ * Approximation:
+ *   1. Estimate delta from moneyness: ATM ~0.50, ITM ~0.65-0.80, OTM ~0.20-0.40
+ *   2. Option price change ≈ delta × (underlying change) - theta decay
+ *   3. Theta ≈ fill_price / (dte_at_fill * theta_factor) per day elapsed
+ *   4. P/L % = estimated_change / fill_price × 100
+ */
+function estimateOptionPnl(
+  underlyingAtFill: number, currentPrice: number, optFill: number,
+  strike: number, dteAtFill: number, optType: string, flowDate?: string,
+): number | null {
+  if (!underlyingAtFill || !currentPrice || !optFill || optFill <= 0 || !strike) return null;
+
+  const isPut = optType.toUpperCase().includes("PUT");
+  const stockMove = currentPrice - underlyingAtFill;
+
+  // Moneyness: how far ITM/OTM as fraction of strike
+  const moneyness = isPut
+    ? (strike - currentPrice) / strike
+    : (currentPrice - strike) / strike;
+
+  // Delta estimate based on moneyness
+  let delta: number;
+  if (moneyness > 0.10) delta = 0.72;       // deep ITM
+  else if (moneyness > 0.02) delta = 0.58;  // slightly ITM
+  else if (moneyness > -0.02) delta = 0.50; // ATM
+  else if (moneyness > -0.10) delta = 0.35; // slightly OTM
+  else if (moneyness > -0.20) delta = 0.20; // OTM
+  else delta = 0.10;                          // deep OTM
+
+  // Gamma boost: if stock moved significantly, delta shifted
+  const pctMove = Math.abs(stockMove / underlyingAtFill);
+  if (pctMove > 0.05) delta = Math.min(0.90, delta + 0.10); // big move = delta expanded
+
+  // Intrinsic value change from stock movement
+  const optionDelta = isPut ? -delta : delta;
+  const deltaGain = optionDelta * stockMove;
+
+  // Theta decay: estimate days elapsed from flow_date
+  let daysElapsed = 0;
+  if (flowDate) {
+    const fd = new Date(flowDate);
+    const now = new Date();
+    daysElapsed = Math.max(0, Math.round((now.getTime() - fd.getTime()) / 86400000));
+  }
+  // Theta accelerates as expiry approaches. Rough: daily decay = fill / (dte * 1.5)
+  // But cap it — theta shouldn't eat more than 60% of the option value over the period
+  const effectiveDte = Math.max(dteAtFill || 30, 5);
+  const dailyTheta = optFill / (effectiveDte * 1.8);
+  const thetaLoss = Math.min(dailyTheta * daysElapsed, optFill * 0.6);
+
+  // Estimated current option price
+  const estCurrentOpt = Math.max(0.01, optFill + deltaGain - thetaLoss);
+  const pnlPct = ((estCurrentOpt - optFill) / optFill) * 100;
+
+  return Math.round(Math.max(-100, Math.min(pnlPct, 999)));
+}
+
+function EntryRow({ entry, price, expandedKey, entryKey, onToggle }: {
+  entry: any; price: number; expandedKey: string | null; entryKey: string; onToggle: (k: string) => void;
+}) {
+  const optType = entry.type || entry.option_type || "";
+  const { side, action } = classifySide(optType, entry.ask_pct, entry.vol_oi_ratio, entry.side);
+  const color = side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
+  const expanded = expandedKey === entryKey;
+  const dl = dteTag(entry.dte);
+
+  // P/L: use delta-based estimate if we have option fill price, else fall back to underlying change
+  const uf = entry.underlying_price || 0;
+  const optFill = entry.avg_price || 0;
+  const strike = entry.strike || 0;
+  const dte = entry.dte || 30;
+  const flowDate = entry._date || entry.flow_date || "";
+
+  let pnl: number | null = null;
+  if (price > 0 && uf > 0 && optFill > 0 && strike > 0) {
+    // Full delta-based estimate
+    pnl = estimateOptionPnl(uf, price, optFill, strike, dte, optType, flowDate);
+  } else if (price > 0 && uf > 0) {
+    // Fallback: simple underlying % change
+    pnl = Math.round(((price - uf) / uf) * 100 * (optType.toUpperCase().includes("PUT") ? -1 : 1));
+    pnl = Math.max(-100, Math.min(pnl, 999));
+  }
+  return (
+    <div>
+      <div className="flex items-center gap-2 text-xs py-1.5 px-2 rounded hover:bg-bg-card-hover transition-colors cursor-pointer"
+        onClick={() => onToggle(entryKey)}>
+        <span className="font-mono font-semibold w-10 shrink-0" style={{ color }}>{side}</span>
+        <span className="text-text-muted italic w-16 shrink-0">{action}</span>
+        <span className="font-mono font-bold text-text-primary">${entry.strike} {optType}</span>
+        <span className="text-text-muted">{entry.expiry}</span>
+        {dl && <span className="font-mono px-1 rounded" style={{ color: dl.color, background: dl.bg }}>{dl.text}</span>}
+        {entry.vol_oi_ratio > 0 && <span className="text-accent-cyan font-mono">{Number(entry.vol_oi_ratio).toFixed(1)}x</span>}
+        {entry.ask_pct > 0 && <span className="text-accent-orange font-mono">{entry.ask_pct}%ask</span>}
+        {pnl !== null && <span className="font-mono font-bold shrink-0" style={{ color: pnl >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>{pnl >= 0 ? "+" : ""}{pnl}%</span>}
+        <span className="text-text-secondary ml-auto font-mono">{entry.premium}</span>
+      </div>
+      {expanded && entry.analysis && (
+        <div className="ml-12 mr-2 mb-2 px-2 py-1.5 rounded text-xs text-text-secondary leading-relaxed" style={{ background: "rgba(13,17,23,0.5)" }}>
+          {entry.analysis}
+          {(entry.underlying_price || entry.avg_price) && (
+            <div className="mt-1 font-mono text-text-muted">
+              {entry.underlying_price ? `Underlying @ fill: $${entry.underlying_price}` : ""}
+              {price > 0 ? ` | Now: $${price.toFixed(2)}` : ""}
+              {entry.underlying_price && price > 0 ? ` (${((price - entry.underlying_price) / entry.underlying_price * 100).toFixed(1)}%)` : ""}
+              {entry.avg_price ? ` | Opt fill: $${entry.avg_price}` : ""}
+              {entry.dte ? ` | ${entry.dte} DTE` : ""}
+              {pnl !== null ? ` | Est P/L: ${pnl >= 0 ? "+" : ""}${pnl}%` : ""}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOP PICKS — conviction entries for a single date
+   ═══════════════════════════════════════════════════════════ */
+function TopPicks({ date, dteFilter }: { date: string; dteFilter: DteFilter }) {
+  const { data } = useIFlowEntries(date);
+  if (!data?.entries?.length) return null;
   const scored = data.entries
-    .filter((e: any) => e.vol_oi_ratio > 0 || e.ask_pct > 0)
-    .map((e: any) => {
-      let score = 0;
-      const premium = parsePremium(e.premium || "$0");
-      const volOi = e.vol_oi_ratio || 0;
-      const askPct = e.ask_pct || 0;
-      const dte = e.dte || 0;
-      const side = e.side || "";
-      const optType = (e.type || e.option_type || "").toUpperCase();
-
-      // Premium
-      if (premium >= 5_000_000) score += 2.5;
-      else if (premium >= 1_000_000) score += 2.0;
-      else if (premium >= 500_000) score += 1.5;
-      else if (premium >= 200_000) score += 1.0;
-      // Ask%
-      if (askPct >= 90) score += 2.0;
-      else if (askPct >= 75) score += 1.5;
-      else if (askPct >= 50) score += 1.0;
-      // Vol/OI
-      if (volOi >= 100) score += 3.0;
-      else if (volOi >= 10) score += 2.0;
-      else if (volOi >= 5) score += 1.5;
-      else if (volOi >= 2) score += 1.0;
-      // Side match
-      if ((side === "Bear" && optType.includes("PUT")) || (side === "Bull" && optType.includes("CALL"))) score += 1.5;
-      // DTE
-      if (dte < 3) score -= 3.0;
-      else if (dte < 7) score -= 1.5;
-      else if (dte >= 90) score += 0.5;
-
-      return { ...e, _score: score };
-    })
+    .filter((e: any) => e.ticker && (e.vol_oi_ratio > 0 || e.ask_pct > 0))
+    .filter((e: any) => matchesDte(e.dte, dteFilter))
+    .map((e: any) => ({ ...e, _score: scoreEntry(e) }))
     .filter((e: any) => e._score >= 7.0)
-    .filter((e: any) => {
-      if (dteFilter === "all") return true;
-      const dte = e.dte || 0;
-      if (dteFilter === "lotto") return dte > 0 && dte <= 14;
-      if (dteFilter === "swing") return dte > 14 && dte <= 60;
-      if (dteFilter === "leap") return dte > 60;
-      return true;
-    })
     .sort((a: any, b: any) => b._score - a._score)
     .slice(0, 15);
-
-  if (scored.length === 0) return null;
-
+  if (!scored.length) return null;
   return (
     <div className="mb-4">
       <h4 className="text-xs font-semibold text-accent-green uppercase tracking-wider mb-2 flex items-center gap-1.5">
-        <TrendingUp size={12} />
-        Top Conviction Flow — {formatDate(date)} ({scored.length})
+        <TrendingUp size={12} /> Top Conviction Flow — {formatDate(date)} ({scored.length})
       </h4>
       <div className="space-y-1">
         {scored.map((e: any, i: number) => {
-          const fa = flowAction(e.side, e.type || e.option_type, e.ask_pct);
-          const sideColor = fa.correctedSide === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
-          const isMega = (parsePremium(e.premium || "$0") >= 1_000_000) && (e.vol_oi_ratio >= 10) && (e.ask_pct >= 95);
+          const { side, action } = classifySide(e.type || e.option_type, e.ask_pct, e.vol_oi_ratio, e.side);
+          const color = side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
+          const mega = parsePremium(e.premium || "$0") >= 1e6 && (e.vol_oi_ratio || 0) >= 10 && (e.ask_pct || 0) >= 95;
+          const dl = dteTag(e.dte);
           return (
             <div key={i} className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
-                 style={{
-                   background: isMega ? "rgba(63,185,80,0.08)" : "rgba(48,54,61,0.12)",
-                   border: isMega ? "1px solid rgba(63,185,80,0.25)" : "1px solid transparent",
-                 }}>
+              style={{ background: mega ? "rgba(63,185,80,0.08)" : "rgba(48,54,61,0.12)", border: mega ? "1px solid rgba(63,185,80,0.25)" : "1px solid transparent" }}>
               <span className="font-mono text-xs font-bold text-accent-cyan w-6">{e._score.toFixed(1)}</span>
               <span className="font-mono font-bold text-text-primary w-14">{e.ticker}</span>
               <span className="font-mono text-text-primary">${e.strike} {e.type || e.option_type}</span>
-              <span style={{ color: sideColor }} className="font-semibold">{fa.correctedSide}</span>
-              <span className="text-text-muted text-xs italic">{fa.action}</span>
+              <span style={{ color }} className="font-semibold">{side}</span>
+              <span className="text-text-muted italic">{action}</span>
               <span className="text-text-muted">{e.expiry}</span>
-              {(() => {
-                const dte = e.dte || 0;
-                if (dte > 0 && dte <= 14) return <span className="font-mono text-accent-orange px-1 rounded" style={{ background: "rgba(227,127,46,0.12)" }}>LOTTO</span>;
-                if (dte > 14 && dte <= 60) return <span className="font-mono text-accent-blue px-1 rounded" style={{ background: "rgba(88,166,255,0.12)" }}>SWING</span>;
-                if (dte > 60) return <span className="font-mono text-accent-cyan px-1 rounded" style={{ background: "rgba(56,211,168,0.12)" }}>LEAP</span>;
-                return null;
-              })()}
-              {e.vol_oi_ratio > 0 && <span className="text-accent-cyan font-mono">{e.vol_oi_ratio.toFixed(1)}x</span>}
+              {dl && <span className="font-mono px-1 rounded" style={{ color: dl.color, background: dl.bg }}>{dl.text}</span>}
+              {e.vol_oi_ratio > 0 && <span className="text-accent-cyan font-mono">{Number(e.vol_oi_ratio).toFixed(1)}x</span>}
               {e.ask_pct > 0 && <span className="text-accent-orange font-mono">{e.ask_pct}%ask</span>}
               <span className="text-text-secondary ml-auto font-mono">{e.premium}</span>
-              {isMega && <span className="text-xs font-bold text-accent-green">MEGA</span>}
+              {mega && <span className="text-xs font-bold text-accent-green">MEGA</span>}
             </div>
           );
         })}
@@ -153,444 +288,109 @@ function DayTopPicks({ date, dteFilter = "all" }: { date: string; dteFilter?: Dt
   );
 }
 
-function flowAction(side: string, optType: string, askPct?: number | null): { action: string; correctedSide: string } {
-  const t = (optType || "").toUpperCase();
-  const ask = askPct ?? 50;
-
-  // ask >= 50% = buyers (lifting the ask) = aggressive entry
-  // ask < 50% = sellers (hitting the bid) = selling the contract
-  const isBuying = ask >= 50;
-
-  if (t.includes("CALL")) {
-    if (isBuying) return { action: "call buying", correctedSide: "Bull" };
-    return { action: "call selling", correctedSide: "Bear" };
-  }
-  if (t.includes("PUT")) {
-    if (isBuying) return { action: "put buying", correctedSide: "Bear" };
-    return { action: "put selling", correctedSide: "Bull" };
-  }
-
-  // Fallback to original side
-  const s = (side || "").toLowerCase();
-  return { action: "", correctedSide: s.includes("bull") ? "Bull" : "Bear" };
-}
-
-function parsePremium(s: string): number {
-  const clean = s.replace("$", "").replace(/,/g, "").trim();
-  if (clean.toUpperCase().endsWith("M")) return parseFloat(clean) * 1_000_000;
-  if (clean.toUpperCase().endsWith("K")) return parseFloat(clean) * 1_000;
-  return parseFloat(clean) || 0;
-}
-
-/* ── Bias Filter ─────────────────────────────────────────── */
-
-type BiasFilter = "all" | "bullish" | "bearish";
-type DteFilter = "all" | "lotto" | "swing" | "leap";
-
-function BiasFilterBar({
-  value,
-  onChange,
-  dteFilter,
-  onDteFilterChange,
-  minContracts,
-  onMinContractsChange,
-}: {
-  value: BiasFilter;
-  onChange: (v: BiasFilter) => void;
-  dteFilter: DteFilter;
-  onDteFilterChange: (v: DteFilter) => void;
-  minContracts: number;
-  onMinContractsChange: (v: number) => void;
-}) {
-  const biasOptions: { label: string; value: BiasFilter; color: string }[] = [
-    { label: "All", value: "all", color: "var(--text-secondary)" },
-    { label: "Bullish", value: "bullish", color: "var(--accent-green)" },
-    { label: "Bearish", value: "bearish", color: "var(--accent-red)" },
-  ];
-
-  const dteOptions: { label: string; value: DteFilter; color: string }[] = [
-    { label: "All DTE", value: "all", color: "var(--text-secondary)" },
-    { label: "Lotto", value: "lotto", color: "var(--accent-orange)" },
-    { label: "Swing", value: "swing", color: "var(--accent-blue)" },
-    { label: "Leap", value: "leap", color: "var(--accent-cyan)" },
-  ];
-
+/* ═══════════════════════════════════════════════════════════
+   TICKER CARD — grid card
+   ═══════════════════════════════════════════════════════════ */
+function TickerCard({ t, selected, onClick }: { t: TrackedTicker; selected: boolean; onClick: () => void }) {
+  const net = t.bullish > t.bearish;
   return (
-    <div className="flex items-center gap-3 mb-4 flex-wrap">
-      <Filter size={13} className="text-text-muted" />
-      <div className="flex items-center rounded-lg border border-border overflow-hidden">
-        {biasOptions.map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => onChange(opt.value)}
-            className="px-3 py-1 text-xs font-semibold transition-colors"
-            style={{
-              background: value === opt.value ? `${opt.color}15` : "transparent",
-              color: value === opt.value ? opt.color : "var(--text-muted)",
-              borderRight: "1px solid var(--border)",
-            }}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center rounded-lg border border-border overflow-hidden">
-        {dteOptions.map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => onDteFilterChange(opt.value)}
-            className="px-3 py-1 text-xs font-semibold transition-colors"
-            style={{
-              background: dteFilter === opt.value ? `${opt.color}15` : "transparent",
-              color: dteFilter === opt.value ? opt.color : "var(--text-muted)",
-              borderRight: "1px solid var(--border)",
-            }}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center gap-1.5 ml-auto">
-        <span className="text-xs text-text-muted">Min entries:</span>
-        <input
-          type="number"
-          min={1}
-          max={50}
-          value={minContracts}
-          onChange={(e) => onMinContractsChange(Number(e.target.value) || 1)}
-          className="w-12 bg-bg-primary border border-border rounded px-1.5 py-0.5 text-xs font-mono text-text-primary text-center focus:outline-none focus:border-accent-blue"
-        />
-      </div>
-    </div>
-  );
-}
-
-/* ── Mini Ticker Card in Grid ────────────────────────────── */
-
-function TickerGridCard({
-  ticker,
-  isSelected,
-  onClick,
-}: {
-  ticker: TrackedTicker;
-  isSelected: boolean;
-  onClick: () => void;
-}) {
-  const total = ticker.bullish + ticker.bearish;
-  const netBullish = ticker.bullish > ticker.bearish;
-
-  return (
-    <button
-      onClick={onClick}
-      className="card text-left transition-all py-2 px-3"
-      style={{
-        borderColor: isSelected ? "var(--accent-blue)" : undefined,
-        background: isSelected ? "rgba(88,166,255,0.08)" : undefined,
-      }}
-    >
+    <button onClick={onClick} className="card text-left transition-all py-2 px-3"
+      style={{ borderColor: selected ? "var(--accent-blue)" : undefined, background: selected ? "rgba(88,166,255,0.08)" : undefined }}>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="font-mono font-bold text-sm text-text-primary">
-          {ticker.ticker}
-        </span>
-        <span className="text-xs font-mono text-text-muted">
-          {ticker.total_entries}
-        </span>
+        <span className="font-mono font-bold text-sm text-text-primary">{t.ticker}</span>
+        <span className="text-xs font-mono text-text-muted">{t.total_entries}</span>
       </div>
-      <BullBearBar
-        bull={ticker.bullish}
-        total={total}
-        height={6}
-        showLabels={false}
-      />
+      <BullBearBar bull={t.bullish} total={t.bullish + t.bearish} height={6} showLabels={false} />
       <div className="flex items-center justify-between mt-1 text-xs">
-        <span
-          className="flex items-center gap-0.5"
-          style={{ color: netBullish ? "var(--accent-green)" : "var(--accent-red)" }}
-        >
-          {netBullish ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-          {netBullish ? "Bullish" : "Bearish"}
+        <span className="flex items-center gap-0.5" style={{ color: net ? "var(--accent-green)" : "var(--accent-red)" }}>
+          {net ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+          {net ? "Bullish" : "Bearish"}
         </span>
-        <span className="text-text-muted font-mono">{ticker.net_premium}</span>
+        <span className="text-text-muted font-mono">{t.net_premium}</span>
       </div>
     </button>
   );
 }
 
-/* ── Ticker Detail Panel ─────────────────────────────────── */
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function useIFlowTickerEntries(ticker: string) {
-  return useQuery<{ entries: any[]; total: number }>({
-    queryKey: ["iflow", "entries", "ticker", ticker],
-    queryFn: () => apiClient.get(`/flow/iflow/entries?ticker=${ticker}`).then((r) => r.data),
-    staleTime: STALE_TIMES.flow,
-    enabled: !!ticker,
-  });
-}
-
-function TickerDetail({
-  ticker,
-  trackedData,
-}: {
-  ticker: string;
-  trackedData: TrackedTicker;
+/* ═══════════════════════════════════════════════════════════
+   TICKER DETAIL — right panel
+   Two modes:
+     - Single date: fetch entries for date+ticker, filter by DTE
+     - All dates: fetch history, group by date, filter by DTE
+   ═══════════════════════════════════════════════════════════ */
+function TickerDetail({ ticker, trackedData, dateFilter, dteFilter }: {
+  ticker: string; trackedData: TrackedTicker; dateFilter: string; dteFilter: DteFilter;
 }) {
-  const { data: dbEntries, isLoading: dbLoading } = useFlowEntries(ticker);
-  const { data: iflowData, isLoading: iflowLoading } = useIFlowTickerEntries(ticker);
+  const isAllDates = !dateFilter;
+  const { data: singleData, isLoading: singleLoading } = useIFlowEntries(isAllDates ? "" : dateFilter, ticker);
+  const { data: historyData, isLoading: historyLoading } = useIFlowHistory(isAllDates ? ticker : "");
+  const { data: priceData } = useStockPrice(ticker);
   const { data: allPicks } = useFlowPicks("open");
-  const { data: closedPicks } = useFlowPicks("closed");
-  const [expandedEntry, setExpandedEntry] = useState<number | null>(null);
-  const [expandedPick, setExpandedPick] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
-  // Fetch current stock price for P/L calculation
-  const { data: priceData } = useQuery({
-    queryKey: ["market-price", ticker],
-    queryFn: () => apiClient.get(`/market/price?ticker=${ticker}`).then((r) => r.data),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    enabled: !!ticker,
-  });
-  const currentStockPrice = priceData?.price || 0;
+  const price = priceData?.price || 0;
+  const loading = isAllDates ? historyLoading : singleLoading;
 
-  const entriesLoading = dbLoading || iflowLoading;
+  // Build grouped entries {date: entries[]} with DTE filter applied
+  const grouped: Record<string, any[]> = useMemo(() => {
+    const g: Record<string, any[]> = {};
+    if (isAllDates && historyData?.by_date) {
+      for (const [date, v] of Object.entries(historyData.by_date)) {
+        const filtered = ((v as any).entries ?? []).filter((e: any) => e.ticker && matchesDte(e.dte, dteFilter));
+        if (filtered.length) g[date] = filtered;
+      }
+    } else if (singleData?.entries) {
+      const filtered = singleData.entries.filter((e: any) => matchesDte(e.dte, dteFilter));
+      if (filtered.length) g[dateFilter] = filtered;
+    }
+    return g;
+  }, [isAllDates, historyData, singleData, dateFilter, dteFilter]);
 
-  // Merge: prefer iFlow entries (have vol_oi, ask%, analysis), fallback to DB entries
-  const mergedEntries = useMemo(() => {
-    const iflowEntries = iflowData?.entries ?? [];
-    const fallback = dbEntries ?? [];
-    // Use iFlow if available, else DB
-    if (iflowEntries.length > 0) return iflowEntries;
-    return fallback;
-  }, [iflowData, dbEntries]);
-
-  // Group entries by date
-  const groupedEntries = useMemo(() => {
-    const groups: Record<string, any[]> = {};
-    mergedEntries.forEach((entry: any) => {
-      const date = entry._date || entry.flow_date || (entry.created_at ?? "").split(" ")[0] || "unknown";
-      if (!groups[date]) groups[date] = [];
-      groups[date].push(entry);
-    });
-    return groups;
-  }, [mergedEntries]);
-
-  const dateKeys = Object.keys(groupedEntries).sort().reverse();
-
-  // Picks for this ticker
+  const dateKeys = Object.keys(grouped).sort().reverse();
+  const totalEntries = dateKeys.reduce((n, d) => n + grouped[d].length, 0);
   const tickerPicks = (allPicks ?? []).filter((p) => p.ticker === ticker);
-
   const total = trackedData.bullish + trackedData.bearish;
+  const toggle = (k: string) => setExpanded(expanded === k ? null : k);
 
   return (
     <div className="space-y-4">
-      {/* Summary hero */}
       <div className="card">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Eye size={14} className="text-accent-cyan" />
-            <span className="font-mono font-bold text-lg text-text-primary">
-              {ticker}
-            </span>
+            <span className="font-mono font-bold text-lg text-text-primary">{ticker}</span>
           </div>
-          <span className="text-xs text-text-muted">
-            {trackedData.total_entries} total entries
-          </span>
+          <span className="text-xs text-text-muted">{trackedData.total_entries} total</span>
         </div>
-
-        <div className="grid grid-cols-3 gap-3 mb-3">
-          <div>
-            <div className="text-xs text-text-muted">Bullish</div>
-            <div className="font-mono font-bold text-accent-green">
-              {trackedData.bullish}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-text-muted">Bearish</div>
-            <div className="font-mono font-bold text-accent-red">
-              {trackedData.bearish}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-text-muted">Net Premium</div>
-            <div className="font-mono font-bold text-text-primary">
-              {trackedData.net_premium}
-            </div>
-          </div>
-        </div>
-
-        <BullBearBar bull={trackedData.bullish} total={total} height={12} />
+        <BullBearBar bull={trackedData.bullish} total={total} />
+        <div className="text-xs text-text-muted mt-2">Net Premium: {trackedData.net_premium}</div>
       </div>
 
-      {/* Picks for this ticker */}
-      {(() => {
-        const allTickerPicks = [...(tickerPicks || []), ...(closedPicks ?? []).filter((p) => p.ticker === ticker)];
-        if (allTickerPicks.length === 0) return null;
-        return (
-          <div>
-            <h4 className="text-xs font-semibold text-accent-blue uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <BarChart3 size={12} />
-              Picks ({allTickerPicks.length})
-            </h4>
-            <div className="space-y-1">
-              {allTickerPicks.map((pick) => {
-                const pnlColor = (pick.option_pnl_pct ?? pick.pnl_pct ?? 0) >= 0 ? "var(--accent-green)" : "var(--accent-red)";
-                const pnl = pick.option_pnl_pct ?? pick.pnl_pct ?? 0;
-                const isOpen = pick.status === "open";
-                const isPickExpanded = expandedPick === pick.id;
-                return (
-                  <div key={pick.id}
-                    className="rounded-lg px-3 py-2 cursor-pointer transition-all"
-                    style={{
-                      background: isOpen ? "rgba(88,166,255,0.06)" : "rgba(48,54,61,0.12)",
-                      border: `1px solid ${isOpen ? "rgba(88,166,255,0.2)" : "var(--border)"}`,
-                    }}
-                    onClick={() => setExpandedPick(isPickExpanded ? null : pick.id)}
-                  >
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="font-bold" style={{ color: pick.direction === "bullish" ? "var(--accent-green)" : "var(--accent-red)" }}>
-                        {pick.direction === "bullish" ? "🐂" : "🐻"} {pick.conviction?.toUpperCase()}
-                      </span>
-                      <span className="font-mono text-text-primary">
-                        ${pick.strike} {pick.option_type}
-                      </span>
-                      <span className="text-text-muted">{pick.expiry}</span>
-                      <span className="ml-auto font-mono font-semibold" style={{ color: pnlColor }}>
-                        {pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}%
-                      </span>
-                      <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${isOpen ? "bg-accent-blue/15 text-accent-blue" : "bg-text-muted/15 text-text-muted"}`}>
-                        {isOpen ? "OPEN" : "CLOSED"}
-                      </span>
-                    </div>
-                    {isPickExpanded && pick.rationale && (
-                      <div className="mt-2 text-xs text-text-secondary leading-relaxed"
-                           style={{ background: "rgba(13,17,23,0.5)", borderRadius: 6, padding: "6px 8px" }}>
-                        {pick.rationale}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
+      {tickerPicks.length > 0 && (
+        <div>
+          <h4 className="text-xs font-semibold text-text-muted uppercase mb-2">Picks ({tickerPicks.length})</h4>
+          <div className="space-y-2">{tickerPicks.map((p) => <PickCard key={p.id} pick={p} />)}</div>
+        </div>
+      )}
 
-      {/* Flow entries grouped by date */}
       <div>
-        <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <Clock size={12} />
-          Flow History
+        <h4 className="text-xs font-semibold text-text-muted uppercase mb-2">
+          {isAllDates ? `Flow History (${totalEntries})` : `Flow — ${formatDate(dateFilter)} (${totalEntries})`}
         </h4>
-
-        {entriesLoading ? (
-          <div className="flex items-center gap-2 py-4 text-text-muted text-xs">
-            <Loader2 size={14} className="animate-spin" />
-            Loading flow entries...
-          </div>
+        {loading ? (
+          <div className="text-xs text-text-muted animate-pulse">Loading...</div>
         ) : dateKeys.length === 0 ? (
-          <p className="text-xs text-text-muted py-4 text-center">
-            No flow entries found
-          </p>
+          <div className="text-xs text-text-muted">No entries match filters</div>
         ) : (
           <div className="space-y-3">
             {dateKeys.map((date) => (
               <div key={date}>
-                <div className="text-xs font-semibold text-text-secondary mb-1.5">
-                  {formatDate(date)}
-                </div>
-                <div className="space-y-1 pl-2 border-l-2 border-border">
-                  {groupedEntries[date].map((entry: any, idx: number) => {
-                    const optType = entry.option_type || entry.type || "";
-                    const volOi = entry.vol_oi_ratio;
-                    const askPct = entry.ask_pct;
-                    const fa = flowAction(entry.side, optType, askPct);
-                    const sideColor = fa.correctedSide === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
-                    const entryKey = `${date}-${idx}`;
-                    const isExpanded = expandedEntry === idx && dateKeys[0] === date;
-
-                    // Estimate P/L from underlying price movement
-                    const underlyingAtFill = entry.underlying_price || 0;
-                    const strike = entry.strike || 0;
-                    const isPut = optType.toUpperCase().includes("P");
-                    const isSelling = fa.action.includes("selling"); // put selling or call selling
-                    let estimatedPnl: number | null = null;
-                    if (currentStockPrice > 0 && underlyingAtFill > 0 && strike > 0 && entry.avg_price) {
-                      const stockMovePct = (currentStockPrice - underlyingAtFill) / underlyingAtFill;
-                      // Delta approximation: ATM ~0.5, ITM ~0.7, OTM ~0.3
-                      const moneyness = isPut
-                        ? (strike - currentStockPrice) / strike
-                        : (currentStockPrice - strike) / strike;
-                      const delta = moneyness > 0.05 ? 0.65 : moneyness > -0.05 ? 0.5 : 0.3;
-                      const leverage = Math.min(currentStockPrice / (entry.avg_price || 1), 200);
-                      let optPnl = isPut
-                        ? -stockMovePct * delta * leverage * 100
-                        : stockMovePct * delta * leverage * 100;
-                      // Sellers profit when options lose value (inverted P/L)
-                      if (isSelling) optPnl = -optPnl;
-                      estimatedPnl = Math.round(Math.max(-100, Math.min(optPnl, 1000)));
-                    }
-
-                    return (
-                      <div key={entryKey}>
-                        <div
-                          className="flex items-center gap-2 text-xs py-1.5 px-2 rounded hover:bg-bg-card-hover transition-colors cursor-pointer"
-                          onClick={() => setExpandedEntry(isExpanded ? null : idx)}
-                        >
-                          <span
-                            className="font-mono font-semibold w-10 shrink-0"
-                            style={{ color: sideColor }}
-                          >
-                            {fa.correctedSide}
-                          </span>
-                          <span className="text-text-muted italic w-16 shrink-0">
-                            {fa.action}
-                          </span>
-                          <span className="font-mono font-bold text-text-primary">
-                            ${entry.strike} {optType}
-                          </span>
-                          <span className="text-text-muted">{entry.expiry}</span>
-                          {volOi != null && volOi > 0 && (
-                            <span className="text-accent-cyan font-mono">
-                              {volOi.toFixed(1)}x
-                            </span>
-                          )}
-                          {askPct != null && askPct > 0 && (
-                            <span className="text-accent-orange font-mono">
-                              {askPct}%ask
-                            </span>
-                          )}
-                          {estimatedPnl !== null && (
-                            <span
-                              className="font-mono font-bold shrink-0"
-                              style={{ color: estimatedPnl >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}
-                            >
-                              {estimatedPnl >= 0 ? "+" : ""}{estimatedPnl}%
-                            </span>
-                          )}
-                          <span className="text-text-secondary ml-auto font-mono">
-                            {entry.premium}
-                          </span>
-                        </div>
-                        {/* Expanded analysis */}
-                        {isExpanded && entry.analysis && (
-                          <div className="ml-12 mr-2 mb-2 px-2 py-1.5 rounded text-xs text-text-secondary leading-relaxed"
-                               style={{ background: "rgba(13,17,23,0.5)" }}>
-                            {entry.analysis}
-                            {(entry.underlying_price || entry.avg_price) && (
-                              <div className="mt-1 font-mono text-text-muted">
-                                {entry.underlying_price ? `Underlying @ fill: $${entry.underlying_price}` : ""}
-                                {currentStockPrice > 0 ? ` | Now: $${currentStockPrice.toFixed(2)}` : ""}
-                                {entry.underlying_price && currentStockPrice > 0 ? ` (${((currentStockPrice - entry.underlying_price) / entry.underlying_price * 100).toFixed(1)}%)` : ""}
-                                {entry.avg_price ? ` | Opt fill: $${entry.avg_price}` : ""}
-                                {entry.dte ? ` | ${entry.dte} DTE` : ""}
-                                {estimatedPnl !== null ? ` | Est P/L: ${estimatedPnl >= 0 ? "+" : ""}${estimatedPnl}%` : ""}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                {dateKeys.length > 1 && <div className="text-xs font-semibold text-accent-blue mb-1">{formatDate(date)}</div>}
+                <div className="space-y-0.5 pl-2 border-l-2 border-border">
+                  {grouped[date].map((entry: any, idx: number) => (
+                    <EntryRow key={`${date}-${idx}`} entry={entry} price={price}
+                      expandedKey={expanded} entryKey={`${date}-${idx}`} onToggle={toggle} />
+                  ))}
                 </div>
               </div>
             ))}
@@ -601,210 +401,147 @@ function TickerDetail({
   );
 }
 
-/* ── Main IFlowTracker ───────────────────────────────────── */
-
+/* ═══════════════════════════════════════════════════════════
+   MAIN — IFlowTracker
+   ═══════════════════════════════════════════════════════════ */
 export function IFlowTracker() {
-  const [biasFilter, setBiasFilter] = useState<BiasFilter>("all");
-  const [dteFilter, setDteFilter] = useState<DteFilter>("all");
-  const [minContracts, setMinContracts] = useState(2);
+  const [bias, setBias] = useState<BiasFilter>("all");
+  const [dte, setDte] = useState<DteFilter>("all");
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [dateFilter, setDateFilter] = useState<string>(""); // "" = all dates (DB), "2026-03-24" = iFlow date
+  const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState<string>("");
 
-  const { data: iflowDates } = useIFlowDates();
-  const { data: iflowSummary, isLoading: iflowLoading } = useIFlowSummary(dateFilter, dteFilter);
-  const { data: tickers, isLoading: tickersLoading } = useTrackedTickers(30, minContracts);
+  const { data: datesData } = useIFlowDates();
+  const dates = datesData?.dates ?? [];
+  const isAllDates = !dateFilter;
 
-  const isLoading = dateFilter ? iflowLoading : tickersLoading;
+  // Data sources: iFlow summary (single date) OR DB tickers (all dates)
+  const { data: summary, isLoading: summaryLoading } = useIFlowSummary(dateFilter, dte);
+  const { data: allTickers, isLoading: allLoading } = useTrackedTickers(30, 1);
 
-  // When a date is selected, convert iFlow summary tickers into TrackedTicker shape
-  const activeTickers: TrackedTicker[] = useMemo(() => {
-    if (dateFilter && iflowSummary) {
-      return iflowSummary.tickers.map((t) => ({
-        ticker: t.ticker,
-        total_entries: t.count,
-        bullish: t.bull,
-        bearish: t.bear,
-        net_premium: t.total_premium > 1_000_000
-          ? `$${(t.total_premium / 1_000_000).toFixed(1)}M`
-          : t.total_premium > 1_000
-          ? `$${(t.total_premium / 1_000).toFixed(0)}K`
-          : `$${t.total_premium.toFixed(0)}`,
-      }));
-    }
-    return tickers ?? [];
-  }, [dateFilter, iflowSummary, tickers]);
+  const loading = isAllDates ? allLoading : summaryLoading;
 
-  // Apply filters
-  const filteredTickers = useMemo(() => {
-    let filtered = [...activeTickers];
+  // Build ticker list
+  const tickers: TrackedTicker[] = useMemo(() => {
+    if (isAllDates) return (allTickers ?? []).map((t) => ({ ...t, net_premium: t.net_premium || "" }));
+    if (!summary) return [];
+    return summary.tickers.map((t) => ({
+      ticker: t.ticker, total_entries: t.count, bullish: t.bull, bearish: t.bear,
+      net_premium: fmtPremium(t.total_premium),
+    }));
+  }, [isAllDates, allTickers, summary]);
 
-    // Min entries filter (only for all-dates view)
-    if (!dateFilter) {
-      filtered = filtered.filter((t) => t.total_entries >= minContracts);
-    }
+  // Filter: bias + search
+  const filtered = useMemo(() => {
+    let list = [...tickers];
+    if (bias === "bullish") list = list.filter((t) => t.bullish > t.bearish);
+    else if (bias === "bearish") list = list.filter((t) => t.bearish > t.bullish);
+    if (search) list = list.filter((t) => t.ticker.toUpperCase().includes(search));
+    list.sort((a, b) => b.total_entries - a.total_entries);
+    return list;
+  }, [tickers, bias, search]);
 
-    // Bias filter
-    if (biasFilter === "bullish") {
-      filtered = filtered.filter((t) => t.bullish > t.bearish);
-    } else if (biasFilter === "bearish") {
-      filtered = filtered.filter((t) => t.bearish > t.bullish);
-    }
-
-    // Search filter
-    if (searchQuery) {
-      const q = searchQuery.toUpperCase();
-      filtered = filtered.filter((t) => t.ticker.includes(q));
-    }
-
-    // Sort by total entries descending
-    filtered.sort((a, b) => b.total_entries - a.total_entries);
-
-    return filtered;
-  }, [activeTickers, biasFilter, searchQuery, minContracts, dateFilter]);
-
-  const selectedData = filteredTickers.find((t) => t.ticker === selectedTicker);
-
-  if (isLoading) {
-    return (
-      <div className="animate-pulse">
-        <div className="h-8 w-full rounded bg-text-muted/20 mb-4" />
-        <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
-          {[...Array(10)].map((_, i) => (
-            <div key={i} className="card h-20" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const selectedData = tickers.find((t) => t.ticker === selectedTicker);
+  const select = (d: string) => { setDateFilter(d); setSelectedTicker(null); };
 
   return (
     <div>
-      {/* Date filter + Search bar */}
+      {/* ── Date bar + Search ── */}
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <div className="flex items-center rounded-lg border border-border overflow-hidden">
-          <button
-            onClick={() => { setDateFilter(""); setSelectedTicker(null); }}
+          <button onClick={() => select("")}
             className="px-3 py-1.5 text-xs font-semibold transition-colors"
-            style={{
-              background: !dateFilter ? "rgba(88,166,255,0.15)" : "transparent",
-              color: !dateFilter ? "var(--accent-blue)" : "var(--text-muted)",
-            }}
-          >
+            style={{ background: isAllDates ? "rgba(88,166,255,0.15)" : "transparent", color: isAllDates ? "var(--accent-blue)" : "var(--text-muted)" }}>
             All Dates
           </button>
-          {(iflowDates?.dates ?? []).slice(0, 7).map((d) => (
-            <button
-              key={d.date}
-              onClick={() => { setDateFilter(d.date); setSelectedTicker(null); }}
+          {dates.slice(0, 8).map((d) => (
+            <button key={d.date} onClick={() => select(d.date)}
               className="px-2.5 py-1.5 text-xs font-mono transition-colors border-l border-border"
-              style={{
-                background: dateFilter === d.date ? "rgba(88,166,255,0.15)" : "transparent",
-                color: dateFilter === d.date ? "var(--accent-blue)" : "var(--text-muted)",
-              }}
-            >
-              {d.date.slice(5)}
-              <span className="ml-1 opacity-60">{d.entries}</span>
+              style={{ background: dateFilter === d.date ? "rgba(88,166,255,0.15)" : "transparent", color: dateFilter === d.date ? "var(--accent-blue)" : "var(--text-muted)" }}>
+              {d.date.slice(5)}<span className="ml-1 opacity-60">{d.entries}</span>
             </button>
           ))}
         </div>
-
         <div className="flex items-center gap-2 rounded-lg border border-border bg-bg-primary px-3 py-1.5 flex-1 max-w-xs focus-within:border-accent-blue transition-colors">
           <Search size={14} className="text-text-muted" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value.toUpperCase())}
-            placeholder="Search ticker..."
-            className="bg-transparent border-none outline-none text-text-primary font-mono text-xs w-full placeholder:text-text-muted"
-          />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value.toUpperCase())}
+            placeholder="Search ticker..." className="bg-transparent border-none outline-none text-text-primary font-mono text-xs w-full placeholder:text-text-muted" />
         </div>
         <span className="text-xs text-text-muted">
-          {filteredTickers.length} tickers
-          {dateFilter && iflowSummary && (
-            <> — <span style={{ color: iflowSummary.net_sentiment === "BULLISH" ? "var(--accent-green)" : iflowSummary.net_sentiment === "BEARISH" ? "var(--accent-red)" : "var(--accent-orange)" }}>
-              {iflowSummary.net_sentiment}
-            </span> ({iflowSummary.bull_count}B / {iflowSummary.bear_count}R)</>
+          {filtered.length} tickers
+          {!isAllDates && summary && (
+            <> — <span style={{ color: summary.net_sentiment === "BULLISH" ? "var(--accent-green)" : summary.net_sentiment === "BEARISH" ? "var(--accent-red)" : "var(--accent-orange)" }}>
+              {summary.net_sentiment}</span> ({summary.bull_count}B / {summary.bear_count}R)</>
           )}
         </span>
-        {dateFilter && (
-          <button
-            onClick={() => {
-              // Fetch entries and download as CSV
-              apiClient.get(`/flow/iflow/entries?date=${dateFilter}`).then(({ data }) => {
-                const entries = data.entries || [];
-                if (!entries.length) return;
-                const headers = ["ticker","strike","type","side","expiry","dte","premium","vol_oi_ratio","ask_pct","underlying_price","avg_price","analysis"];
-                const rows = entries.map((e: any) => headers.map(h => {
-                  const val = e[h] ?? "";
-                  return typeof val === "string" && val.includes(",") ? `"${val}"` : val;
-                }).join(","));
-                const csv = [headers.join(","), ...rows].join("\n");
-                const blob = new Blob([csv], { type: "text/csv" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `iflow-${dateFilter}.csv`;
-                a.click();
-                URL.revokeObjectURL(url);
-              });
-            }}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-accent-blue hover:bg-accent-blue/15 transition-colors"
-          >
-            <Download size={12} />
-            CSV
+        {!isAllDates && (
+          <button onClick={() => {
+            apiClient.get(`/flow/iflow/entries?date=${dateFilter}`).then(({ data }) => {
+              const entries = data.entries || []; if (!entries.length) return;
+              const h = ["ticker","strike","type","side","expiry","dte","premium","vol_oi_ratio","ask_pct","underlying_price","avg_price","analysis"];
+              const rows = entries.map((e: any) => h.map(k => { const v = e[k] ?? ""; return typeof v === "string" && v.includes(",") ? `"${v}"` : v; }).join(","));
+              const blob = new Blob([[h.join(","), ...rows].join("\n")], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a"); a.href = url; a.download = `iflow-${dateFilter}.csv`; a.click(); URL.revokeObjectURL(url);
+            });
+          }} className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-accent-blue hover:bg-accent-blue/15 transition-colors">
+            <Download size={12} /> CSV
           </button>
         )}
       </div>
 
-      {/* Bias + min contracts filter */}
-      <BiasFilterBar
-        value={biasFilter}
-        onChange={setBiasFilter}
-        dteFilter={dteFilter}
-        onDteFilterChange={setDteFilter}
-        minContracts={minContracts}
-        onMinContractsChange={setMinContracts}
-      />
+      {/* ── Filters: Bias + DTE ── */}
+      <div className="flex items-center gap-3 mb-4">
+        <Filter size={13} className="text-text-muted" />
+        <div className="flex items-center rounded-lg border border-border overflow-hidden">
+          {([["All","all","var(--text-secondary)"],["Bullish","bullish","var(--accent-green)"],["Bearish","bearish","var(--accent-red)"]] as const).map(([l,v,c]) => (
+            <button key={v} onClick={() => setBias(v as BiasFilter)} className="px-3 py-1 text-xs font-semibold transition-colors"
+              style={{ background: bias === v ? `${c}15` : "transparent", color: bias === v ? c : "var(--text-muted)", borderRight: "1px solid var(--border)" }}>{l}</button>
+          ))}
+        </div>
+        <div className="flex items-center rounded-lg border border-border overflow-hidden">
+          {([["All DTE","all","var(--text-secondary)"],["Lotto","lotto","var(--accent-orange)"],["Swing","swing","var(--accent-blue)"],["Leap","leap","var(--accent-cyan)"]] as const).map(([l,v,c]) => (
+            <button key={v} onClick={() => { setDte(v as DteFilter); setSelectedTicker(null); }} className="px-3 py-1 text-xs font-semibold transition-colors"
+              style={{ background: dte === v ? `${c}15` : "transparent", color: dte === v ? c : "var(--text-muted)", borderRight: "1px solid var(--border)" }}>{l}</button>
+          ))}
+        </div>
+      </div>
 
-      {/* Top conviction picks for selected date */}
-      {dateFilter && <DayTopPicks date={dateFilter} dteFilter={dteFilter} />}
+      {/* ── Top Picks (single date only) ── */}
+      {!isAllDates && dateFilter && <TopPicks date={dateFilter} dteFilter={dte} />}
 
-      <div className="grid grid-cols-12 gap-4">
-        {/* Ticker grid */}
-        <div className={selectedTicker ? "col-span-5" : "col-span-12"}>
-          {filteredTickers.length === 0 ? (
-            <div className="card text-center py-8">
-              <Eye size={24} className="mx-auto mb-2 text-text-muted opacity-40" />
-              <p className="text-sm text-text-muted">
-                No tickers match your filters
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-              {filteredTickers.map((ticker) => (
-                <TickerGridCard
-                  key={ticker.ticker}
-                  ticker={ticker}
-                  isSelected={selectedTicker === ticker.ticker}
-                  onClick={() =>
-                    setSelectedTicker(
-                      selectedTicker === ticker.ticker ? null : ticker.ticker
-                    )
-                  }
-                />
-              ))}
+      {/* ── Loading ── */}
+      {loading && (
+        <div className="animate-pulse"><div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+          {[...Array(10)].map((_, i) => <div key={i} className="card h-20" />)}
+        </div></div>
+      )}
+
+      {/* ── Grid + Detail ── */}
+      {!loading && (
+        <div className="grid grid-cols-12 gap-4">
+          <div className={selectedTicker ? "col-span-5" : "col-span-12"}>
+            {filtered.length === 0 ? (
+              <div className="card text-center py-8">
+                <Eye size={24} className="mx-auto mb-2 text-text-muted opacity-40" />
+                <p className="text-sm text-text-muted">No tickers match your filters</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {filtered.map((t) => (
+                  <TickerCard key={t.ticker} t={t} selected={selectedTicker === t.ticker}
+                    onClick={() => setSelectedTicker(selectedTicker === t.ticker ? null : t.ticker)} />
+                ))}
+              </div>
+            )}
+          </div>
+          {selectedTicker && selectedData && (
+            <div className="col-span-7">
+              <TickerDetail ticker={selectedTicker} trackedData={selectedData} dateFilter={dateFilter} dteFilter={dte} />
             </div>
           )}
         </div>
-
-        {/* Detail panel */}
-        {selectedTicker && selectedData && (
-          <div className="col-span-7">
-            <TickerDetail ticker={selectedTicker} trackedData={selectedData} />
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

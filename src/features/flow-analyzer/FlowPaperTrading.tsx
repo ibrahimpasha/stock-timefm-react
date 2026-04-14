@@ -300,7 +300,11 @@ export function FlowPaperTrading() {
   const retColor = changeColor(ret);
   const watchlist = summary.watchlist || [];
   const positions = summary.positions || [];
-  const closed = summary.closed || [];
+  const closed = [...(summary.closed || [])].sort((a, b) => {
+    const da = a.exit_date || a.closed_at || "";
+    const db = b.exit_date || b.closed_at || "";
+    return db.localeCompare(da);
+  });
   const sortedWatchlist = [...watchlist].sort(
     (a, b) => (b.score || 0) - (a.score || 0)
   );
