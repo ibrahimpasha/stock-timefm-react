@@ -19,12 +19,23 @@ type DteFilter = "all" | "lotto" | "swing" | "leap";
 
 function classifySide(optType: string, askPct?: number | null, volOi?: number | null, fallback?: string) {
   const t = (optType || "").toUpperCase();
+  const fb = (fallback || "").toLowerCase();
   const ask = askPct ?? 50;
   const voi = volOi ?? 0;
   const buying = ask >= 55 ? true : ask < 40 ? false : voi >= 1.5;
+
+  // If source already provides a side, trust it and derive the action from option type
+  if (fb.includes("bull") || fb.includes("bear")) {
+    const side = fb.includes("bull") ? "Bull" as const : "Bear" as const;
+    let action = "";
+    if (t.includes("CALL")) action = side === "Bull" ? "call buying" : "call selling";
+    else if (t.includes("PUT")) action = side === "Bear" ? "put buying" : "put selling";
+    return { side, action };
+  }
+
   if (t.includes("CALL")) return buying ? { side: "Bull" as const, action: "call buying" } : { side: "Bear" as const, action: "call selling" };
   if (t.includes("PUT")) return buying ? { side: "Bear" as const, action: "put buying" } : { side: "Bull" as const, action: "put selling" };
-  return { side: ((fallback || "").toLowerCase().includes("bull") ? "Bull" : "Bear") as "Bull" | "Bear", action: "" };
+  return { side: "Bear" as "Bull" | "Bear", action: "" };
 }
 
 function parsePremium(s: string): number {
