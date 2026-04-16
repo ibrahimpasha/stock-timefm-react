@@ -20,6 +20,7 @@ import { FlowChat } from "../features/flow-analyzer/FlowChat";
 import { IFlowTracker } from "../features/flow-analyzer/IFlowTracker";
 
 import { FlowPaperTrading } from "../features/flow-analyzer/FlowPaperTrading";
+import { FlowIntel } from "../features/flow-analyzer/FlowIntel";
 
 // iFlow Discord Pipeline
 import { FetchIFlowPanel } from "../features/flow-analyzer/FetchIFlowPanel";
@@ -33,15 +34,17 @@ import {
   Target,
   Eye,
   Bell,
+  BarChart3,
 } from "lucide-react";
 
 /* ── Tab definitions ─────────────────────────────────────── */
 
-type FlowTab = "chat" | "picks" | "iflow" | "flow-trader";
+type FlowTab = "chat" | "picks" | "iflow" | "flow-trader" | "flow-intel";
 
 const FLOW_TABS: { id: FlowTab; label: string; icon: React.ElementType }[] = [
   { id: "flow-trader", label: "Flow Trader", icon: Zap },
   { id: "iflow", label: "iFlow Tracker", icon: Eye },
+  { id: "flow-intel", label: "Flow Intel", icon: BarChart3 },
   { id: "chat", label: "Flow Chat", icon: MessageCircle },
 ];
 
@@ -177,6 +180,8 @@ function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
       );
     case "iflow":
       return <IFlowTracker />;
+    case "flow-intel":
+      return <FlowIntel />;
     case "flow-trader":
       return <FlowPaperTrading />;
     default:
