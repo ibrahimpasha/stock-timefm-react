@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueries } from "@tanstack/react-query";
 import { useFlowPicks, useTrackedTickers } from "../../api/flow";
 import apiClient from "../../api/client";
 import { BullBearBar } from "../../components/BullBearBar";
@@ -94,13 +94,27 @@ function useIFlowDates() {
   });
 }
 
+type IFlowSummaryData = { total_entries: number; bull_count: number; bear_count: number; net_sentiment: string; tickers: { ticker: string; count: number; bull: number; bear: number; total_premium: number }[] };
+
 function useIFlowSummary(date: string, dte: DteFilter) {
   const p = dte === "lotto" ? "&dte_min=1&dte_max=14" : dte === "swing" ? "&dte_min=15&dte_max=60" : dte === "leap" ? "&dte_min=61" : "";
-  return useQuery<{ total_entries: number; bull_count: number; bear_count: number; net_sentiment: string; tickers: { ticker: string; count: number; bull: number; bear: number; total_premium: number }[] }>({
+  return useQuery<IFlowSummaryData>({
     queryKey: ["iflow", "summary", date, dte],
     queryFn: () => apiClient.get(`/flow/iflow/summary?date=${date}${p}`).then((r) => r.data),
     staleTime: STALE_TIMES.flow,
     enabled: !!date,
+  });
+}
+
+function useMultiDateSummaries(dates: string[], dte: DteFilter) {
+  const p = dte === "lotto" ? "&dte_min=1&dte_max=14" : dte === "swing" ? "&dte_min=15&dte_max=60" : dte === "leap" ? "&dte_min=61" : "";
+  return useQueries({
+    queries: dates.map((date) => ({
+      queryKey: ["iflow", "summary", date, dte],
+      queryFn: () => apiClient.get<IFlowSummaryData>(`/flow/iflow/summary?date=${date}${p}`).then((r) => r.data),
+      staleTime: STALE_TIMES.flow,
+      enabled: !!date,
+    })),
   });
 }
 
@@ -330,35 +344,39 @@ function TickerCard({ t, selected, onClick }: { t: TrackedTicker; selected: bool
      - Single date: fetch entries for date+ticker, filter by DTE
      - All dates: fetch history, group by date, filter by DTE
    ═══════════════════════════════════════════════════════════ */
-function TickerDetail({ ticker, trackedData, dateFilter, dteFilter }: {
-  ticker: string; trackedData: TrackedTicker; dateFilter: string; dteFilter: DteFilter;
+function TickerDetail({ ticker, trackedData, selectedDates, dteFilter }: {
+  ticker: string; trackedData: TrackedTicker; selectedDates: Set<string>; dteFilter: DteFilter;
 }) {
-  const isAllDates = !dateFilter;
-  const { data: singleData, isLoading: singleLoading } = useIFlowEntries(isAllDates ? "" : dateFilter, ticker);
-  const { data: historyData, isLoading: historyLoading } = useIFlowHistory(isAllDates ? ticker : "");
+  const isAllDates = selectedDates.size === 0;
+  const isSingleDate = selectedDates.size === 1;
+  const singleDate = isSingleDate ? [...selectedDates][0] : "";
+  const { data: singleData, isLoading: singleLoading } = useIFlowEntries(singleDate, ticker);
+  const { data: historyData, isLoading: historyLoading } = useIFlowHistory(!isSingleDate ? ticker : "");
   const { data: priceData } = useStockPrice(ticker);
   const { data: allPicks } = useFlowPicks("open");
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const price = priceData?.price || 0;
-  const loading = isAllDates ? historyLoading : singleLoading;
+  const loading = isSingleDate ? singleLoading : historyLoading;
 
   // Build grouped entries {date: entries[]} with DTE filter applied
   const grouped: Record<string, any[]> = useMemo(() => {
     const g: Record<string, any[]> = {};
     const sortEntries = (entries: any[]) =>
       [...entries].sort((a, b) => parsePremium(b.premium || "$0") - parsePremium(a.premium || "$0"));
-    if (isAllDates && historyData?.by_date) {
+    if (isSingleDate && singleData?.entries) {
+      const filtered = singleData.entries.filter((e: any) => matchesDte(e.dte, dteFilter));
+      if (filtered.length) g[singleDate] = sortEntries(filtered);
+    } else if (historyData?.by_date) {
+      // All dates or multi-date: use history, filter to selected dates
       for (const [date, v] of Object.entries(historyData.by_date)) {
+        if (!isAllDates && !selectedDates.has(date)) continue;
         const filtered = ((v as any).entries ?? []).filter((e: any) => e.ticker && matchesDte(e.dte, dteFilter));
         if (filtered.length) g[date] = sortEntries(filtered);
       }
-    } else if (singleData?.entries) {
-      const filtered = singleData.entries.filter((e: any) => matchesDte(e.dte, dteFilter));
-      if (filtered.length) g[dateFilter] = sortEntries(filtered);
     }
     return g;
-  }, [isAllDates, historyData, singleData, dateFilter, dteFilter]);
+  }, [isAllDates, isSingleDate, historyData, singleData, singleDate, selectedDates, dteFilter]);
 
   const dateKeys = Object.keys(grouped).sort().reverse();
   const totalEntries = dateKeys.reduce((n, d) => n + grouped[d].length, 0);
@@ -389,7 +407,7 @@ function TickerDetail({ ticker, trackedData, dateFilter, dteFilter }: {
 
       <div>
         <h4 className="text-xs font-semibold text-text-muted uppercase mb-2">
-          {isAllDates ? `Flow History (${totalEntries})` : `Flow — ${formatDate(dateFilter)} (${totalEntries})`}
+          {isAllDates ? `Flow History (${totalEntries})` : isSingleDate ? `Flow — ${formatDate(singleDate)} (${totalEntries})` : `Flow — ${selectedDates.size} dates (${totalEntries})`}
         </h4>
         {loading ? (
           <div className="text-xs text-text-muted animate-pulse">Loading...</div>
@@ -424,27 +442,66 @@ export function IFlowTracker() {
   const [sort, setSort] = useState<SortMode>("entries");
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [dateFilter, setDateFilter] = useState<string>("");
+  const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
 
   const { data: datesData } = useIFlowDates();
   const dates = datesData?.dates ?? [];
-  const isAllDates = !dateFilter;
+  const isAllDates = selectedDates.size === 0;
+  const isSingleDate = selectedDates.size === 1;
+  const singleDate = isSingleDate ? [...selectedDates][0] : "";
 
-  // Data sources: iFlow summary (single date) OR DB tickers (all dates)
-  const { data: summary, isLoading: summaryLoading } = useIFlowSummary(dateFilter, dte);
+  // Toggle date selection (click = toggle single, works like multi-select)
+  const toggleDate = (d: string) => {
+    setSelectedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(d)) next.delete(d); else next.add(d);
+      return next;
+    });
+    setSelectedTicker(null);
+  };
+
+  // Data sources: single date summary, multi-date summaries, or all tickers
+  const { data: summary, isLoading: summaryLoading } = useIFlowSummary(singleDate, dte);
+
+  // For multi-date: fetch each date's summary individually
+  const multiDateKeys = [...selectedDates].sort().reverse();
+  const multiSummaryQueries = useMultiDateSummaries(
+    selectedDates.size > 1 ? multiDateKeys : [],
+    dte
+  );
+  const multiLoading = multiSummaryQueries.some((q) => q.isLoading);
+
   const { data: allTickers, isLoading: allLoading } = useTrackedTickers(30, 1);
 
-  const loading = isAllDates ? allLoading : summaryLoading;
+  const loading = isAllDates ? allLoading : isSingleDate ? summaryLoading : multiLoading;
 
   // Build ticker list
   const tickers: TrackedTicker[] = useMemo(() => {
     if (isAllDates) return (allTickers ?? []).map((t) => ({ ...t, net_premium: t.net_premium || "" }));
-    if (!summary) return [];
-    return summary.tickers.map((t) => ({
-      ticker: t.ticker, total_entries: t.count, bullish: t.bull, bearish: t.bear,
-      net_premium: fmtPremium(t.total_premium),
+    if (isSingleDate) {
+      if (!summary) return [];
+      return summary.tickers.map((t) => ({
+        ticker: t.ticker, total_entries: t.count, bullish: t.bull, bearish: t.bear,
+        net_premium: fmtPremium(t.total_premium),
+      }));
+    }
+    // Multi-date: merge summaries from all selected dates
+    const merged: Record<string, { count: number; bull: number; bear: number; premium: number }> = {};
+    for (const q of multiSummaryQueries) {
+      if (!q.data) continue;
+      for (const t of q.data.tickers) {
+        if (!merged[t.ticker]) merged[t.ticker] = { count: 0, bull: 0, bear: 0, premium: 0 };
+        merged[t.ticker].count += t.count;
+        merged[t.ticker].bull += t.bull;
+        merged[t.ticker].bear += t.bear;
+        merged[t.ticker].premium += t.total_premium;
+      }
+    }
+    return Object.entries(merged).map(([ticker, m]) => ({
+      ticker, total_entries: m.count, bullish: m.bull, bearish: m.bear,
+      net_premium: fmtPremium(m.premium),
     }));
-  }, [isAllDates, allTickers, summary]);
+  }, [isAllDates, isSingleDate, allTickers, summary, multiSummaryQueries]);
 
   // Filter: bias + search + sort
   const filtered = useMemo(() => {
@@ -468,22 +525,21 @@ export function IFlowTracker() {
   }, [tickers, bias, search, sort]);
 
   const selectedData = tickers.find((t) => t.ticker === selectedTicker);
-  const select = (d: string) => { setDateFilter(d); setSelectedTicker(null); };
 
   return (
     <div>
       {/* ── Date bar + Search ── */}
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <div className="flex items-center rounded-lg border border-border overflow-hidden">
-          <button onClick={() => select("")}
+          <button onClick={() => { setSelectedDates(new Set()); setSelectedTicker(null); }}
             className="px-3 py-1.5 text-xs font-semibold transition-colors"
             style={{ background: isAllDates ? "rgba(88,166,255,0.15)" : "transparent", color: isAllDates ? "var(--accent-blue)" : "var(--text-muted)" }}>
             All Dates
           </button>
           {dates.slice(0, 8).map((d) => (
-            <button key={d.date} onClick={() => select(d.date)}
+            <button key={d.date} onClick={() => toggleDate(d.date)}
               className="px-2.5 py-1.5 text-xs font-mono transition-colors border-l border-border"
-              style={{ background: dateFilter === d.date ? "rgba(88,166,255,0.15)" : "transparent", color: dateFilter === d.date ? "var(--accent-blue)" : "var(--text-muted)" }}>
+              style={{ background: selectedDates.has(d.date) ? "rgba(88,166,255,0.15)" : "transparent", color: selectedDates.has(d.date) ? "var(--accent-blue)" : "var(--text-muted)" }}>
               {d.date.slice(5)}<span className="ml-1 opacity-60">{d.entries}</span>
             </button>
           ))}
@@ -495,20 +551,21 @@ export function IFlowTracker() {
         </div>
         <span className="text-xs text-text-muted">
           {filtered.length} tickers
-          {!isAllDates && summary && (
+          {isSingleDate && summary && (
             <> — <span style={{ color: summary.net_sentiment === "BULLISH" ? "var(--accent-green)" : summary.net_sentiment === "BEARISH" ? "var(--accent-red)" : "var(--accent-orange)" }}>
               {summary.net_sentiment}</span> ({summary.bull_count}B / {summary.bear_count}R)</>
           )}
+          {selectedDates.size > 1 && <> — {selectedDates.size} dates selected</>}
         </span>
-        {!isAllDates && (
+        {!isAllDates && isSingleDate && (
           <button onClick={() => {
-            apiClient.get(`/flow/iflow/entries?date=${dateFilter}`).then(({ data }) => {
+            apiClient.get(`/flow/iflow/entries?date=${singleDate}`).then(({ data }) => {
               const entries = data.entries || []; if (!entries.length) return;
               const h = ["ticker","strike","type","side","expiry","dte","premium","vol_oi_ratio","ask_pct","underlying_price","avg_price","analysis"];
               const rows = entries.map((e: any) => h.map(k => { const v = e[k] ?? ""; return typeof v === "string" && v.includes(",") ? `"${v}"` : v; }).join(","));
               const blob = new Blob([[h.join(","), ...rows].join("\n")], { type: "text/csv" });
               const url = URL.createObjectURL(blob);
-              const a = document.createElement("a"); a.href = url; a.download = `iflow-${dateFilter}.csv`; a.click(); URL.revokeObjectURL(url);
+              const a = document.createElement("a"); a.href = url; a.download = `iflow-${singleDate}.csv`; a.click(); URL.revokeObjectURL(url);
             });
           }} className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-accent-blue hover:bg-accent-blue/15 transition-colors">
             <Download size={12} /> CSV
@@ -541,7 +598,7 @@ export function IFlowTracker() {
       </div>
 
       {/* ── Top Picks (single date only) ── */}
-      {!isAllDates && dateFilter && <TopPicks date={dateFilter} dteFilter={dte} />}
+      {isSingleDate && singleDate && <TopPicks date={singleDate} dteFilter={dte} />}
 
       {/* ── Loading ── */}
       {loading && (
@@ -570,7 +627,7 @@ export function IFlowTracker() {
           </div>
           {selectedTicker && selectedData && (
             <div className="col-span-7">
-              <TickerDetail ticker={selectedTicker} trackedData={selectedData} dateFilter={dateFilter} dteFilter={dte} />
+              <TickerDetail ticker={selectedTicker} trackedData={selectedData} selectedDates={selectedDates} dteFilter={dte} />
             </div>
           )}
         </div>
