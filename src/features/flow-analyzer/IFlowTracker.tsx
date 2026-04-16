@@ -16,7 +16,7 @@ import type { TrackedTicker } from "../../lib/types";
    ═══════════════════════════════════════════════════════════ */
 type BiasFilter = "all" | "bullish" | "bearish";
 type DteFilter = "all" | "lotto" | "swing" | "leap";
-type SortMode = "entries" | "premium" | "score";
+type SortMode = "entries" | "premium" | "score" | "escalating";
 
 function classifySide(optType: string, askPct?: number | null, volOi?: number | null, fallback?: string) {
   const t = (optType || "").toUpperCase();
@@ -134,6 +134,41 @@ function useIFlowHistory(ticker: string) {
     queryFn: () => apiClient.get(`/flow/iflow/history?ticker=${ticker}&days=30`).then((r) => r.data),
     staleTime: STALE_TIMES.flow,
     enabled: !!ticker,
+  });
+}
+
+interface TickerIntel {
+  escalating: boolean;
+  accumScore: number;
+  accumLabel: string;
+  exitSignals: number;
+  daysActive: number;
+}
+
+function useTickerIntelBatch(tickers: string[]) {
+  // Fetch history for up to 20 tickers to get escalation/accumulation data
+  const keys = tickers.slice(0, 20);
+  return useQuery<Record<string, TickerIntel>>({
+    queryKey: ["iflow", "intel-batch", keys.join(",")],
+    queryFn: async () => {
+      const result: Record<string, TickerIntel> = {};
+      const fetches = keys.map(async (t) => {
+        try {
+          const { data } = await apiClient.get(`/flow/iflow/history?ticker=${t}&days=14`);
+          result[t] = {
+            escalating: data.summary?.strikes_escalating || false,
+            accumScore: data.accumulation_score || 0,
+            accumLabel: data.accumulation_label || "",
+            exitSignals: (data.exit_signals || []).length,
+            daysActive: data.summary?.days_active || 0,
+          };
+        } catch { /* skip */ }
+      });
+      await Promise.all(fetches);
+      return result;
+    },
+    staleTime: STALE_TIMES.flow * 3,
+    enabled: keys.length > 0,
   });
 }
 
@@ -317,14 +352,24 @@ function TopPicks({ date, dteFilter }: { date: string; dteFilter: DteFilter }) {
 /* ═══════════════════════════════════════════════════════════
    TICKER CARD — grid card
    ═══════════════════════════════════════════════════════════ */
-function TickerCard({ t, selected, onClick }: { t: TrackedTicker; selected: boolean; onClick: () => void }) {
+function TickerCard({ t, selected, onClick, intel }: { t: TrackedTicker; selected: boolean; onClick: () => void; intel?: TickerIntel }) {
   const net = t.bullish > t.bearish;
+  const esc = intel?.escalating;
+  const accum = intel?.accumLabel || "";
+  const hasAccum = accum.includes("STRONG") || accum.includes("ACCUM");
   return (
     <button onClick={onClick} className="card text-left transition-all py-2 px-3"
-      style={{ borderColor: selected ? "var(--accent-blue)" : undefined, background: selected ? "rgba(88,166,255,0.08)" : undefined }}>
+      style={{
+        borderColor: selected ? "var(--accent-blue)" : esc ? "rgba(63,185,80,0.35)" : undefined,
+        background: selected ? "rgba(88,166,255,0.08)" : esc ? "rgba(63,185,80,0.04)" : undefined,
+      }}>
       <div className="flex items-center justify-between mb-1.5">
         <span className="font-mono font-bold text-sm text-text-primary">{t.ticker}</span>
-        <span className="text-xs font-mono text-text-muted">{t.total_entries}</span>
+        <div className="flex items-center gap-1">
+          {esc && <TrendingUp size={10} style={{ color: "var(--accent-green)" }} />}
+          {intel?.exitSignals ? <span className="text-[9px] font-mono" style={{ color: "var(--accent-orange)" }}>{intel.exitSignals}x</span> : null}
+          <span className="text-xs font-mono text-text-muted">{t.total_entries}</span>
+        </div>
       </div>
       <BullBearBar bull={t.bullish} total={t.bullish + t.bearish} height={6} showLabels={false} />
       <div className="flex items-center justify-between mt-1 text-xs">
@@ -334,6 +379,11 @@ function TickerCard({ t, selected, onClick }: { t: TrackedTicker; selected: bool
         </span>
         <span className="text-text-muted font-mono">{t.net_premium}</span>
       </div>
+      {hasAccum && (
+        <div className="mt-1 text-[9px] font-mono" style={{ color: accum.includes("BULL") ? "var(--accent-green)" : accum.includes("BEAR") ? "var(--accent-red)" : "var(--text-muted)" }}>
+          {accum.replace(/_/g, " ")}
+        </div>
+      )}
     </button>
   );
 }
@@ -475,6 +525,10 @@ export function IFlowTracker() {
 
   const loading = isAllDates ? allLoading : isSingleDate ? summaryLoading : multiLoading;
 
+  // Fetch escalation/accumulation intel for visible tickers
+  const tickerNames = useMemo(() => (allTickers ?? []).slice(0, 20).map((t) => t.ticker), [allTickers]);
+  const { data: intelMap } = useTickerIntelBatch(tickerNames);
+
   // Build ticker list
   const tickers: TrackedTicker[] = useMemo(() => {
     if (isAllDates) return (allTickers ?? []).map((t) => ({ ...t, net_premium: t.net_premium || "" }));
@@ -514,15 +568,27 @@ export function IFlowTracker() {
     } else if (sort === "premium") {
       list.sort((a, b) => parsePremium(b.net_premium || "$0") - parsePremium(a.net_premium || "$0"));
     } else if (sort === "score") {
-      // Sort by bullish ratio (conviction) descending
       list.sort((a, b) => {
         const ra = a.total_entries > 0 ? a.bullish / a.total_entries : 0;
         const rb = b.total_entries > 0 ? b.bullish / b.total_entries : 0;
-        return Math.abs(rb - 0.5) - Math.abs(ra - 0.5); // Most one-sided first
+        return Math.abs(rb - 0.5) - Math.abs(ra - 0.5);
+      });
+    } else if (sort === "escalating" && intelMap) {
+      // Sort: escalating first, then by accumulation score, then by entries
+      list.sort((a, b) => {
+        const ia = intelMap[a.ticker];
+        const ib = intelMap[b.ticker];
+        const escA = ia?.escalating ? 1 : 0;
+        const escB = ib?.escalating ? 1 : 0;
+        if (escB !== escA) return escB - escA;
+        const scoreA = ia?.accumScore ?? 0;
+        const scoreB = ib?.accumScore ?? 0;
+        if (scoreB !== scoreA) return scoreB - scoreA;
+        return b.total_entries - a.total_entries;
       });
     }
     return list;
-  }, [tickers, bias, search, sort]);
+  }, [tickers, bias, search, sort, intelMap]);
 
   const selectedData = tickers.find((t) => t.ticker === selectedTicker);
 
@@ -590,7 +656,7 @@ export function IFlowTracker() {
         </div>
         <span className="text-text-muted text-xs">Sort:</span>
         <div className="flex items-center rounded-lg border border-border overflow-hidden">
-          {([["Entries","entries"],["Premium","premium"],["Conviction","score"]] as const).map(([l,v]) => (
+          {([["Entries","entries"],["Premium","premium"],["Conviction","score"],["Escalating","escalating"]] as const).map(([l,v]) => (
             <button key={v} onClick={() => setSort(v as SortMode)} className="px-3 py-1 text-xs font-semibold transition-colors"
               style={{ background: sort === v ? "rgba(88,166,255,0.15)" : "transparent", color: sort === v ? "var(--accent-blue)" : "var(--text-muted)", borderRight: "1px solid var(--border)" }}>{l}</button>
           ))}
@@ -620,7 +686,8 @@ export function IFlowTracker() {
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 {filtered.map((t) => (
                   <TickerCard key={t.ticker} t={t} selected={selectedTicker === t.ticker}
-                    onClick={() => setSelectedTicker(selectedTicker === t.ticker ? null : t.ticker)} />
+                    onClick={() => setSelectedTicker(selectedTicker === t.ticker ? null : t.ticker)}
+                    intel={intelMap?.[t.ticker]} />
                 ))}
               </div>
             )}
