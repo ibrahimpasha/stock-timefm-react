@@ -9,7 +9,7 @@ import {
 } from "recharts";
 import {
   TrendingUp, TrendingDown, AlertTriangle, Activity,
-  ArrowUpRight, ArrowDownRight, Layers,
+  ArrowUpRight, ArrowDownRight, Layers, Search, X, Plus,
 } from "lucide-react";
 
 /* ── Types ─────────────────────────────────────────────────── */
@@ -394,13 +394,106 @@ function TopMovers() {
   );
 }
 
+/* ── Ticker Selector (search + pinned + auto-detected) ─────── */
+
+const LS_PINNED_KEY = "flow_intel_pinned";
+
+function loadPinned(): string[] {
+  try { return JSON.parse(localStorage.getItem(LS_PINNED_KEY) || "[]"); } catch { return []; }
+}
+function savePinned(tickers: string[]) {
+  try { localStorage.setItem(LS_PINNED_KEY, JSON.stringify(tickers)); } catch { /* */ }
+}
+
+function TickerSelector({ tickers, selected, onSelect, pinned, onPin, onUnpin }: {
+  tickers: string[]; selected: string; onSelect: (t: string) => void;
+  pinned: string[]; onPin: (t: string) => void; onUnpin: (t: string) => void;
+}) {
+  const [input, setInput] = useState("");
+
+  const handleAdd = () => {
+    const t = input.trim().toUpperCase();
+    if (t && !pinned.includes(t) && !tickers.includes(t)) {
+      onPin(t);
+      onSelect(t);
+    } else if (t) {
+      onSelect(t);
+    }
+    setInput("");
+  };
+
+  const all = useMemo(() => {
+    const set = new Set([...pinned, ...tickers]);
+    return [...set];
+  }, [pinned, tickers]);
+
+  return (
+    <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+      {all.map((t) => {
+        const isPinned = pinned.includes(t);
+        const isAuto = tickers.includes(t);
+        return (
+          <div key={t} className="flex items-center rounded-lg border transition-colors"
+            style={{
+              background: selected === t ? "rgba(88,166,255,0.15)" : "transparent",
+              borderColor: selected === t ? "rgba(88,166,255,0.3)" : isPinned && !isAuto ? `${PURPLE}40` : "var(--border)",
+            }}>
+            <button onClick={() => onSelect(selected === t ? "" : t)}
+              className="px-2 py-1 text-xs font-mono transition-colors"
+              style={{ color: selected === t ? CYAN : isPinned && !isAuto ? PURPLE : "var(--text-muted)" }}>
+              {t}
+            </button>
+            {isPinned && (
+              <button onClick={() => { onUnpin(t); if (selected === t) onSelect(""); }}
+                className="pr-1.5 opacity-40 hover:opacity-100 transition-opacity">
+                <X size={10} />
+              </button>
+            )}
+          </div>
+        );
+      })}
+      <div className="flex items-center gap-1 rounded-lg border border-border bg-bg-primary px-2 py-1 focus-within:border-accent-blue transition-colors">
+        <Search size={11} className="text-text-muted" />
+        <input type="text" value={input}
+          onChange={(e) => setInput(e.target.value.toUpperCase())}
+          onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+          placeholder="Add ticker..."
+          className="bg-transparent border-none outline-none text-text-primary font-mono text-xs w-20 placeholder:text-text-muted" />
+        {input && (
+          <button onClick={handleAdd} className="text-accent-blue"><Plus size={12} /></button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Main FlowIntel Component ──────────────────────────────── */
 
 export function FlowIntel() {
   const [view, setView] = useState<IntelView>("accumulation");
   const [selectedTicker, setSelectedTicker] = useState("");
+  const [pinned, setPinned] = useState<string[]>(loadPinned);
   const { data: allTickers } = useTrackedTickers(7, 2);
   const topTickers = useMemo(() => (allTickers ?? []).slice(0, 8).map((t) => t.ticker), [allTickers]);
+
+  const handlePin = (t: string) => {
+    const next = [...pinned, t];
+    setPinned(next);
+    savePinned(next);
+  };
+  const handleUnpin = (t: string) => {
+    const next = pinned.filter((p) => p !== t);
+    setPinned(next);
+    savePinned(next);
+  };
+
+  // Combine pinned + auto for chart display
+  const displayTickers = useMemo(() => {
+    const set = new Set([...pinned, ...topTickers]);
+    return [...set];
+  }, [pinned, topTickers]);
+
+  const ChartComponent = view === "strikes" ? StrikeChart : AccumulationChart;
 
   return (
     <div className="space-y-4">
@@ -432,70 +525,25 @@ export function FlowIntel() {
         <TopMovers />
       </div>
 
-      {/* View-specific content */}
-      {view === "accumulation" && (
-        <div className="space-y-4">
-          <div>
-            <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
-              Ticker Accumulation Charts
-            </h4>
-            <div className="flex items-center gap-1.5 mb-3 flex-wrap">
-              {topTickers.map((t) => (
-                <button key={t} onClick={() => setSelectedTicker(selectedTicker === t ? "" : t)}
-                  className="px-2 py-1 text-xs font-mono rounded-lg border transition-colors"
-                  style={{
-                    background: selectedTicker === t ? "rgba(88,166,255,0.15)" : "transparent",
-                    color: selectedTicker === t ? CYAN : "var(--text-muted)",
-                    borderColor: selectedTicker === t ? "rgba(88,166,255,0.3)" : "var(--border)",
-                  }}>
-                  {t}
-                </button>
-              ))}
-            </div>
-            {selectedTicker ? (
-              <div className="card">
-                <AccumulationChart ticker={selectedTicker} />
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {topTickers.slice(0, 4).map((t) => (
-                  <div key={t} className="card">
-                    <AccumulationChart ticker={t} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {view === "strikes" && (
+      {/* Accumulation / Strikes views */}
+      {(view === "accumulation" || view === "strikes") && (
         <div className="space-y-4">
           <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
-            Strike Escalation / De-escalation
+            {view === "accumulation" ? "Ticker Accumulation Charts" : "Strike Escalation / De-escalation"}
           </h4>
-          <div className="flex items-center gap-1.5 mb-3 flex-wrap">
-            {topTickers.map((t) => (
-              <button key={t} onClick={() => setSelectedTicker(selectedTicker === t ? "" : t)}
-                className="px-2 py-1 text-xs font-mono rounded-lg border transition-colors"
-                style={{
-                  background: selectedTicker === t ? "rgba(88,166,255,0.15)" : "transparent",
-                  color: selectedTicker === t ? CYAN : "var(--text-muted)",
-                  borderColor: selectedTicker === t ? "rgba(88,166,255,0.3)" : "var(--border)",
-                }}>
-                {t}
-              </button>
-            ))}
-          </div>
+          <TickerSelector
+            tickers={topTickers} selected={selectedTicker} onSelect={setSelectedTicker}
+            pinned={pinned} onPin={handlePin} onUnpin={handleUnpin}
+          />
           {selectedTicker ? (
             <div className="card">
-              <StrikeChart ticker={selectedTicker} />
+              <ChartComponent ticker={selectedTicker} />
             </div>
           ) : (
             <div className="space-y-3">
-              {topTickers.slice(0, 4).map((t) => (
+              {displayTickers.slice(0, 6).map((t) => (
                 <div key={t} className="card">
-                  <StrikeChart ticker={t} />
+                  <ChartComponent ticker={t} />
                 </div>
               ))}
             </div>
