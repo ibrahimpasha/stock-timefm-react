@@ -16,6 +16,7 @@ import type { TrackedTicker } from "../../lib/types";
    ═══════════════════════════════════════════════════════════ */
 type BiasFilter = "all" | "bullish" | "bearish";
 type DteFilter = "all" | "lotto" | "swing" | "leap";
+type SortMode = "entries" | "premium" | "score";
 
 function classifySide(optType: string, askPct?: number | null, volOi?: number | null, fallback?: string) {
   const t = (optType || "").toUpperCase();
@@ -345,14 +346,16 @@ function TickerDetail({ ticker, trackedData, dateFilter, dteFilter }: {
   // Build grouped entries {date: entries[]} with DTE filter applied
   const grouped: Record<string, any[]> = useMemo(() => {
     const g: Record<string, any[]> = {};
+    const sortEntries = (entries: any[]) =>
+      [...entries].sort((a, b) => parsePremium(b.premium || "$0") - parsePremium(a.premium || "$0"));
     if (isAllDates && historyData?.by_date) {
       for (const [date, v] of Object.entries(historyData.by_date)) {
         const filtered = ((v as any).entries ?? []).filter((e: any) => e.ticker && matchesDte(e.dte, dteFilter));
-        if (filtered.length) g[date] = filtered;
+        if (filtered.length) g[date] = sortEntries(filtered);
       }
     } else if (singleData?.entries) {
       const filtered = singleData.entries.filter((e: any) => matchesDte(e.dte, dteFilter));
-      if (filtered.length) g[dateFilter] = filtered;
+      if (filtered.length) g[dateFilter] = sortEntries(filtered);
     }
     return g;
   }, [isAllDates, historyData, singleData, dateFilter, dteFilter]);
@@ -418,6 +421,7 @@ function TickerDetail({ ticker, trackedData, dateFilter, dteFilter }: {
 export function IFlowTracker() {
   const [bias, setBias] = useState<BiasFilter>("all");
   const [dte, setDte] = useState<DteFilter>("all");
+  const [sort, setSort] = useState<SortMode>("entries");
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [dateFilter, setDateFilter] = useState<string>("");
@@ -442,15 +446,26 @@ export function IFlowTracker() {
     }));
   }, [isAllDates, allTickers, summary]);
 
-  // Filter: bias + search
+  // Filter: bias + search + sort
   const filtered = useMemo(() => {
     let list = [...tickers];
     if (bias === "bullish") list = list.filter((t) => t.bullish > t.bearish);
     else if (bias === "bearish") list = list.filter((t) => t.bearish > t.bullish);
     if (search) list = list.filter((t) => t.ticker.toUpperCase().includes(search));
-    list.sort((a, b) => b.total_entries - a.total_entries);
+    if (sort === "entries") {
+      list.sort((a, b) => b.total_entries - a.total_entries);
+    } else if (sort === "premium") {
+      list.sort((a, b) => parsePremium(b.net_premium || "$0") - parsePremium(a.net_premium || "$0"));
+    } else if (sort === "score") {
+      // Sort by bullish ratio (conviction) descending
+      list.sort((a, b) => {
+        const ra = a.total_entries > 0 ? a.bullish / a.total_entries : 0;
+        const rb = b.total_entries > 0 ? b.bullish / b.total_entries : 0;
+        return Math.abs(rb - 0.5) - Math.abs(ra - 0.5); // Most one-sided first
+      });
+    }
     return list;
-  }, [tickers, bias, search]);
+  }, [tickers, bias, search, sort]);
 
   const selectedData = tickers.find((t) => t.ticker === selectedTicker);
   const select = (d: string) => { setDateFilter(d); setSelectedTicker(null); };
@@ -514,6 +529,13 @@ export function IFlowTracker() {
           {([["All DTE","all","var(--text-secondary)"],["Lotto","lotto","var(--accent-orange)"],["Swing","swing","var(--accent-blue)"],["Leap","leap","var(--accent-cyan)"]] as const).map(([l,v,c]) => (
             <button key={v} onClick={() => { setDte(v as DteFilter); setSelectedTicker(null); }} className="px-3 py-1 text-xs font-semibold transition-colors"
               style={{ background: dte === v ? `${c}15` : "transparent", color: dte === v ? c : "var(--text-muted)", borderRight: "1px solid var(--border)" }}>{l}</button>
+          ))}
+        </div>
+        <span className="text-text-muted text-xs">Sort:</span>
+        <div className="flex items-center rounded-lg border border-border overflow-hidden">
+          {([["Entries","entries"],["Premium","premium"],["Conviction","score"]] as const).map(([l,v]) => (
+            <button key={v} onClick={() => setSort(v as SortMode)} className="px-3 py-1 text-xs font-semibold transition-colors"
+              style={{ background: sort === v ? "rgba(88,166,255,0.15)" : "transparent", color: sort === v ? "var(--accent-blue)" : "var(--text-muted)", borderRight: "1px solid var(--border)" }}>{l}</button>
           ))}
         </div>
       </div>
