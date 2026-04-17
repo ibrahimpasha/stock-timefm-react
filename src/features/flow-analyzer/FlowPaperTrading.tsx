@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../../api/client";
 import { formatCurrency, changeColor } from "../../lib/utils";
@@ -143,6 +143,101 @@ function useIFlowSynthesis() {
       apiClient.get("/iflow-trader/synthesis").then((r) => r.data),
     staleTime: 60_000,
   });
+}
+
+function useTickerPrices(tickers: string[]) {
+  return useQuery<Record<string, number>>({
+    queryKey: ["ticker-prices-batch", tickers.join(",")],
+    queryFn: async () => {
+      const prices: Record<string, number> = {};
+      const fetches = tickers.slice(0, 30).map(async (t) => {
+        try {
+          const { data } = await apiClient.get(`/market/price?ticker=${t}`);
+          prices[t] = data.price || 0;
+        } catch { /* skip */ }
+      });
+      await Promise.all(fetches);
+      return prices;
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    enabled: tickers.length > 0,
+  });
+}
+
+/**
+ * Estimate option P/L % using delta approximation.
+ * underlyingAtFill is unknown for watchlist items, so we estimate from strike + option type.
+ * For WL items: ref_premium is the institutional fill price, current price is estimated from underlying movement.
+ */
+function estimateWatchlistPnl(
+  currentPrice: number, strike: number, optionType: string,
+  refPremium: number, addedDate?: string,
+): number | null {
+  if (!currentPrice || !strike || !refPremium || refPremium <= 0) return null;
+
+  const isPut = (optionType || "").toUpperCase().includes("PUT");
+
+  // Estimate underlying at time of flow (rough: assume stock was near strike for ATM, or deduce from moneyness)
+  // Simple approach: intrinsic value change as a lower bound
+  const intrinsicNow = isPut
+    ? Math.max(0, strike - currentPrice)
+    : Math.max(0, currentPrice - strike);
+
+  // Moneyness-based delta estimate
+  const moneyness = isPut
+    ? (strike - currentPrice) / strike
+    : (currentPrice - strike) / strike;
+
+  let delta: number;
+  if (moneyness > 0.10) delta = 0.72;
+  else if (moneyness > 0.02) delta = 0.58;
+  else if (moneyness > -0.02) delta = 0.50;
+  else if (moneyness > -0.10) delta = 0.35;
+  else if (moneyness > -0.20) delta = 0.20;
+  else delta = 0.10;
+
+  // Estimate current option price: at minimum the intrinsic, plus some time value
+  // Time value estimate: ref_premium minus intrinsic at fill, decayed
+  let daysElapsed = 0;
+  if (addedDate) {
+    const fd = new Date(addedDate);
+    const now = new Date();
+    daysElapsed = Math.max(0, Math.round((now.getTime() - fd.getTime()) / 86400000));
+  }
+
+  // Very rough estimate: option moved proportionally to delta * underlying change from strike neighborhood
+  // Since we don't know exact underlying at fill, use ref_premium as anchor
+  const estCurrentOpt = Math.max(0.01, intrinsicNow > 0 ? Math.max(refPremium * 0.3, intrinsicNow + refPremium * 0.1) : refPremium * (1 - daysElapsed * 0.02));
+
+  // Better approach: assume ref_premium was fair at entry, estimate change
+  // If stock moved toward strike = option gained, away = lost
+  const otmPct = isPut ? (currentPrice - strike) / strike : (strike - currentPrice) / strike;
+  let pnlMultiplier: number;
+  if (otmPct < -0.05) {
+    // ITM -- option is worth at least intrinsic
+    pnlMultiplier = (intrinsicNow + refPremium * 0.15) / refPremium - 1;
+  } else if (otmPct < 0.02) {
+    // Near ATM -- modest gain/loss
+    pnlMultiplier = -otmPct * 3 - daysElapsed * 0.015;
+  } else {
+    // OTM -- losing time value
+    pnlMultiplier = -0.1 - otmPct * 2 - daysElapsed * 0.02;
+  }
+
+  const pnlPct = pnlMultiplier * 100;
+  return Math.round(Math.max(-99, Math.min(pnlPct, 999)));
+}
+
+function PnlBadge({ pnl }: { pnl: number | null }) {
+  if (pnl === null) return null;
+  const color = pnl >= 0 ? "var(--accent-green)" : "var(--accent-red)";
+  return (
+    <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
+      style={{ color, background: `${color}12` }}>
+      {pnl >= 0 ? "+" : ""}{pnl}%
+    </span>
+  );
 }
 
 function ScoreBadge({ score }: { score: number }) {
@@ -317,6 +412,15 @@ export function FlowPaperTrading() {
   const slots = iflowStatus?.slots;
   const wla = iflowWatchlist?.wla ?? [];
   const wlb = iflowWatchlist?.wlb ?? [];
+
+  // Fetch current prices for all watchlist tickers to compute "what if" P/L
+  const wlTickers = useMemo(() => {
+    const set = new Set<string>();
+    for (const w of wla) if (w.ticker) set.add(w.ticker);
+    for (const w of wlb) if (w.ticker) set.add(w.ticker);
+    return [...set];
+  }, [wla, wlb]);
+  const { data: wlPrices } = useTickerPrices(wlTickers);
 
   return (
     <div className="space-y-4">
@@ -757,6 +861,8 @@ export function FlowPaperTrading() {
                     w.option_type === "CALL" || w.option_type === "C"
                       ? "var(--accent-green)"
                       : "var(--accent-red)";
+                  const curPrice = wlPrices?.[w.ticker] || 0;
+                  const pnl = estimateWatchlistPnl(curPrice, Number(w.strike), w.option_type, w.ref_premium);
                   return (
                     <div
                       key={w.id ?? idx}
@@ -792,6 +898,7 @@ export function FlowPaperTrading() {
                             gate ${typeof w.gate_price === "number" ? w.gate_price.toFixed(2) : w.gate_price}
                           </span>
                         )}
+                        <PnlBadge pnl={pnl} />
                       </div>
                     </div>
                   );
@@ -813,6 +920,8 @@ export function FlowPaperTrading() {
                     w.option_type === "CALL" || w.option_type === "C"
                       ? "var(--accent-green)"
                       : "var(--accent-red)";
+                  const curPrice = wlPrices?.[w.ticker] || 0;
+                  const pnl = estimateWatchlistPnl(curPrice, Number(w.strike), w.option_type, w.ref_premium);
                   return (
                     <div
                       key={w.id ?? idx}
@@ -840,6 +949,7 @@ export function FlowPaperTrading() {
                         <SourceTag source={w.source} />
                       </div>
                       <div className="flex items-center gap-3">
+                        <PnlBadge pnl={pnl} />
                         <span className="text-sm text-text-muted">
                           ref ${typeof w.ref_premium === "number" ? w.ref_premium.toFixed(2) : w.ref_premium}
                         </span>
