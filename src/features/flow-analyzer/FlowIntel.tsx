@@ -4,9 +4,9 @@ import apiClient from "../../api/client";
 import { useTrackedTickers } from "../../api/flow";
 import { STALE_TIMES } from "../../lib/constants";
 import {
-  BarChart, Bar, LineChart, Line, AreaChart, Area,
+  BarChart, Bar, LineChart, Line, ComposedChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Cell, ReferenceLine, ScatterChart, Scatter, ZAxis,
+  ReferenceLine,
 } from "recharts";
 import {
   TrendingUp, TrendingDown, AlertTriangle, Activity,
@@ -655,11 +655,11 @@ function FlowVsPrice({ ticker }: { ticker: string }) {
         <span className="text-xs text-text-muted">Price + Flow Overlay</span>
       </div>
       <ResponsiveContainer width="100%" height={220}>
-        <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+        <ComposedChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(48,54,61,0.4)" />
           <XAxis dataKey="date" tick={{ fill: "#8b949e", fontSize: 10 }} />
           <YAxis yAxisId="price" tick={{ fill: "#8b949e", fontSize: 10 }} domain={["auto", "auto"]} tickFormatter={(v) => `$${v}`} />
-          <YAxis yAxisId="flow" orientation="right" tick={{ fill: "#8b949e", fontSize: 10 }} tickFormatter={(v) => `${v.toFixed(1)}M`} />
+          <YAxis yAxisId="flow" orientation="right" tick={{ fill: "#8b949e", fontSize: 10 }} tickFormatter={(v) => `${Number(v).toFixed(1)}M`} />
           <Tooltip
             contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, fontSize: 11 }}
             formatter={(v: any, name: string) => {
@@ -670,7 +670,7 @@ function FlowVsPrice({ ticker }: { ticker: string }) {
           <Area yAxisId="price" type="monotone" dataKey="price" stroke={CYAN} fill={`${CYAN}15`} strokeWidth={2} dot={false} connectNulls />
           <Bar yAxisId="flow" dataKey="bullPremium" fill={`${GREEN}60`} />
           <Bar yAxisId="flow" dataKey="bearPremium" fill={`${RED}60`} />
-        </AreaChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );
