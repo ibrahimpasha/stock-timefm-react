@@ -382,6 +382,22 @@ export function FlowPaperTrading() {
     },
   });
 
+  // iFlow macro
+  const macro = iflowStatus?.macro;
+  const slots = iflowStatus?.slots;
+  const wla = iflowWatchlist?.wla ?? [];
+  const wlb = iflowWatchlist?.wlb ?? [];
+
+  // Fetch current prices for all watchlist tickers to compute "what if" P/L
+  // (must be before any early returns to satisfy React hooks rules)
+  const wlTickers = useMemo(() => {
+    const set = new Set<string>();
+    for (const w of wla) if (w.ticker) set.add(w.ticker);
+    for (const w of wlb) if (w.ticker) set.add(w.ticker);
+    return [...set];
+  }, [wla, wlb]);
+  const { data: wlPrices } = useTickerPrices(wlTickers);
+
   if (isLoading || !summary) {
     return (
       <div className="flex items-center justify-center py-12 text-text-muted text-sm gap-2">
@@ -406,21 +422,6 @@ export function FlowPaperTrading() {
   const displayWatchlist = showAllWatchlist
     ? sortedWatchlist
     : sortedWatchlist.slice(0, 15);
-
-  // iFlow macro
-  const macro = iflowStatus?.macro;
-  const slots = iflowStatus?.slots;
-  const wla = iflowWatchlist?.wla ?? [];
-  const wlb = iflowWatchlist?.wlb ?? [];
-
-  // Fetch current prices for all watchlist tickers to compute "what if" P/L
-  const wlTickers = useMemo(() => {
-    const set = new Set<string>();
-    for (const w of wla) if (w.ticker) set.add(w.ticker);
-    for (const w of wlb) if (w.ticker) set.add(w.ticker);
-    return [...set];
-  }, [wla, wlb]);
-  const { data: wlPrices } = useTickerPrices(wlTickers);
 
   return (
     <div className="space-y-4">
