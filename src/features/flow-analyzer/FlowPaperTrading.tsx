@@ -1,4 +1,7 @@
 import { useState, useMemo } from "react";
+import { SystemRiskStatus } from "./SystemRiskStatus";
+import { TradeDecisionLog } from "./TradeDecisionLog";
+import { MissedOpportunities } from "./MissedOpportunities";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../../api/client";
 import { formatCurrency, changeColor } from "../../lib/utils";
@@ -411,11 +414,6 @@ export function FlowPaperTrading() {
   const retColor = changeColor(ret);
   const watchlist = summary.watchlist || [];
   const positions = summary.positions || [];
-  const closed = [...(summary.closed || [])].sort((a, b) => {
-    const da = a.exit_date || a.closed_at || "";
-    const db = b.exit_date || b.closed_at || "";
-    return db.localeCompare(da);
-  });
   const sortedWatchlist = [...watchlist].sort(
     (a, b) => (b.score || 0) - (a.score || 0)
   );
@@ -450,6 +448,9 @@ export function FlowPaperTrading() {
           Reset
         </button>
       </div>
+
+      {/* System Risk Status (drawdown, circuit breaker, slots, sector warnings) */}
+      <SystemRiskStatus />
 
       {/* Portfolio Summary */}
       <div className="card">
@@ -817,34 +818,13 @@ export function FlowPaperTrading() {
         </div>
       )}
 
-      {/* Closed Positions */}
-      {closed.length > 0 && (
-        <details className="text-xs">
-          <summary className="text-xs uppercase tracking-wider text-text-muted font-semibold cursor-pointer mb-2">
-            Closed Positions ({closed.length})
-          </summary>
-          <div className="space-y-1 mt-2">
-            {closed.map((pos) => {
-              const pnlColor = changeColor(pos.pnl_pct);
-              return (
-                <div
-                  key={pos.id}
-                  className="flex items-center justify-between px-3 py-1.5 border-b border-border"
-                >
-                  <span className="font-mono text-text-muted">
-                    {pos.ticker} ${pos.strike} {pos.option_type} x
-                    {pos.contracts}
-                  </span>
-                  <span className="font-mono font-bold" style={{ color: pnlColor }}>
-                    {pos.pnl_pct >= 0 ? "+" : ""}
-                    {pos.pnl_pct.toFixed(1)}% — {pos.exit_reason}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </details>
-      )}
+      {/* Trade Decision Log — closed positions with full scoring rationale + exit reason */}
+      <details className="text-xs">
+        <summary className="text-xs uppercase tracking-wider text-text-muted font-semibold cursor-pointer mb-2">
+          Trade Decision Log
+        </summary>
+        <div className="mt-2"><TradeDecisionLog /></div>
+      </details>
 
       {/* WL-A / WL-B Separated Watchlist */}
       {(wla.length > 0 || wlb.length > 0) && (
@@ -966,6 +946,14 @@ export function FlowPaperTrading() {
           )}
         </div>
       )}
+
+      {/* Missed Opportunities — WL-A unfilled + WL-B high-score with what-if P/L */}
+      <details className="text-xs">
+        <summary className="text-xs uppercase tracking-wider text-text-muted font-semibold cursor-pointer mb-2">
+          Missed Opportunities
+        </summary>
+        <div className="mt-2"><MissedOpportunities /></div>
+      </details>
 
       {/* Synthesis Report Panel + trigger */}
       <div className="card">
