@@ -29,6 +29,10 @@ interface ForecastChartProps {
   forecastOrigin?: string;
   overlays?: ChartOverlays;
   className?: string;
+  /** Inner chart-canvas height in px. Default 420 — pass a smaller value
+   *  for compact embeds (e.g., in side panels). The card itself adds
+   *  ~50px more for legend + padding. */
+  height?: number;
 }
 
 /** Convert YYYY-MM-DD to time value for lightweight-charts */
@@ -72,6 +76,7 @@ export function ForecastChart({
   forecastOrigin,
   overlays,
   className = "",
+  height = 420,
 }: ForecastChartProps) {
   const showMA = overlays?.showMA ?? ["MA20", "MA50"];
   const showBB = overlays?.showBB ?? false;
@@ -411,7 +416,10 @@ export function ForecastChart({
   // Loading state
   if (!historicalData) {
     return (
-      <div className={`card min-h-[450px] flex items-center justify-center ${className}`}>
+      <div
+        className={`card flex items-center justify-center ${className}`}
+        style={{ minHeight: `${height + 50}px` }}
+      >
         {isLoading ? (
           <div className="flex flex-col items-center gap-3 text-text-muted">
             <div className="w-8 h-8 border-2 border-accent-blue/30 border-t-accent-blue rounded-full animate-spin" />
@@ -462,7 +470,7 @@ export function ForecastChart({
       <div
         ref={containerRef}
         className="w-full"
-        style={{ height: "420px" }}
+        style={{ height: `${height}px` }}
       />
     </div>
   );

@@ -10,6 +10,7 @@ import { NAV_ITEMS } from "./lib/constants";
 
 import { ForecastPage } from "./pages/ForecastPage";
 import { CommandCenterPage } from "./pages/CommandCenterPage";
+import { CommandCenterPageV2 } from "./pages/CommandCenterPageV2";
 import { ModelEvalPage } from "./pages/ModelEvalPage";
 import { IntelligencePage } from "./pages/IntelligencePage";
 import { SignalAnalysisPage } from "./pages/SignalAnalysisPage";
@@ -81,11 +82,11 @@ function AppLayout() {
   return (
     <div className="min-h-screen flex flex-col bg-bg-primary">
       <Navbar />
-      <TickerBar />
       <main className="flex-1 p-6">
         <Routes>
           <Route path="/" element={<ForecastPage />} />
           <Route path="/command-center" element={<CommandCenterPage />} />
+          <Route path="/command-center-v2" element={<CommandCenterPageV2 />} />
           <Route path="/eval" element={<ModelEvalPage />} />
           <Route path="/intel" element={<IntelligencePage />} />
           <Route path="/signals" element={<SignalAnalysisPage />} />

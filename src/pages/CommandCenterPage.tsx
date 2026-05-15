@@ -1,7 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAppStore } from "../store/useAppStore";
-import { useMarketPrice } from "../api/forecast";
+import { useMarketPrice, useMarketHistory } from "../api/forecast";
 import { useSignal, useGenerateSignal } from "../api/signals";
 import { useTrustScores } from "../api/eval";
 import { useFlowAlerts } from "../api/flow";
@@ -9,6 +9,13 @@ import apiClient from "../api/client";
 
 // Command Center feature components
 import { DecisionHero } from "../features/command-center/DecisionHero";
+import { ForecastChart } from "../features/forecast/ForecastChart";
+import {
+  ForecastConfig,
+  DEFAULT_SETTINGS,
+  type ForecastSettings,
+} from "../features/forecast/ForecastConfig";
+import type { OHLCV, ModelForecast } from "../lib/types";
 import { ActionPanel } from "../features/command-center/ActionPanel";
 import { ModelBreakdown } from "../features/command-center/ModelBreakdown";
 import { TrustScores } from "../features/command-center/TrustScores";
@@ -35,6 +42,8 @@ import {
   Eye,
   Bell,
   BarChart3,
+  X,
+  SidebarOpen,
 } from "lucide-react";
 
 /* ── Tab definitions ─────────────────────────────────────── */
@@ -59,6 +68,10 @@ function AnalyzeBar({
 }) {
   const { activeTicker, setActiveTicker } = useAppStore();
   const [tickerInput, setTickerInput] = useState(activeTicker);
+
+  useEffect(() => {
+    setTickerInput(activeTicker);
+  }, [activeTicker]);
 
   const handleSubmit = useCallback(() => {
     const cleaned = tickerInput.toUpperCase().trim();
@@ -196,9 +209,94 @@ export function CommandCenterPage() {
   const [activeFlowTab, setActiveFlowTab] = useState<FlowTab>("flow-trader");
   const [showAlerts, setShowAlerts] = useState(false);
 
+  // Detail panel slides in when the user picks a ticker (from a flow card,
+  // alert, anywhere). Closed by default so flow gets full width on first load.
+  const [detailOpen, setDetailOpen] = useState(false);
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    setDetailOpen(true);
+  }, [ticker]);
+
+  // Forecast Config — same settings + run loop as the /forecast page, embedded
+  // here so the user can re-run with different models/horizon/origin without
+  // leaving Command Center. When custom forecasts exist they override the
+  // signal's per-ticker top-N for the chart display.
+  const [settings, setSettings] = useState<ForecastSettings>(DEFAULT_SETTINGS);
+  const [customForecasts, setCustomForecasts] = useState<ModelForecast[]>([]);
+  const [forecastOriginOverride, setForecastOriginOverride] = useState<string | undefined>();
+  const [isRunningForecast, setIsRunningForecast] = useState(false);
+
+  // Reset custom forecasts when the ticker changes (the old forecast was for
+  // a different name and would be misleading on the new chart).
+  useEffect(() => {
+    setCustomForecasts([]);
+    setForecastOriginOverride(undefined);
+  }, [ticker]);
+
+  const runCustomForecast = useCallback(async () => {
+    if (!ticker || settings.selectedModels.length === 0) return;
+    setIsRunningForecast(true);
+    setCustomForecasts([]);
+    setForecastOriginOverride(undefined);
+    try {
+      const isDaily = settings.forecastType === "daily";
+      const endpoint = isDaily ? "/forecast/daily" : "/forecast/intraday";
+      const body = isDaily
+        ? {
+            ticker,
+            days: settings.forecastDays,
+            history_days: settings.historyDays,
+            use_covariates: settings.useCovariates,
+            use_pretrained: settings.usePretrained,
+          }
+        : {
+            ticker,
+            minutes: settings.forecastMinutes,
+            interval: settings.interval,
+            history_period: settings.historyPeriod,
+            use_covariates: settings.useCovariates,
+            use_pretrained: settings.usePretrained,
+          };
+
+      const results = await Promise.allSettled(
+        settings.selectedModels.map((model) =>
+          apiClient.post(endpoint, { ...body, model }).then((r) => {
+            const d = r.data;
+            const prices = d.prices ?? (d.predictions
+              ? d.predictions.map((p: { price: number }) => p.price)
+              : []);
+            return {
+              model,
+              prices,
+              end_price: d.end_price ?? d.summary?.final_price
+                ?? (prices.length ? prices[prices.length - 1] : 0),
+              predictions: d.predictions ?? [],
+              current_price: d.current_price ?? 0,
+              latency_ms: d.latency_ms ?? 0,
+            } as ModelForecast;
+          }),
+        ),
+      );
+      const successful: ModelForecast[] = [];
+      for (const r of results) {
+        if (r.status === "fulfilled") successful.push(r.value);
+      }
+      setCustomForecasts(successful);
+    } catch (err) {
+      console.error("Custom forecast failed:", err);
+    } finally {
+      setIsRunningForecast(false);
+    }
+  }, [ticker, settings]);
+
   // Data queries
   const { data: marketPrice, isLoading: priceLoading } = useMarketPrice(ticker);
   const { data: signalResult, isLoading: signalLoading } = useSignal(ticker);
+  const { data: history, isLoading: historyLoading } = useMarketHistory(ticker, 180);
   const { data: trustScores, isLoading: trustLoading } = useTrustScores();
   const { data: snapshot } = useQuery({
     queryKey: ["cc-snapshot", ticker],
@@ -206,6 +304,21 @@ export function CommandCenterPage() {
     staleTime: 60_000,
     retry: 1,
   });
+
+  // Normalize history rows to OHLCV shape the chart expects.
+  const historicalData: OHLCV[] = (history ?? []).map(
+    (d: Record<string, number | string>) => ({
+      date: String(d.date),
+      open: Number(d.open),
+      high: Number(d.high),
+      low: Number(d.low),
+      close: Number(d.close),
+      volume: Number(d.volume),
+    })
+  );
+  const ensembleModels = signalResult?.ensemble_models
+    ?? signalResult?.models?.map((m) => m.model)
+    ?? [];
 
   // Generate signal mutation
   const generateSignal = useGenerateSignal();
@@ -236,51 +349,32 @@ export function CommandCenterPage() {
         <AnalyzeBar onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} />
       </div>
 
-      {/* Two-column layout: Left (analysis) + Right (flow engine) */}
-      <div className="grid grid-cols-12 gap-4">
-        {/* Left column: Signal + Models + Intelligence */}
-        <div className="col-span-12 lg:col-span-4 space-y-4">
-          <DecisionHero
-            signal={signal}
-            marketPrice={marketPrice ?? null}
-            isLoading={isSignalLoading}
-          />
-          <ActionPanel
-            signal={signal}
-            currentPrice={currentPrice}
-            isLoading={isSignalLoading}
-            option={snapshot?.option ? {
-              strike: snapshot.option.strike,
-              type: snapshot.option.type,
-              expiry: snapshot.option.expiry_display || snapshot.option.expiry,
-              premium: snapshot.option.premium,
-              bid: snapshot.option.call_premium,
-              ask: snapshot.option.put_premium,
-              iv: snapshot.option.iv ? snapshot.option.iv / 100 : undefined,
-            } : undefined}
-          />
-          <ModelBreakdown
-            models={models}
-            currentPrice={currentPrice}
-            isLoading={isSignalLoading}
-          />
-          <TrustScores
-            scores={trustScores ?? []}
-            isLoading={trustLoading}
-          />
-          <IntelligencePanel
-            thesis={thesis ?? null}
-            isLoading={isSignalLoading}
-            currentPrice={currentPrice}
-          />
-        </div>
-
-        {/* Right column: Flow Analyzer (wider, primary workspace) */}
-        <div className="col-span-12 lg:col-span-8">
-          <div className="card sticky top-4">
-            <div className="flex items-center justify-between">
+      {/* Master/detail layout:
+            - Default state: Flow workspace takes the full width (col 12).
+            - Clicking any ticker (which updates activeTicker) auto-opens the
+              detail panel on the right with chart + analysis + intelligence.
+            - The detail panel can be dismissed via [X] to reclaim flow width.
+            - When closed and a ticker is set, a tiny "Show analysis" button
+              brings it back without forcing another ticker click. */}
+      <div className="grid grid-cols-12 gap-4 items-start">
+        <div className={detailOpen ? "col-span-12 lg:col-span-7" : "col-span-12"}>
+          <div className="card">
+            <div className="flex items-center justify-between gap-2">
               <FlowTabBar activeTab={activeFlowTab} onTabChange={setActiveFlowTab} />
-              <AlertBellInner onClick={() => setShowAlerts(!showAlerts)} isOpen={showAlerts} />
+              <div className="flex items-center gap-2">
+                {!detailOpen && ticker && (
+                  <button
+                    type="button"
+                    onClick={() => setDetailOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors"
+                    title="Open analysis panel for the current ticker"
+                  >
+                    <SidebarOpen size={14} />
+                    Analysis ({ticker})
+                  </button>
+                )}
+                <AlertBellInner onClick={() => setShowAlerts(!showAlerts)} isOpen={showAlerts} />
+              </div>
             </div>
 
             {showAlerts && (
@@ -289,11 +383,102 @@ export function CommandCenterPage() {
               </div>
             )}
 
-            <div className="mt-3 max-h-[calc(100vh-180px)] overflow-y-auto pr-1">
+            <div className="mt-3">
               <FlowTabContent activeTab={activeFlowTab} />
             </div>
           </div>
         </div>
+
+        {detailOpen && (
+          <div className="col-span-12 lg:col-span-5 space-y-4">
+            {/* Detail header: ticker label + close button */}
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <BarChart3 size={16} className="text-accent-blue" />
+                <span className="font-mono font-semibold text-text-primary">{ticker}</span>
+                <span className="text-xs text-text-muted">analysis</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailOpen(false)}
+                className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-colors"
+                title="Hide analysis panel"
+                aria-label="Close analysis panel"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Forecast configuration — re-run with different models / horizon
+                / origin without leaving Command Center. When the user runs a
+                custom forecast, those results override the signal's per-ticker
+                top-N for the chart. */}
+            <ForecastConfig
+              settings={settings}
+              onChange={setSettings}
+              onRunForecast={runCustomForecast}
+              isLoading={isRunningForecast}
+            />
+
+            {/* Chart — uses custom forecasts when available, otherwise the
+                signal's per-ticker top-N. */}
+            <ForecastChart
+              historicalData={historicalData}
+              forecasts={customForecasts.length ? customForecasts : (signalResult?.models ?? [])}
+              selectedModels={customForecasts.length ? settings.selectedModels : ensembleModels}
+              isLoading={historyLoading || isSignalLoading || isRunningForecast}
+              forecastOrigin={forecastOriginOverride || settings.forecastOrigin}
+              height={300}
+            />
+
+            {/* Analysis grid:
+                  Left column  — DecisionHero
+                  Right column — ModelBreakdown stacked on top of TrustScores
+                  Bottom row   — ActionPanel full-width (3 sub-cards horizontal) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+              <DecisionHero
+                signal={signal}
+                marketPrice={marketPrice ?? null}
+                isLoading={isSignalLoading}
+              />
+              <div className="space-y-3">
+                <ModelBreakdown
+                  models={models}
+                  currentPrice={currentPrice}
+                  isLoading={isSignalLoading}
+                />
+                <TrustScores
+                  scores={trustScores ?? []}
+                  isLoading={trustLoading}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <ActionPanel
+                  signal={signal}
+                  currentPrice={currentPrice}
+                  isLoading={isSignalLoading}
+                  option={snapshot?.option ? {
+                    strike: snapshot.option.strike,
+                    type: snapshot.option.type,
+                    expiry: snapshot.option.expiry_display || snapshot.option.expiry,
+                    premium: snapshot.option.premium,
+                    bid: snapshot.option.call_premium,
+                    ask: snapshot.option.put_premium,
+                    iv: snapshot.option.iv ? snapshot.option.iv / 100 : undefined,
+                  } : undefined}
+                />
+              </div>
+            </div>
+
+            {/* Intelligence prose under the analysis grid */}
+            <IntelligencePanel
+              thesis={thesis ?? null}
+              isLoading={isSignalLoading}
+              currentPrice={currentPrice}
+              ticker={ticker}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
