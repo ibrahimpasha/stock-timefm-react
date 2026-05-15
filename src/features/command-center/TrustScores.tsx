@@ -1,10 +1,14 @@
 import { MODEL_COLORS, MODEL_LABELS } from "../../lib/constants";
-import { Shield, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Shield, TrendingUp, TrendingDown, Minus, Star } from "lucide-react";
 import type { TrustScore } from "../../lib/types";
 
 interface TrustScoresProps {
   scores: TrustScore[];
   isLoading?: boolean;
+  /** Models the router currently picked for this ticker (in order). When
+   *  set, these rows get a star + accent so the user sees which leaderboard
+   *  entries are actively driving the live signal. */
+  pickedModels?: string[];
 }
 
 function getTrustColor(score: number): string {
@@ -35,7 +39,8 @@ function SkeletonTrust() {
   );
 }
 
-export function TrustScores({ scores, isLoading }: TrustScoresProps) {
+export function TrustScores({ scores, isLoading, pickedModels }: TrustScoresProps) {
+  const picked = new Set((pickedModels ?? []).map((m) => m.toLowerCase()));
   if (isLoading) return <SkeletonTrust />;
 
   if (!scores || scores.length === 0) {
@@ -57,9 +62,17 @@ export function TrustScores({ scores, isLoading }: TrustScoresProps) {
 
   return (
     <div className="card">
-      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5 mb-4">
-        <Shield size={13} />
-        Trust Scores
+      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center justify-between gap-1.5 mb-4">
+        <span className="flex items-center gap-1.5">
+          <Shield size={13} />
+          Trust Scores
+        </span>
+        {picked.size > 0 && (
+          <span className="flex items-center gap-1 text-[10px] normal-case text-text-muted">
+            <Star size={10} style={{ color: "var(--accent-yellow, #f0c040)" }} fill="currentColor" />
+            picked for this ticker
+          </span>
+        )}
       </h3>
 
       <div className="space-y-2.5">
@@ -68,11 +81,27 @@ export function TrustScores({ scores, isLoading }: TrustScoresProps) {
           const label = MODEL_LABELS[entry.model] || entry.model;
           const barColor = getTrustColor(entry.score);
           const barWidth = Math.max(entry.score, 3);
+          const isPicked = picked.has(entry.model.toLowerCase());
 
           return (
-            <div key={entry.model}>
+            <div
+              key={entry.model}
+              className={isPicked ? "rounded px-1.5 py-1 -mx-1.5" : ""}
+              style={
+                isPicked
+                  ? { background: "rgba(240,192,64,0.07)", outline: "1px solid rgba(240,192,64,0.25)" }
+                  : undefined
+              }
+            >
               <div className="flex items-center justify-between text-xs mb-0.5">
-                <span className="font-mono" style={{ color: modelColor }}>
+                <span className="font-mono flex items-center gap-1" style={{ color: modelColor }}>
+                  {isPicked && (
+                    <Star
+                      size={10}
+                      style={{ color: "var(--accent-yellow, #f0c040)" }}
+                      fill="currentColor"
+                    />
+                  )}
                   {label}
                 </span>
                 <div className="flex items-center gap-1.5">

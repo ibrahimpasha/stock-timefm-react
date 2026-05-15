@@ -20,6 +20,15 @@ interface ChartOverlays {
   showATR: boolean;
 }
 
+/** Annotations drawn as horizontal price lines on the main close series. */
+export interface ChartAnnotations {
+  entry_low?: number;
+  entry_high?: number;
+  stop_loss?: number;
+  t1?: number;
+  t2?: number;
+}
+
 interface ForecastChartProps {
   historicalData: OHLCV[] | undefined;
   forecasts: ModelForecast[];
@@ -33,6 +42,9 @@ interface ForecastChartProps {
    *  for compact embeds (e.g., in side panels). The card itself adds
    *  ~50px more for legend + padding. */
   height?: number;
+  /** Optional Entry / Stop / Target price-line annotations drawn on the
+   *  close series. Pass undefined values to omit individual lines. */
+  annotations?: ChartAnnotations;
 }
 
 /** Convert YYYY-MM-DD to time value for lightweight-charts */
@@ -77,6 +89,7 @@ export function ForecastChart({
   overlays,
   className = "",
   height = 420,
+  annotations,
 }: ForecastChartProps) {
   const showMA = overlays?.showMA ?? ["MA20", "MA50"];
   const showBB = overlays?.showBB ?? false;
@@ -144,6 +157,31 @@ export function ForecastChart({
     }));
     candleSeries.setData(candleData);
     seriesRefs.current.push(candleSeries);
+
+    // --- Entry / Stop / Target price-line annotations on the close series ---
+    // Drawn as dashed horizontal lines so users can see at a glance where
+    // the signal's trade levels sit relative to current price.
+    if (annotations) {
+      const addLine = (price: number | undefined, color: string, title: string) => {
+        if (typeof price !== "number" || !isFinite(price) || price <= 0) return;
+        candleSeries.createPriceLine({
+          price,
+          color,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title,
+        });
+      };
+      // Entry zone — blue band edges
+      addLine(annotations.entry_low, "#58a6ff", "Entry lo");
+      addLine(annotations.entry_high, "#58a6ff", "Entry hi");
+      // Targets — green
+      addLine(annotations.t1, "#3fb950", "T1");
+      addLine(annotations.t2, "#3fb950", "T2");
+      // Stop — red
+      addLine(annotations.stop_loss, "#f85149", "Stop");
+    }
 
     // --- Volume histogram ---
     const volumeSeries = chart.addHistogramSeries({
@@ -379,7 +417,7 @@ export function ForecastChart({
 
     // Fit content
     chart.timeScale().fitContent();
-  }, [historicalData, forecasts, selectedModels, actualPrices, forecastOrigin, showMA, showBB, showRSI]);
+  }, [historicalData, forecasts, selectedModels, actualPrices, forecastOrigin, showMA, showBB, showRSI, annotations]);
 
   // Build chart whenever data changes
   useEffect(() => {

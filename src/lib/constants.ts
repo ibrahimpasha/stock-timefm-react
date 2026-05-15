@@ -31,7 +31,7 @@ export const MODEL_LABELS: Record<string, string> = {
   tide: "TiDE",
   chronos2: "Chronos-2",
   claude: "Claude Opus",
-  ensemble: "Ensemble (3-model)",
+  ensemble: "Ensemble (per-ticker top-N)",
 };
 
 /** Quantile band colors (fill) */

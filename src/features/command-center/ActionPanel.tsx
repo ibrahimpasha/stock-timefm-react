@@ -130,7 +130,15 @@ interface OptionPickData {
 }
 
 function OptionPickCard({ option }: { option?: OptionPickData }) {
-  if (!option) {
+  // Treat "partially-populated option" (object present but missing/NaN core
+  // fields) as no-pick. The snapshot endpoint sometimes returns a stub with
+  // strike but no premium/bid/ask, which previously rendered as "$NaN".
+  const hasUsableOption =
+    option &&
+    typeof option.strike === "number" && isFinite(option.strike) && option.strike > 0 &&
+    typeof option.premium === "number" && isFinite(option.premium) && option.premium > 0;
+
+  if (!hasUsableOption) {
     return (
       <div className="card flex flex-col gap-3">
         <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5">

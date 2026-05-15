@@ -1,11 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BarChart3 } from "lucide-react";
-import { TickerInput } from "./components/TickerInput";
-import { ServerStatus } from "./components/ServerStatus";
-import { PriceDisplay } from "./components/PriceDisplay";
-import { useAppStore } from "./store/useAppStore";
-import { useMarketPrice } from "./api/forecast";
 import { NAV_ITEMS } from "./lib/constants";
 
 import { ForecastPage } from "./pages/ForecastPage";
@@ -23,27 +18,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-function TickerBar() {
-  const ticker = useAppStore((s) => s.activeTicker);
-  const { data: price } = useMarketPrice(ticker);
-
-  return (
-    <div className="flex items-center justify-between px-6 py-2 border-b border-border bg-bg-card/50">
-      <div className="flex items-center gap-4">
-        <TickerInput />
-        {price && (
-          <PriceDisplay
-            price={price.price}
-            changePct={price.change_pct}
-            size="md"
-          />
-        )}
-      </div>
-      <ServerStatus />
-    </div>
-  );
-}
 
 function Navbar() {
   return (

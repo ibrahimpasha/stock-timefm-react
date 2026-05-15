@@ -294,7 +294,7 @@ export function CommandCenterPage() {
   }, [ticker, settings]);
 
   // Data queries
-  const { data: marketPrice, isLoading: priceLoading } = useMarketPrice(ticker);
+  const { data: marketPrice } = useMarketPrice(ticker);
   const { data: signalResult, isLoading: signalLoading } = useSignal(ticker);
   const { data: history, isLoading: historyLoading } = useMarketHistory(ticker, 180);
   const { data: trustScores, isLoading: trustLoading } = useTrustScores();
@@ -421,7 +421,9 @@ export function CommandCenterPage() {
             />
 
             {/* Chart — uses custom forecasts when available, otherwise the
-                signal's per-ticker top-N. */}
+                signal's per-ticker top-N. Entry/Stop/T1/T2 from the signal
+                are drawn as horizontal price lines so the trade levels are
+                visible relative to current price without reading the cards. */}
             <ForecastChart
               historicalData={historicalData}
               forecasts={customForecasts.length ? customForecasts : (signalResult?.models ?? [])}
@@ -429,6 +431,20 @@ export function CommandCenterPage() {
               isLoading={historyLoading || isSignalLoading || isRunningForecast}
               forecastOrigin={forecastOriginOverride || settings.forecastOrigin}
               height={300}
+              annotations={
+                signal
+                  ? {
+                      entry_low: signal.entry_low,
+                      entry_high: signal.entry_high,
+                      stop_loss:
+                        signal.direction === "BEAR"
+                          ? signal.entry_high * 1.03
+                          : signal.entry_low * 0.97,
+                      t1: signal.t1,
+                      t2: signal.t2,
+                    }
+                  : undefined
+              }
             />
 
             {/* Analysis grid:
@@ -450,6 +466,7 @@ export function CommandCenterPage() {
                 <TrustScores
                   scores={trustScores ?? []}
                   isLoading={trustLoading}
+                  pickedModels={ensembleModels}
                 />
               </div>
               <div className="sm:col-span-2">
