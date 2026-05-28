@@ -1,4 +1,14 @@
-# React + TypeScript + Vite
+# Stock-TimeFM React Dashboard
+
+React + TypeScript + Vite dashboard for the Stock-TimeFM trading backend. See `CLAUDE.md` for routes, feature layout, and conventions; see the sister backend repo (`~/stock-timefm`) for the API contract.
+
+Routes today: `/` (Forecasts), `/command-center`, `/command-center-v2`, `/eval`, `/intel`, `/signals`, `/traders` (trader leaderboard + per-trader positions + Trending / Leaders / Sentiment signals panel).
+
+Dev server: `npm run dev` (Vite on `:3000`, proxies `/api/*` to the backend on `:8001`). Type-check: `npx --no-install tsc --noEmit -p tsconfig.json`.
+
+---
+
+## React + TypeScript + Vite (template defaults)
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

@@ -49,6 +49,10 @@ interface ForecastConfigProps {
   onChange: (settings: ForecastSettings) => void;
   onRunForecast: () => void;
   isLoading: boolean;
+  /** Active ticker the forecast will run against. Passed in (instead of
+   *  re-read from the store inside this component) so the button can show
+   *  WHY it's disabled when nothing is selected. */
+  ticker?: string;
 }
 
 export const DEFAULT_SETTINGS: ForecastSettings = {
@@ -75,8 +79,21 @@ export function ForecastConfig({
   onChange,
   onRunForecast,
   isLoading,
+  ticker = "",
 }: ForecastConfigProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // The button looks enabled if you only check selectedModels, but the
+  // handler also bails on empty ticker — making the click silently do
+  // nothing. Compute the real reasons so we can surface them in the title.
+  const noTicker = !ticker;
+  const noModels = settings.selectedModels.length === 0;
+  const runDisabled = isLoading || noTicker || noModels;
+  const disabledReason = noTicker
+    ? "Select a ticker first"
+    : noModels
+      ? "Select at least one model"
+      : "";
 
   const update = (partial: Partial<ForecastSettings>) =>
     onChange({ ...settings, ...partial });
@@ -276,7 +293,8 @@ export function ForecastConfig({
 
         <button
           onClick={onRunForecast}
-          disabled={isLoading || settings.selectedModels.length === 0}
+          disabled={runDisabled}
+          title={disabledReason || "Run forecast across selected models"}
           className="flex items-center gap-2 px-5 py-2 rounded-lg bg-accent-blue text-bg-primary font-semibold text-sm transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isLoading ? (
@@ -292,6 +310,11 @@ export function ForecastConfig({
           )}
         </button>
       </div>
+      {disabledReason && !isLoading && (
+        <div className="text-[10px] font-mono text-text-muted text-right -mt-2">
+          {disabledReason}
+        </div>
+      )}
 
       {/* Advanced settings panel */}
       {showAdvanced && (

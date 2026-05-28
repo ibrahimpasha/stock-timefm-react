@@ -1,9 +1,148 @@
-import { Brain, BookOpen, AlertTriangle, Clock, TrendingUp, TrendingDown, Target } from "lucide-react";
+import { Brain, BookOpen, AlertTriangle, Clock, TrendingUp, TrendingDown, Target, RefreshCw } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import apiClient from "../../api/client";
+import { relativeAge, absoluteAge } from "../../lib/utils";
 
 interface IntelligencePanelProps {
   thesis: string | null;
   isLoading?: boolean;
   currentPrice?: number;
+  ticker?: string;   // optional — when present, panel falls back to cached web-search intel
+}
+
+interface IntelCategoryResponse {
+  type: string;
+  title: string;
+  content: string;
+  timestamp: string;
+}
+
+function useIntelLatestForPanel(ticker: string | undefined) {
+  return useQuery<IntelCategoryResponse[]>({
+    queryKey: ["intel-latest", ticker || ""],
+    queryFn: () =>
+      apiClient.get(`/intel/latest?ticker=${ticker}&max_age=72`).then((r) => r.data),
+    staleTime: 5 * 60_000,
+    enabled: !!ticker,
+  });
+}
+
+function useIntelRefresh(ticker: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation<{ status: string; ticker: string; categories: number }>({
+    mutationFn: async () => {
+      if (!ticker) throw new Error("no ticker");
+      const { data } = await apiClient.post(`/intel/refresh?ticker=${ticker}`);
+      return data;
+    },
+    onSuccess: () => {
+      // Invalidate cache so the panel re-renders with the fresh DB row.
+      qc.invalidateQueries({ queryKey: ["intel-latest", ticker || ""] });
+    },
+  });
+}
+
+/** Directional-bias header chip. Color: green=BULLISH, red=BEARISH,
+ *  amber=NEUTRAL. Hover tooltip shows the one-line reason. */
+function BiasChip({
+  bias,
+  reason,
+}: {
+  bias: "BULLISH" | "BEARISH" | "NEUTRAL" | "UNKNOWN";
+  reason: string;
+}) {
+  const palette: Record<string, { bg: string; fg: string; border: string }> = {
+    BULLISH: {
+      bg: "rgba(63,185,80,0.12)",
+      fg: "var(--accent-green)",
+      border: "rgba(63,185,80,0.35)",
+    },
+    BEARISH: {
+      bg: "rgba(248,81,73,0.12)",
+      fg: "var(--accent-red)",
+      border: "rgba(248,81,73,0.35)",
+    },
+    NEUTRAL: {
+      bg: "rgba(227,127,46,0.10)",
+      fg: "var(--accent-orange)",
+      border: "rgba(227,127,46,0.30)",
+    },
+    UNKNOWN: {
+      bg: "transparent",
+      fg: "var(--text-muted)",
+      border: "var(--border)",
+    },
+  };
+  const c = palette[bias] || palette.UNKNOWN;
+  return (
+    <span
+      className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold normal-case tracking-normal"
+      style={{ background: c.bg, color: c.fg, border: `1px solid ${c.border}` }}
+      title={reason || `Perplexity bias call: ${bias}`}
+    >
+      {bias}
+    </span>
+  );
+}
+
+/** Pull the `_bias` synthetic section out of the IntelSection[] response.
+ *  Backend returns `{type: "_bias", content: '{"bias":"BULLISH","reason":"..."}'}`
+ *  as a leading section; the dashboard renders it as a header chip.
+ *  Returns null when the response predates the bias rollout. */
+function extractBias(cats: IntelCategoryResponse[] | undefined): {
+  bias: "BULLISH" | "BEARISH" | "NEUTRAL" | "UNKNOWN";
+  reason: string;
+} | null {
+  if (!cats) return null;
+  const row = cats.find((c) => c.type === "_bias");
+  if (!row || !row.content) return null;
+  try {
+    const parsed = JSON.parse(row.content);
+    if (parsed && typeof parsed.bias === "string") {
+      return {
+        bias: parsed.bias,
+        reason: typeof parsed.reason === "string" ? parsed.reason : "",
+      };
+    }
+  } catch {
+    /* malformed bias payload — ignore */
+  }
+  return null;
+}
+
+function buildFallbackThesis(cats: IntelCategoryResponse[] | undefined): string | null {
+  if (!cats || cats.length === 0) return null;
+  // 2026-05-24: the backend now saves the entire Perplexity blob to a single
+  // `catalysts` row. That blob already contains its own `## ...` markdown
+  // headers (Latest earnings / Sentiment / Competitors / Risks / 2-week
+  // trading outlook / Numbers and dates), so we return it AS-IS — no outer
+  // `## Catalysts` wrapper that would create a duplicate header. Legacy
+  // entries with multiple per-category rows fall through to the old format.
+  const byType: Record<string, string> = {};
+  for (const c of cats) {
+    if (c.content && !byType[c.type]) byType[c.type] = c.content.trim();
+  }
+  const cat = byType.catalysts || "";
+  const hasOwnHeaders = /^##\s+/m.test(cat);
+  const otherCats = Object.keys(byType).filter(
+    (k) => k !== "catalysts" && !k.startsWith("_"),
+  );
+  if (cat && hasOwnHeaders && otherCats.length === 0) {
+    return cat;
+  }
+  // Legacy multi-category path (pre-2026-05-24 entries).
+  const sections: string[] = [];
+  if (byType.catalysts)            sections.push(`## Catalysts\n${byType.catalysts}`);
+  if (byType.deep_sentiment)       sections.push(`## Sentiment\n${byType.deep_sentiment}`);
+  if (byType.competitive_landscape) sections.push(`## Competitive\n${byType.competitive_landscape}`);
+  if (byType.regime_drivers)       sections.push(`## Regime Drivers\n${byType.regime_drivers}`);
+  if (byType.macro_calendar)       sections.push(`## Macro Calendar\n${byType.macro_calendar}`);
+  if (sections.length === 0 && Object.keys(byType).length > 0) {
+    const [firstKey, firstVal] = Object.entries(byType)[0];
+    sections.push(`## ${firstKey.replace(/_/g, " ")}\n${firstVal}`);
+  }
+  return sections.length > 0 ? sections.join("\n\n") : null;
 }
 
 /* ── Prediction extraction from thesis text ─────────────────────── */
@@ -24,7 +163,20 @@ function extractPrediction(text: string, currentPrice?: number): PricePrediction
 
   const lower = text.toLowerCase();
 
-  // ── Direction scoring ──
+  // ── Direction: defer to explicit BIAS: line if present ──
+  // The Perplexity prompt now demands `BIAS: BULLISH|BEARISH|NEUTRAL` on
+  // line 1. When that's there, ignore keyword counting — it gets fooled by
+  // technical-analysis words like "support", "upside" (in "fading upside"),
+  // and "bullish" (in "bullish target revisions from a subset of analysts")
+  // even when the overall read is bearish. See 2026-05-24 BLDP regression.
+  const biasMatch = text.match(/^\s*[`*]*\s*BIAS\s*[:\-]\s*\**\s*(BULLISH|BEARISH|NEUTRAL)\b/im);
+  let direction: PricePrediction["direction"];
+  if (biasMatch) {
+    const b = biasMatch[1].toUpperCase();
+    direction = b === "BULLISH" ? "bullish" : b === "BEARISH" ? "bearish" : "mixed";
+  }
+
+  // ── Fallback direction scoring (only when no BIAS line) ──
   const bullWords = [
     "buy", "bullish", "upside", "rally", "long", "outperform",
     "upgrade", "breakout", "accumulate", "support", "conviction: buy",
@@ -45,18 +197,19 @@ function extractPrediction(text: string, currentPrice?: number): PricePrediction
     bearScore += matches;
   }
 
-  // Check for explicit conviction statements (weighted heavily)
   if (/conviction:\s*buy/i.test(text)) bullScore += 5;
   if (/conviction:\s*sell/i.test(text)) bearScore += 5;
   if (/bull\s*case.*\$(\d+)/i.test(text)) bullScore += 2;
   if (/bear\s*case.*\$(\d+)/i.test(text)) bearScore += 1;
 
   const total = bullScore + bearScore;
-  if (total === 0) return null;
+  if (!biasMatch && total === 0) return null;
 
-  const direction: PricePrediction["direction"] =
-    bullScore > bearScore * 1.3 ? "bullish" :
-    bearScore > bullScore * 1.3 ? "bearish" : "mixed";
+  if (!biasMatch) {
+    direction =
+      bullScore > bearScore * 1.3 ? "bullish" :
+      bearScore > bullScore * 1.3 ? "bearish" : "mixed";
+  }
 
   // ── Confidence ──
   const ratio = Math.max(bullScore, bearScore) / Math.max(total, 1);
@@ -318,10 +471,29 @@ function SectionIcon({ title }: { title: string }) {
 
 /* ── Main component ──────────────────────────────────────────── */
 
-export function IntelligencePanel({ thesis, isLoading, currentPrice }: IntelligencePanelProps) {
+export function IntelligencePanel({ thesis, isLoading, currentPrice, ticker }: IntelligencePanelProps) {
+  // Always pull cached web-search intel so we can fall back when no formal
+  // thesis exists. Backfill script pre-populates this for all flow tickers,
+  // so the "no intelligence" state should essentially never appear.
+  const { data: cats, isLoading: catsLoading } = useIntelLatestForPanel(ticker);
+  const refresh = useIntelRefresh(ticker);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const bias = extractBias(cats);
+  const fallbackThesis = !thesis ? buildFallbackThesis(cats) : null;
+  const effectiveThesis = thesis || fallbackThesis;
+  const fromCache = !thesis && !!fallbackThesis;
+  // Timestamp comes back on every category — they all share the latest row's
+  // created_at because that's what the server backfills onto each section.
+  const lastRefreshIso = cats?.[0]?.timestamp || null;
+  const lastRefreshLabel = relativeAge(lastRefreshIso);
+
   if (isLoading) return <SkeletonIntel />;
 
-  if (!thesis) {
+  if (!effectiveThesis) {
+    // Only show the empty state when BOTH thesis and intel cache are empty.
+    // While the intel fetch is in flight, show a skeleton instead of the
+    // "run analysis" prompt so the user doesn't blame themselves.
+    if (catsLoading && ticker) return <SkeletonIntel />;
     return (
       <div className="card">
         <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5 mb-3">
@@ -329,24 +501,98 @@ export function IntelligencePanel({ thesis, isLoading, currentPrice }: Intellige
           Intelligence
         </h3>
         <p className="text-xs text-text-muted text-center py-4">
-          No thesis available -- run analysis to generate intelligence
+          No cached intelligence for {ticker || "this ticker"} — backfill pending
         </p>
       </div>
     );
   }
 
-  const sections = parseThesisSections(thesis);
-  const prediction = extractPrediction(thesis, currentPrice);
+  const sections = parseThesisSections(effectiveThesis);
+  const prediction = extractPrediction(effectiveThesis, currentPrice);
 
   return (
     <div className="card">
       <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5 mb-4">
         <Brain size={13} />
         Intelligence
+        {bias && bias.bias !== "UNKNOWN" && (
+          <BiasChip bias={bias.bias} reason={bias.reason} />
+        )}
+        <div className="ml-auto flex items-center gap-2 normal-case font-normal">
+          {fromCache && (
+            <span
+              className="text-[10px] font-mono text-text-muted"
+              title="Showing cached web-search intel because no ML thesis exists yet. Click Analyze for a full ensemble-backed thesis."
+            >
+              web-search cache
+            </span>
+          )}
+          {lastRefreshLabel && (
+            <span
+              className="text-[10px] font-mono text-text-muted"
+              title={lastRefreshIso ? `Last refreshed ${absoluteAge(lastRefreshIso)}` : undefined}
+            >
+              updated {lastRefreshLabel}
+            </span>
+          )}
+          {ticker && (
+            <button
+              onClick={() => {
+                setRefreshError(null);
+                refresh.mutate(undefined, {
+                  onError: (e) => setRefreshError((e as Error)?.message || "refresh failed"),
+                });
+              }}
+              disabled={refresh.isPending}
+              title="Re-fetch this ticker's intel via Perplexity / Claude web-search. Takes ~30-60s."
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono text-accent-blue hover:bg-accent-blue/10 border border-accent-blue/30 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={10} className={refresh.isPending ? "animate-spin" : ""} />
+              {refresh.isPending ? "fetching…" : "refresh"}
+            </button>
+          )}
+        </div>
       </h3>
+      {refreshError && (
+        <div className="mb-2 text-[10px] font-mono text-accent-red">
+          {refreshError}
+        </div>
+      )}
 
-      {/* Prediction card at top */}
-      {prediction && <PredictionCard prediction={prediction} currentPrice={currentPrice} />}
+      {bias && bias.bias !== "UNKNOWN" && bias.reason && (() => {
+        const c =
+          bias.bias === "BULLISH"
+            ? { fg: "var(--accent-green)", bg: "rgba(63,185,80,0.08)", border: "rgba(63,185,80,0.45)" }
+            : bias.bias === "BEARISH"
+              ? { fg: "var(--accent-red)", bg: "rgba(248,81,73,0.08)", border: "rgba(248,81,73,0.45)" }
+              : { fg: "var(--accent-orange)", bg: "rgba(227,127,46,0.08)", border: "rgba(227,127,46,0.40)" };
+        return (
+          <div
+            className="mb-3 text-xs leading-snug text-text-secondary rounded-md px-2.5 py-2"
+            style={{
+              background: c.bg,
+              border: `1px solid ${c.border}`,
+            }}
+          >
+            <span
+              className="font-mono font-semibold uppercase text-[10px] mr-1.5"
+              style={{ color: c.fg }}
+            >
+              why {bias.bias.toLowerCase()}
+            </span>
+            {bias.reason}
+          </div>
+        );
+      })()}
+
+      {/* Prediction card — only when we don't already have an explicit BIAS
+          chip + reasoning. The bias chip carries the directional signal; the
+          prediction card's keyAction/direction fallback is keyword-based and
+          conflicts with the explicit bias (see 2026-05-24 BLDP regression
+          where it said BULLISH while bias said BEARISH). */}
+      {!bias && prediction && (
+        <PredictionCard prediction={prediction} currentPrice={currentPrice} />
+      )}
 
       <div className="space-y-3">
         {sections.map((section, idx) => (

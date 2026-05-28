@@ -4,7 +4,6 @@ import { STALE_TIMES } from "../lib/constants";
 import type {
   FlowAlert,
   FlowPick,
-  FlowEntry,
   FlowChatMessage,
   TrackedTicker,
 } from "../lib/types";
@@ -33,20 +32,6 @@ export function useFlowPicks(status: "open" | "closed" = "open") {
       return data;
     },
     staleTime: STALE_TIMES.flow,
-  });
-}
-
-export function useFlowEntries(ticker: string, days: number = 30) {
-  return useQuery({
-    queryKey: ["flow", "entries", ticker, days],
-    queryFn: async () => {
-      const { data } = await apiClient.get<FlowEntry[]>(
-        `/flow/entries?ticker=${ticker}&days=${days}`
-      );
-      return data;
-    },
-    staleTime: STALE_TIMES.flow,
-    enabled: !!ticker,
   });
 }
 

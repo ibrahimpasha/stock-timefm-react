@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import apiClient from "../../api/client";
 import { useTrackedTickers } from "../../api/flow";
 import { STALE_TIMES } from "../../lib/constants";
+import { formatPremium } from "../../lib/utils";
 import {
   BarChart, Bar, LineChart, Line, ComposedChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -117,12 +118,6 @@ function parsePremium(s: string): number {
   if (c.toUpperCase().endsWith("M")) return parseFloat(c) * 1e6;
   if (c.toUpperCase().endsWith("K")) return parseFloat(c) * 1e3;
   return parseFloat(c) || 0;
-}
-
-function fmtM(n: number) {
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
-  return `$${n.toFixed(0)}`;
 }
 
 const GREEN = "#3fb950";
@@ -430,7 +425,7 @@ function TopMovers() {
             <span className="font-mono text-text-muted">{m.days}d</span>
             {m.escalating && <span style={{ color: GREEN }}><ArrowUpRight size={11} /></span>}
             {hasExits && <span className="flex items-center gap-0.5" style={{ color: ORANGE }}><AlertTriangle size={10} />{m.exitCount}</span>}
-            <span className="ml-auto font-mono text-text-muted">{fmtM(m.total)}</span>
+            <span className="ml-auto font-mono text-text-muted">{formatPremium(m.total)}</span>
             <span className="font-mono font-bold w-14 text-right" style={{ color: m.premiumTrend > 10 ? GREEN : m.premiumTrend < -10 ? RED : "var(--text-muted)" }}>
               {m.premiumTrend >= 0 ? "+" : ""}{m.premiumTrend.toFixed(0)}%
             </span>
@@ -595,7 +590,7 @@ function ContractTracker() {
                 <Target size={10} />
                 {c.daysActive}d / {c.totalEntries}x
               </span>
-              <span className="ml-auto font-mono text-text-secondary">{fmtM(c.totalPremium)}</span>
+              <span className="ml-auto font-mono text-text-secondary">{formatPremium(c.totalPremium)}</span>
             </div>
             {isExpanded && (
               <div className="ml-4 pl-3 border-l-2 border-border space-y-0.5 py-1">
@@ -753,10 +748,10 @@ function ExpiryHeatmap() {
         <BarChart data={expiryData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(48,54,61,0.4)" />
           <XAxis dataKey="expiry" tick={{ fill: "#8b949e", fontSize: 9 }} angle={-30} textAnchor="end" height={50} />
-          <YAxis tick={{ fill: "#8b949e", fontSize: 10 }} tickFormatter={(v) => fmtM(v)} />
+          <YAxis tick={{ fill: "#8b949e", fontSize: 10 }} tickFormatter={(v) => formatPremium(v)} />
           <Tooltip
             contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, fontSize: 11 }}
-            formatter={(v: number, name: string) => [fmtM(v), name === "bullPremium" ? "Bullish" : "Bearish"]}
+            formatter={(v: number, name: string) => [formatPremium(v), name === "bullPremium" ? "Bullish" : "Bearish"]}
           />
           <Bar dataKey="bullPremium" stackId="a" fill={GREEN} radius={[3, 3, 0, 0]} />
           <Bar dataKey="bearPremium" stackId="a" fill={RED} />
@@ -781,7 +776,7 @@ function ExpiryHeatmap() {
                   <div className="h-full rounded-full" style={{ width: `${d.bullPct}%`, background: GREEN }} />
                 </div>
                 <span className="font-mono" style={{ color: bullish ? GREEN : bearish ? RED : "var(--text-muted)" }}>
-                  {fmtM(d.totalPremium)}
+                  {formatPremium(d.totalPremium)}
                 </span>
               </div>
               <div className="text-text-muted truncate">{d.tickers.slice(0, 6).join(", ")}{d.tickers.length > 6 ? ` +${d.tickers.length - 6}` : ""}</div>

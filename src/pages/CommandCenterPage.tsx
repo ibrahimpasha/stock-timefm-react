@@ -1,14 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useAppStore } from "../store/useAppStore";
 import { useMarketPrice, useMarketHistory } from "../api/forecast";
 import { useSignal, useGenerateSignal } from "../api/signals";
-import { useTrustScores } from "../api/eval";
 import { useFlowAlerts } from "../api/flow";
-import apiClient from "../api/client";
 
 // Command Center feature components
 import { DecisionHero } from "../features/command-center/DecisionHero";
+import { GraphContextCard } from "../features/command-center/GraphContextCard";
 import { ForecastChart } from "../features/forecast/ForecastChart";
 import {
   ForecastConfig,
@@ -16,10 +14,13 @@ import {
   type ForecastSettings,
 } from "../features/forecast/ForecastConfig";
 import type { OHLCV, ModelForecast } from "../lib/types";
-import { ActionPanel } from "../features/command-center/ActionPanel";
-import { ModelBreakdown } from "../features/command-center/ModelBreakdown";
-import { TrustScores } from "../features/command-center/TrustScores";
 import { IntelligencePanel } from "../features/command-center/IntelligencePanel";
+import IntelligencePanelV3 from "../features/command-center/IntelligencePanelV3";
+// Keep `IntelligencePanel` referenced so the fallback import survives
+// `noUnusedLocals`. Swap `<IntelligencePanelV3 />` below for `<IntelligencePanel ... />`
+// to revert the panel if V3 misbehaves.
+const _IntelligencePanelFallback = IntelligencePanel;
+void _IntelligencePanelFallback;
 
 // Flow Analyzer feature components
 import { FlowAlerts } from "../features/flow-analyzer/FlowAlerts";
@@ -28,6 +29,8 @@ import { IFlowTracker } from "../features/flow-analyzer/IFlowTracker";
 
 import { FlowPaperTrading } from "../features/flow-analyzer/FlowPaperTrading";
 import { FlowIntel } from "../features/flow-analyzer/FlowIntel";
+import { VoicesTab } from "../features/flow-analyzer/VoicesTab";
+import { NewsTab } from "../features/flow-analyzer/NewsTab";
 
 // iFlow Discord Pipeline
 import { FetchIFlowPanel } from "../features/flow-analyzer/FetchIFlowPanel";
@@ -44,17 +47,21 @@ import {
   BarChart3,
   X,
   SidebarOpen,
+  Mic2,
+  Globe,
 } from "lucide-react";
 
 /* ── Tab definitions ─────────────────────────────────────── */
 
-type FlowTab = "chat" | "picks" | "iflow" | "flow-trader" | "flow-intel";
+type FlowTab = "chat" | "picks" | "iflow" | "flow-trader" | "flow-intel" | "voices" | "news";
 
 const FLOW_TABS: { id: FlowTab; label: string; icon: React.ElementType }[] = [
-  { id: "flow-trader", label: "Flow Trader", icon: Zap },
   { id: "iflow", label: "iFlow Tracker", icon: Eye },
+  { id: "flow-trader", label: "Flow Trader", icon: Zap },
   { id: "flow-intel", label: "Flow Intel", icon: BarChart3 },
   { id: "chat", label: "Flow Chat", icon: MessageCircle },
+  { id: "voices", label: "Voices", icon: Mic2 },
+  { id: "news", label: "News", icon: Globe },
 ];
 
 /* ── Ticker Input + Analyze Bar ──────────────────────────── */
@@ -197,6 +204,10 @@ function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
       return <FlowIntel />;
     case "flow-trader":
       return <FlowPaperTrading />;
+    case "voices":
+      return <VoicesTab />;
+    case "news":
+      return <NewsTab />;
     default:
       return null;
   }
@@ -206,7 +217,7 @@ function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
 
 export function CommandCenterPage() {
   const ticker = useAppStore((s) => s.activeTicker);
-  const [activeFlowTab, setActiveFlowTab] = useState<FlowTab>("flow-trader");
+  const [activeFlowTab, setActiveFlowTab] = useState<FlowTab>("iflow");
   const [showAlerts, setShowAlerts] = useState(false);
 
   // Detail panel slides in when the user picks a ticker (from a flow card,
@@ -238,7 +249,19 @@ export function CommandCenterPage() {
   }, [ticker]);
 
   const runCustomForecast = useCallback(async () => {
-    if (!ticker || settings.selectedModels.length === 0) return;
+    if (!ticker) {
+      console.warn("[runCustomForecast] aborted: no active ticker");
+      return;
+    }
+    if (settings.selectedModels.length === 0) {
+      console.warn("[runCustomForecast] aborted: no models selected");
+      return;
+    }
+    console.log("[runCustomForecast] starting", {
+      ticker,
+      models: settings.selectedModels,
+      type: settings.forecastType,
+    });
     setIsRunningForecast(true);
     setCustomForecasts([]);
     setForecastOriginOverride(undefined);
@@ -282,12 +305,20 @@ export function CommandCenterPage() {
         ),
       );
       const successful: ModelForecast[] = [];
-      for (const r of results) {
+      const failed: Array<{ model: string; reason: unknown }> = [];
+      results.forEach((r, i) => {
         if (r.status === "fulfilled") successful.push(r.value);
-      }
+        else failed.push({ model: settings.selectedModels[i], reason: r.reason });
+      });
+      console.log("[runCustomForecast] done", {
+        ok: successful.length,
+        failed: failed.length,
+        successful_models: successful.map((s) => s.model),
+      });
+      if (failed.length) console.warn("[runCustomForecast] failed models:", failed);
       setCustomForecasts(successful);
     } catch (err) {
-      console.error("Custom forecast failed:", err);
+      console.error("[runCustomForecast] threw:", err);
     } finally {
       setIsRunningForecast(false);
     }
@@ -297,13 +328,6 @@ export function CommandCenterPage() {
   const { data: marketPrice } = useMarketPrice(ticker);
   const { data: signalResult, isLoading: signalLoading } = useSignal(ticker);
   const { data: history, isLoading: historyLoading } = useMarketHistory(ticker, 180);
-  const { data: trustScores, isLoading: trustLoading } = useTrustScores();
-  const { data: snapshot } = useQuery({
-    queryKey: ["cc-snapshot", ticker],
-    queryFn: () => apiClient.get(`/command-center/snapshot?ticker=${ticker}`).then((r) => r.data),
-    staleTime: 60_000,
-    retry: 1,
-  });
 
   // Normalize history rows to OHLCV shape the chart expects.
   const historicalData: OHLCV[] = (history ?? []).map(
@@ -320,6 +344,23 @@ export function CommandCenterPage() {
     ?? signalResult?.models?.map((m) => m.model)
     ?? [];
 
+  // Whenever the signal's per-ticker picks change, fold them into the
+  // ForecastConfig `selectedModels` list so the checkboxes show them as
+  // checked and they render on the chart. Without this, a ticker whose
+  // router picks aren't in the user's default settings produces an empty
+  // chart even though the data is available.
+  useEffect(() => {
+    if (!ensembleModels.length) return;
+    setSettings((prev) => {
+      const merged = Array.from(new Set([...prev.selectedModels, ...ensembleModels]));
+      return merged.length === prev.selectedModels.length
+        ? prev
+        : { ...prev, selectedModels: merged };
+    });
+    // ensembleModels is a fresh array each render; key on its joined string.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ensembleModels.join(",")]);
+
   // Generate signal mutation
   const generateSignal = useGenerateSignal();
 
@@ -328,9 +369,6 @@ export function CommandCenterPage() {
   };
 
   const signal = signalResult?.signal ?? null;
-  const thesis = signalResult?.thesis ?? null;
-  const models = signalResult?.models ?? [];
-  const currentPrice = marketPrice?.price;
 
   const isAnalyzing = generateSignal.isPending;
   const isSignalLoading = signalLoading || isAnalyzing;
@@ -409,6 +447,24 @@ export function CommandCenterPage() {
               </button>
             </div>
 
+            {/* DecisionHero moved to TOP — direction + price + sector
+                breadcrumb + iFlow rollup is the at-a-glance ticker summary
+                that should be visible without scrolling. ForecastConfig and
+                the chart follow below as the analysis controls. */}
+            <DecisionHero
+              signal={signal}
+              marketPrice={marketPrice ?? null}
+              isLoading={isSignalLoading}
+            />
+
+            {/* Knowledge-graph context — competitors / supply-chain neighbors
+                for the active ticker, pulled from the Understand-Anything graph.
+                Sits between DecisionHero and ForecastConfig because it's the
+                structural context that informs the forecast you're about to
+                configure. Self-hides when the graph isn't built or the ticker
+                has no neighbors. Chip clicks swap activeTicker. */}
+            <GraphContextCard ticker={ticker} />
+
             {/* Forecast configuration — re-run with different models / horizon
                 / origin without leaving Command Center. When the user runs a
                 custom forecast, those results override the signal's per-ticker
@@ -418,82 +474,29 @@ export function CommandCenterPage() {
               onChange={setSettings}
               onRunForecast={runCustomForecast}
               isLoading={isRunningForecast}
+              ticker={ticker}
             />
 
             {/* Chart — uses custom forecasts when available, otherwise the
-                signal's per-ticker top-N. Entry/Stop/T1/T2 from the signal
-                are drawn as horizontal price lines so the trade levels are
-                visible relative to current price without reading the cards. */}
+                signal's per-ticker top-N. `selectedModels` always comes from
+                ForecastConfig so the checkbox toggles immediately show/hide
+                lines on the chart in either mode. */}
             <ForecastChart
               historicalData={historicalData}
               forecasts={customForecasts.length ? customForecasts : (signalResult?.models ?? [])}
-              selectedModels={customForecasts.length ? settings.selectedModels : ensembleModels}
+              selectedModels={settings.selectedModels}
               isLoading={historyLoading || isSignalLoading || isRunningForecast}
               forecastOrigin={forecastOriginOverride || settings.forecastOrigin}
               height={300}
-              annotations={
-                signal
-                  ? {
-                      entry_low: signal.entry_low,
-                      entry_high: signal.entry_high,
-                      stop_loss:
-                        signal.direction === "BEAR"
-                          ? signal.entry_high * 1.03
-                          : signal.entry_low * 0.97,
-                      t1: signal.t1,
-                      t2: signal.t2,
-                    }
-                  : undefined
-              }
             />
 
-            {/* Analysis grid:
-                  Left column  — DecisionHero
-                  Right column — ModelBreakdown stacked on top of TrustScores
-                  Bottom row   — ActionPanel full-width (3 sub-cards horizontal) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-              <DecisionHero
-                signal={signal}
-                marketPrice={marketPrice ?? null}
-                isLoading={isSignalLoading}
-              />
-              <div className="space-y-3">
-                <ModelBreakdown
-                  models={models}
-                  currentPrice={currentPrice}
-                  isLoading={isSignalLoading}
-                />
-                <TrustScores
-                  scores={trustScores ?? []}
-                  isLoading={trustLoading}
-                  pickedModels={ensembleModels}
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <ActionPanel
-                  signal={signal}
-                  currentPrice={currentPrice}
-                  isLoading={isSignalLoading}
-                  option={snapshot?.option ? {
-                    strike: snapshot.option.strike,
-                    type: snapshot.option.type,
-                    expiry: snapshot.option.expiry_display || snapshot.option.expiry,
-                    premium: snapshot.option.premium,
-                    bid: snapshot.option.call_premium,
-                    ask: snapshot.option.put_premium,
-                    iv: snapshot.option.iv ? snapshot.option.iv / 100 : undefined,
-                  } : undefined}
-                />
-              </div>
-            </div>
-
-            {/* Intelligence prose under the analysis grid */}
-            <IntelligencePanel
-              thesis={thesis ?? null}
-              isLoading={isSignalLoading}
-              currentPrice={currentPrice}
-              ticker={ticker}
-            />
+            {/* Intelligence prose under the analysis grid.
+                V3 = convergence-first panel (news + iFlow + voices + traders
+                + forecast merged into a single verdict + reaction timeline +
+                forward calendar). Old IntelligencePanel embeds inside V3's
+                bottom collapsible, so the 8-category view remains one click
+                away. The original import is kept above as a fallback. */}
+            <IntelligencePanelV3 />
           </div>
         )}
       </div>

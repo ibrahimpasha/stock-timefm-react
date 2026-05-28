@@ -9,6 +9,7 @@ import { CommandCenterPageV2 } from "./pages/CommandCenterPageV2";
 import { ModelEvalPage } from "./pages/ModelEvalPage";
 import { IntelligencePage } from "./pages/IntelligencePage";
 import { SignalAnalysisPage } from "./pages/SignalAnalysisPage";
+import { TraderLeaderboardPage } from "./pages/TraderLeaderboardPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -60,6 +61,7 @@ function AppLayout() {
         <Routes>
           <Route path="/" element={<ForecastPage />} />
           <Route path="/command-center" element={<CommandCenterPage />} />
+          <Route path="/traders" element={<TraderLeaderboardPage />} />
           <Route path="/command-center-v2" element={<CommandCenterPageV2 />} />
           <Route path="/eval" element={<ModelEvalPage />} />
           <Route path="/intel" element={<IntelligencePage />} />

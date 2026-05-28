@@ -75,10 +75,54 @@ export const STALE_TIMES = {
   flow: 60_000, // 1min
 } as const;
 
+/** Intelligence bullet tag colors — used by V2 panel and any future bullet renderer.
+ *
+ *  Also drives catalyst chip coloring in the Traders → Signals view.
+ *  Keys are normalized via `catalystTagColor()` below (uppercased, punctuation
+ *  forgiven) so "FDA", "fda", and "Fda" all map to the same color.
+ */
+export const INTEL_TAG_COLORS: Record<string, string> = {
+  CATALYST: "var(--accent-orange)",
+  VALUATION: "var(--accent-blue)",
+  RISK: "var(--accent-red)",
+  FLOW: "var(--accent-purple)",
+  // Trader-alert catalyst types — used in the Signals view's chip strips.
+  EARNINGS: "var(--accent-orange)",
+  FOMC: "var(--accent-blue)",
+  FDA: "var(--accent-purple)",
+  "M&A": "var(--accent-cyan)",
+  MA: "var(--accent-cyan)",
+  LOCKUP: "var(--accent-red)",
+  GUIDANCE: "var(--accent-orange)",
+  BEAT: "var(--accent-green)",
+  MISS: "var(--accent-red)",
+  SPINOFF: "var(--accent-purple)",
+  BUYBACK: "var(--accent-green)",
+} as const;
+
+/** Look up the chip color for a catalyst tag, tolerant of casing/punctuation. */
+export function catalystTagColor(tag: string): string {
+  const norm = tag.trim().toUpperCase();
+  if (norm in INTEL_TAG_COLORS) return INTEL_TAG_COLORS[norm];
+  // M&A → also try with the ampersand stripped
+  const stripped = norm.replace(/[^A-Z0-9&]/g, "");
+  if (stripped in INTEL_TAG_COLORS) return INTEL_TAG_COLORS[stripped];
+  return "var(--text-secondary)";
+}
+
+/** Intelligence LLM view colors (BULL/BEAR/NEUTRAL) — used in the LLM Panel tile */
+export const INTEL_VIEW_COLORS: Record<string, string> = {
+  BULL: "var(--accent-green)",
+  BEAR: "var(--accent-red)",
+  NEUTRAL: "var(--text-secondary)",
+} as const;
+
 /** Navigation items */
 export const NAV_ITEMS = [
   { label: "Forecast", path: "/" },
   { label: "Command Center", path: "/command-center" },
+  { label: "Traders", path: "/traders" },
+  { label: "CC v2", path: "/command-center-v2" },
   { label: "Model Eval", path: "/eval" },
   { label: "Intelligence", path: "/intel" },
   { label: "Signal Analysis", path: "/signals" },
