@@ -366,10 +366,24 @@ export function useGenerateSynthesis() {
     mutationFn: async (args: { voice?: string; windowDays?: number; maxTweets?: number }) => {
       const voice = args.voice ?? "aleabitoreddit";
       const windowDays = args.windowDays ?? 30;
-      const maxTweets = args.maxTweets ?? 200;
-      const { data } = await apiClient.post<SynthesisRecord & { ok: boolean }>(
+      // Default well under the server cap. The single Claude call legitimately
+      // runs 2-4 min (sonnet generating the full structured digest over ~100
+      // tweets — measured ~226s at 120), so override the shared 60s axios
+      // timeout for THIS request only — otherwise axios aborts mid-synthesis
+      // and the button "does nothing". The server auto-trims the prompt to a
+      // safe size regardless.
+      const maxTweets = args.maxTweets ?? 100;
+      const { data } = await apiClient.post<SynthesisRecord & { ok: boolean; reason?: string }>(
         `/voices/synthesize?voice=${encodeURIComponent(voice)}&window_days=${windowDays}&max_tweets=${maxTweets}`,
+        undefined,
+        { timeout: 300_000 },
       );
+      // The endpoint returns 200 with {ok:false, reason} when the window has no
+      // analyzed tweets — treat that as an error so the UI shows the reason
+      // instead of silently re-displaying the previous (stale) synthesis.
+      if (data && data.ok === false) {
+        throw new Error(data.reason || "Synthesis returned no content");
+      }
       return data;
     },
     onSuccess: (_data, args) => {

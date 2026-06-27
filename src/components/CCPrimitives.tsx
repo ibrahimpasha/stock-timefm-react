@@ -1,8 +1,8 @@
 /**
- * Shared atomic UI primitives for the Command Center v2 redesign.
+ * Shared atomic UI primitives for the Command Center.
  *
- * Used across the new CC v2 feature components (FlowTape, TickerHero,
- * ScanGrid, IntelligencePanelV2). No external deps beyond React + lucide.
+ * Used across CC feature components (DecisionHero, GraphContextCard,
+ * IntelligencePanel(V3), etc.). No external deps beyond React + lucide.
  */
 import { useMemo } from "react";
 
@@ -79,7 +79,7 @@ export function RangeBar({ low, high, last, width = 100 }: RangeBarProps) {
       style={{
         width,
         height: 4,
-        background: "rgba(48,54,61,0.6)",
+        background: "var(--border)",
         borderRadius: 2,
         position: "relative",
       }}
@@ -130,7 +130,7 @@ export function DotGauge({ value, max = 100, color = "var(--accent-blue)" }: Dot
           style={{
             width: 6,
             height: 6,
-            background: i < filled ? color : "rgba(72,79,88,0.45)",
+            background: i < filled ? color : "color-mix(in srgb, var(--text-muted) 45%, transparent)",
           }}
         />
       ))}
@@ -205,7 +205,7 @@ export function Panel({ title, accent, right, children, padding = 10, className 
           justifyContent: "space-between",
           padding: "6px 10px",
           borderBottom: "1px solid var(--border)",
-          background: "rgba(22,27,34,0.6)",
+          background: "var(--bg-card-hover)",
           gap: 12,
         }}
       >

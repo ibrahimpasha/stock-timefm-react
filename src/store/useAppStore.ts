@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { DEFAULT_TICKER } from "../lib/constants";
 
 interface AppStore {
   /** Currently selected ticker across all pages */
@@ -47,7 +46,9 @@ function contractKey(c: { ticker: string; strike: number; opt_type: string; expi
 export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
-      activeTicker: DEFAULT_TICKER,
+      // No ticker auto-loads on startup — the user picks one from the
+      // watchlist or the input. (Not persisted; see partialize below.)
+      activeTicker: "",
       setActiveTicker: (ticker: string) =>
         set({ activeTicker: ticker.toUpperCase().trim() }),
 

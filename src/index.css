@@ -11,6 +11,8 @@
   --color-accent-purple: #bc8cff;
   --color-accent-orange: #ffa500;
   --color-accent-cyan: #40e0d0;
+  --color-accent-yellow: #eab308;
+  --color-accent-fuchsia: #d946ef;
   --color-text-primary: #e6edf3;
   --color-text-secondary: #8b949e;
   --color-text-muted: #484f58;
@@ -29,11 +31,57 @@
   --accent-purple: #bc8cff;
   --accent-orange: #ffa500;
   --accent-cyan: #40e0d0;
+  --accent-yellow: #eab308;
+  --accent-fuchsia: #d946ef;
   --text-primary: #e6edf3;
   --text-secondary: #8b949e;
   --text-muted: #484f58;
   --font-mono: "JetBrains Mono", monospace;
   --font-sans: "Inter", sans-serif;
+}
+
+/* ── Light theme ──────────────────────────────────────────────────────────
+ * Toggled by setting data-theme="light" on <html> (see src/store/useTheme.ts).
+ * Override BOTH var families: the Tailwind `@theme` --color-* tokens (so utility
+ * classes like bg-bg-card / text-text-primary flip) and the runtime --* vars
+ * (inline style="var(--…)" + the .card utility). Accents are darkened for
+ * legibility on a light surface. */
+:root[data-theme="light"] {
+  --color-bg-primary: #f4f6fb;
+  --color-bg-card: #ffffff;
+  --color-bg-card-hover: #eef1f7;
+  --color-border: rgba(140, 149, 165, 0.32);
+  --color-accent-green: #1a7f37;
+  --color-accent-red: #cf222e;
+  --color-accent-blue: #0969da;
+  --color-accent-purple: #8250df;
+  --color-accent-orange: #bc4c00;
+  --color-accent-cyan: #0c7b8a;
+  --color-accent-yellow: #9a6700;
+  --color-accent-fuchsia: #a21caf;
+  --color-text-primary: #0a0d12;
+  --color-text-secondary: #353c45;
+  --color-text-muted: #58606a;
+
+  --bg-primary: #f4f6fb;
+  --bg-card: #ffffff;
+  --bg-card-hover: #eef1f7;
+  --border: rgba(140, 149, 165, 0.32);
+  --accent-green: #1a7f37;
+  --accent-red: #cf222e;
+  --accent-blue: #0969da;
+  --accent-purple: #8250df;
+  --accent-orange: #bc4c00;
+  --accent-cyan: #0c7b8a;
+  --accent-yellow: #9a6700;
+  --accent-fuchsia: #a21caf;
+  --text-primary: #0a0d12;
+  --text-secondary: #353c45;
+  --text-muted: #58606a;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 *,
@@ -43,7 +91,23 @@
 }
 
 html {
+  /* Base rem — bumps every Tailwind text-xs/text-sm/… size (and proportional
+   * spacing) up together. The dashboard's default 16px read too small; 17.5px
+   * is ~+9%. Single knob: raise/lower this one value to scale the whole UI. */
+  font-size: 17.5px;
   color-scheme: dark;
+}
+
+/* Crisp opaque cards in light mode (the dark theme's translucent card bg would
+ * composite muddy over a light page). Literal values on a higher-specificity
+ * selector so they win regardless of how the var() cascade resolves. */
+:root[data-theme="light"] .card {
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(31, 35, 40, 0.06);
+}
+
+:root[data-theme="light"] .card:hover {
+  background: #eef1f7;
 }
 
 body {

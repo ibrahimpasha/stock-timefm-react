@@ -70,6 +70,8 @@ export const DEFAULT_TICKER = "INTC";
 export const STALE_TIMES = {
   price: 30_000, // 30s
   forecast: 60_000, // 1min — forecasts should refresh frequently
+  marketHistory: 10 * 60_000, // 10min — daily OHLCV barely moves intraday; long
+  // cache makes re-clicking a previously-viewed ticker's chart instant
   intel: 10 * 60_000, // 10min
   eval: 5 * 60_000, // 5min
   flow: 60_000, // 1min
@@ -119,11 +121,8 @@ export const INTEL_VIEW_COLORS: Record<string, string> = {
 
 /** Navigation items */
 export const NAV_ITEMS = [
-  { label: "Forecast", path: "/" },
-  { label: "Command Center", path: "/command-center" },
+  { label: "Command Center", path: "/" },
+  { label: "Pillars", path: "/pillars" },
   { label: "Traders", path: "/traders" },
-  { label: "CC v2", path: "/command-center-v2" },
-  { label: "Model Eval", path: "/eval" },
-  { label: "Intelligence", path: "/intel" },
-  { label: "Signal Analysis", path: "/signals" },
+  { label: "Map", path: "/map" },
 ] as const;

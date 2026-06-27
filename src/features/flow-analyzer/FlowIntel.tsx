@@ -10,7 +10,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import {
-  TrendingUp, TrendingDown, AlertTriangle, Activity,
+  TrendingUp, AlertTriangle, Activity,
   ArrowUpRight, ArrowDownRight, Layers, Search, X, Plus,
   Zap, Target, Calendar, Crosshair,
 } from "lucide-react";
@@ -73,7 +73,7 @@ function useMultiTickerHistories(tickers: string[]) {
   });
 }
 
-function useRecentEntries(days: number = 7) {
+function useRecentEntries(_days: number = 7) {
   return useQuery<{ dates: { date: string; entries: number }[] }>({
     queryKey: ["iflow", "dates"],
     queryFn: () => apiClient.get("/flow/iflow/dates").then((r) => r.data),
@@ -174,9 +174,9 @@ function AccumulationChart({ ticker }: { ticker: string }) {
           <XAxis dataKey="date" tick={{ fill: "#8b949e", fontSize: 10 }} />
           <YAxis tick={{ fill: "#8b949e", fontSize: 10 }} tickFormatter={(v) => `${Math.abs(v).toFixed(1)}M`} />
           <Tooltip
-            contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, fontSize: 11 }}
-            formatter={(v: number, name: string) => [
-              `$${Math.abs(v).toFixed(2)}M`,
+            contentStyle={{ background: "var(--bg-card-hover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
+            formatter={(v, name) => [
+              `$${Math.abs(Number(v)).toFixed(2)}M`,
               name === "bull" ? "Bullish" : "Bearish",
             ]}
           />
@@ -190,7 +190,7 @@ function AccumulationChart({ ticker }: { ticker: string }) {
       {data.exit_signals && data.exit_signals.length > 0 && (
         <div className="space-y-1">
           {data.exit_signals.map((sig, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs px-2 py-1 rounded" style={{ background: "rgba(248,81,73,0.08)" }}>
+            <div key={i} className="flex items-center gap-2 text-xs px-2 py-1 rounded" style={{ background: "color-mix(in srgb, var(--accent-red) 8%, transparent)" }}>
               <AlertTriangle size={11} style={{ color: ORANGE }} />
               <span className="text-text-muted">{sig.contract}</span>
               <span className="font-semibold" style={{ color: RED }}>{sig.signal}</span>
@@ -256,8 +256,8 @@ function StrikeChart({ ticker }: { ticker: string }) {
           <XAxis dataKey="date" tick={{ fill: "#8b949e", fontSize: 10 }} />
           <YAxis tick={{ fill: "#8b949e", fontSize: 10 }} domain={["auto", "auto"]} tickFormatter={(v) => `$${v}`} />
           <Tooltip
-            contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, fontSize: 11 }}
-            formatter={(v: number, name: string) => [`$${v.toFixed(1)}`, name === "avgStrike" ? "Avg Strike" : name === "maxStrike" ? "High Strike" : "Low Strike"]}
+            contentStyle={{ background: "var(--bg-card-hover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
+            formatter={(v, name) => [`$${Number(v).toFixed(1)}`, name === "avgStrike" ? "Avg Strike" : name === "maxStrike" ? "High Strike" : "Low Strike"]}
           />
           <Line type="monotone" dataKey="maxStrike" stroke={GREEN} strokeWidth={1} dot={false} strokeDasharray="4 2" />
           <Line type="monotone" dataKey="avgStrike" stroke={CYAN} strokeWidth={2} dot={{ r: 3, fill: CYAN }} />
@@ -325,8 +325,8 @@ function SectorClustering() {
           <XAxis type="number" tick={{ fill: "#8b949e", fontSize: 10 }} />
           <YAxis dataKey="sector" type="category" tick={{ fill: "#c9d1d9", fontSize: 11 }} width={65} />
           <Tooltip
-            contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, fontSize: 11 }}
-            formatter={(v: number, name: string) => [v, name === "total_bull" ? "Bullish" : "Bearish"]}
+            contentStyle={{ background: "var(--bg-card-hover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
+            formatter={(v, name) => [Number(v), name === "total_bull" ? "Bullish" : "Bearish"]}
           />
           <Bar dataKey="total_bull" stackId="a" fill={GREEN} />
           <Bar dataKey="total_bear" stackId="a" fill={RED} />
@@ -417,7 +417,7 @@ function TopMovers() {
         const hasExits = m.exitCount > 0;
         const color = isBull ? GREEN : isBear ? RED : "var(--text-muted)";
         return (
-          <div key={m.ticker} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: "rgba(48,54,61,0.12)" }}>
+          <div key={m.ticker} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: "color-mix(in srgb, var(--border) 12%, transparent)" }}>
             <span className="font-mono font-bold text-text-primary w-12">{m.ticker}</span>
             <span className="font-mono px-1.5 py-0.5 rounded" style={{ color, background: `${color}12` }}>
               {m.label.replace(/_/g, " ").replace("ACCUMULATION", "ACCUM")}
@@ -501,7 +501,7 @@ function UnusualActivity() {
         const optType = e.type || e.option_type || "";
         return (
           <div key={i} className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
-            style={{ background: e._unusualScore >= 6 ? "rgba(63,185,80,0.06)" : "rgba(48,54,61,0.12)",
+            style={{ background: e._unusualScore >= 6 ? "color-mix(in srgb, var(--accent-green) 6%, transparent)" : "color-mix(in srgb, var(--border) 12%, transparent)",
                      border: e._unusualScore >= 6 ? `1px solid ${GREEN}25` : "1px solid transparent" }}>
             <span className="font-mono font-bold text-accent-cyan w-5">{e._unusualScore}</span>
             <span className="font-mono font-bold text-text-primary w-12">{e.ticker}</span>
@@ -580,7 +580,7 @@ function ContractTracker() {
           <div key={c.key}>
             <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-bg-card-hover transition-colors"
               onClick={() => setExpanded(isExpanded ? null : c.key)}
-              style={{ background: c.daysActive >= 3 ? "rgba(63,185,80,0.06)" : "rgba(48,54,61,0.12)",
+              style={{ background: c.daysActive >= 3 ? "color-mix(in srgb, var(--accent-green) 6%, transparent)" : "color-mix(in srgb, var(--border) 12%, transparent)",
                        border: c.daysActive >= 3 ? `1px solid ${GREEN}25` : "1px solid transparent" }}>
               <span className="font-mono font-bold text-text-primary w-12">{c.ticker}</span>
               <span style={{ color }} className="font-semibold w-8">{isBull ? "Bull" : "Bear"}</span>
@@ -656,8 +656,8 @@ function FlowVsPrice({ ticker }: { ticker: string }) {
           <YAxis yAxisId="price" tick={{ fill: "#8b949e", fontSize: 10 }} domain={["auto", "auto"]} tickFormatter={(v) => `$${v}`} />
           <YAxis yAxisId="flow" orientation="right" tick={{ fill: "#8b949e", fontSize: 10 }} tickFormatter={(v) => `${Number(v).toFixed(1)}M`} />
           <Tooltip
-            contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, fontSize: 11 }}
-            formatter={(v: any, name: string) => {
+            contentStyle={{ background: "var(--bg-card-hover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
+            formatter={(v, name) => {
               if (name === "price") return [`$${Number(v).toFixed(2)}`, "Price"];
               return [`$${Math.abs(Number(v)).toFixed(2)}M`, name === "bullPremium" ? "Bull Flow" : name === "bearPremium" ? "Bear Flow" : "Net Flow"];
             }}
@@ -750,8 +750,8 @@ function ExpiryHeatmap() {
           <XAxis dataKey="expiry" tick={{ fill: "#8b949e", fontSize: 9 }} angle={-30} textAnchor="end" height={50} />
           <YAxis tick={{ fill: "#8b949e", fontSize: 10 }} tickFormatter={(v) => formatPremium(v)} />
           <Tooltip
-            contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, fontSize: 11 }}
-            formatter={(v: number, name: string) => [formatPremium(v), name === "bullPremium" ? "Bullish" : "Bearish"]}
+            contentStyle={{ background: "var(--bg-card-hover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
+            formatter={(v, name) => [formatPremium(Number(v)), name === "bullPremium" ? "Bullish" : "Bearish"]}
           />
           <Bar dataKey="bullPremium" stackId="a" fill={GREEN} radius={[3, 3, 0, 0]} />
           <Bar dataKey="bearPremium" stackId="a" fill={RED} />
@@ -829,8 +829,8 @@ function TickerSelector({ tickers, selected, onSelect, pinned, onPin, onUnpin }:
         return (
           <div key={t} className="flex items-center rounded-lg border transition-colors"
             style={{
-              background: selected === t ? "rgba(88,166,255,0.15)" : "transparent",
-              borderColor: selected === t ? "rgba(88,166,255,0.3)" : isPinned && !isAuto ? `${PURPLE}40` : "var(--border)",
+              background: selected === t ? "color-mix(in srgb, var(--accent-blue) 15%, transparent)" : "transparent",
+              borderColor: selected === t ? "color-mix(in srgb, var(--accent-blue) 30%, transparent)" : isPinned && !isAuto ? `${PURPLE}40` : "var(--border)",
             }}>
             <button onClick={() => onSelect(selected === t ? "" : t)}
               className="px-2 py-1 text-xs font-mono transition-colors"
@@ -905,9 +905,9 @@ export function FlowIntel() {
           <button key={id} onClick={() => setView(id as IntelView)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors"
             style={{
-              background: view === id ? "rgba(88,166,255,0.12)" : "transparent",
+              background: view === id ? "color-mix(in srgb, var(--accent-blue) 12%, transparent)" : "transparent",
               color: view === id ? CYAN : "var(--text-muted)",
-              border: `1px solid ${view === id ? "rgba(88,166,255,0.3)" : "var(--border)"}`,
+              border: `1px solid ${view === id ? "color-mix(in srgb, var(--accent-blue) 30%, transparent)" : "var(--border)"}`,
             }}>
             <Icon size={12} />
             {label}

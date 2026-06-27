@@ -18,7 +18,7 @@ import { useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { Star, X as XIcon } from "lucide-react";
 import apiClient from "../../../api/client";
-import { useAppStore, type WatchedContract } from "../../../store/useAppStore";
+import { useAppStore } from "../../../store/useAppStore";
 import { formatPremium } from "../../../lib/utils";
 import { normExpiry, dteTag, parsePremium } from "./utils";
 
@@ -216,7 +216,7 @@ export function ContractsView({
                   e.stopPropagation();
                   toggleWatchedContract(c);
                 }}
-                className="p-0.5 -ml-0.5 rounded hover:bg-white/5 transition-colors shrink-0"
+                className="p-0.5 -ml-0.5 rounded hover:bg-bg-card-hover transition-colors shrink-0"
                 title="Unwatch contract"
               >
                 <Star
@@ -290,7 +290,7 @@ export function ContractsView({
                     e.stopPropagation();
                     toggleWatchedContract(c);
                   }}
-                  className="ml-auto p-0.5 rounded hover:bg-white/5 text-text-muted"
+                  className="ml-auto p-0.5 rounded hover:bg-bg-card-hover text-text-muted"
                   title="Remove"
                 >
                   <XIcon size={11} />

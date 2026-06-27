@@ -168,15 +168,15 @@ export function MissedOpportunities() {
               key={`${e.ticker}_${e.strike}_${e.expiry}_${i}`}
               className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs"
               style={{
-                background: isHighlighted ? "rgba(63,185,80,0.06)" : "rgba(48,54,61,0.12)",
-                border: isHighlighted ? "1px solid rgba(63,185,80,0.3)" : "1px solid transparent",
+                background: isHighlighted ? "color-mix(in srgb, var(--accent-green) 6%, transparent)" : "color-mix(in srgb, var(--border) 12%, transparent)",
+                border: isHighlighted ? "1px solid color-mix(in srgb, var(--accent-green) 30%, transparent)" : "1px solid transparent",
                 borderLeft: e.list === "WL-A" ? "3px solid var(--accent-green)" : "3px solid var(--accent-orange)",
               }}
             >
               <span
                 className="text-[10px] font-bold px-1.5 py-0.5 rounded"
                 style={{
-                  background: e.list === "WL-A" ? "rgba(63,185,80,0.15)" : "rgba(227,127,46,0.15)",
+                  background: e.list === "WL-A" ? "color-mix(in srgb, var(--accent-green) 15%, transparent)" : "color-mix(in srgb, var(--accent-orange) 15%, transparent)",
                   color: e.list === "WL-A" ? "var(--accent-green)" : "var(--accent-orange)",
                 }}
               >

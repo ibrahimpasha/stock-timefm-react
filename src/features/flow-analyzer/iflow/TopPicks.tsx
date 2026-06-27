@@ -43,8 +43,8 @@ export function TopPicks({ date, dteFilter }: { date: string; dteFilter: DteFilt
               key={i}
               className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
               style={{
-                background: mega ? "rgba(63,185,80,0.08)" : "rgba(48,54,61,0.12)",
-                border: mega ? "1px solid rgba(63,185,80,0.25)" : "1px solid transparent",
+                background: mega ? "color-mix(in srgb, var(--accent-green) 8%, transparent)" : "color-mix(in srgb, var(--bg-card) 70%, transparent)",
+                border: mega ? "1px solid color-mix(in srgb, var(--accent-green) 25%, transparent)" : "1px solid transparent",
               }}
             >
               <span className="font-mono text-xs font-bold text-accent-cyan w-6">

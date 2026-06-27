@@ -92,7 +92,81 @@ export function useMarketHistory(ticker: string, days: number = 365) {
       );
       return data;
     },
-    staleTime: STALE_TIMES.forecast,
+    staleTime: STALE_TIMES.marketHistory,
+    enabled: !!ticker,
+  });
+}
+
+/* ── Signal Analysis (reliable, replaces the deprecated price forecast) ───── */
+
+export interface SignalTechnical {
+  tech_score: number;
+  trend: string;
+  rsi14: number;
+  macd_hist: number;
+  pct_b: number;
+  fib_pos: number;
+  near_level: string;
+  setup_strength: number;
+  price: number;
+  pattern?: string;
+  pattern_dir?: string;
+  pattern_strength?: number;
+  patterns?: string[];
+}
+
+export interface SignalConvergence {
+  ticker: string;
+  window_hours: number;
+  as_of: string;
+  signals: Record<
+    string,
+    { count: number; bullish?: number; bearish?: number; authors?: string[] }
+  >;
+  convergence: { score: number; alignment: string; label: string };
+}
+
+export interface SignalML {
+  peak_score: number;
+  n_entries: number;
+  as_of: string | null;
+  best: {
+    type: string;
+    strike: number | string | null;
+    expiry: string | null;
+    premium: number | string | null;
+    flow_date: string | null;
+  };
+}
+
+export interface SignalProfile {
+  name: string | null;
+  market_cap: number | null;
+  sector: string | null;
+  industry: string | null;
+  target_mean: number | null;
+  target_high: number | null;
+  target_low: number | null;
+}
+
+export interface SignalAnalysisResult {
+  ticker: string;
+  profile: SignalProfile | null;
+  technical: SignalTechnical | null;
+  convergence: SignalConvergence | null;
+  ml: SignalML | null;
+}
+
+/** Reliable per-ticker signal panel: deterministic TA + cross-source
+ *  convergence + ML peak-potential. No discredited price forecast. */
+export function useSignalAnalysis(ticker: string) {
+  return useQuery<SignalAnalysisResult>({
+    queryKey: ["signal-analysis", ticker],
+    queryFn: () =>
+      apiClient
+        .get<SignalAnalysisResult>(`/market/signal-analysis?ticker=${ticker}`)
+        .then((r) => r.data),
+    staleTime: STALE_TIMES.intel,
     enabled: !!ticker,
   });
 }

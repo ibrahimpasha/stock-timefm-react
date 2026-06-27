@@ -184,7 +184,10 @@ export function TickerDetail({
             Net Premium:{" "}
             <span className="text-text-secondary font-mono">{trackedData.net_premium}</span>
           </span>
-          <EarningsBadge isoDate={earningsData?.earnings_date ?? null} />
+          <EarningsBadge
+            isoDate={earningsData?.earnings_date ?? null}
+            session={earningsData?.earnings_session ?? null}
+          />
         </div>
       </div>
 

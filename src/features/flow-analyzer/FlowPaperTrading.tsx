@@ -52,6 +52,9 @@ interface Position {
   status: string;
   exit_reason?: string;
   hold_days: number;
+  slot_type?: string;
+  entry_date?: string;
+  analysis?: string;
 }
 
 interface FlowPaperSummary {
@@ -187,19 +190,6 @@ function estimateWatchlistPnl(
     ? Math.max(0, strike - currentPrice)
     : Math.max(0, currentPrice - strike);
 
-  // Moneyness-based delta estimate
-  const moneyness = isPut
-    ? (strike - currentPrice) / strike
-    : (currentPrice - strike) / strike;
-
-  let delta: number;
-  if (moneyness > 0.10) delta = 0.72;
-  else if (moneyness > 0.02) delta = 0.58;
-  else if (moneyness > -0.02) delta = 0.50;
-  else if (moneyness > -0.10) delta = 0.35;
-  else if (moneyness > -0.20) delta = 0.20;
-  else delta = 0.10;
-
   // Estimate current option price: at minimum the intrinsic, plus some time value
   // Time value estimate: ref_premium minus intrinsic at fill, decayed
   let daysElapsed = 0;
@@ -208,10 +198,6 @@ function estimateWatchlistPnl(
     const now = new Date();
     daysElapsed = Math.max(0, Math.round((now.getTime() - fd.getTime()) / 86400000));
   }
-
-  // Very rough estimate: option moved proportionally to delta * underlying change from strike neighborhood
-  // Since we don't know exact underlying at fill, use ref_premium as anchor
-  const estCurrentOpt = Math.max(0.01, intrinsicNow > 0 ? Math.max(refPremium * 0.3, intrinsicNow + refPremium * 0.1) : refPremium * (1 - daysElapsed * 0.02));
 
   // Better approach: assume ref_premium was fair at entry, estimate change
   // If stock moved toward strike = option gained, away = lost
@@ -323,23 +309,23 @@ function SynthesisReport({ report }: { report: string }) {
         }
 
         // Lines starting with medal emojis (priority queue)
-        if (/^[🥇🥈🥉]/.test(trimmed)) {
+        if (/^[🥇🥈🥉]/u.test(trimmed)) {
           return (
             <div key={i} className="pl-3 py-1.5 rounded-md text-sm"
-                 style={{ background: "rgba(88,166,255,0.06)", borderLeft: "3px solid var(--accent-blue)" }}>
+                 style={{ background: "color-mix(in srgb, var(--accent-blue) 6%, transparent)", borderLeft: "3px solid var(--accent-blue)" }}>
               {renderLine(trimmed)}
             </div>
           );
         }
 
         // Lines starting with status emojis (positions, exits)
-        if (/^[🟢🔵🟡🔴🔥⚠️🎉❌🚫✅]/.test(trimmed)) {
+        if (["🟢", "🔵", "🟡", "🔴", "🔥", "⚠️", "🎉", "❌", "🚫", "✅"].some((prefix) => trimmed.startsWith(prefix))) {
           const isGreen = trimmed.startsWith("🟢") || trimmed.startsWith("🔵") || trimmed.startsWith("🎉") || trimmed.startsWith("🔥");
           const isRed = trimmed.startsWith("🔴") || trimmed.startsWith("❌") || trimmed.startsWith("⚠️");
           const borderColor = isGreen ? "var(--accent-green)" : isRed ? "var(--accent-red)" : "var(--border)";
           return (
             <div key={i} className="pl-3 py-1 rounded-md text-sm"
-                 style={{ background: "rgba(48,54,61,0.12)", borderLeft: `3px solid ${borderColor}` }}>
+                 style={{ background: "color-mix(in srgb, var(--border) 12%, transparent)", borderLeft: `3px solid ${borderColor}` }}>
               {renderLine(trimmed)}
             </div>
           );
@@ -362,7 +348,6 @@ export function FlowPaperTrading() {
   const { data: iflowStatus } = useIFlowTraderStatus();
   const { data: iflowWatchlist } = useIFlowTraderWatchlist();
   const { data: synthesis } = useIFlowSynthesis();
-  const [showAllWatchlist, setShowAllWatchlist] = useState(false);
   const [expandedPos, setExpandedPos] = useState<number | null>(null);
 
   const scanMutation = useMutation({
@@ -388,8 +373,8 @@ export function FlowPaperTrading() {
   // iFlow macro
   const macro = iflowStatus?.macro;
   const slots = iflowStatus?.slots;
-  const wla = iflowWatchlist?.wla ?? [];
-  const wlb = iflowWatchlist?.wlb ?? [];
+  const wla = useMemo(() => iflowWatchlist?.wla ?? [], [iflowWatchlist?.wla]);
+  const wlb = useMemo(() => iflowWatchlist?.wlb ?? [], [iflowWatchlist?.wlb]);
 
   // Fetch current prices for all watchlist tickers to compute "what if" P/L
   // (must be before any early returns to satisfy React hooks rules)
@@ -412,14 +397,7 @@ export function FlowPaperTrading() {
 
   const ret = summary.return_pct;
   const retColor = changeColor(ret);
-  const watchlist = summary.watchlist || [];
   const positions = summary.positions || [];
-  const sortedWatchlist = [...watchlist].sort(
-    (a, b) => (b.score || 0) - (a.score || 0)
-  );
-  const displayWatchlist = showAllWatchlist
-    ? sortedWatchlist
-    : sortedWatchlist.slice(0, 15);
 
   return (
     <div className="space-y-4">
@@ -574,9 +552,9 @@ export function FlowPaperTrading() {
                   ? "var(--accent-green)"
                   : "var(--accent-red)",
                 background: macro.is_safe
-                  ? "rgba(63,185,80,0.12)"
-                  : "rgba(248,81,73,0.12)",
-                border: `1px solid ${macro.is_safe ? "rgba(63,185,80,0.3)" : "rgba(248,81,73,0.3)"}`,
+                  ? "color-mix(in srgb, var(--accent-green) 12%, transparent)"
+                  : "color-mix(in srgb, var(--accent-red) 12%, transparent)",
+                border: `1px solid ${macro.is_safe ? "color-mix(in srgb, var(--accent-green) 30%, transparent)" : "color-mix(in srgb, var(--accent-red) 30%, transparent)"}`,
               }}
             >
               <Shield
@@ -678,7 +656,7 @@ export function FlowPaperTrading() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-mono px-1 py-0.5 rounded" style={{
-                        background: pos.slot_type === "day_trade" ? "rgba(88,166,255,0.15)" : "rgba(188,140,255,0.15)",
+                        background: pos.slot_type === "day_trade" ? "color-mix(in srgb, var(--accent-blue) 15%, transparent)" : "color-mix(in srgb, var(--accent-purple) 15%, transparent)",
                         color: pos.slot_type === "day_trade" ? "var(--accent-blue)" : "var(--accent-purple)",
                       }}>{slotLabel}</span>
                       <span className="font-mono text-base font-extrabold text-text-primary">
@@ -765,7 +743,7 @@ export function FlowPaperTrading() {
 
                       {pos.analysis && (
                         <div className="text-xs text-text-secondary leading-relaxed rounded-md px-2 py-1.5"
-                             style={{ background: "rgba(13,17,23,0.5)" }}>
+                             style={{ background: "color-mix(in srgb, var(--bg-card) 50%, transparent)" }}>
                           {pos.analysis}
                         </div>
                       )}
@@ -849,7 +827,7 @@ export function FlowPaperTrading() {
                       key={w.id ?? idx}
                       className="flex items-center justify-between px-3 py-1.5 rounded-md"
                       style={{
-                        background: "rgba(63,185,80,0.05)",
+                        background: "color-mix(in srgb, var(--accent-green) 5%, transparent)",
                         borderLeft: "3px solid var(--accent-green)",
                       }}
                     >
@@ -908,7 +886,7 @@ export function FlowPaperTrading() {
                       key={w.id ?? idx}
                       className="flex items-center justify-between px-3 py-1.5 rounded-md"
                       style={{
-                        background: "rgba(255,165,0,0.05)",
+                        background: "color-mix(in srgb, var(--accent-orange) 5%, transparent)",
                         borderLeft: "3px solid var(--accent-orange)",
                       }}
                     >

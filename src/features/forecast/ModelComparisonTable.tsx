@@ -13,6 +13,35 @@ interface ModelComparisonTableProps {
   className?: string;
 }
 
+function SortHeader({
+  label,
+  colKey,
+  activeSortKey,
+  onSort,
+  align = "left",
+}: {
+  label: string;
+  colKey: SortKey;
+  activeSortKey: SortKey;
+  onSort: (key: SortKey) => void;
+  align?: "left" | "right" | "center";
+}) {
+  return (
+    <th
+      className={`px-3 py-2 text-xs font-semibold text-text-muted cursor-pointer hover:text-text-secondary select-none transition-colors text-${align}`}
+      onClick={() => onSort(colKey)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <ArrowUpDown
+          size={10}
+          className={activeSortKey === colKey ? "text-accent-blue" : "opacity-30"}
+        />
+      </span>
+    </th>
+  );
+}
+
 export function ModelComparisonTable({
   forecasts,
   isLoading,
@@ -100,29 +129,6 @@ export function ModelComparisonTable({
     );
   }
 
-  const SortHeader = ({
-    label,
-    colKey,
-    align = "left",
-  }: {
-    label: string;
-    colKey: SortKey;
-    align?: "left" | "right" | "center";
-  }) => (
-    <th
-      className={`px-3 py-2 text-xs font-semibold text-text-muted cursor-pointer hover:text-text-secondary select-none transition-colors text-${align}`}
-      onClick={() => handleSort(colKey)}
-    >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        <ArrowUpDown
-          size={10}
-          className={sortKey === colKey ? "text-accent-blue" : "opacity-30"}
-        />
-      </span>
-    </th>
-  );
-
   return (
     <div className={`card ${className}`}>
       <h2 className="text-sm font-semibold text-text-secondary mb-3">
@@ -133,10 +139,10 @@ export function ModelComparisonTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <SortHeader label="Model" colKey="model" />
-              <SortHeader label="Target Price" colKey="end_price" align="right" />
-              <SortHeader label="% Change" colKey="pct_change" align="right" />
-              <SortHeader label="Direction" colKey="direction" align="center" />
+              <SortHeader label="Model" colKey="model" activeSortKey={sortKey} onSort={handleSort} />
+              <SortHeader label="Target Price" colKey="end_price" activeSortKey={sortKey} onSort={handleSort} align="right" />
+              <SortHeader label="% Change" colKey="pct_change" activeSortKey={sortKey} onSort={handleSort} align="right" />
+              <SortHeader label="Direction" colKey="direction" activeSortKey={sortKey} onSort={handleSort} align="center" />
             </tr>
           </thead>
           <tbody>

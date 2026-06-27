@@ -121,12 +121,12 @@ function TradeSetupCard({
 
 interface OptionPickData {
   strike: number;
-  type: "CALL" | "PUT";
+  type: string;
   expiry: string;
   premium: number;
-  bid: number;
-  ask: number;
-  iv: number;
+  bid?: number;
+  ask?: number;
+  iv?: number;
 }
 
 function OptionPickCard({ option }: { option?: OptionPickData }) {
@@ -188,13 +188,13 @@ function OptionPickCard({ option }: { option?: OptionPickData }) {
         <div>
           <span className="text-text-secondary">Bid/Ask:</span>{" "}
           <span className="font-mono text-text-primary">
-            {formatCurrency(option.bid)} / {formatCurrency(option.ask)}
+            {formatCurrency(option.bid ?? 0)} / {formatCurrency(option.ask ?? 0)}
           </span>
         </div>
         <div>
           <span className="text-text-secondary">IV:</span>{" "}
           <span className="font-mono text-accent-purple">
-            {(option.iv * 100).toFixed(1)}%
+            {((option.iv ?? 0) * 100).toFixed(1)}%
           </span>
         </div>
       </div>

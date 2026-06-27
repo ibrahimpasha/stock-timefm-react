@@ -12,13 +12,16 @@
  * are applied here too — passed in as props so the parent stays the single
  * source of truth for filter UI.
  */
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useMultiDateEntries, useTickerPricesBatch } from "./hooks";
 import { estimateOptionPnl } from "./estimator";
 import type { BiasFilter, DteFilter } from "./types";
 import { dteTag } from "./utils";
 import { formatPremium } from "../../../lib/utils";
-import { ChevronUp, ChevronDown, Activity } from "lucide-react";
+import { useTickerMeta, type TickerMeta } from "../../../api/tickerMeta";
+import { useTickerTechnicals, type TickerTechnical } from "../../../api/tickerTechnicals";
+import { useDashboardFilters } from "../../../store/useDashboardFilters";
+import { ChevronUp, ChevronDown, Activity, Sparkles } from "lucide-react";
 
 /** Subset of the backend's INDEX_ETFS blacklist — must match
  *  src/notable_score.py::INDEX_ETFS so the frontend Kian filter agrees
@@ -63,18 +66,20 @@ function passesKianFilter(entry: {
   return false;
 }
 
-/** Notable filter has 4 states cycled by clicking the button:
+/** Notable filter has 5 states cycled by clicking the button:
  *   "none"            → no filter
  *   "notable_nscore"  → NScore ≥ threshold (heuristic)
  *   "notable_ml"      → ML ≥ threshold (model)
  *   "notable_both"    → BOTH NScore AND ML ≥ threshold (intersection)
+ *   "avg_sweet"       → AVG ∈ [75, 85)  (empirical sweet spot per 14d bucket
+ *                       study — best median current P/L, lowest drawdown rate)
  * The Flowseidon "kian" filter remains mutually exclusive with all
  * Notable variants — clicking Flowseidon clears whichever Notable was on
  * and vice versa.
  */
-type FilterMode = "none" | "notable_nscore" | "notable_ml" | "notable_both" | "kian";
+type FilterMode = "none" | "notable_nscore" | "notable_ml" | "notable_both" | "avg_sweet" | "kian" | "outliers";
 
-const NOTABLE_CYCLE: FilterMode[] = ["none", "notable_nscore", "notable_ml", "notable_both"];
+const NOTABLE_CYCLE: FilterMode[] = ["none", "notable_nscore", "notable_ml", "notable_both", "avg_sweet"];
 
 /** Visual + label per Notable filter state. Picked so the operator
  *  always knows which lens is active without reading the tooltip. */
@@ -88,20 +93,26 @@ const NOTABLE_STYLE: Record<FilterMode, { label: string; fg: string; bg: string;
   notable_nscore: {
     label: "Top NScore",
     fg: "var(--accent-yellow, #eab308)",
-    bg: "rgba(234,179,8,0.18)",
-    bd: "rgba(234,179,8,0.50)",
+    bg: "color-mix(in srgb, var(--accent-yellow) 18%, transparent)",
+    bd: "color-mix(in srgb, var(--accent-yellow) 50%, transparent)",
   },
   notable_ml: {
     label: "Top ML",
     fg: "var(--accent-cyan, #22d3ee)",
-    bg: "rgba(34,211,238,0.18)",
-    bd: "rgba(34,211,238,0.50)",
+    bg: "color-mix(in srgb, var(--accent-cyan) 18%, transparent)",
+    bd: "color-mix(in srgb, var(--accent-cyan) 50%, transparent)",
   },
   notable_both: {
     label: "Top Both",
     fg: "var(--accent-purple, #c084fc)",
-    bg: "rgba(192,132,252,0.18)",
-    bd: "rgba(192,132,252,0.50)",
+    bg: "color-mix(in srgb, var(--accent-purple) 18%, transparent)",
+    bd: "color-mix(in srgb, var(--accent-purple) 50%, transparent)",
+  },
+  avg_sweet: {
+    label: "AVG 75-85",
+    fg: "var(--accent-green, #4ade80)",
+    bg: "color-mix(in srgb, var(--accent-green) 18%, transparent)",
+    bd: "color-mix(in srgb, var(--accent-green) 50%, transparent)",
   },
   kian: {  // unused for Notable button, defined for type completeness
     label: "—",
@@ -109,7 +120,26 @@ const NOTABLE_STYLE: Record<FilterMode, { label: string; fg: string; bg: string;
     bg: "transparent",
     bd: "var(--border)",
   },
+  outliers: {  // unused for Notable button, defined for type completeness
+    label: "—",
+    fg: "var(--text-muted)",
+    bg: "transparent",
+    bd: "var(--border)",
+  },
 };
+
+/** % the strike sits out-of-the-money — positive = OTM for BOTH calls and
+ *  puts, negative = in-the-money. The deeper OTM, the more convex / lottery-
+ *  like the bet (a 40C on a $13 stock = +208%). Null when we can't price it.
+ *  Single source for the row-level moneyness AND the outlier filter/count. */
+function entryMoneyness(e: Record<string, unknown>): number | null {
+  const underlying = Number(e.underlying_price ?? 0);
+  const strike = Number(e.strike ?? 0);
+  if (!(underlying > 0) || !(strike > 0)) return null;
+  let m = ((strike - underlying) / underlying) * 100;
+  if (String(e.type ?? "").toUpperCase().includes("PUT")) m = -m;
+  return m;
+}
 
 /** Normalize the LLM-parsed type field. Our entries sometimes carry "C"
  *  / "P" / "CALL" / "PUT" — same contract, different label. Collapse to
@@ -184,7 +214,7 @@ function recomputeAggregateScore(
 type SortKey =
   | "time" | "ticker" | "side" | "action" | "contract"
   | "dte" | "voi" | "ask" | "atm" | "premium" | "pnl"
-  | "score" | "ml" | "avg";
+  | "score" | "ml" | "setup" | "avg" | "pred_peak";
 type SortDir = "asc" | "desc";
 
 /** Default direction when first clicking a column. Numeric / time columns
@@ -192,8 +222,93 @@ type SortDir = "asc" | "desc";
 const DEFAULT_DIR: Record<SortKey, SortDir> = {
   time: "desc", ticker: "asc", side: "asc", action: "asc", contract: "asc",
   dte: "desc", voi: "desc", ask: "desc", atm: "desc", premium: "desc",
-  pnl: "desc", score: "desc", ml: "desc", avg: "desc",
+  pnl: "desc", score: "desc", ml: "desc", setup: "desc", avg: "desc", pred_peak: "desc",
 };
+
+function SortHeaderButton({
+  label,
+  sortKey,
+  activeSortKey,
+  sortDir,
+  className,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  activeSortKey: SortKey;
+  sortDir: SortDir;
+  className: string;
+  onSort: (key: SortKey) => void;
+}) {
+  const active = activeSortKey === sortKey;
+  const Arrow = sortDir === "asc" ? ChevronUp : ChevronDown;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      className={`${className} flex items-center gap-0.5 select-none cursor-pointer hover:text-text-primary transition-colors`}
+      style={{ color: active ? "var(--accent-blue)" : undefined }}
+      title={`Sort by ${label}`}
+    >
+      <span>{label}</span>
+      {active && <Arrow size={10} strokeWidth={3} />}
+    </button>
+  );
+}
+
+const _clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/** SETUP — does the *underlying's* fundamental/technical picture AGREE with
+ *  the direction THIS options bet is making? Unlike NScore/ML (which grade the
+ *  option-contract quality, direction-agnostic), this is a per-ticker DIRECTIONAL
+ *  agreement score, aligned to the entry's Bull/Bear side:
+ *
+ *    100 = analyst target + chart pattern + technical trend all back this
+ *          trade's direction (a tailwind);  50 = neutral / no data;
+ *      0 = the underlying setup fights the trade (a Double Top under a bullish
+ *          call, etc. — a headwind).
+ *
+ *  Weights: technical .40, chart pattern .35, analyst target .25 (target is
+ *  lighter — it lags and has partial coverage). Heuristic CONTEXT, not an
+ *  empirically-calibrated predictor like ML — read it as a convergence flag. */
+function setupScore(
+  side: "Bull" | "Bear" | undefined,
+  m: TickerMeta | undefined,
+  t: TickerTechnical | undefined,
+): { score: number | null; tech: number | null; pat: number | null; tgt: number | null; bull: number } {
+  const comps: { v: number; w: number }[] = [];
+  let tech: number | null = null;
+  let pat: number | null = null;
+  let tgt: number | null = null;
+  if (t && typeof t.tech_score === "number") {
+    tech = _clamp(t.tech_score / 100, -1, 1);
+    comps.push({ v: tech, w: 0.4 });
+  }
+  if (t && t.pattern && t.pattern_strength) {
+    pat = t.pattern_dir === "bull" ? t.pattern_strength / 100
+      : t.pattern_dir === "bear" ? -t.pattern_strength / 100 : 0;
+    comps.push({ v: pat, w: 0.35 });
+  }
+  if (m && typeof m.target_pct === "number") {
+    tgt = _clamp(m.target_pct / 25, -1, 1); // ±25% upside saturates
+    comps.push({ v: tgt, w: 0.25 });
+  }
+  if (!comps.length) return { score: null, tech, pat, tgt, bull: 0 };
+  const wsum = comps.reduce((s, c) => s + c.w, 0);
+  const bull = comps.reduce((s, c) => s + c.v * c.w, 0) / wsum; // -1..+1 net bullishness
+  const dir = side === "Bear" ? -1 : 1;
+  const score = Math.round(50 + 50 * _clamp(bull * dir, -1, 1)); // 0..100 alignment with the trade
+  return { score, tech, pat, tgt, bull };
+}
+
+/** SETUP color — green = strong tailwind, red = fighting the tape. */
+function setupTextColor(score: number | null): string {
+  if (score == null) return "var(--text-muted)";
+  if (score >= 70) return "var(--accent-green)";
+  if (score >= 55) return "var(--accent-orange, #e37f2e)";
+  if (score >= 45) return "var(--text-secondary)";
+  return "var(--accent-red, #ef4444)"; // underlying setup contradicts the trade
+}
 
 /** Average-score helper. Returns (nscore + ml) / 2 when both present,
  *  whichever single one is present otherwise, null when neither is. */
@@ -225,7 +340,7 @@ function scoreBorderStyle(score: number | null, fallbackColor: string) {
   if (score >= 85) {
     return {
       borderLeft: "3px solid var(--accent-yellow, #eab308)",
-      boxShadow: "0 0 6px rgba(234, 179, 8, 0.35)",
+      boxShadow: "0 0 6px color-mix(in srgb, var(--accent-yellow) 35%, transparent)",
     };
   }
   if (score >= 70) {
@@ -296,11 +411,21 @@ function fmtExpiry(raw: string): string {
 }
 
 /** Time-only string from the entry's UTC arrival timestamp. */
+/** Parse the backend's `'YYYY-MM-DD HH:MM:SS UTC'` string and render it as
+ *  HH:MM in America/Los_Angeles (handles PST/PDT via Intl).
+ *  `image_downloaded_at` is the canonical source — it's universal across
+ *  every entry, unlike `_discord_time_utc` / `flow_time` which are sparse. */
 function fmtTime(raw: string | undefined): string {
   if (!raw) return "";
-  // "2026-05-27 13:33:25 UTC" → "13:33"
-  const m = raw.match(/(\d{2}:\d{2})(?::\d{2})?/);
-  return m ? m[1] : raw.slice(11, 16);
+  const m = raw.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return "";
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "America/Los_Angeles",
+  }).format(d);
 }
 
 /** Use the same side-correction logic the backend summary applies, so a
@@ -351,6 +476,12 @@ interface NotableScore {
    *  when the model bundle isn't loadable. Rendered in the "ML"
    *  column, sortable, separately colored from NScore. */
   ml_score?: number | null;
+  /** Model's predicted peak P/L %. From the same v4 bundle's regressor
+   *  (`reg_peak`). NOT magnitude-calibrated (test R² was negative); use
+   *  this for RANKING / order-of-magnitude only. A predicted +85% says
+   *  "model thinks this is upper-band of outcomes", not exactly +85%.
+   *  Rendered in the "PRED PEAK" column, sortable, distinct accent. */
+  predicted_peak_pnl?: number | null;
 }
 
 interface EntryRow {
@@ -407,6 +538,9 @@ export function EntryTape({
   // Query dedupes by (date, includeNotable), so re-renders don't re-fetch.
   const dateQueries = useMultiDateEntries(dates, true);
   const isLoading = dateQueries.length > 0 && dateQueries.some((q) => q.isLoading);
+  // Per-ticker reference data for the SETUP column (analyst target + TA + pattern).
+  const { data: tickerMeta } = useTickerMeta();
+  const { data: tickerTech } = useTickerTechnicals();
   // Merge all entries across the selected dates into a single flat list.
   // Per-entry msg_id stays unique across dates because Discord snowflakes
   // are globally unique.
@@ -428,7 +562,11 @@ export function EntryTape({
   //             prints) so the row count matches what he posts on Twitter
   //             — his $805K BWA 75C is our $233K + $572K + ... summed.
   // The two are MUTUALLY EXCLUSIVE.
-  const [filterMode, setFilterMode] = useState<FilterMode>("none");
+  // Filter + sort state lives in the shared Zustand store so it survives
+  // tab/view switches (this component unmounts on Tape↔Grid toggle and the
+  // whole tab unmounts on tab switch; local useState would reset on remount).
+  const { filterMode, sortKey, sortDir, outlierMin } = useDashboardFilters((s) => s.tape);
+  const patchTape = useDashboardFilters((s) => s.patchTape);
   const NOTABLE_THRESHOLD = 65;
 
   // Kian-mode contract aggregation. Groups entries by
@@ -457,7 +595,7 @@ export function EntryTape({
       const prem = parseFloat(String(e.premium ?? "0").replace(/[$,]/g, "")) || 0;
       const askRaw = e.ask_pct;
       const ask = askRaw == null ? null : Number(askRaw);
-      const ts = String(e._discord_time_utc || e.image_downloaded_at || "");
+      const ts = String(e.image_downloaded_at || "");
       const existing = groups.get(key);
       if (!existing) {
         groups.set(key, {
@@ -487,7 +625,7 @@ export function EntryTape({
       ...g.seed,
       premium: g.sumPremium,
       ask_pct: g.bestAsk,
-      _discord_time_utc: g.earliestTs || g.seed._discord_time_utc,
+      image_downloaded_at: g.earliestTs || g.seed.image_downloaded_at,
       _print_count: g.printCount,
     }));
   }, [entries, filterMode]);
@@ -517,12 +655,11 @@ export function EntryTape({
       if (bias === "bullish" && side !== "Bull") continue;
       if (bias === "bearish" && side !== "Bear") continue;
 
-      // Same priority as the backend's _entry_ts: discord post time first
-      // (most precise), then image download time (universal baseline,
-      // populated by the iFlow fetcher / backfill), then flow_time fallback.
-      const tsRaw = String(
-        e._discord_time_utc || e.image_downloaded_at || ""
-      );
+      // image_downloaded_at is the canonical timestamp — universal on
+      // every entry (set by the iFlow fetcher when the Discord image lands).
+      // _discord_time_utc / flow_time are intentionally NOT used here:
+      // they're sparse + sometimes wrong + cause inconsistent ordering.
+      const tsRaw = String(e.image_downloaded_at || "");
       const type = String(e.type || "").toUpperCase();
       const strike = Number(e.strike ?? 0);
       const expiry = fmtExpiry(String(e.expiry ?? ""));
@@ -534,13 +671,10 @@ export function EntryTape({
         return null;
       })();
       const underlying = Number(e.underlying_price ?? 0);
-      // Moneyness as % to ATM. Positive for calls = stock needs to rise;
-      // negative for puts = stock needs to fall. Drives the green/red tone.
-      let moneyness: number | null = null;
-      if (underlying > 0 && strike > 0) {
-        moneyness = ((strike - underlying) / underlying) * 100;
-        if (type.includes("PUT")) moneyness = -moneyness;
-      }
+      // Moneyness as % to ATM. Positive = OTM (for both calls and puts);
+      // the deeper OTM, the more convex. Drives the green/red tone + the
+      // "Someone knows something" outlier filter.
+      const moneyness = entryMoneyness(e);
 
       const contractType = type.includes("CALL") ? "CALL" : type.includes("PUT") ? "PUT" : type;
       const contractLabel = `$${strike} ${contractType}${expiry ? ` ${expiry}` : ""}`;
@@ -564,6 +698,22 @@ export function EntryTape({
         const ml = notable?.ml_score;
         if (ml != null && ml < NOTABLE_THRESHOLD) continue;
       }
+      if (filterMode === "avg_sweet") {
+        // Empirical sweet spot from 14d bucket study:
+        // AVG ∈ [75, 85) had highest median current P/L (+23.8%) and
+        // lowest drawdown rate (18.9%). 85+ bucket has higher mean but
+        // higher variance; 65-75 has positive but lower hit-rate.
+        const ns = notable?.score;
+        const ml = notable?.ml_score;
+        if (ns == null || ml == null) continue;
+        const avg = (ns + ml) / 2;
+        if (avg < 75 || avg >= 85) continue;
+      }
+      if (filterMode === "outliers") {
+        // Deep-OTM convexity bets — "someone knows something" prints.
+        // Keep only strikes at least `outlierMin`% out-of-the-money.
+        if (moneyness == null || moneyness < outlierMin) continue;
+      }
       if (filterMode === "kian") {
         const passes = passesKianFilter({
           ticker,
@@ -579,7 +729,7 @@ export function EntryTape({
       // aggregator. Score + parts get re-derived against the aggregated
       // premium + best ask% so BOTH the score column and the hover
       // tooltip show numbers that reflect the WHOLE bet, not a seed print.
-      const printCount = Number((e as any)._print_count ?? 1);
+      const printCount = Number((e._print_count as number | string | undefined) ?? 1);
       let rowNotable: NotableScore | null = notable;
       if (filterMode === "kian" && notable && printCount > 1) {
         const rescore = recomputeAggregateScore(notable, premiumNum, askPct, voi, dteNum > 0 ? dteNum : null);
@@ -593,7 +743,7 @@ export function EntryTape({
       out.push({
         msgId: String(e._msg_id ?? `${ticker}-${strike}-${type}-${expiry}-${tsRaw}`),
         ts: tsRaw,
-        timeLabel: fmtTime(tsRaw) || (String(e.flow_time ?? "")),
+        timeLabel: fmtTime(tsRaw),
         ticker,
         side,
         action: actionLabel(type, askPct ?? 50),
@@ -608,13 +758,13 @@ export function EntryTape({
         optType: type,
         optFill: Number(e.avg_price ?? 0),
         underlyingFill: underlying,
-        flowDate: String(e._date ?? (e.flow_date ?? date)),
+        flowDate: String(e._date ?? (e.flow_date ?? (dates[0] ?? ""))),
         notable: rowNotable,
         printCount,
       });
     }
     return out;
-  }, [entries, aggregatedEntries, bias, dte, search, tradersOnly, authorTickerSet, filterMode]);
+  }, [entries, aggregatedEntries, bias, dte, search, tradersOnly, authorTickerSet, filterMode, outlierMin, dates]);
 
   // Batch-fetch current prices for every unique ticker in the visible
   // rows. Refetches every 60s via the hook's refetchInterval — so the
@@ -624,7 +774,7 @@ export function EntryTape({
     [rows],
   );
   const { data: pricesResp } = useTickerPricesBatch(uniqueTickers);
-  const priceMap = pricesResp?.prices ?? {};
+  const priceMap = useMemo(() => pricesResp?.prices ?? {}, [pricesResp?.prices]);
 
   // Per-row P/L — same delta+theta estimator the grid view's EntryRow uses
   // (canonical impl in iflow/estimator.ts). Null when we can't price the
@@ -657,10 +807,8 @@ export function EntryTape({
 
   // Active sort — default: time DESC (newest first). The full row list
   // above stays in insertion order; sorting happens here so toggling sort
-  // never re-runs the filter pass.
-  const [sortKey, setSortKey] = useState<SortKey>("time");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
-
+  // never re-runs the filter pass. `sortKey`/`sortDir` come from the shared
+  // store (destructured above) so they persist across tab/view switches.
   const sortedRows = useMemo(() => {
     // null/missing values sink to the bottom regardless of direction.
     const numCmp = (a: number | null, b: number | null, dir: SortDir) => {
@@ -693,21 +841,28 @@ export function EntryTape({
         case "pnl":      return numCmp(pnlByMsg[a.msgId], pnlByMsg[b.msgId], sortDir);
         case "score":    return numCmp(a.notable?.score ?? null, b.notable?.score ?? null, sortDir);
         case "ml":       return numCmp(a.notable?.ml_score ?? null, b.notable?.ml_score ?? null, sortDir);
+        case "setup":    return numCmp(
+                           setupScore(a.side, tickerMeta?.[a.ticker], tickerTech?.[a.ticker]).score,
+                           setupScore(b.side, tickerMeta?.[b.ticker], tickerTech?.[b.ticker]).score,
+                           sortDir);
         case "avg":      return numCmp(
                            avgScore(a.notable?.score, a.notable?.ml_score),
                            avgScore(b.notable?.score, b.notable?.ml_score),
                            sortDir);
+        case "pred_peak": return numCmp(
+                            a.notable?.predicted_peak_pnl ?? null,
+                            b.notable?.predicted_peak_pnl ?? null,
+                            sortDir);
       }
     });
     return copy;
-  }, [rows, sortKey, sortDir, pnlByMsg]);
+  }, [rows, sortKey, sortDir, pnlByMsg, tickerMeta, tickerTech]);
 
   const toggleSort = (k: SortKey) => {
     if (k === sortKey) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      patchTape({ sortDir: sortDir === "asc" ? "desc" : "asc" });
     } else {
-      setSortKey(k);
-      setSortDir(DEFAULT_DIR[k]);
+      patchTape({ sortKey: k, sortDir: DEFAULT_DIR[k] });
     }
   };
 
@@ -716,7 +871,7 @@ export function EntryTape({
   // matter which mode is active. MUST be declared before any early
   // return (Rules of Hooks).
   const notableCounts = useMemo(() => {
-    let n = 0, m = 0, b = 0;
+    let n = 0, m = 0, b = 0, sweet = 0;
     for (const e of entries as any[]) {
       const ns = e?.notable?.score;
       const ml = e?.notable?.ml_score;
@@ -725,8 +880,12 @@ export function EntryTape({
       if (nsHit) n += 1;
       if (mlHit) m += 1;
       if (nsHit && mlHit) b += 1;
+      if (ns != null && ml != null) {
+        const avg = (ns + ml) / 2;
+        if (avg >= 75 && avg < 85) sweet += 1;
+      }
     }
-    return { nscore: n, ml: m, both: b };
+    return { nscore: n, ml: m, both: b, sweet };
   }, [entries]);
   // Kian-mode count must match the aggregated-contract semantics — same
   // grouping logic as `aggregatedEntries` so the badge number lines up
@@ -761,6 +920,15 @@ export function EntryTape({
     }
     return n;
   }, [entries]);
+  // "Someone knows something" count — entries at least outlierMin% OTM.
+  const outlierCount = useMemo(() => {
+    let n = 0;
+    for (const e of entries as Record<string, unknown>[]) {
+      const m = entryMoneyness(e);
+      if (m != null && m >= outlierMin) n += 1;
+    }
+    return n;
+  }, [entries, outlierMin]);
 
   if (isLoading) {
     return (
@@ -783,32 +951,21 @@ export function EntryTape({
     );
   }
 
-  // Reusable header cell — clickable, shows the active sort arrow.
-  // Defining this AFTER the early returns is safe — it's a plain function
-  // expression, not a hook. (Hooks-rules apply only to use*() calls.)
-  const Th = ({
-    label, k, className,
-  }: { label: string; k: SortKey; className: string }) => {
-    const active = sortKey === k;
-    const Arrow = sortDir === "asc" ? ChevronUp : ChevronDown;
-    return (
-      <button
-        type="button"
-        onClick={() => toggleSort(k)}
-        className={`${className} flex items-center gap-0.5 select-none cursor-pointer hover:text-text-primary transition-colors`}
-        style={{ color: active ? "var(--accent-blue)" : undefined }}
-        title={`Sort by ${label}`}
-      >
-        <span>{label}</span>
-        {active && <Arrow size={10} strokeWidth={3} />}
-      </button>
-    );
-  };
+  const renderHeader = (label: string, key: SortKey, className: string) => (
+    <SortHeaderButton
+      label={label}
+      sortKey={key}
+      activeSortKey={sortKey}
+      sortDir={sortDir}
+      className={className}
+      onSort={toggleSort}
+    />
+  );
 
   return (
     <div className="space-y-0.5 font-mono text-xs">
-      <div className="flex items-center justify-between px-2 py-1">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-2 py-1 max-md:px-1 max-md:flex-wrap max-md:gap-1">
+        <div className="flex items-center gap-2 max-md:gap-1 max-md:overflow-x-auto max-md:flex-nowrap max-md:w-full">
           {(() => {
             // Notable button — cycles through:
             //   none → Top NScore → Top ML → Top Both → none
@@ -816,31 +973,37 @@ export function EntryTape({
             // at a glance (gold for NScore, cyan for ML, purple for
             // intersection). Mutually exclusive with the Flowseidon
             // button — clicking either resets the other.
-            const notableModes: FilterMode[] = ["notable_nscore", "notable_ml", "notable_both"];
+            const notableModes: FilterMode[] = ["notable_nscore", "notable_ml", "notable_both", "avg_sweet"];
             const currentNotable: FilterMode = notableModes.includes(filterMode) ? filterMode : "none";
             const style = NOTABLE_STYLE[currentNotable];
             const count =
               currentNotable === "notable_nscore" ? notableCounts.nscore
               : currentNotable === "notable_ml"   ? notableCounts.ml
               : currentNotable === "notable_both" ? notableCounts.both
+              : currentNotable === "avg_sweet"    ? notableCounts.sweet
               : notableCounts.both;
             const onClick = () => {
               const idx = NOTABLE_CYCLE.indexOf(currentNotable);
               const next = NOTABLE_CYCLE[(idx + 1) % NOTABLE_CYCLE.length];
-              setFilterMode(next);
               if (next === "notable_ml" && sortKey !== "ml") {
-                setSortKey("ml"); setSortDir("desc");
+                patchTape({ filterMode: next, sortKey: "ml", sortDir: "desc" });
               } else if ((next === "notable_nscore" || next === "notable_both")
                          && sortKey !== "score" && sortKey !== "ml") {
-                setSortKey("score"); setSortDir("desc");
+                patchTape({ filterMode: next, sortKey: "score", sortDir: "desc" });
+              } else if (next === "avg_sweet" && sortKey !== "avg") {
+                patchTape({ filterMode: next, sortKey: "avg", sortDir: "desc" });
+              } else {
+                patchTape({ filterMode: next });
               }
             };
             const tooltipFor: Record<FilterMode, string> = {
-              none: `Click to cycle: Top NScore (${notableCounts.nscore}) → Top ML (${notableCounts.ml}) → Top Both (${notableCounts.both}) → off`,
+              none: `Click to cycle: Top NScore (${notableCounts.nscore}) → Top ML (${notableCounts.ml}) → Top Both (${notableCounts.both}) → AVG 75-85 (${notableCounts.sweet}) → off`,
               notable_nscore: `Heuristic NScore ≥ ${NOTABLE_THRESHOLD}. Click → Top ML.`,
               notable_ml: `ML probability ≥ ${NOTABLE_THRESHOLD} (P[peak P/L > +100%]). Click → Top Both.`,
-              notable_both: `BOTH NScore AND ML ≥ ${NOTABLE_THRESHOLD} — the picks both systems agree on. Click → off.`,
+              notable_both: `BOTH NScore AND ML ≥ ${NOTABLE_THRESHOLD} — the picks both systems agree on. Click → AVG 75-85.`,
+              avg_sweet: `AVG ∈ [75, 85) — empirical sweet spot from 14d bucket study (best median P/L, lowest drawdown rate). Click → off.`,
               kian: "",
+              outliers: "",
             };
             return (
               <button
@@ -859,19 +1022,19 @@ export function EntryTape({
             type="button"
             onClick={() => {
               const next: FilterMode = filterMode === "kian" ? "none" : "kian";
-              setFilterMode(next);
               // Kian filter is rule-based pass/fail — premium sort
               // matches how he visually surfaces "biggest single bets".
               if (next === "kian" && sortKey !== "premium" && sortKey !== "score") {
-                setSortKey("premium");
-                setSortDir("desc");
+                patchTape({ filterMode: next, sortKey: "premium", sortDir: "desc" });
+              } else {
+                patchTape({ filterMode: next });
               }
             }}
             className="px-2 py-0.5 rounded text-xs font-semibold transition-colors flex items-center gap-1.5"
             style={{
-              background: filterMode === "kian" ? "rgba(34,211,238,0.18)" : "transparent",
+              background: filterMode === "kian" ? "color-mix(in srgb, var(--accent-cyan) 18%, transparent)" : "transparent",
               color: filterMode === "kian" ? "var(--accent-cyan, #22d3ee)" : "var(--text-muted)",
-              border: `1px solid ${filterMode === "kian" ? "rgba(34,211,238,0.50)" : "var(--border)"}`,
+              border: `1px solid ${filterMode === "kian" ? "color-mix(in srgb, var(--accent-cyan) 50%, transparent)" : "var(--border)"}`,
             }}
             title={
               "Replication of @kiantrades' (Flowseidon) Twitter selection logic: " +
@@ -884,27 +1047,80 @@ export function EntryTape({
             {filterMode === "kian" ? "Showing Flowseidon" : "Flowseidon"}
             <span className="opacity-70 font-mono">{kianCount > 0 ? `(${kianCount})` : ""}</span>
           </button>
+          {/* "Someone knows something" — deep-OTM convexity bets (strike far
+              out of the money). The 40C-on-a-$13-stock kind of print. */}
+          <button
+            type="button"
+            onClick={() => {
+              const next: FilterMode = filterMode === "outliers" ? "none" : "outliers";
+              // Surface the most extreme first — sort by ATM% desc on activate.
+              if (next === "outliers" && sortKey !== "atm") {
+                patchTape({ filterMode: next, sortKey: "atm", sortDir: "desc" });
+              } else {
+                patchTape({ filterMode: next });
+              }
+            }}
+            className="px-2 py-0.5 rounded text-xs font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap"
+            style={{
+              background: filterMode === "outliers" ? "color-mix(in srgb, var(--accent-fuchsia) 18%, transparent)" : "transparent",
+              color: filterMode === "outliers" ? "var(--accent-fuchsia, #d946ef)" : "var(--text-muted)",
+              border: `1px solid ${filterMode === "outliers" ? "color-mix(in srgb, var(--accent-fuchsia) 50%, transparent)" : "var(--border)"}`,
+            }}
+            title={
+              `Deep out-of-the-money convexity bets — strike at least ${outlierMin}% OTM ` +
+              `(e.g. a $40 call on a $13 stock = +208%). The "someone knows something" prints: ` +
+              `lottery-ticket lottos and long-dated conviction LEAPs. ` +
+              `Tip: add the DTE = Leap filter for the long-dated 2027-style ones. Sorts by ATM% (most extreme first).`
+            }
+          >
+            <Sparkles size={11} />
+            Someone knows something
+            <span className="opacity-70 font-mono">{outlierCount > 0 ? `(${outlierCount})` : ""}</span>
+          </button>
+          {filterMode === "outliers" && (
+            <label
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 border whitespace-nowrap"
+              style={{ borderColor: "color-mix(in srgb, var(--accent-fuchsia) 40%, transparent)", background: "color-mix(in srgb, var(--accent-fuchsia) 8%, transparent)" }}
+              title="Minimum % out-of-the-money to qualify"
+            >
+              <span className="text-[10px] uppercase tracking-wide text-text-muted">≥</span>
+              <input
+                type="number"
+                min={0}
+                max={1000}
+                step={10}
+                value={outlierMin}
+                onChange={(e) =>
+                  patchTape({ outlierMin: Math.max(0, Math.min(1000, Number(e.target.value) || 0)) })
+                }
+                className="w-12 bg-transparent text-xs text-text-primary outline-none font-mono"
+              />
+              <span className="text-[10px] text-text-muted">% OTM</span>
+            </label>
+          )}
         </div>
         <span className="text-[10px] text-text-muted">
           {sortedRows.length} of {entries.length} entries
           {dates.length > 1 ? ` · ${dates.length} dates` : ""}
         </span>
       </div>
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-text-muted px-2 py-1 border-b border-border">
-        <Th label="avg"      k="avg"      className="w-12 justify-center" />
-        <Th label="nscore"   k="score"    className="w-10 justify-center" />
-        <Th label="ml"       k="ml"       className="w-10 justify-center" />
-        <Th label="time"     k="time"     className="w-12 justify-start" />
-        <Th label="ticker"   k="ticker"   className="w-14 justify-start" />
-        <Th label="side"     k="side"     className="w-12 justify-start" />
-        <Th label="action"   k="action"   className="w-24 justify-start" />
-        <Th label="contract" k="contract" className="flex-1 min-w-[160px] justify-start" />
-        <Th label="dte"      k="dte"      className="w-14 justify-start" />
-        <Th label="vol/oi"   k="voi"      className="w-14 justify-end" />
-        <Th label="ask%"     k="ask"      className="w-14 justify-end" />
-        <Th label="ATM%"     k="atm"      className="w-16 justify-end" />
-        <Th label="premium"  k="premium"  className="w-20 justify-end" />
-        <Th label="P/L"      k="pnl"      className="w-16 justify-end" />
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-text-muted px-2 py-1 border-b border-border max-md:gap-1">
+        {renderHeader("avg", "avg", "w-12 justify-center")}
+        {renderHeader("nscore", "score", "w-10 justify-center max-md:hidden")}
+        {renderHeader("ml", "ml", "w-10 justify-center max-md:hidden")}
+        {renderHeader("setup", "setup", "w-10 justify-center max-md:hidden")}
+        {renderHeader("time", "time", "w-12 justify-start max-md:hidden")}
+        {renderHeader("ticker", "ticker", "w-14 justify-start")}
+        {renderHeader("side", "side", "w-12 justify-start max-md:w-10")}
+        {renderHeader("action", "action", "w-24 justify-start max-md:hidden")}
+        {renderHeader("contract", "contract", "flex-1 min-w-[160px] justify-start max-md:min-w-[80px]")}
+        {renderHeader("dte", "dte", "w-14 justify-start max-md:hidden")}
+        {renderHeader("vol/oi", "voi", "w-14 justify-end max-md:hidden")}
+        {renderHeader("ask%", "ask", "w-14 justify-end max-md:hidden")}
+        {renderHeader("ATM%", "atm", "w-16 justify-end max-md:hidden")}
+        {renderHeader("premium", "premium", "w-20 justify-end max-md:hidden")}
+        {renderHeader("P/L", "pnl", "w-16 justify-end")}
+        {renderHeader("pred peak", "pred_peak", "w-20 justify-end max-md:hidden")}
       </div>
       {sortedRows.map((r) => {
         const sideColor =
@@ -957,9 +1173,9 @@ export function EntryTape({
             key={r.msgId}
             type="button"
             onClick={() => onSelectTicker(r.ticker)}
-            className="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-bg-card-hover transition-colors text-left"
+            className="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-bg-card-hover transition-colors text-left max-md:gap-1"
             style={{
-              background: isSelected ? "rgba(88,166,255,0.08)" : "transparent",
+              background: isSelected ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : "transparent",
               ...borderStyle,
             }}
           >
@@ -991,7 +1207,7 @@ export function EntryTape({
                 with empirically-recalibrated weights. Component breakdown
                 in the hover tooltip. */}
             <span
-              className="w-10 text-center font-semibold"
+              className="w-10 text-center font-semibold max-md:hidden"
               style={{ color: scoreTextColor(scoreNum) }}
               title={scoreTitle}
             >
@@ -1007,7 +1223,7 @@ export function EntryTape({
                   `Source: notable_ml_v4 (gradient boosting, peak-graded labels)`;
               return (
                 <span
-                  className="w-10 text-center font-semibold"
+                  className="w-10 text-center font-semibold max-md:hidden"
                   style={{ color: mlTextColor(ml) }}
                   title={mlTitle}
                 >
@@ -1015,10 +1231,35 @@ export function EntryTape({
                 </span>
               );
             })()}
-            <span className="w-12 text-text-secondary">{r.timeLabel}</span>
+            {/* SETUP — does the underlying's analyst target + chart pattern +
+                technical trend AGREE with this trade's direction? Per-ticker,
+                direction-aware (vs NScore/ML which grade the contract). */}
+            {(() => {
+              const s = setupScore(r.side, tickerMeta?.[r.ticker], tickerTech?.[r.ticker]);
+              const t = tickerTech?.[r.ticker];
+              const pct = (x: number | null) =>
+                x == null ? "—" : `${x >= 0 ? "+" : ""}${Math.round(x * 100)}`;
+              const title = s.score == null
+                ? "Setup score unavailable (no technical/target data for this ticker yet)"
+                : `SETUP ${s.score}/100 — does the underlying back this ${r.side} trade?\n` +
+                  `net underlying lean ${s.bull >= 0 ? "+" : ""}${Math.round(s.bull * 100)} ` +
+                  `(>50 tailwind, <50 fights the trade)\n` +
+                  `technical ${pct(s.tech)} · pattern ${pct(s.pat)}${t?.pattern ? ` (${t.pattern})` : ""} · target ${pct(s.tgt)}\n` +
+                  `weights 0.40 / 0.35 / 0.25. Heuristic context — not a calibrated predictor like ML.`;
+              return (
+                <span
+                  className="w-10 text-center font-semibold max-md:hidden"
+                  style={{ color: setupTextColor(s.score) }}
+                  title={title}
+                >
+                  {s.score != null ? s.score : "—"}
+                </span>
+              );
+            })()}
+            <span className="w-12 text-text-secondary max-md:hidden">{r.timeLabel}</span>
             <span className="w-14 font-semibold text-text-primary">{r.ticker}</span>
             <span
-              className="w-12 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase text-center"
+              className="w-12 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase text-center max-md:w-10 max-md:px-1"
               style={{
                 background: `${sideColor}1f`,
                 color: sideColor,
@@ -1027,16 +1268,16 @@ export function EntryTape({
             >
               {r.side}
             </span>
-            <span className="w-24 text-text-secondary">{r.action}</span>
-            <span className="flex-1 min-w-[160px] text-text-primary truncate flex items-center gap-1.5" title={r.contractLabel}>
+            <span className="w-24 text-text-secondary max-md:hidden">{r.action}</span>
+            <span className="flex-1 min-w-[160px] text-text-primary truncate flex items-center gap-1.5 max-md:min-w-[80px]" title={r.contractLabel}>
               <span className="truncate">{r.contractLabel}</span>
               {r.printCount > 1 && (
                 <span
                   className="px-1 rounded text-[9px] font-mono font-bold shrink-0"
                   style={{
                     color: "var(--accent-cyan, #22d3ee)",
-                    background: "rgba(34,211,238,0.10)",
-                    border: "1px solid rgba(34,211,238,0.30)",
+                    background: "color-mix(in srgb, var(--accent-cyan) 10%, transparent)",
+                    border: "1px solid color-mix(in srgb, var(--accent-cyan) 30%, transparent)",
                   }}
                   title={`Aggregated from ${r.printCount} prints (same ticker/strike/type/expiry). Premium and score reflect the sum; ask% is the most directional across prints.`}
                 >
@@ -1044,7 +1285,7 @@ export function EntryTape({
                 </span>
               )}
             </span>
-            <span className="w-14 flex items-center gap-1 text-text-muted">
+            <span className="w-14 flex items-center gap-1 text-text-muted max-md:hidden">
               {r.dte ? <span>{r.dte}d</span> : null}
               {r.dteCategory ? (
                 <span
@@ -1059,7 +1300,7 @@ export function EntryTape({
               ) : null}
             </span>
             <span
-              className="w-14 text-right"
+              className="w-14 text-right max-md:hidden"
               style={{
                 color: r.voiRatio != null && r.voiRatio >= 2
                   ? "var(--accent-green)"
@@ -1069,7 +1310,7 @@ export function EntryTape({
               {r.voiRatio != null ? `${r.voiRatio.toFixed(1)}×` : "—"}
             </span>
             <span
-              className="w-14 text-right"
+              className="w-14 text-right max-md:hidden"
               style={{
                 color: r.askPct == null
                   ? "var(--text-muted)"
@@ -1082,12 +1323,12 @@ export function EntryTape({
             >
               {r.askPct != null ? `${r.askPct}%` : "—"}
             </span>
-            <span className="w-16 text-right" style={{ color: moneyColor }}>
+            <span className="w-16 text-right max-md:hidden" style={{ color: moneyColor }}>
               {r.moneyness != null
                 ? `${r.moneyness >= 0 ? "+" : ""}${r.moneyness.toFixed(1)}%`
                 : "—"}
             </span>
-            <span className="w-20 text-right text-text-primary">
+            <span className="w-20 text-right text-text-primary max-md:hidden">
               {r.premium > 0 ? formatPremium(r.premium) : "—"}
             </span>
             {(() => {
@@ -1115,6 +1356,54 @@ export function EntryTape({
                   title={cur > 0 ? `current ${r.ticker} $${cur.toFixed(2)} vs entry $${r.underlyingFill.toFixed(2)}` : "price loading…"}
                 >
                   {label}
+                </span>
+              );
+            })()}
+            {/* PRED PEAK — model's regressor forecast, weighted by
+                classifier confidence.
+                The raw regressor (reg_peak) outputs E[peak P/L]; on this
+                heavy-tailed target with negative test R² the magnitudes
+                aren't calibrated. Multiplying by (ml_score/100) shrinks
+                low-confidence predictions toward zero — so an entry with
+                ML=11 / raw_pred=+427% displays as +47%, which is honest
+                ("low probability so probability-weighted expected
+                upside is modest"). Cyan accent matches the ML column. */}
+            {(() => {
+              const raw = r.notable?.predicted_peak_pnl;
+              const ml = r.notable?.ml_score;
+              if (raw == null) {
+                return (
+                  <span className="w-20 text-right text-text-muted max-md:hidden" title="Predicted peak unavailable">
+                    —
+                  </span>
+                );
+              }
+              // Confidence weight from classifier. When ml is absent,
+              // fall back to 0.5 (max-entropy assumption).
+              const weight = ml != null ? Math.max(0, Math.min(1, ml / 100)) : 0.5;
+              const effective = raw * weight;
+              const color = effective >= 0
+                ? "var(--accent-cyan, #22d3ee)" : "var(--accent-red)";
+              const display = effective >= 999 ? "+999%"
+                            : effective <= -100 ? "-100%"
+                            : `${effective >= 0 ? "+" : ""}${Math.round(effective)}%`;
+              const title =
+                `Probability-weighted predicted peak: ${effective.toFixed(1)}%\n` +
+                `  raw regressor output: ${raw.toFixed(1)}%\n` +
+                `  × classifier confidence: ${ml ?? "—"}/100 (P[peak > +100%])\n` +
+                `\n` +
+                `Why weighted: raw regressor magnitudes are noisy (test R² was negative).\n` +
+                `Shrinking by classifier confidence keeps low-ML rows from showing huge\n` +
+                `expected peaks just because the deep-OTM tail of the training distribution\n` +
+                `is wide. Rank-order across rows is meaningful; treat magnitudes as\n` +
+                `order-of-magnitude estimates.`;
+              return (
+                <span
+                  className="w-20 text-right font-semibold max-md:hidden"
+                  style={{ color }}
+                  title={title}
+                >
+                  {display}
                 </span>
               );
             })()}

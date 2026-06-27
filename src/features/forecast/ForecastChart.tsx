@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import {
   createChart,
   type IChartApi,
@@ -78,7 +78,7 @@ export function ForecastChart({
   className = "",
   height = 420,
 }: ForecastChartProps) {
-  const showMA = overlays?.showMA ?? ["MA20", "MA50"];
+  const showMA = useMemo(() => overlays?.showMA ?? ["MA20", "MA50"], [overlays?.showMA]);
   const showBB = overlays?.showBB ?? false;
   const showRSI = overlays?.showRSI ?? false;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -276,14 +276,14 @@ export function ForecastChart({
         // Outer band (q10-q90)
         const q90Series = chart.addLineSeries({
           color: "transparent",
-          lineWidth: 0,
+          lineWidth: 1,
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
         });
         const q10Series = chart.addLineSeries({
           color: "transparent",
-          lineWidth: 0,
+          lineWidth: 1,
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
@@ -311,7 +311,7 @@ export function ForecastChart({
           topColor: `${color}18`,
           bottomColor: `${color}05`,
           lineColor: "transparent",
-          lineWidth: 0,
+          lineWidth: 1,
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
@@ -413,8 +413,11 @@ export function ForecastChart({
     };
   }, []);
 
-  // Loading state
-  if (!historicalData) {
+  // Loading / empty state. NOTE: callers pass `[]` (not undefined) while a new
+  // ticker's history is in flight, so check length too — otherwise a ticker
+  // switch leaves the PREVIOUS ticker's chart frozen on screen until the fetch
+  // lands. Showing the spinner makes the switch feel immediate.
+  if (!historicalData || historicalData.length === 0) {
     return (
       <div
         className={`card flex items-center justify-center ${className}`}

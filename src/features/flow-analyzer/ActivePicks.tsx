@@ -1,6 +1,6 @@
 import { PickCard } from "../../components/PickCard";
 import { useFlowPicks, useClosePick } from "../../api/flow";
-import { formatCurrency, formatPercentRaw, changeColor } from "../../lib/utils";
+import { formatPercentRaw, changeColor } from "../../lib/utils";
 import {
   Target,
   TrendingUp,
@@ -98,7 +98,6 @@ export function ActivePicks() {
 
   const open = openPicks ?? [];
   const closed = closedPicks ?? [];
-  const total = open.length + closed.length;
   const wins = closed.filter((p) => p.option_pnl_pct > 0).length;
   const winRate = closed.length > 0 ? (wins / closed.length) * 100 : 0;
   const avgPnl =

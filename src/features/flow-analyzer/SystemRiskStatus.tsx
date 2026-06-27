@@ -119,7 +119,6 @@ function SlotPills({ slots }: { slots: RiskData["slots"] }) {
   return (
     <div className="flex items-center gap-2">
       {items.map((item) => {
-        const pct = (item.used / item.max) * 100;
         const isFull = item.used >= item.max;
         return (
           <div key={item.label} className="flex items-center gap-1">

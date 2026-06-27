@@ -53,36 +53,36 @@ function statusChip(status: string): {
     return {
       label: "OPEN",
       color: "var(--accent-green)",
-      bg: "rgba(56,211,168,0.12)",
+      bg: "color-mix(in srgb, var(--accent-green) 12%, transparent)",
     };
   if (s === "partial")
     return {
       label: "PARTIAL",
       color: "var(--accent-orange)",
-      bg: "rgba(227,127,46,0.12)",
+      bg: "color-mix(in srgb, var(--accent-orange) 12%, transparent)",
     };
   if (s === "closed")
     return {
       label: "CLOSED",
       color: "var(--accent-red)",
-      bg: "rgba(248,81,73,0.12)",
+      bg: "color-mix(in srgb, var(--accent-red) 12%, transparent)",
     };
   if (s === "stopped")
     return {
       label: "STOPPED",
       color: "var(--accent-red)",
-      bg: "rgba(248,81,73,0.12)",
+      bg: "color-mix(in srgb, var(--accent-red) 12%, transparent)",
     };
   if (s === "runner")
     return {
       label: "RUNNER",
       color: "var(--accent-cyan)",
-      bg: "rgba(46,160,255,0.12)",
+      bg: "color-mix(in srgb, var(--accent-cyan) 12%, transparent)",
     };
   return {
     label: (status || "—").toUpperCase(),
     color: "var(--text-muted)",
-    bg: "rgba(125,133,144,0.10)",
+    bg: "color-mix(in srgb, var(--text-muted) 10%, transparent)",
   };
 }
 
@@ -253,7 +253,7 @@ export function TraderPositionRow({
   return (
     <div
       style={{
-        borderBottom: "1px solid rgba(48,54,61,0.5)",
+        borderBottom: "1px solid var(--border)",
       }}
     >
       {/* Main row — clickable */}
@@ -331,7 +331,7 @@ export function TraderPositionRow({
                 ? "var(--accent-blue)"
                 : "var(--text-primary)",
               background: tickerHi
-                ? "rgba(88,166,255,0.10)"
+                ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)"
                 : "transparent",
               border: "none",
               padding: tickerHi ? "1px 6px" : 0,
@@ -436,7 +436,7 @@ export function TraderPositionRow({
           <Tag
             color="var(--accent-orange)"
             border="var(--accent-orange)"
-            bg="rgba(227,127,46,0.10)"
+            bg="color-mix(in srgb, var(--accent-orange) 10%, transparent)"
           >
             <span title={
               lastTodayEvent
@@ -494,7 +494,7 @@ export function TraderPositionRow({
           className="text-xs"
           style={{
             padding: "8px 12px 12px 56px",
-            background: "rgba(13,17,23,0.5)",
+            background: "color-mix(in srgb, var(--bg-card) 50%, transparent)",
             color: "var(--text-secondary)",
             display: "flex",
             flexDirection: "column",
@@ -533,7 +533,7 @@ export function TraderPositionRow({
                     alignItems: "baseline",
                     gap: 8,
                     paddingBottom: 4,
-                    borderBottom: "1px dotted rgba(48,54,61,0.4)",
+                    borderBottom: "1px dotted var(--border)",
                   }}
                 >
                   <span
@@ -704,7 +704,7 @@ export function TraderPositionRow({
                         whiteSpace: "pre-wrap",
                         fontSize: 14,
                         color: "var(--text-secondary)",
-                        background: "rgba(22,27,34,0.5)",
+                        background: "color-mix(in srgb, var(--bg-card-hover) 50%, transparent)",
                         padding: 8,
                         borderRadius: 4,
                         border: "1px solid var(--border)",

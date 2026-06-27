@@ -331,7 +331,7 @@ export function ForecastConfig({
               }`}
             >
               <div
-                className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                className={`w-4 h-4 rounded-full bg-text-primary transition-transform ${
                   settings.useCovariates ? "translate-x-4" : "translate-x-0.5"
                 }`}
               />
@@ -348,7 +348,7 @@ export function ForecastConfig({
               }`}
             >
               <div
-                className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                className={`w-4 h-4 rounded-full bg-text-primary transition-transform ${
                   settings.usePretrained ? "translate-x-4" : "translate-x-0.5"
                 }`}
               />

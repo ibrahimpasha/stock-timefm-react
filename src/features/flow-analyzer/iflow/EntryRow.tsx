@@ -87,7 +87,7 @@ export function EntryRow({
             e.stopPropagation();
             toggleWatchedContract(contractKey);
           }}
-          className="p-0.5 -ml-0.5 rounded hover:bg-white/5 transition-colors shrink-0"
+          className="p-0.5 -ml-0.5 rounded hover:bg-bg-card-hover transition-colors shrink-0"
           title={watched ? "Unwatch contract" : "Watch contract"}
         >
           <Star
@@ -138,7 +138,7 @@ export function EntryRow({
       {expanded && entry.analysis && (
         <div
           className="ml-12 mr-2 mb-2 px-2 py-1.5 rounded text-xs text-text-secondary leading-relaxed"
-          style={{ background: "rgba(13,17,23,0.5)" }}
+          style={{ background: "color-mix(in srgb, var(--bg-card) 50%, transparent)" }}
         >
           {entry.analysis}
           {(entry.underlying_price || entry.avg_price) && (

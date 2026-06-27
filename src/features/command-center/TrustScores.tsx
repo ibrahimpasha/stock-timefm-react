@@ -77,7 +77,7 @@ export function TrustScores({ scores, isLoading, pickedModels }: TrustScoresProp
 
       <div className="space-y-2.5">
         {sorted.map((entry) => {
-          const modelColor = MODEL_COLORS[entry.model] || "#8b949e";
+          const modelColor = MODEL_COLORS[entry.model] || "var(--text-secondary)";
           const label = MODEL_LABELS[entry.model] || entry.model;
           const barColor = getTrustColor(entry.score);
           const barWidth = Math.max(entry.score, 3);
@@ -89,7 +89,7 @@ export function TrustScores({ scores, isLoading, pickedModels }: TrustScoresProp
               className={isPicked ? "rounded px-1.5 py-1 -mx-1.5" : ""}
               style={
                 isPicked
-                  ? { background: "rgba(240,192,64,0.07)", outline: "1px solid rgba(240,192,64,0.25)" }
+                  ? { background: "color-mix(in srgb, var(--accent-yellow) 7%, transparent)", outline: "1px solid color-mix(in srgb, var(--accent-yellow) 25%, transparent)" }
                   : undefined
               }
             >
@@ -114,7 +114,7 @@ export function TrustScores({ scores, isLoading, pickedModels }: TrustScoresProp
               </div>
               <div
                 className="w-full h-2 rounded-full overflow-hidden"
-                style={{ background: "rgba(72,79,88,0.2)" }}
+                style={{ background: "color-mix(in srgb, var(--text-muted) 20%, transparent)" }}
               >
                 <div
                   className="h-full rounded-full transition-all duration-700"

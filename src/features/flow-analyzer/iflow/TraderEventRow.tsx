@@ -165,23 +165,23 @@ export function TraderEventRow({
     let bg: string;
     if (s === "stopped") {
       color = "var(--accent-red)";
-      bg = "rgba(248,81,73,0.12)";
+      bg = "color-mix(in srgb, var(--accent-red) 12%, transparent)";
     } else if (s === "partial") {
       color = "var(--accent-orange)";
-      bg = "rgba(255,165,0,0.12)";
+      bg = "color-mix(in srgb, var(--accent-orange) 12%, transparent)";
     } else if (s === "runner") {
       color = "var(--accent-cyan)";
-      bg = "rgba(46,160,255,0.12)";
+      bg = "color-mix(in srgb, var(--accent-cyan) 12%, transparent)";
     } else if (headlinePct != null && headlinePct >= 0) {
       color = "var(--accent-green)";
-      bg = "rgba(63,185,80,0.14)";
+      bg = "color-mix(in srgb, var(--accent-green) 14%, transparent)";
     } else if (headlinePct != null) {
       color = "var(--accent-red)";
-      bg = "rgba(248,81,73,0.12)";
+      bg = "color-mix(in srgb, var(--accent-red) 12%, transparent)";
     } else {
       // No P/L data yet — neutral chip so the status is still visible.
       color = "var(--text-muted)";
-      bg = "rgba(125,133,144,0.10)";
+      bg = "color-mix(in srgb, var(--text-muted) 10%, transparent)";
     }
     return { label: s.toUpperCase(), pct: headlinePct, color, bg };
   })();
@@ -189,7 +189,7 @@ export function TraderEventRow({
   return (
     <div
       style={{
-        background: "rgba(188, 140, 255, 0.06)",
+        background: "color-mix(in srgb, var(--accent-purple) 6%, transparent)",
         borderLeft: "2px solid var(--accent-purple)",
         borderRadius: 3,
       }}
@@ -334,7 +334,7 @@ export function TraderEventRow({
           className="text-xs"
           style={{
             padding: "8px 12px 12px 56px",
-            background: "rgba(13,17,23,0.4)",
+            background: "color-mix(in srgb, var(--bg-card) 40%, transparent)",
             color: "var(--text-secondary)",
             display: "flex",
             flexDirection: "column",
@@ -388,7 +388,7 @@ export function TraderEventRow({
                         alignItems: "baseline",
                         gap: 8,
                         paddingBottom: 4,
-                        borderBottom: "1px dotted rgba(48,54,61,0.4)",
+                        borderBottom: "1px dotted var(--border)",
                       }}
                     >
                       <span
@@ -527,7 +527,7 @@ export function TraderEventRow({
                             whiteSpace: "pre-wrap",
                             fontSize: 12,
                             color: "var(--text-secondary)",
-                            background: "rgba(22,27,34,0.5)",
+                            background: "color-mix(in srgb, var(--bg-card-hover) 50%, transparent)",
                             padding: 8,
                             borderRadius: 4,
                             border: "1px solid var(--border)",

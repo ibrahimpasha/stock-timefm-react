@@ -101,12 +101,6 @@ export interface FlowEntry {
   created_at?: string;
 }
 
-export interface FlowChatMessage {
-  role: "user" | "assistant";
-  content: string;
-  timestamp: string;
-}
-
 export interface TrackedTicker {
   ticker: string;
   total_entries: number;
@@ -184,119 +178,139 @@ export interface PortfolioHistoryPoint {
 
 /* ── Intelligence ─────────────────────────────────────────── */
 
-export interface IntelSection {
-  type: string;
-  title: string;
-  content: string;
-  timestamp: string;
-}
-
 /** Directional bias signal extracted from the Perplexity intel response.
- *  Returned by /intel/latest as a synthetic section with type === "_bias",
- *  whose `content` field is JSON-encoded `{bias, reason}`. The dashboard
- *  pulls it out for the panel-header chip; Ruby Trader (which iterates by
- *  known category names) ignores unknown types. */
+ *  Used by the Command Center intelligence panels + the intel-graph
+ *  context card to color-code bullish / bearish / neutral chips. */
 export type IntelBiasDirection = "BULLISH" | "BEARISH" | "NEUTRAL" | "UNKNOWN";
-export interface IntelBias {
-  bias: IntelBiasDirection;
-  reason: string;
-}
 
-export interface IntelEvent {
-  id: number;
+/** graphify structural-role enum — the supply-chain position of a ticker,
+ *  read from intelligence.db `_structural_signal`. */
+export type StructuralRole =
+  | "PLATFORM"
+  | "ENABLER"
+  | "BOTTLENECK"
+  | "CONSUMER"
+  | "NEUTRAL";
+
+/** graphify edge confidence — EXTRACTED (stated in source), INFERRED (model
+ *  deduced), AMBIGUOUS (low confidence). */
+export type EdgeConfidence = "EXTRACTED" | "INFERRED" | "AMBIGUOUS" | string;
+
+/** A ticker→ticker peer edge from the graphify graph, with the relation kind
+ *  (semantic vs conceptual) and confidence so the UI can weight it. */
+export interface GraphRelatedCompany {
   ticker: string;
-  event_date: string;
-  event_type: string;
-  summary: string;
-  severity: number;
-  trend: string;
+  relation: string;
+  confidence: EdgeConfidence;
+  role?: StructuralRole | null;
 }
 
-export interface IntelSignal {
-  type: "bullish" | "bearish" | "caution";
-  title: string;
-  detail: string;
-}
-
-/** Per-edge brief used by /intel-graph/context. Edge "type" is the related
- *  node's type (article / claim / entity); name is the related node's display
- *  name (e.g. "AMD" for a ticker article, "TSMC 3nm capacity" for an entity).
- *  edge_desc is the LLM-extracted reason the edge exists, capped to 240 chars.
- *  `bias` is present only for ticker articles — lets the chip color-code
- *  competitor alignment (e.g. peer also BULL = confirmation). */
-export interface GraphEdgeBrief {
-  id: string;
+/** A non-ticker concept the ticker hangs off — a chokepoint thesis, a theme,
+ *  or another concept node. */
+export interface GraphConcept {
   name: string;
-  type: string;
-  file: string;
-  summary: string;
-  edge_desc: string;
-  bias?: IntelBiasDirection | null;
+  relation: string;
+  confidence?: EdgeConfidence;
 }
 
-/** Same-theme ticker with its bias and one-liner summary. Returned by
- *  /intel-graph/context.theme_peers, pre-sorted bull → neutral → bear. */
+/** Same-theme ticker with its graphify structural role. */
 export interface GraphThemePeer {
   ticker: string;
-  bias: IntelBiasDirection | null;
-  summary: string;
+  role?: StructuralRole | null;
+}
+
+/** A graphify hyperedge the ticker participates in (a thematic group), with
+ *  its co-members and the model's rationale. */
+export interface GraphThematicGroup {
+  id: string;
+  relation: string;
+  members: string[];
+  rationale?: string;
+}
+
+/** graphify community (cluster) the ticker belongs to, with its human label. */
+export interface GraphCommunity {
+  id: number;
+  label?: string | null;
+}
+
+/** Entity/company the ticker is structurally tied to (product, segment, JV). */
+export interface GraphTiedTo {
+  name: string;
+  relation: string;
+}
+
+/** One ticker inside a Theme Pulse, with its auditable quant play-score, the
+ *  bucket the score put it in, and the LLM "why". */
+export interface ThemePulseTicker {
+  ticker: string;
+  play_score: number;
+  bucket: "play" | "watch" | "wait";
+  role?: StructuralRole | null;
+  accum_label: string;
+  bull_share?: number | null;
+  days_active: number;
+  tech_score?: number | null;
+  ret_30d?: number | null;
+  days_to_earnings?: number | null;
+  key_facts: string[];
+  why: string;
+}
+
+/** Response of GET /api/intel-graph/theme-pulse — theme-level synthesis:
+ *  a one-paragraph read + tickers bucketed Plays-now / Watch / Wait. */
+export interface ThemePulse {
+  available: boolean;
+  reason?: string;
+  theme?: string;
+  n?: number;
+  theme_read?: string;
+  generated_at?: string;
+  plays?: ThemePulseTicker[];
+  watch?: ThemePulseTicker[];
+  wait?: ThemePulseTicker[];
 }
 
 /** Response of GET /api/intel-graph/context — the ticker's structural
- *  neighborhood in the Understand-Anything knowledge graph. bias is read
- *  from intelligence.db (graph extraction drops the YAML), so it stays
- *  fresh between weekly graph re-ingests. */
+ *  neighborhood in the **graphify** knowledge graph (migrated from
+ *  Understand-Anything 2026-06-13). Superset of the old shape: adds
+ *  structural_role, related_companies (with confidence), chokepoints,
+ *  concepts, community cluster, and thematic_groups. `bias` is always null
+ *  (removed 2026-06-02) and kept only for back-compat. */
 export interface IntelGraphContext {
   ticker: string;
   available: boolean;
   reason?: string;
+  source?: string;
   bias?: IntelBiasDirection | null;
-  bias_reason?: string | null;
-  bias_as_of?: string | null;
   sector?: string;
   theme?: string | null;
   thesis?: string;
-  competitors?: GraphEdgeBrief[];
-  builds_on?: GraphEdgeBrief[];
-  enabled_by?: GraphEdgeBrief[];
-  cites?: GraphEdgeBrief[];
-  /** Entity ties — products, customer cohorts, market segments the ticker
-   *  is structurally exposed to. Backend filters targets to entity nodes
-   *  only so this never duplicates claims (Key facts) or other tickers. */
-  exemplifies?: GraphEdgeBrief[];
-  claims?: GraphEdgeBrief[];
+  /** Supply-chain role: PLATFORM / ENABLER / BOTTLENECK / CONSUMER / NEUTRAL. */
+  structural_role?: { role: StructuralRole; reason?: string } | null;
+  /** graphify community cluster + human label. */
+  community?: GraphCommunity | null;
+  /** Per-ticker narrative facts read fresh from intelligence.db catalysts. */
+  key_facts?: string[];
+  sentiment?: string | null;
+  competitors_text?: string | null;
+  outlook?: string | null;
+  intel_as_of?: string | null;
+  /** Tightest semantic peers (subset of related_companies). */
+  competitors?: { ticker: string; confidence: EdgeConfidence; role?: StructuralRole | null }[];
+  /** All ticker→ticker peer/related edges with relation kind + confidence. */
+  related_companies?: GraphRelatedCompany[];
+  /** Supply-chain chokepoint theses this ticker hangs off. */
+  chokepoints?: GraphConcept[];
+  /** Other conceptually-related concept nodes (themes, buildouts). */
+  concepts?: GraphConcept[];
+  /** Hyperedge thematic groups the ticker participates in. */
+  thematic_groups?: GraphThematicGroup[];
   theme_peers?: GraphThemePeer[];
+  tied_to?: GraphTiedTo[];
 }
 
 /* ── Model Evaluation ─────────────────────────────────────── */
-
-export interface LeaderboardEntry {
-  model: string;
-  mape: number;
-  rmse: number;
-  mae: number;
-  dir_acc: number;
-  samples: number;
-  trust_score: number;
-}
-
-export interface DailyMetric {
-  date: string;
-  mape: number;
-  mae: number;
-  dir_acc: number;
-}
-
-export interface ModelHistoryEntry {
-  id: number;
-  ticker: string;
-  model: string;
-  predicted_price: number;
-  actual_price: number;
-  pct_error: number;
-  direction_correct: boolean;
-  date: string;
-}
 
 export interface TrustScore {
   model: string;

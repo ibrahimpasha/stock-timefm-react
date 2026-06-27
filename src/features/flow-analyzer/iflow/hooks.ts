@@ -201,14 +201,19 @@ export function useTickerEarningsBatch(tickers: string[]) {
 }
 
 /* ── Single-ticker convenience wrapper around earnings-batch ─────────── */
+/* Uses detail=1 so we also get the trading session (bmo/amc) for the badge. */
 export function useTickerEarnings(ticker: string) {
-  return useQuery<{ earnings_date: string | null }>({
+  return useQuery<{ earnings_date: string | null; earnings_session: string | null }>({
     queryKey: ["ticker-earnings-single", ticker],
     queryFn: async () => {
-      const { data } = await apiClient.get<Record<string, string | null>>(
-        `/market/earnings-batch?tickers=${encodeURIComponent(ticker)}`,
-      );
-      return { earnings_date: data?.[ticker] ?? null };
+      const { data } = await apiClient.get<
+        Record<string, { date: string | null; session: string | null }>
+      >(`/market/earnings-batch?tickers=${encodeURIComponent(ticker)}&detail=1`);
+      const row = data?.[ticker];
+      return {
+        earnings_date: row?.date ?? null,
+        earnings_session: row?.session ?? null,
+      };
     },
     staleTime: EARNINGS_STALE_MS,
     enabled: !!ticker,

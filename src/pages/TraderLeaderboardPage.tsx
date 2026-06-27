@@ -30,6 +30,7 @@ type SortMode = "n_calls" | "today" | "win_rate" | "mean_pl_pct" | "latest" | "a
 
 const SORT_LABELS: Record<SortMode, string> = {
   n_calls: "Calls",
+  today: "Today",
   win_rate: "Win %",
   mean_pl_pct: "Mean P/L",
   latest: "Latest",
@@ -141,6 +142,52 @@ interface LeaderboardTableProps {
   todayMap?: Record<string, number>;
 }
 
+function LeaderboardHeader({
+  mode,
+  label,
+  align = "left",
+  sortMode,
+  onSort,
+}: {
+  mode: SortMode;
+  label: string;
+  align?: "left" | "right";
+  sortMode: SortMode;
+  onSort: (mode: SortMode) => void;
+}) {
+  const active = sortMode === mode;
+  return (
+    <th
+      onClick={() => onSort(mode)}
+      style={{
+        padding: "6px 10px",
+        textAlign: align,
+        cursor: "pointer",
+        userSelect: "none",
+        fontSize: 10,
+        letterSpacing: 0.8,
+        textTransform: "uppercase",
+        color: active ? "var(--accent-blue)" : "var(--text-muted)",
+        fontWeight: 600,
+        fontFamily: "var(--font-mono, ui-monospace, monospace)",
+        borderBottom: "1px solid var(--border)",
+        background: "color-mix(in srgb, var(--bg-card-hover) 40%, transparent)",
+        position: "sticky",
+        top: 0,
+        zIndex: 1,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+        {label}
+        {active && (
+          <ArrowUpDown size={10} style={{ opacity: 0.7 }} />
+        )}
+      </span>
+    </th>
+  );
+}
+
 function LeaderboardTable({
   rows,
   selected,
@@ -179,44 +226,6 @@ function LeaderboardTable({
     return copy;
   }, [rows, sortMode, sortDesc, todayMap]);
 
-  const Header = ({ mode, label, align = "left" }: {
-    mode: SortMode;
-    label: string;
-    align?: "left" | "right";
-  }) => {
-    const active = sortMode === mode;
-    return (
-      <th
-        onClick={() => onSort(mode)}
-        style={{
-          padding: "6px 10px",
-          textAlign: align,
-          cursor: "pointer",
-          userSelect: "none",
-          fontSize: 10,
-          letterSpacing: 0.8,
-          textTransform: "uppercase",
-          color: active ? "var(--accent-blue)" : "var(--text-muted)",
-          fontWeight: 600,
-          fontFamily: "var(--font-mono, ui-monospace, monospace)",
-          borderBottom: "1px solid var(--border)",
-          background: "rgba(22,27,34,0.4)",
-          position: "sticky",
-          top: 0,
-          zIndex: 1,
-          whiteSpace: "nowrap",
-        }}
-      >
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          {label}
-          {active && (
-            <ArrowUpDown size={10} style={{ opacity: 0.7 }} />
-          )}
-        </span>
-      </th>
-    );
-  };
-
   return (
     <div style={{ overflow: "auto", maxHeight: "calc(100vh - 240px)" }}>
       <table
@@ -228,12 +237,12 @@ function LeaderboardTable({
       >
         <thead>
           <tr>
-            <Header mode="author" label="Trader" />
-            <Header mode="n_calls" label="N" align="right" />
-            <Header mode="today" label="Today" align="right" />
-            <Header mode="win_rate" label="Win" align="right" />
-            <Header mode="mean_pl_pct" label="Mean" align="right" />
-            <Header mode="latest" label="Last" align="right" />
+            <LeaderboardHeader mode="author" label="Trader" sortMode={sortMode} onSort={onSort} />
+            <LeaderboardHeader mode="n_calls" label="N" align="right" sortMode={sortMode} onSort={onSort} />
+            <LeaderboardHeader mode="today" label="Today" align="right" sortMode={sortMode} onSort={onSort} />
+            <LeaderboardHeader mode="win_rate" label="Win" align="right" sortMode={sortMode} onSort={onSort} />
+            <LeaderboardHeader mode="mean_pl_pct" label="Mean" align="right" sortMode={sortMode} onSort={onSort} />
+            <LeaderboardHeader mode="latest" label="Last" align="right" sortMode={sortMode} onSort={onSort} />
           </tr>
         </thead>
         <tbody>
@@ -246,7 +255,7 @@ function LeaderboardTable({
                 onClick={() => onSelect(r.author)}
                 style={{
                   cursor: "pointer",
-                  background: isSel ? "rgba(88,166,255,0.10)" : "transparent",
+                  background: isSel ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)" : "transparent",
                   borderLeft: isSel
                     ? "2px solid var(--accent-blue)"
                     : "2px solid transparent",
@@ -255,7 +264,7 @@ function LeaderboardTable({
                 <td
                   style={{
                     padding: "8px 10px",
-                    borderBottom: "1px solid rgba(48,54,61,0.5)",
+                    borderBottom: "1px solid var(--border)",
                   }}
                 >
                   <div
@@ -293,7 +302,7 @@ function LeaderboardTable({
                     textAlign: "right",
                     color: "var(--text-secondary)",
                     fontSize: 14,
-                    borderBottom: "1px solid rgba(48,54,61,0.5)",
+                    borderBottom: "1px solid var(--border)",
                   }}
                 >
                   {r.n_calls}
@@ -316,7 +325,7 @@ function LeaderboardTable({
                     padding: "8px 10px",
                     textAlign: "right",
                     fontSize: 14,
-                    borderBottom: "1px solid rgba(48,54,61,0.5)",
+                    borderBottom: "1px solid var(--border)",
                     color:
                       (todayMap[r.author] || 0) > 0
                         ? "var(--accent-orange)"
@@ -330,7 +339,7 @@ function LeaderboardTable({
                 <td
                   style={{
                     padding: "8px 10px",
-                    borderBottom: "1px solid rgba(48,54,61,0.5)",
+                    borderBottom: "1px solid var(--border)",
                     minWidth: 90,
                   }}
                 >
@@ -377,7 +386,7 @@ function LeaderboardTable({
                       r.mean_pl_pct != null
                         ? changeColor(r.mean_pl_pct)
                         : "var(--text-muted)",
-                    borderBottom: "1px solid rgba(48,54,61,0.5)",
+                    borderBottom: "1px solid var(--border)",
                   }}
                 >
                   {r.mean_pl_pct != null
@@ -391,7 +400,7 @@ function LeaderboardTable({
                     textAlign: "right",
                     fontSize: 11,
                     color: "var(--text-muted)",
-                    borderBottom: "1px solid rgba(48,54,61,0.5)",
+                    borderBottom: "1px solid var(--border)",
                     whiteSpace: "nowrap",
                   }}
                   title={absoluteAge(r.latest_call_ts) || ""}

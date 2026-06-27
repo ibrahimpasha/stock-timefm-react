@@ -170,7 +170,7 @@ export function ThemeSection({
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center gap-2 py-1.5 px-2 -mx-2 rounded hover:bg-white/3 transition-colors text-left"
+        className="w-full flex items-center gap-2 py-1.5 px-2 -mx-2 rounded hover:bg-bg-card-hover transition-colors text-left"
         title={categoryDescription || ""}
       >
         {expanded ? (
@@ -197,9 +197,9 @@ export function ThemeSection({
           <span
             className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold"
             style={{
-              background: "rgba(63,185,80,0.10)",
+              background: "color-mix(in srgb, var(--accent-green) 10%, transparent)",
               color: "var(--accent-green)",
-              border: "1px solid rgba(63,185,80,0.30)",
+              border: "1px solid color-mix(in srgb, var(--accent-green) 30%, transparent)",
             }}
             title={`${catEsc.esc} ticker${catEsc.esc === 1 ? "" : "s"} with strike-ladder escalation in last 14d (${catEsc.bullDom} bull-dominant, ${catEsc.bearDom} bear-dominant overall)`}
           >
@@ -212,9 +212,9 @@ export function ThemeSection({
             <span
               className="px-1.5 py-0.5 rounded truncate"
               style={{
-                background: "rgba(227,127,46,0.10)",
+                background: "color-mix(in srgb, var(--accent-orange) 10%, transparent)",
                 color: "var(--accent-orange)",
-                border: "1px solid rgba(227,127,46,0.25)",
+                border: "1px solid color-mix(in srgb, var(--accent-orange) 25%, transparent)",
               }}
               title={`${topBottleneck}: ${bnDef.detail}`}
             >
@@ -258,8 +258,8 @@ export function ThemeSection({
                       background: isSentinel
                         ? "transparent"
                         : isThemeMode
-                          ? "rgba(168,85,247,0.10)"
-                          : "rgba(88,166,255,0.10)",
+                          ? "color-mix(in srgb, var(--accent-purple) 10%, transparent)"
+                          : "color-mix(in srgb, var(--accent-blue) 10%, transparent)",
                       color: isSentinel
                         ? "var(--text-muted)"
                         : isThemeMode
@@ -268,8 +268,8 @@ export function ThemeSection({
                       border: isSentinel
                         ? "1px dashed var(--border)"
                         : isThemeMode
-                          ? "1px solid rgba(168,85,247,0.25)"
-                          : "1px solid rgba(88,166,255,0.25)",
+                          ? "1px solid color-mix(in srgb, var(--accent-purple) 25%, transparent)"
+                          : "1px solid color-mix(in srgb, var(--accent-blue) 25%, transparent)",
                     }}
                   >
                     {chipLabel}
@@ -286,9 +286,9 @@ export function ThemeSection({
                       <span
                         className="inline-flex items-center gap-0.5 px-1 py-px rounded text-[9px] font-mono normal-case tracking-normal"
                         style={{
-                          background: "rgba(63,185,80,0.10)",
+                          background: "color-mix(in srgb, var(--accent-green) 10%, transparent)",
                           color: "var(--accent-green)",
-                          border: "1px solid rgba(63,185,80,0.25)",
+                          border: "1px solid color-mix(in srgb, var(--accent-green) 25%, transparent)",
                         }}
                         title={`${sc.esc} of ${items.length} ticker${items.length === 1 ? "" : "s"} escalating in last 14d`}
                       >

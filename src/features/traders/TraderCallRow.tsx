@@ -17,7 +17,6 @@ import { Tag } from "../../components/CCPrimitives";
 import { catalystTagColor } from "../../lib/constants";
 import {
   absoluteAge,
-  changeColor,
   formatPercentRaw,
   relativeAge,
 } from "../../lib/utils";
@@ -50,7 +49,7 @@ function deriveExitStatus(
     return {
       label: "CLOSED",
       color: "var(--accent-red)",
-      bg: "rgba(248,81,73,0.10)",
+      bg: "color-mix(in srgb, var(--accent-red) 10%, transparent)",
       pct,
       title: closes[0].rationale || "Position fully closed",
     };
@@ -60,7 +59,7 @@ function deriveExitStatus(
     return {
       label: "STOPPED",
       color: "var(--accent-red)",
-      bg: "rgba(248,81,73,0.10)",
+      bg: "color-mix(in srgb, var(--accent-red) 10%, transparent)",
       pct,
       title: stops[0].rationale || "Stopped out",
     };
@@ -70,7 +69,7 @@ function deriveExitStatus(
     return {
       label: "TRIMMED",
       color: "var(--accent-orange)",
-      bg: "rgba(255,165,0,0.10)",
+      bg: "color-mix(in srgb, var(--accent-orange) 10%, transparent)",
       pct,
       title: `${trims.length} trim event${trims.length > 1 ? "s" : ""}`,
     };
@@ -206,7 +205,7 @@ export function TraderCallRow({
   return (
     <div
       style={{
-        borderBottom: "1px solid rgba(48,54,61,0.5)",
+        borderBottom: "1px solid var(--border)",
       }}
     >
       {/* Main row — clickable */}
@@ -240,7 +239,7 @@ export function TraderCallRow({
             style={{
               fontSize: 13,
               color: tickerHi ? "var(--accent-blue)" : "var(--text-primary)",
-              background: tickerHi ? "rgba(88,166,255,0.10)" : "transparent",
+              background: tickerHi ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)" : "transparent",
               border: "none",
               padding: tickerHi ? "1px 6px" : 0,
               borderRadius: 3,
@@ -395,7 +394,7 @@ export function TraderCallRow({
           className="text-xs"
           style={{
             padding: "8px 12px 10px 56px",
-            background: "rgba(13,17,23,0.5)",
+            background: "color-mix(in srgb, var(--bg-card) 50%, transparent)",
             color: "var(--text-secondary)",
             display: "flex",
             flexDirection: "column",
@@ -421,7 +420,7 @@ export function TraderCallRow({
                 whiteSpace: "pre-wrap",
                 fontSize: 12,
                 color: "var(--text-secondary)",
-                background: "rgba(22,27,34,0.5)",
+                background: "color-mix(in srgb, var(--bg-card-hover) 50%, transparent)",
                 padding: 8,
                 borderRadius: 4,
                 border: "1px solid var(--border)",

@@ -28,6 +28,8 @@ export function TickerCard({
   retPct,
   retEntries,
   voicesIntel,
+  highlightOn,
+  highlightTitle,
 }: {
   t: TrackedTicker;
   selected: boolean;
@@ -36,9 +38,16 @@ export function TickerCard({
   retPct?: number | null;
   retEntries?: number;
   voicesIntel?: VoicesCardIntel;
+  /** When provided, drives the green border instead of `esc` — lets the grid's
+   *  Highlight selector re-point the border at play / ML / accumulation. */
+  highlightOn?: boolean;
+  highlightTitle?: string;
 }) {
   const net = t.bullish > t.bearish;
   const esc = intel?.escalating;
+  // The Highlight selector (when active) owns the border; fall back to the
+  // escalating tint for callers that don't pass a highlight.
+  const lit = highlightOn ?? esc;
   const accum = intel?.accumLabel || "";
   const hasAccum = accum.includes("STRONG") || accum.includes("ACCUM");
   const showReturn = retPct !== undefined;
@@ -48,10 +57,11 @@ export function TickerCard({
   return (
     <div
       onClick={onClick}
+      title={highlightTitle}
       className="card text-left transition-all py-2 px-3 cursor-pointer relative"
       style={{
-        borderColor: selected ? "var(--accent-blue)" : esc ? "rgba(63,185,80,0.35)" : undefined,
-        background: selected ? "rgba(88,166,255,0.08)" : esc ? "rgba(63,185,80,0.04)" : undefined,
+        borderColor: selected ? "var(--accent-blue)" : lit ? "color-mix(in srgb, var(--accent-green) 55%, transparent)" : undefined,
+        background: selected ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : lit ? "color-mix(in srgb, var(--accent-green) 6%, transparent)" : undefined,
       }}
     >
       <div className="flex items-center justify-between mb-1.5">
@@ -62,7 +72,7 @@ export function TickerCard({
               e.stopPropagation();
               toggleWatchlist(t.ticker);
             }}
-            className="p-0.5 -ml-0.5 rounded hover:bg-white/5 transition-colors"
+            className="p-0.5 -ml-0.5 rounded hover:bg-bg-card-hover transition-colors"
             title={watched ? "Remove from watchlist" : "Add to watchlist"}
           >
             <Star
@@ -81,14 +91,14 @@ export function TickerCard({
             <span
               className="inline-flex items-center gap-0.5 px-1 py-px rounded text-[9px] font-mono font-semibold"
               style={{
-                background: "rgba(167,139,250,0.12)",
+                background: "color-mix(in srgb, var(--accent-purple) 12%, transparent)",
                 color:
                   voicesIntel.bullish > voicesIntel.bearish
                     ? "var(--accent-green)"
                     : voicesIntel.bearish > voicesIntel.bullish
                     ? "var(--accent-red)"
                     : "var(--accent-purple)",
-                border: "1px solid rgba(167,139,250,0.3)",
+                border: "1px solid color-mix(in srgb, var(--accent-purple) 30%, transparent)",
               }}
               title={`Tracked voices: ${voicesIntel.mentions} mention${voicesIntel.mentions === 1 ? "" : "s"} in last 7d (${voicesIntel.bullish}↑ ${voicesIntel.bearish}↓)`}
             >
@@ -163,12 +173,26 @@ export function TickerCard({
  * Small earnings-date pill shown under the ticker hero card. Colors track
  * urgency: <=7d orange, <=30d blue, beyond muted.
  */
-export function EarningsBadge({ isoDate }: { isoDate: string | null }) {
+export function EarningsBadge({
+  isoDate,
+  session,
+}: {
+  isoDate: string | null;
+  session?: string | null;
+}) {
   if (!isoDate) {
     return <span className="text-text-muted italic">No earnings date</span>;
   }
-  const dt = new Date(isoDate);
-  const days = Math.round((dt.getTime() - Date.now()) / 86_400_000);
+  // Parse the date part as a LOCAL calendar date. `new Date("2026-06-18")`
+  // parses as UTC midnight, which renders as the PREVIOUS day in negative-UTC
+  // zones (PT, UTC-7) — that's why ACN's 6/18 earnings showed as "Jun 17".
+  // Match the single source (ticker_earnings) and the forward calendar, which
+  // both treat the date as a local calendar day.
+  const [yy, mm, dd] = isoDate.slice(0, 10).split("-").map(Number);
+  const dt = new Date(yy, (mm || 1) - 1, dd || 1);
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+  const days = Math.round((dt.getTime() - todayMidnight.getTime()) / 86_400_000);
   const fmt = dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const rel = days < 0 ? `${Math.abs(days)}d ago` : days === 0 ? "today" : `in ${days}d`;
   const color =
@@ -183,17 +207,27 @@ export function EarningsBadge({ isoDate }: { isoDate: string | null }) {
     days < 0
       ? "transparent"
       : days <= 7
-      ? "rgba(227,127,46,0.12)"
+      ? "color-mix(in srgb, var(--accent-orange) 12%, transparent)"
       : days <= 30
-      ? "rgba(88,166,255,0.10)"
-      : "rgba(48,54,61,0.20)";
+      ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)"
+      : "var(--border)";
+  // Trading session: 'bmo' = before market open (pre-market), 'amc' = after
+  // market close (after-hours). Drives a small label + tooltip.
+  const sessLabel = session === "bmo" ? "BMO" : session === "amc" ? "AMC" : null;
+  const sessTitle =
+    session === "bmo"
+      ? "Before market open (pre-market)"
+      : session === "amc"
+      ? "After market close (after-hours)"
+      : "";
   return (
     <span
       className="font-mono px-2 py-0.5 rounded text-xs"
       style={{ color, background: bg, border: `1px solid ${color}33` }}
-      title={`Next earnings: ${fmt}`}
+      title={`Next earnings: ${fmt}${sessLabel ? ` · ${sessTitle}` : ""}`}
     >
       EPS {rel} · {fmt}
+      {sessLabel && <span className="opacity-75"> · {sessLabel}</span>}
     </span>
   );
 }

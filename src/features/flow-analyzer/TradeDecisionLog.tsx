@@ -44,17 +44,17 @@ function useClosedTrades(limit: number = 50) {
 
 function exitReasonLabel(reason: string): { label: string; color: string; bg: string; Icon: React.ElementType } {
   const r = (reason || "").toUpperCase();
-  if (r.includes("TRIM1")) return { label: "TRIM 1 (+25%)", color: "var(--accent-cyan)", bg: "rgba(88,166,255,0.12)", Icon: Target };
-  if (r.includes("TRIM2")) return { label: "TRIM 2 (RISK-FREE)", color: "var(--accent-green)", bg: "rgba(63,185,80,0.15)", Icon: Target };
-  if (r.includes("TRIM3")) return { label: "TRIM 3 (+100%)", color: "var(--accent-green)", bg: "rgba(63,185,80,0.15)", Icon: Target };
-  if (r.includes("RUNNER") || r.includes("TRAIL")) return { label: "RUNNER TRAIL", color: "var(--accent-green)", bg: "rgba(63,185,80,0.15)", Icon: TrendingUp };
-  if (r.includes("STOP") && !r.includes("UNDERLYING")) return { label: "STOP LOSS", color: "var(--accent-red)", bg: "rgba(248,81,73,0.12)", Icon: AlertOctagon };
-  if (r.includes("UNDERLYING")) return { label: "UNDERLYING STOP", color: "var(--accent-red)", bg: "rgba(248,81,73,0.12)", Icon: AlertOctagon };
-  if (r.includes("CIRCUIT")) return { label: "CIRCUIT BREAKER", color: "var(--accent-orange)", bg: "rgba(227,127,46,0.15)", Icon: AlertOctagon };
-  if (r.includes("EVICT")) return { label: "EVICTED", color: "var(--accent-orange)", bg: "rgba(227,127,46,0.15)", Icon: AlertOctagon };
-  if (r.includes("LOTTO_TP")) return { label: r, color: "var(--accent-orange)", bg: "rgba(227,127,46,0.15)", Icon: Target };
-  if (r.includes("TP")) return { label: r, color: "var(--accent-green)", bg: "rgba(63,185,80,0.15)", Icon: Target };
-  return { label: reason || "CLOSED", color: "var(--text-muted)", bg: "rgba(48,54,61,0.15)", Icon: Activity };
+  if (r.includes("TRIM1")) return { label: "TRIM 1 (+25%)", color: "var(--accent-cyan)", bg: "color-mix(in srgb, var(--accent-blue) 12%, transparent)", Icon: Target };
+  if (r.includes("TRIM2")) return { label: "TRIM 2 (RISK-FREE)", color: "var(--accent-green)", bg: "color-mix(in srgb, var(--accent-green) 15%, transparent)", Icon: Target };
+  if (r.includes("TRIM3")) return { label: "TRIM 3 (+100%)", color: "var(--accent-green)", bg: "color-mix(in srgb, var(--accent-green) 15%, transparent)", Icon: Target };
+  if (r.includes("RUNNER") || r.includes("TRAIL")) return { label: "RUNNER TRAIL", color: "var(--accent-green)", bg: "color-mix(in srgb, var(--accent-green) 15%, transparent)", Icon: TrendingUp };
+  if (r.includes("STOP") && !r.includes("UNDERLYING")) return { label: "STOP LOSS", color: "var(--accent-red)", bg: "color-mix(in srgb, var(--accent-red) 12%, transparent)", Icon: AlertOctagon };
+  if (r.includes("UNDERLYING")) return { label: "UNDERLYING STOP", color: "var(--accent-red)", bg: "color-mix(in srgb, var(--accent-red) 12%, transparent)", Icon: AlertOctagon };
+  if (r.includes("CIRCUIT")) return { label: "CIRCUIT BREAKER", color: "var(--accent-orange)", bg: "color-mix(in srgb, var(--accent-orange) 15%, transparent)", Icon: AlertOctagon };
+  if (r.includes("EVICT")) return { label: "EVICTED", color: "var(--accent-orange)", bg: "color-mix(in srgb, var(--accent-orange) 15%, transparent)", Icon: AlertOctagon };
+  if (r.includes("LOTTO_TP")) return { label: r, color: "var(--accent-orange)", bg: "color-mix(in srgb, var(--accent-orange) 15%, transparent)", Icon: Target };
+  if (r.includes("TP")) return { label: r, color: "var(--accent-green)", bg: "color-mix(in srgb, var(--accent-green) 15%, transparent)", Icon: Target };
+  return { label: reason || "CLOSED", color: "var(--text-muted)", bg: "color-mix(in srgb, var(--border) 15%, transparent)", Icon: Activity };
 }
 
 function fmtDate(iso: string): string {
@@ -185,7 +185,7 @@ function TradeRow({ pos }: { pos: ClosedPosition }) {
               <div className="text-text-muted mb-1">Build Fills ({pos.build_fills.length})</div>
               <div className="flex items-center gap-2 flex-wrap font-mono text-[10px] text-text-secondary">
                 {pos.build_fills.map((f, i) => (
-                  <span key={i} className="px-1.5 py-0.5 rounded" style={{ background: "rgba(48,54,61,0.3)" }}>
+                  <span key={i} className="px-1.5 py-0.5 rounded" style={{ background: "color-mix(in srgb, var(--border) 30%, transparent)" }}>
                     {fmtDate(f.at)} {f.contracts}× @ ${f.price?.toFixed(2)}
                   </span>
                 ))}

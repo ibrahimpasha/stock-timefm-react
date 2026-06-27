@@ -9,7 +9,7 @@
  * "Refresh" button triggers POST /voices/synthesize — one LLM call, 30-90s.
  * Cached up to 24h on the server so default open is instant.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Sparkles,
   Loader2,
@@ -296,23 +296,40 @@ export function SynthesisView({
   const { data, isLoading, refetch } = useVoicesSynthesis(voice, windowDays, 720);
   const generate = useGenerateSynthesis();
   const [justGenerated, setJustGenerated] = useState(false);
+  const [nowMs, setNowMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    const update = () => setNowMs(Date.now());
+    update();
+    const id = window.setInterval(update, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const handleGenerate = async () => {
+    setJustGenerated(false);
     try {
       await generate.mutateAsync({ voice, windowDays });
       setJustGenerated(true);
       await refetch();
     } catch (err) {
+      // generate.isError / generate.error drive the inline banner below.
       console.error("synthesize failed", err);
     }
   };
+
+  const errMsg =
+    generate.isError && generate.error instanceof Error
+      ? generate.error.message
+      : generate.isError
+        ? "Synthesis failed"
+        : null;
 
   const content = data?.content ?? null;
   const hasContent = !!content;
   const stale =
     data?.stale ||
     (!hasContent && !isLoading) ||
-    (hasContent && data?.generated_at && Date.now() - new Date(data.generated_at).getTime() > 24 * 3600_000);
+    (hasContent && data?.generated_at && nowMs != null && nowMs - new Date(data.generated_at).getTime() > 24 * 3600_000);
 
   return (
     <div className="space-y-3">
@@ -370,17 +387,31 @@ export function SynthesisView({
         </button>
       </div>
 
+      {/* Error banner — surfaces the real backend reason instead of failing silently */}
+      {errMsg && !generate.isPending && (
+        <div
+          className="card p-3 flex items-start gap-2 text-sm"
+          style={{ borderColor: "var(--accent-red)", color: "var(--accent-red)" }}
+        >
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+          <div>
+            <div className="font-semibold">Synthesis failed</div>
+            <div className="text-text-secondary break-words">{errMsg}</div>
+          </div>
+        </div>
+      )}
+
       {/* Body */}
       {generate.isPending && !hasContent && (
         <div className="card p-6 text-center text-sm text-text-muted">
           <Loader2 size={18} className="animate-spin inline-block mb-2" />
-          <div>One LLM call summarizing all tweets in the window. 30-90s.</div>
+          <div>One LLM call summarizing all tweets in the window. Takes 2-4 minutes.</div>
         </div>
       )}
 
       {!generate.isPending && !hasContent && !isLoading && (
         <div className="card p-6 text-center text-sm text-text-muted">
-          No synthesis cached. Click <span className="text-accent-purple">Generate</span> above to run one (single LLM call, ~30-90s).
+          No synthesis cached. Click <span className="text-accent-purple">Generate</span> above to run one (single LLM call, ~2-4 min).
         </div>
       )}
 

@@ -97,8 +97,8 @@ export function MarketContextCards({
     );
   }
 
-  const analyst = consensusBadge(context.analyst_consensus);
-  const sentiment = sentimentBadge(context.news_sentiment);
+  const analyst = consensusBadge(context.analyst_consensus ?? "");
+  const sentiment = sentimentBadge(context.news_sentiment ?? "");
 
   return (
     <div className={`space-y-3 ${className}`}>
@@ -127,7 +127,7 @@ export function MarketContextCards({
           <div className="text-right">
             <div className="text-xs text-text-muted">Avg Target</div>
             <div className="text-sm font-mono text-text-primary">
-              {formatCurrency(context.price_target)}
+              {formatCurrency(context.price_target ?? 0)}
             </div>
           </div>
         </div>

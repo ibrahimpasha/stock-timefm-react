@@ -1,4 +1,4 @@
-import { Play, Loader2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Play, Loader2 } from "lucide-react";
 
 type ForecastType = "daily" | "intraday";
 

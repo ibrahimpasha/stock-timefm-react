@@ -40,7 +40,6 @@ export function ConsensusBar({
   const bullCount = forecasts.filter(
     (f) => f.end_price > f.current_price
   ).length;
-  const bearCount = forecasts.length - bullCount;
   const total = forecasts.length;
   const bullPct = total > 0 ? (bullCount / total) * 100 : 50;
 

@@ -17,7 +17,7 @@
  * global activeTicker so the rest of the dashboard re-aligns.
  */
 import { useMemo } from "react";
-import { TrendingUp, Sparkles, Zap, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { Sparkles, Zap, ArrowUp, ArrowDown, Minus } from "lucide-react";
 import { useAppStore } from "../../../store/useAppStore";
 import { relativeAge } from "../../../lib/utils";
 import {

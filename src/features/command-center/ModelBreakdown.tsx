@@ -65,7 +65,7 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
 
       <div className="space-y-2.5">
         {sorted.map((model) => {
-          const color = MODEL_COLORS[model.model] || "#8b949e";
+          const color = MODEL_COLORS[model.model] || "var(--text-secondary)";
           const label = MODEL_LABELS[model.model] || model.model;
           const pctChange = currentPrice
             ? ((model.end_price - currentPrice) / currentPrice) * 100

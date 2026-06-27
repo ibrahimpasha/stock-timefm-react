@@ -21,17 +21,21 @@ import { useQuery } from "@tanstack/react-query";
 import { Eye, Search, Filter, Download, X, Star, Layers, Grid, List } from "lucide-react";
 import apiClient from "../../api/client";
 import { useAppStore } from "../../store/useAppStore";
+import { useDashboardFilters } from "../../store/useDashboardFilters";
 import { formatPremium } from "../../lib/utils";
 import type { TrackedTicker } from "../../lib/types";
 import { useLeaderboard } from "../../api/alerts";
 import { useVoicesTrending } from "../../api/voices";
 import { useTaxonomy } from "../../api/taxonomy";
+import { useThemePulseScores } from "../../api/intelGraph";
 import type { BiasFilter, DteFilter, SortMode, EarningsWindow } from "./iflow/types";
+import type { IfHighlight } from "../../store/useDashboardFilters";
 import { EARNINGS_WINDOW_DAYS, parsePremium, matchesDte, classifySide, dteTag } from "./iflow/utils";
 import {
   useIFlowDates,
   useIFlowSummary,
   useMultiDateSummaries,
+  useMultiDateEntries,
   useTickerIntelBatch,
   useTickerEarningsBatch,
   useFlowReturns,
@@ -49,21 +53,32 @@ type WatchView = "tickers" | "contracts" | "both";
 type GroupMode = "subcat" | "macro" | "flat";
 
 export function IFlowTracker() {
-  const [bias, setBias] = useState<BiasFilter>("all");
-  const [dte, setDte] = useState<DteFilter>("all");
-  const [sort, setSort] = useState<SortMode>("entries");
-  // Grid = per-ticker aggregated cards (the original view).
-  // Tape = chronological per-entry feed for one date — answers "what just
-  // came in today" in raw form. Sort dropdown is hidden in tape mode
-  // because tape is always newest-first by arrival timestamp.
-  const [viewMode, setViewMode] = useState<"grid" | "tape">("grid");
-  const [earningsWindow, setEarningsWindow] = useState<EarningsWindow>("all");
-  const [tradersOnly, setTradersOnly] = useState(false);
-  const [selectedAuthors, setSelectedAuthors] = useState<Set<string>>(new Set());
+  // Filter/view state lives in the shared dashboard-filters store so it
+  // survives tab switches (the Command Center unmounts the inactive tab,
+  // which would otherwise reset every local useState). UI-only state
+  // (selectedTicker, the search input ref) stays local below.
+  const {
+    bias,
+    dte,
+    sort,
+    // Grid = per-ticker aggregated cards (the original view).
+    // Tape = chronological per-entry feed for one date — answers "what just
+    // came in today" in raw form. Sort dropdown is hidden in tape mode
+    // because tape is always newest-first by arrival timestamp.
+    viewMode,
+    earningsWindow,
+    tradersOnly,
+    selectedAuthors,
+    search,
+    selectedDates,
+    watchView,
+    groupMode,
+    highlightMode,
+    highlightMin,
+  } = useDashboardFilters((s) => s.iflow);
+  const patchIFlow = useDashboardFilters((s) => s.patchIFlow);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
   const activeTicker = useAppStore((s) => s.activeTicker);
   const setActiveTicker = useAppStore((s) => s.setActiveTicker);
   const watchlist = useAppStore((s) => s.watchlist);
@@ -78,18 +93,16 @@ export function IFlowTracker() {
   useEffect(() => {
     if (activeTicker && activeTicker !== selectedTicker) {
       setSelectedTicker(activeTicker);
-      setSearch(activeTicker);
+      patchIFlow({ search: activeTicker });
     }
     // selectedTicker intentionally excluded — we only react to activeTicker
     // changes, not to internal selection updates that already match it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTicker]);
-  const [watchView, setWatchView] = useState<WatchView>("tickers");
-  const [groupMode, setGroupMode] = useState<GroupMode>("subcat");
   const { data: taxonomy } = useTaxonomy();
 
   const { data: datesData } = useIFlowDates();
-  const dates = datesData?.dates ?? [];
+  const dates = useMemo(() => datesData?.dates ?? [], [datesData?.dates]);
   const isAllDates = selectedDates.size === 0;
   const isSingleDate = selectedDates.size === 1;
   const singleDate = isSingleDate ? [...selectedDates][0] : "";
@@ -98,33 +111,23 @@ export function IFlowTracker() {
   // (which falls back to "today" inside the Tape so the user isn't
   // staring at thousands of rows). The earlier single-date restriction
   // was lifted when we added multi-date entry fetching.
-  // Default tape date when nothing is selected = today's date if present
-  // in the iFlow corpus, else the most recent date with data.
-  const pickTapeDefaultDate = (): string | null => {
-    if (!dates.length) return null;
-    const today = new Date().toISOString().slice(0, 10);
-    return dates.some((d: { date: string }) => d.date === today) ? today : dates[0].date;
-  };
-
   // The actual date list the Tape consumes. When the user hasn't picked
   // anything (All Dates), default to today only — multi-date is opt-in
   // via the date selector to keep the row count manageable.
   const tapeDates: string[] = useMemo(() => {
     if (selectedDates.size > 0) return [...selectedDates].sort().reverse();
-    const def = pickTapeDefaultDate();
+    const today = new Date().toISOString().slice(0, 10);
+    const def = dates.some((d: { date: string }) => d.date === today) ? today : dates[0]?.date;
     return def ? [def] : [];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDates, dates]);
 
   // Date toggling = multi-select. Selecting a new date clears the selected
   // ticker so the right column doesn't show stale data.
   const toggleDate = (d: string) => {
-    setSelectedDates((prev) => {
-      const next = new Set(prev);
-      if (next.has(d)) next.delete(d);
-      else next.add(d);
-      return next;
-    });
+    const next = new Set(selectedDates);
+    if (next.has(d)) next.delete(d);
+    else next.add(d);
+    patchIFlow({ selectedDates: next });
     setSelectedTicker(null);
   };
 
@@ -226,6 +229,38 @@ export function IFlowTracker() {
   // each sub-bucket header. Reuses `allTickerNames` (loading-gated above) so
   // it doesn't refire on every interim summary resolution.
   const { data: escMap } = useEscalatingBatch(allTickerNames, 14);
+
+  // ── Grid-card highlight data ───────────────────────────────────────────────
+  // The Highlight selector re-points the green border at one of: escalating
+  // (default, uses intelMap/escMap above), bullish accumulation, the Theme-Pulse
+  // play score, or the best ML score. Play scores are one tiny shared endpoint
+  // (cheap, cached with the heat map). ML needs per-entry data, so it's gated on
+  // the "ml" mode and bounded to recent dates in All-Dates view.
+  const { data: playScoreData } = useThemePulseScores();
+  const playScores = playScoreData?.scores;
+
+  // Dates whose entries we walk for the per-ticker best ML score. Mirror the
+  // grid's visible-date set, but cap All-Dates to the 10 most-recent so we don't
+  // fire ~40 include_notable entry fetches just to light a border.
+  const mlDates: string[] = useMemo(() => {
+    if (highlightMode !== "ml") return [];
+    if (useSingleDateView) return singleDate ? [singleDate] : [];
+    if (isAllDates || earningsFilterOn) return dates.slice(0, 10).map((d) => d.date);
+    return [...selectedDates].sort().reverse();
+  }, [highlightMode, useSingleDateView, singleDate, isAllDates, earningsFilterOn, dates, selectedDates]);
+  const mlEntryQueries = useMultiDateEntries(mlDates, true);
+  const mlByTicker = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const q of mlEntryQueries) {
+      for (const e of q.data?.entries ?? []) {
+        const tk = String(e.ticker || "").toUpperCase();
+        const ml = Number(e.ml_score ?? e.notable?.score ?? 0);
+        if (tk && ml > (m.get(tk) ?? 0)) m.set(tk, ml);
+      }
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mlEntryQueries.map((q) => q.dataUpdatedAt).join(",")]);
 
   // Flow P/L per ticker — only fetched when "Highest Returns" sort is on.
   // Server walks all available flow JSON and premium-weights P/L estimates.
@@ -364,6 +399,46 @@ export function IFlowTracker() {
     return list;
   }, [tickers, bias, search, sort, intelMap, earningsWindow, earningsMap, flowReturnsMap, tradersOnly, authorTickerSet]);
 
+  // Resolve the green-border highlight for one card under the active mode.
+  // Returns {on} + a hover title explaining why (and the raw score even when
+  // it's below the threshold, so the card stays auditable).
+  const highlightOf = (t: TrackedTicker): { on: boolean; title?: string } => {
+    const tk = t.ticker;
+    switch (highlightMode) {
+      case "off":
+        return { on: false };
+      case "play": {
+        const v = playScores?.[tk];
+        if (v == null) return { on: false };
+        return v >= highlightMin
+          ? { on: true, title: `Play score ${v} ≥ ${highlightMin} — flow accumulation + catalyst + technicals (capital-preservation tuned)` }
+          : { on: false, title: `Play score ${v}` };
+      }
+      case "ml": {
+        const v = mlByTicker.get(tk);
+        if (v == null) return { on: false };
+        return v >= highlightMin
+          ? { on: true, title: `Best ML score ${v} ≥ ${highlightMin} — P[option doubles] on recent flow` }
+          : { on: false, title: `Best ML score ${v}` };
+      }
+      case "accum": {
+        const lbl = (intelMap?.[tk]?.accumLabel || "").toUpperCase();
+        const e = escMap?.[tk];
+        const netBull = t.bullish > t.bearish;
+        const richBull = lbl.includes("ACCUM") && !lbl.includes("DIST") && netBull;
+        const escBull = !!e && e.dominant_side === "Bull" && e.escalating;
+        if (richBull) return { on: true, title: lbl.replace(/_/g, " ").toLowerCase() };
+        if (escBull) return { on: true, title: "bullish accumulation (strikes escalating, bull side)" };
+        return { on: false };
+      }
+      case "escalating":
+      default: {
+        const on = !!(intelMap?.[tk]?.escalating || escMap?.[tk]?.escalating);
+        return on ? { on: true, title: "strikes escalating" } : { on: false };
+      }
+    }
+  };
+
   const selectedData = tickers.find((t) => t.ticker === selectedTicker);
 
   return (
@@ -373,7 +448,7 @@ export function IFlowTracker() {
         <div className="flex items-center rounded-lg border border-border overflow-hidden">
           <button
             onClick={() => {
-              setSelectedDates(new Set());
+              patchIFlow({ selectedDates: new Set() });
               setSelectedTicker(null);
             }}
             className="px-3 py-1.5 text-xs font-semibold transition-colors"
@@ -405,7 +480,7 @@ export function IFlowTracker() {
             ref={searchInputRef}
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value.toUpperCase())}
+            onChange={(e) => patchIFlow({ search: e.target.value.toUpperCase() })}
             placeholder="Search ticker..."
             className="bg-transparent border-none outline-none text-text-primary font-mono text-xs w-full placeholder:text-text-muted pr-5"
           />
@@ -413,7 +488,7 @@ export function IFlowTracker() {
             <button
               type="button"
               onClick={() => {
-                setSearch("");
+                patchIFlow({ search: "" });
                 searchInputRef.current?.focus();
               }}
               aria-label="Clear search"
@@ -476,7 +551,7 @@ export function IFlowTracker() {
           ).map(([label, v, count]) => (
             <button
               key={v}
-              onClick={() => setWatchView(v as WatchView)}
+              onClick={() => patchIFlow({ watchView: v as WatchView })}
               className="px-3 py-1 text-xs font-semibold transition-colors"
               style={{
                 background:
@@ -508,7 +583,7 @@ export function IFlowTracker() {
             ).map(([label, v, tip]) => (
               <button
                 key={v}
-                onClick={() => setGroupMode(v as GroupMode)}
+                onClick={() => patchIFlow({ groupMode: v as GroupMode })}
                 className="px-3 py-1 text-xs font-semibold transition-colors"
                 style={{
                   background:
@@ -539,7 +614,7 @@ export function IFlowTracker() {
           ).map(([l, v, c]) => (
             <button
               key={v}
-              onClick={() => setBias(v as BiasFilter)}
+              onClick={() => patchIFlow({ bias: v as BiasFilter })}
               className="px-3 py-1 text-xs font-semibold transition-colors"
               style={{
                 background: bias === v ? `${c}15` : "transparent",
@@ -563,7 +638,7 @@ export function IFlowTracker() {
             <button
               key={v}
               onClick={() => {
-                setDte(v as DteFilter);
+                patchIFlow({ dte: v as DteFilter });
                 setSelectedTicker(null);
               }}
               className="px-3 py-1 text-xs font-semibold transition-colors"
@@ -582,7 +657,7 @@ export function IFlowTracker() {
           {([["Grid", "grid", Grid], ["Tape", "tape", List]] as const).map(([l, v, Icon]) => {
             const isTape = v === "tape";
             const handleClick = () => {
-              setViewMode(isTape ? "tape" : "grid");
+              patchIFlow({ viewMode: isTape ? "tape" : "grid" });
               // Tape now supports multi-date. We no longer force a snap
               // to a single date; the Tape itself defaults to today when
               // no dates are selected.
@@ -629,7 +704,7 @@ export function IFlowTracker() {
           ).map(([l, v]) => (
             <button
               key={v}
-              onClick={() => setSort(v as SortMode)}
+              onClick={() => patchIFlow({ sort: v as SortMode })}
               className="px-3 py-1 text-xs font-semibold transition-colors"
               style={{
                 background: sort === v ? "rgba(88,166,255,0.15)" : "transparent",
@@ -650,6 +725,60 @@ export function IFlowTracker() {
             {flowReturnsMeta.entry_count.toLocaleString()} entries
           </span>
         )}
+        {/* Highlight: which signal lights a grid card's green border. Grid-only —
+            irrelevant in the chronological Tape view. */}
+        {viewMode !== "tape" && (
+          <>
+            <span className="text-text-muted text-xs">Highlight:</span>
+            <div className="flex items-center rounded-lg border border-border overflow-hidden">
+              {(
+                [
+                  ["Off", "off", "No green border"],
+                  ["Esc", "escalating", "Strikes escalating (original default)"],
+                  ["Accum", "accum", "Bullish accumulation (accumulation label / escalating bull side)"],
+                  ["Play", "play", "Theme-Pulse play score ≥ threshold — capital-preservation tuned (accumulation + catalyst + technicals, penalizes stretched names)"],
+                  ["ML", "ml", "Best ML score ≥ threshold — P[option doubles] on recent flow"],
+                ] as const
+              ).map(([l, v, tip]) => {
+                const active = highlightMode === v;
+                return (
+                  <button
+                    key={v}
+                    onClick={() => patchIFlow({ highlightMode: v as IfHighlight })}
+                    title={tip}
+                    className="px-3 py-1 text-xs font-semibold transition-colors"
+                    style={{
+                      background: active ? "rgba(63,185,80,0.15)" : "transparent",
+                      color: active ? "var(--accent-green)" : "var(--text-muted)",
+                      borderRight: "1px solid var(--border)",
+                    }}
+                  >
+                    {l}
+                  </button>
+                );
+              })}
+            </div>
+            {(highlightMode === "play" || highlightMode === "ml") && (
+              <label
+                className="flex items-center gap-1.5 rounded-lg border border-border bg-bg-card px-2 py-1"
+                title="Minimum 0–100 score a ticker needs to get the green border"
+              >
+                <span className="text-[10px] uppercase tracking-wide text-text-muted">≥</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={highlightMin}
+                  onChange={(e) =>
+                    patchIFlow({ highlightMin: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })
+                  }
+                  className="w-12 bg-transparent text-xs text-text-primary outline-none font-mono"
+                />
+              </label>
+            )}
+          </>
+        )}
         <span className="text-text-muted text-xs">Earnings:</span>
         <div className="flex items-center rounded-lg border border-border overflow-hidden">
           {(
@@ -665,7 +794,7 @@ export function IFlowTracker() {
             return (
               <button
                 key={v}
-                onClick={() => setEarningsWindow(v as EarningsWindow)}
+                onClick={() => patchIFlow({ earningsWindow: v as EarningsWindow })}
                 className="px-3 py-1 text-xs font-semibold transition-colors"
                 style={{
                   background: active ? "rgba(227,127,46,0.15)" : "transparent",
@@ -684,11 +813,14 @@ export function IFlowTracker() {
         <div className="flex items-center rounded-lg border border-border overflow-hidden">
           <button
             onClick={() => {
-              setTradersOnly((v) => {
-                const next = !v;
-                if (!next) setSelectedAuthors(new Set());
-                return next;
-              });
+              const next = !tradersOnly;
+              // Clearing Traders also clears any author selection so a stale
+              // author filter doesn't silently apply next time it's enabled.
+              patchIFlow(
+                next
+                  ? { tradersOnly: true }
+                  : { tradersOnly: false, selectedAuthors: new Set() },
+              );
             }}
             className="px-3 py-1 text-xs font-semibold transition-colors"
             style={{
@@ -707,12 +839,10 @@ export function IFlowTracker() {
                 <button
                   key={t.author}
                   onClick={() => {
-                    setSelectedAuthors((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(t.author)) next.delete(t.author);
-                      else next.add(t.author);
-                      return next;
-                    });
+                    const next = new Set(selectedAuthors);
+                    if (next.has(t.author)) next.delete(t.author);
+                    else next.add(t.author);
+                    patchIFlow({ selectedAuthors: next });
                     setSelectedTicker(null);
                   }}
                   className="px-2 py-1 rounded text-xs font-semibold transition-colors border"
@@ -730,7 +860,7 @@ export function IFlowTracker() {
             })}
             {selectedAuthors.size > 0 && (
               <button
-                onClick={() => setSelectedAuthors(new Set())}
+                onClick={() => patchIFlow({ selectedAuthors: new Set() })}
                 className="px-2 py-1 rounded text-xs font-semibold text-text-muted hover:text-text-primary transition-colors"
                 title="Clear trader selection"
               >
@@ -761,11 +891,11 @@ export function IFlowTracker() {
           height changes, adjust the 260px offset. */}
       {!loading && (
         <div
-          className="grid grid-cols-12 gap-4"
+          className="grid grid-cols-12 gap-4 max-md:gap-2 max-md:!h-auto max-md:!min-h-0"
           style={{ height: "calc(100vh - 260px)", minHeight: 420 }}
         >
           <div
-            className={`${selectedTicker ? "col-span-5" : "col-span-12"} overflow-y-auto pr-1`}
+            className={`${selectedTicker ? "col-span-7" : "col-span-12"} overflow-y-auto pr-1 max-md:col-span-12 max-md:overflow-visible max-md:pr-0`}
           >
             {/* Watched-contracts surface: shown in "contracts" + "both" modes. */}
             {(watchView === "contracts" || watchView === "both") && (
@@ -822,6 +952,7 @@ export function IFlowTracker() {
                         daysActive: escRow.days_active,
                       }
                     : undefined;
+                const hl = highlightOf(t);
                 return (
                 <TickerCard
                   key={t.ticker}
@@ -836,6 +967,8 @@ export function IFlowTracker() {
                     }
                   }}
                   intel={mergedIntel}
+                  highlightOn={hl.on}
+                  highlightTitle={hl.title}
                   voicesIntel={voicesByTicker[t.ticker]}
                   retPct={
                     sort === "returns"
@@ -909,7 +1042,7 @@ export function IFlowTracker() {
             })()}
           </div>
           {selectedTicker && selectedData && (
-            <div className="col-span-7 overflow-y-auto pr-1">
+            <div className="col-span-5 overflow-y-auto pr-1 max-md:col-span-12 max-md:overflow-visible max-md:pr-0">
               <TickerDetail
                 ticker={selectedTicker}
                 trackedData={selectedData}

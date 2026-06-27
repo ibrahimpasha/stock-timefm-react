@@ -227,7 +227,7 @@ function TrendingTab({
           gap: 8,
           padding: "8px 10px",
           borderBottom: "1px solid var(--border)",
-          background: "rgba(22,27,34,0.4)",
+          background: "color-mix(in srgb, var(--bg-card-hover) 40%, transparent)",
         }}
       >
         <span
@@ -258,7 +258,7 @@ function TrendingTab({
                     ? "var(--accent-blue)"
                     : "var(--text-secondary)",
                   background: active
-                    ? "rgba(88,166,255,0.10)"
+                    ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)"
                     : "transparent",
                   border: active
                     ? "1px solid var(--accent-blue)"
@@ -338,7 +338,7 @@ function TrendingTab({
                       fontFamily:
                         "var(--font-mono, ui-monospace, monospace)",
                       borderBottom: "1px solid var(--border)",
-                      background: "rgba(22,27,34,0.4)",
+                      background: "color-mix(in srgb, var(--bg-card-hover) 40%, transparent)",
                       position: "sticky",
                       top: 0,
                       zIndex: 1,
@@ -360,7 +360,7 @@ function TrendingTab({
                     <td
                       style={{
                         padding: "8px 10px",
-                        borderBottom: "1px solid rgba(48,54,61,0.5)",
+                        borderBottom: "1px solid var(--border)",
                       }}
                     >
                       <button
@@ -386,7 +386,7 @@ function TrendingTab({
                         padding: "8px 10px",
                         textAlign: "right",
                         color: "var(--text-secondary)",
-                        borderBottom: "1px solid rgba(48,54,61,0.5)",
+                        borderBottom: "1px solid var(--border)",
                       }}
                     >
                       {r.n_mentions}
@@ -397,7 +397,7 @@ function TrendingTab({
                         padding: "8px 10px",
                         textAlign: "right",
                         color: "var(--text-secondary)",
-                        borderBottom: "1px solid rgba(48,54,61,0.5)",
+                        borderBottom: "1px solid var(--border)",
                       }}
                     >
                       {r.n_unique_authors}
@@ -405,7 +405,7 @@ function TrendingTab({
                     <td
                       style={{
                         padding: "8px 10px",
-                        borderBottom: "1px solid rgba(48,54,61,0.5)",
+                        borderBottom: "1px solid var(--border)",
                         minWidth: 90,
                       }}
                     >
@@ -440,7 +440,7 @@ function TrendingTab({
                     <td
                       style={{
                         padding: "8px 10px",
-                        borderBottom: "1px solid rgba(48,54,61,0.5)",
+                        borderBottom: "1px solid var(--border)",
                       }}
                     >
                       <Tag
@@ -461,7 +461,7 @@ function TrendingTab({
                     <td
                       style={{
                         padding: "8px 10px",
-                        borderBottom: "1px solid rgba(48,54,61,0.5)",
+                        borderBottom: "1px solid var(--border)",
                       }}
                     >
                       <CatalystChips catalysts={r.catalysts_top} max={3} />
@@ -469,7 +469,7 @@ function TrendingTab({
                     <td
                       style={{
                         padding: "8px 10px",
-                        borderBottom: "1px solid rgba(48,54,61,0.5)",
+                        borderBottom: "1px solid var(--border)",
                         fontSize: 11,
                       }}
                     >
@@ -556,7 +556,7 @@ function TickerDrawer({
                 gridTemplateColumns: "140px 1fr auto",
                 gap: 8,
                 padding: "8px 12px",
-                borderBottom: "1px solid rgba(48,54,61,0.5)",
+                borderBottom: "1px solid var(--border)",
                 alignItems: "center",
                 fontSize: 13,
               }}
@@ -638,7 +638,7 @@ function TickerDrawer({
           justifyContent: "space-between",
           padding: "6px 10px",
           borderBottom: "1px solid var(--border)",
-          background: "rgba(22,27,34,0.6)",
+          background: "color-mix(in srgb, var(--bg-card-hover) 60%, transparent)",
         }}
       >
         <span
@@ -705,7 +705,7 @@ function LeadersTab() {
           gap: 8,
           padding: "8px 10px",
           borderBottom: "1px solid var(--border)",
-          background: "rgba(22,27,34,0.4)",
+          background: "color-mix(in srgb, var(--bg-card-hover) 40%, transparent)",
         }}
       >
         <span
@@ -736,7 +736,7 @@ function LeadersTab() {
                     ? "var(--accent-blue)"
                     : "var(--text-secondary)",
                   background: active
-                    ? "rgba(88,166,255,0.10)"
+                    ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)"
                     : "transparent",
                   border: active
                     ? "1px solid var(--accent-blue)"
@@ -804,7 +804,7 @@ function LeadersTab() {
                         fontFamily:
                           "var(--font-mono, ui-monospace, monospace)",
                         borderBottom: "1px solid var(--border)",
-                        background: "rgba(22,27,34,0.4)",
+                        background: "color-mix(in srgb, var(--bg-card-hover) 40%, transparent)",
                         position: "sticky",
                         top: 0,
                         zIndex: 1,
@@ -826,14 +826,14 @@ function LeadersTab() {
                     key={r.author}
                     style={{
                       background: influencing
-                        ? "rgba(188,140,255,0.06)"
+                        ? "color-mix(in srgb, var(--accent-purple) 6%, transparent)"
                         : "transparent",
                     }}
                   >
                     <td
                       style={{
                         padding: "8px 10px",
-                        borderBottom: "1px solid rgba(48,54,61,0.5)",
+                        borderBottom: "1px solid var(--border)",
                       }}
                     >
                       <div
@@ -865,7 +865,7 @@ function LeadersTab() {
                         padding: "8px 10px",
                         textAlign: "right",
                         color: "var(--text-secondary)",
-                        borderBottom: "1px solid rgba(48,54,61,0.5)",
+                        borderBottom: "1px solid var(--border)",
                       }}
                     >
                       {r.n_first_mentions}
@@ -873,7 +873,7 @@ function LeadersTab() {
                     <td
                       style={{
                         padding: "8px 10px",
-                        borderBottom: "1px solid rgba(48,54,61,0.5)",
+                        borderBottom: "1px solid var(--border)",
                         minWidth: 140,
                       }}
                     >
@@ -910,7 +910,7 @@ function LeadersTab() {
                     <td
                       style={{
                         padding: "8px 10px",
-                        borderBottom: "1px solid rgba(48,54,61,0.5)",
+                        borderBottom: "1px solid var(--border)",
                       }}
                     >
                       <span
@@ -1005,7 +1005,7 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
           gap: 8,
           padding: "8px 10px",
           borderBottom: "1px solid var(--border)",
-          background: "rgba(22,27,34,0.4)",
+          background: "color-mix(in srgb, var(--bg-card-hover) 40%, transparent)",
         }}
       >
         <span
@@ -1046,7 +1046,7 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
             padding: "4px 12px",
             fontSize: 13,
             color: "var(--accent-blue)",
-            background: "rgba(88,166,255,0.10)",
+            background: "color-mix(in srgb, var(--accent-blue) 10%, transparent)",
             border: "1px solid var(--accent-blue)",
             borderRadius: 3,
             cursor: "pointer",
@@ -1237,7 +1237,7 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
                       gridTemplateColumns: "80px 1fr",
                       gap: 8,
                       padding: "5px 0",
-                      borderBottom: "1px solid rgba(48,54,61,0.3)",
+                      borderBottom: "1px solid var(--border)",
                       alignItems: "center",
                     }}
                   >
@@ -1348,7 +1348,7 @@ export function SignalsView() {
                   ? "var(--accent-orange)"
                   : "var(--text-secondary)",
                 background: active
-                  ? "rgba(255,165,0,0.08)"
+                  ? "color-mix(in srgb, var(--accent-orange) 8%, transparent)"
                   : "transparent",
                 border: "none",
                 borderBottom: active

@@ -115,6 +115,7 @@ export interface CalendarEvent {
   source?: string;
   ticker?: string | null;
   weight?: number;
+  session?: string | null; // 'bmo' | 'amc' | null — earnings rows only
 }
 
 export interface CalendarResponse {

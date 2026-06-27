@@ -4,7 +4,6 @@ import { STALE_TIMES } from "../lib/constants";
 import type {
   FlowAlert,
   FlowPick,
-  FlowChatMessage,
   TrackedTicker,
 } from "../lib/types";
 
@@ -48,33 +47,7 @@ export function useTrackedTickers(days: number = 30, min: number = 2) {
   });
 }
 
-export function useFlowChat() {
-  return useQuery({
-    queryKey: ["flow", "chat"],
-    queryFn: async () => {
-      const { data } = await apiClient.get<FlowChatMessage[]>("/flow/chat");
-      return data;
-    },
-    staleTime: STALE_TIMES.flow,
-  });
-}
-
 /* ── Mutations ────────────────────────────────────────────── */
-
-export function useAnalyzeFlow() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (flowText: string) => {
-      const { data } = await apiClient.post("/flow/analyze", {
-        text: flowText,
-      });
-      return data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["flow"] });
-    },
-  });
-}
 
 export function useDismissAlert() {
   const qc = useQueryClient();
@@ -113,28 +86,3 @@ export function useSendDiscordAlert() {
   });
 }
 
-export function useSendChatMessage() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (message: string) => {
-      const { data } = await apiClient.post("/flow/chat", { message });
-      return data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["flow", "chat"] });
-    },
-  });
-}
-
-export function useClearChat() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      const { data } = await apiClient.delete("/flow/chat");
-      return data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["flow", "chat"] });
-    },
-  });
-}

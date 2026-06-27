@@ -437,7 +437,7 @@ function TweetRow({
                   key={t.ticker}
                   ticker={t.ticker}
                   sentiment={t.sentiment}
-                  onClick={(e: any) => {
+                  onClick={(e?: React.MouseEvent) => {
                     e?.stopPropagation?.();
                     onPickTicker(t.ticker);
                   }}
@@ -454,7 +454,7 @@ function TweetRow({
                   key={`s:${s}`}
                   label={s}
                   kind="sector"
-                  onClick={(e: any) => {
+                  onClick={(e?: any) => {
                     e?.stopPropagation?.();
                     onPickTheme(s);
                   }}
@@ -465,7 +465,7 @@ function TweetRow({
                   key={`t:${th}`}
                   label={th}
                   kind="theme"
-                  onClick={(e: any) => {
+                  onClick={(e?: any) => {
                     e?.stopPropagation?.();
                     onPickTheme(th);
                   }}

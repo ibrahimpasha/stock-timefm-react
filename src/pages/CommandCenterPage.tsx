@@ -1,19 +1,16 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAppStore } from "../store/useAppStore";
-import { useMarketPrice, useMarketHistory } from "../api/forecast";
-import { useSignal, useGenerateSignal } from "../api/signals";
+import { useMarketHistory } from "../api/forecast";
 import { useFlowAlerts } from "../api/flow";
 
 // Command Center feature components
-import { DecisionHero } from "../features/command-center/DecisionHero";
+import { DailyBrief } from "../features/command-center/DailyBrief";
+import { SignalAnalysisCard } from "../features/command-center/SignalAnalysisCard";
 import { GraphContextCard } from "../features/command-center/GraphContextCard";
+import { ThemePulseCard } from "../features/command-center/ThemePulseCard";
 import { ForecastChart } from "../features/forecast/ForecastChart";
-import {
-  ForecastConfig,
-  DEFAULT_SETTINGS,
-  type ForecastSettings,
-} from "../features/forecast/ForecastConfig";
-import type { OHLCV, ModelForecast } from "../lib/types";
+import type { OHLCV } from "../lib/types";
+import { TickerSearch } from "../components/TickerSearch";
 import { IntelligencePanel } from "../features/command-center/IntelligencePanel";
 import IntelligencePanelV3 from "../features/command-center/IntelligencePanelV3";
 // Keep `IntelligencePanel` referenced so the fallback import survives
@@ -24,115 +21,50 @@ void _IntelligencePanelFallback;
 
 // Flow Analyzer feature components
 import { FlowAlerts } from "../features/flow-analyzer/FlowAlerts";
-import { FlowChat } from "../features/flow-analyzer/FlowChat";
 import { IFlowTracker } from "../features/flow-analyzer/IFlowTracker";
+import { FlowHeatmap } from "../features/flow-analyzer/FlowHeatmap";
 
 import { FlowPaperTrading } from "../features/flow-analyzer/FlowPaperTrading";
+import { SmartTrader } from "../features/flow-analyzer/SmartTrader";
 import { FlowIntel } from "../features/flow-analyzer/FlowIntel";
 import { VoicesTab } from "../features/flow-analyzer/VoicesTab";
 import { NewsTab } from "../features/flow-analyzer/NewsTab";
 
-// iFlow Discord Pipeline
-import { FetchIFlowPanel } from "../features/flow-analyzer/FetchIFlowPanel";
-
 import {
   Command,
-  Search,
-  Loader2,
   Zap,
-  MessageCircle,
-  Target,
   Eye,
   Bell,
   BarChart3,
+  Brain,
   X,
   SidebarOpen,
   Mic2,
   Globe,
+  Grid3x3,
 } from "lucide-react";
 
 /* ── Tab definitions ─────────────────────────────────────── */
 
-type FlowTab = "chat" | "picks" | "iflow" | "flow-trader" | "flow-intel" | "voices" | "news";
+type FlowTab =
+  | "picks"
+  | "iflow"
+  | "heatmap"
+  | "flow-trader"
+  | "smart-trader"
+  | "flow-intel"
+  | "voices"
+  | "news";
 
 const FLOW_TABS: { id: FlowTab; label: string; icon: React.ElementType }[] = [
   { id: "iflow", label: "iFlow Tracker", icon: Eye },
+  { id: "heatmap", label: "Heat Map", icon: Grid3x3 },
   { id: "flow-trader", label: "Flow Trader", icon: Zap },
+  { id: "smart-trader", label: "Smart Trader", icon: Brain },
   { id: "flow-intel", label: "Flow Intel", icon: BarChart3 },
-  { id: "chat", label: "Flow Chat", icon: MessageCircle },
   { id: "voices", label: "Voices", icon: Mic2 },
   { id: "news", label: "News", icon: Globe },
 ];
-
-/* ── Ticker Input + Analyze Bar ──────────────────────────── */
-
-function AnalyzeBar({
-  onAnalyze,
-  isAnalyzing,
-}: {
-  onAnalyze: () => void;
-  isAnalyzing: boolean;
-}) {
-  const { activeTicker, setActiveTicker } = useAppStore();
-  const [tickerInput, setTickerInput] = useState(activeTicker);
-
-  useEffect(() => {
-    setTickerInput(activeTicker);
-  }, [activeTicker]);
-
-  const handleSubmit = useCallback(() => {
-    const cleaned = tickerInput.toUpperCase().trim();
-    if (cleaned) {
-      setActiveTicker(cleaned);
-      setTickerInput(cleaned);
-    }
-  }, [tickerInput, setActiveTicker]);
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleSubmit();
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-3">
-      {/* Ticker input */}
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-bg-card px-3 py-2 focus-within:border-accent-blue transition-colors">
-        <Search size={16} className="text-text-muted shrink-0" />
-        <input
-          type="text"
-          value={tickerInput}
-          onChange={(e) => setTickerInput(e.target.value.toUpperCase())}
-          onBlur={handleSubmit}
-          onKeyDown={handleKeyDown}
-          placeholder="TICKER"
-          className="bg-transparent border-none outline-none text-text-primary font-mono text-base w-24 placeholder:text-text-muted"
-          spellCheck={false}
-          autoComplete="off"
-        />
-      </div>
-
-      {/* Analyze button */}
-      <button
-        onClick={onAnalyze}
-        disabled={isAnalyzing}
-        className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold bg-accent-purple/15 text-accent-purple hover:bg-accent-purple/25 border border-accent-purple/30 transition-all disabled:opacity-50"
-      >
-        {isAnalyzing ? (
-          <>
-            <Loader2 size={16} className="animate-spin" />
-            Analyzing...
-          </>
-        ) : (
-          <>
-            <Zap size={16} />
-            Analyze
-          </>
-        )}
-      </button>
-    </div>
-  );
-}
 
 /* ── Flow Tab Bar ────────────────────────────────────────── */
 
@@ -191,19 +123,16 @@ function AlertBellInner({ onClick, isOpen }: { onClick: () => void; isOpen: bool
 
 function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
   switch (activeTab) {
-    case "chat":
-      return (
-        <div className="space-y-3">
-          <FetchIFlowPanel />
-          <FlowChat />
-        </div>
-      );
     case "iflow":
       return <IFlowTracker />;
+    case "heatmap":
+      return <FlowHeatmap />;
     case "flow-intel":
       return <FlowIntel />;
     case "flow-trader":
       return <FlowPaperTrading />;
+    case "smart-trader":
+      return <SmartTrader />;
     case "voices":
       return <VoicesTab />;
     case "news":
@@ -229,109 +158,19 @@ export function CommandCenterPage() {
       firstRender.current = false;
       return;
     }
-    setDetailOpen(true);
+    const id = window.setTimeout(() => setDetailOpen(true), 0);
+    return () => window.clearTimeout(id);
   }, [ticker]);
 
-  // Forecast Config — same settings + run loop as the /forecast page, embedded
-  // here so the user can re-run with different models/horizon/origin without
-  // leaving Command Center. When custom forecasts exist they override the
-  // signal's per-ticker top-N for the chart display.
-  const [settings, setSettings] = useState<ForecastSettings>(DEFAULT_SETTINGS);
-  const [customForecasts, setCustomForecasts] = useState<ModelForecast[]>([]);
-  const [forecastOriginOverride, setForecastOriginOverride] = useState<string | undefined>();
-  const [isRunningForecast, setIsRunningForecast] = useState(false);
-
-  // Reset custom forecasts when the ticker changes (the old forecast was for
-  // a different name and would be misleading on the new chart).
-  useEffect(() => {
-    setCustomForecasts([]);
-    setForecastOriginOverride(undefined);
-  }, [ticker]);
-
-  const runCustomForecast = useCallback(async () => {
-    if (!ticker) {
-      console.warn("[runCustomForecast] aborted: no active ticker");
-      return;
-    }
-    if (settings.selectedModels.length === 0) {
-      console.warn("[runCustomForecast] aborted: no models selected");
-      return;
-    }
-    console.log("[runCustomForecast] starting", {
-      ticker,
-      models: settings.selectedModels,
-      type: settings.forecastType,
-    });
-    setIsRunningForecast(true);
-    setCustomForecasts([]);
-    setForecastOriginOverride(undefined);
-    try {
-      const isDaily = settings.forecastType === "daily";
-      const endpoint = isDaily ? "/forecast/daily" : "/forecast/intraday";
-      const body = isDaily
-        ? {
-            ticker,
-            days: settings.forecastDays,
-            history_days: settings.historyDays,
-            use_covariates: settings.useCovariates,
-            use_pretrained: settings.usePretrained,
-          }
-        : {
-            ticker,
-            minutes: settings.forecastMinutes,
-            interval: settings.interval,
-            history_period: settings.historyPeriod,
-            use_covariates: settings.useCovariates,
-            use_pretrained: settings.usePretrained,
-          };
-
-      const results = await Promise.allSettled(
-        settings.selectedModels.map((model) =>
-          apiClient.post(endpoint, { ...body, model }).then((r) => {
-            const d = r.data;
-            const prices = d.prices ?? (d.predictions
-              ? d.predictions.map((p: { price: number }) => p.price)
-              : []);
-            return {
-              model,
-              prices,
-              end_price: d.end_price ?? d.summary?.final_price
-                ?? (prices.length ? prices[prices.length - 1] : 0),
-              predictions: d.predictions ?? [],
-              current_price: d.current_price ?? 0,
-              latency_ms: d.latency_ms ?? 0,
-            } as ModelForecast;
-          }),
-        ),
-      );
-      const successful: ModelForecast[] = [];
-      const failed: Array<{ model: string; reason: unknown }> = [];
-      results.forEach((r, i) => {
-        if (r.status === "fulfilled") successful.push(r.value);
-        else failed.push({ model: settings.selectedModels[i], reason: r.reason });
-      });
-      console.log("[runCustomForecast] done", {
-        ok: successful.length,
-        failed: failed.length,
-        successful_models: successful.map((s) => s.model),
-      });
-      if (failed.length) console.warn("[runCustomForecast] failed models:", failed);
-      setCustomForecasts(successful);
-    } catch (err) {
-      console.error("[runCustomForecast] threw:", err);
-    } finally {
-      setIsRunningForecast(false);
-    }
-  }, [ticker, settings]);
-
-  // Data queries
-  const { data: marketPrice } = useMarketPrice(ticker);
-  const { data: signalResult, isLoading: signalLoading } = useSignal(ticker);
+  // Data query — historical OHLCV powers the candlestick price chart. The
+  // deprecated 8-model forecast/signal stack (predicted-price overlays,
+  // DecisionHero verdict, ForecastConfig) was removed 2026-06-24; this is now a
+  // pure price chart fed by live market history. See task #38.
   const { data: history, isLoading: historyLoading } = useMarketHistory(ticker, 180);
 
   // Normalize history rows to OHLCV shape the chart expects.
   const historicalData: OHLCV[] = (history ?? []).map(
-    (d: Record<string, number | string>) => ({
+    (d) => ({
       date: String(d.date),
       open: Number(d.open),
       high: Number(d.high),
@@ -340,38 +179,6 @@ export function CommandCenterPage() {
       volume: Number(d.volume),
     })
   );
-  const ensembleModels = signalResult?.ensemble_models
-    ?? signalResult?.models?.map((m) => m.model)
-    ?? [];
-
-  // Whenever the signal's per-ticker picks change, fold them into the
-  // ForecastConfig `selectedModels` list so the checkboxes show them as
-  // checked and they render on the chart. Without this, a ticker whose
-  // router picks aren't in the user's default settings produces an empty
-  // chart even though the data is available.
-  useEffect(() => {
-    if (!ensembleModels.length) return;
-    setSettings((prev) => {
-      const merged = Array.from(new Set([...prev.selectedModels, ...ensembleModels]));
-      return merged.length === prev.selectedModels.length
-        ? prev
-        : { ...prev, selectedModels: merged };
-    });
-    // ensembleModels is a fresh array each render; key on its joined string.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ensembleModels.join(",")]);
-
-  // Generate signal mutation
-  const generateSignal = useGenerateSignal();
-
-  const handleAnalyze = () => {
-    generateSignal.mutate(ticker);
-  };
-
-  const signal = signalResult?.signal ?? null;
-
-  const isAnalyzing = generateSignal.isPending;
-  const isSignalLoading = signalLoading || isAnalyzing;
 
   return (
     <div className="space-y-5">
@@ -384,8 +191,15 @@ export function CommandCenterPage() {
           </h1>
           <span className="font-mono text-lg text-accent-blue">{ticker}</span>
         </div>
-        <AnalyzeBar onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} />
+        {/* Ticker / company-name search */}
+        <TickerSearch inputWidth="w-44" />
       </div>
+
+      {/* Daily Brief — JARVIS-style situational read at the very top: regime,
+          today's agenda, your paper books, cross-source convergence, theme heat,
+          plus a cached Claude "Read" that prioritises the day with a
+          capital-preservation stance. */}
+      <DailyBrief />
 
       {/* Master/detail layout:
             - Default state: Flow workspace takes the full width (col 12).
@@ -447,46 +261,33 @@ export function CommandCenterPage() {
               </button>
             </div>
 
-            {/* DecisionHero moved to TOP — direction + price + sector
-                breadcrumb + iFlow rollup is the at-a-glance ticker summary
-                that should be visible without scrolling. ForecastConfig and
-                the chart follow below as the analysis controls. */}
-            <DecisionHero
-              signal={signal}
-              marketPrice={marketPrice ?? null}
-              isLoading={isSignalLoading}
-            />
+            {/* Signal Analysis — reliable per-ticker read at the TOP, replacing
+                the deprecated 8-model price forecast. Three auditable sources:
+                deterministic Technical, cross-source Convergence, and the
+                production ML peak-potential. No discredited price target. */}
+            <SignalAnalysisCard ticker={ticker} />
+
+            {/* Theme Pulse — zoom out from the active ticker to its whole
+                taxonomy theme: which names are plays-now vs wait, ranked by an
+                auditable quant score, with a one-paragraph theme read. Sits
+                above Graph context as the "what's the play across this group"
+                lead-in. Self-hides when the theme has no pulse yet. */}
+            <ThemePulseCard ticker={ticker} />
 
             {/* Knowledge-graph context — competitors / supply-chain neighbors
                 for the active ticker, pulled from the Understand-Anything graph.
-                Sits between DecisionHero and ForecastConfig because it's the
-                structural context that informs the forecast you're about to
-                configure. Self-hides when the graph isn't built or the ticker
-                has no neighbors. Chip clicks swap activeTicker. */}
+                Self-hides when the graph isn't built or the ticker has no
+                neighbors. Chip clicks swap activeTicker. */}
             <GraphContextCard ticker={ticker} />
 
-            {/* Forecast configuration — re-run with different models / horizon
-                / origin without leaving Command Center. When the user runs a
-                custom forecast, those results override the signal's per-ticker
-                top-N for the chart. */}
-            <ForecastConfig
-              settings={settings}
-              onChange={setSettings}
-              onRunForecast={runCustomForecast}
-              isLoading={isRunningForecast}
-              ticker={ticker}
-            />
-
-            {/* Chart — uses custom forecasts when available, otherwise the
-                signal's per-ticker top-N. `selectedModels` always comes from
-                ForecastConfig so the checkbox toggles immediately show/hide
-                lines on the chart in either mode. */}
+            {/* Price chart — candlesticks + volume + MA overlays from live
+                market history. The deprecated forecast overlays / model-config
+                were removed (task #38); this is now a pure price chart. */}
             <ForecastChart
               historicalData={historicalData}
-              forecasts={customForecasts.length ? customForecasts : (signalResult?.models ?? [])}
-              selectedModels={settings.selectedModels}
-              isLoading={historyLoading || isSignalLoading || isRunningForecast}
-              forecastOrigin={forecastOriginOverride || settings.forecastOrigin}
+              forecasts={[]}
+              selectedModels={[]}
+              isLoading={historyLoading}
               height={300}
             />
 
