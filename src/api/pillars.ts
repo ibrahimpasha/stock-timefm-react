@@ -148,3 +148,22 @@ export function usePillar(key?: string | null) {
     enabled: !!key,
   });
 }
+
+export interface WeeklyReport {
+  available: boolean;
+  date?: string | null;
+  title?: string;
+  markdown?: string;
+  file?: string;
+  reason?: string;
+}
+
+/** Latest weekly AI synthesis report (markdown), archived in
+ *  intel-wiki/weekly-ai-report/. Backed by GET /api/pillars/weekly-report. */
+export function useWeeklyReport() {
+  return useQuery<WeeklyReport>({
+    queryKey: ["pillars", "weekly-report"],
+    queryFn: () => apiClient.get("/pillars/weekly-report").then((r) => r.data),
+    staleTime: 30 * 60_000,
+  });
+}

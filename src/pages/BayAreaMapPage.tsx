@@ -8,6 +8,7 @@ import "leaflet.heat";
 import { useTickerMap, type BayAreaCompany } from "../api/map";
 import { useTickerTaxonomy } from "../api/tickerTaxonomy";
 import { useAppStore } from "../store/useAppStore";
+import { Chip, Segmented } from "../components/Glass";
 
 type HeatPoint = [number, number, number];
 
@@ -208,75 +209,81 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search ticker or name…"
-          className="px-3 py-1.5 rounded text-xs bg-bg-card border border-border text-text-primary w-56 focus:outline-none focus:border-accent-blue"
+          className="px-3 py-1.5 rounded-full text-xs border border-border text-text-primary w-56 focus:outline-none focus:border-accent-blue transition-colors"
+          style={{ background: "var(--glass-bg)" }}
         />
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center gap-2 flex-wrap text-xs">
-        <div className="flex items-center gap-1 bg-bg-card rounded p-0.5">
-          {MODES.map((m) => (
-            <button key={m.id} onClick={() => setMode(m.id)}
-              className={`px-2.5 py-1 rounded font-medium ${mode === m.id ? "bg-accent-blue/20 text-accent-blue" : "text-text-secondary hover:bg-bg-card-hover"}`}>
-              {m.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1 bg-bg-card rounded p-0.5">
-          {(["all", "bay"] as Region[]).map((r) => (
-            <button key={r} onClick={() => setRegion(r)}
-              className={`px-2.5 py-1 rounded font-medium ${region === r ? "bg-accent-blue/20 text-accent-blue" : "text-text-secondary hover:bg-bg-card-hover"}`}>
-              {r === "all" ? "All US" : "Bay Area"}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1 bg-bg-card rounded p-0.5">
-          {(["all", "bull", "bear"] as Signal[]).map((s) => (
-            <button key={s} onClick={() => setSignal(s)}
-              className={`px-2.5 py-1 rounded font-medium capitalize ${signal === s ? "bg-accent-blue/20 text-accent-blue" : "text-text-secondary hover:bg-bg-card-hover"}`}>
-              {s === "all" ? "Any signal" : s}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1 bg-bg-card rounded p-0.5">
-          {(["signal", "sector", "theme"] as ColorBy[]).map((cb) => (
-            <button key={cb} onClick={() => setColorBy(cb)}
-              className={`px-2.5 py-1 rounded font-medium capitalize ${colorBy === cb ? "bg-accent-blue/20 text-accent-blue" : "text-text-secondary hover:bg-bg-card-hover"}`}>
-              {cb === "signal" ? "Color: signal" : cb}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1">
-          {CAP_FILTERS.map((f) => (
-            <button key={f.label} onClick={() => setMinCap(f.min)}
-              className={`px-2 py-1 rounded font-medium ${minCap === f.min ? "bg-accent-blue/20 text-accent-blue" : "text-text-secondary hover:bg-bg-card-hover"}`}>
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <span className="text-text-muted ml-1">
-          <span className="text-text-secondary font-mono">{stats.shown}</span>
-          {stats.shown !== stats.total && <span>/{stats.total}</span>} shown ·{" "}
-          <span className="text-accent-green">{stats.bull}▲</span>{" "}
-          <span className="text-accent-red">{stats.bear}▼</span>
-        </span>
-        {mode === "footprints" && (
-          <span className="text-accent-orange">⌖ real building footprints — zoom in to see the shapes</span>
-        )}
-      </div>
-
-      {colorBy !== "signal" && groupLegend.length > 0 && (
-        <div className="flex items-center gap-x-3 gap-y-1 text-xs text-text-muted flex-wrap">
-          {groupLegend.map(([g, n]) => (
-            <span key={g} className="flex items-center gap-1">
-              <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: groupColorMap.get(g) || "#6b7280" }} />
-              {g.replace(/_/g, " ").toLowerCase()} <span className="opacity-50">{n}</span>
+      <div className="overflow-hidden border border-border relative" style={{ height: `calc(100vh - ${heightOffset}px)`, minHeight: 460, borderRadius: "var(--radius-panel)" }}>
+        {/* Floating control bar — chrome only; the map surface below is untouched */}
+        <div className="absolute top-3 left-3 right-3 z-[1000] glass-strong px-3 py-2 flex items-center gap-2 flex-wrap text-xs">
+          <Segmented<Mode>
+            options={MODES.map((m) => ({ value: m.id, label: m.label }))}
+            value={mode}
+            onChange={setMode}
+          />
+          <Segmented<Region>
+            options={[
+              { value: "all", label: "All US" },
+              { value: "bay", label: "Bay Area" },
+            ]}
+            value={region}
+            onChange={setRegion}
+          />
+          <Segmented<Signal>
+            options={[
+              { value: "all", label: "Any signal" },
+              { value: "bull", label: "Bull" },
+              { value: "bear", label: "Bear" },
+            ]}
+            value={signal}
+            onChange={setSignal}
+          />
+          <Segmented<ColorBy>
+            options={[
+              { value: "signal", label: "Color: signal" },
+              { value: "sector", label: "Sector" },
+              { value: "theme", label: "Theme" },
+            ]}
+            value={colorBy}
+            onChange={setColorBy}
+          />
+          <div className="flex items-center gap-1">
+            {CAP_FILTERS.map((f) => (
+              <button key={f.label} type="button" onClick={() => setMinCap(f.min)} className="cursor-pointer">
+                <Chip tone={minCap === f.min ? "blue" : "neutral"}>{f.label}</Chip>
+              </button>
+            ))}
+          </div>
+          <span className="text-text-muted ml-auto">
+            <span className="text-text-secondary num">{stats.shown}</span>
+            {stats.shown !== stats.total && <span className="num">/{stats.total}</span>} shown ·{" "}
+            <span className="text-accent-green num">{stats.bull}▲</span>{" "}
+            <span className="text-accent-red num">{stats.bear}▼</span>
+          </span>
+          {mode === "footprints" && (
+            <span className="text-accent-orange basis-full">
+              ⌖ real building footprints — zoom in to see the shapes
             </span>
-          ))}
+          )}
         </div>
-      )}
 
-      <div className="rounded-lg overflow-hidden border border-border relative" style={{ height: `calc(100vh - ${heightOffset}px)`, minHeight: 460 }}>
+        {/* Group legend — glass panel floating over the map */}
+        {colorBy !== "signal" && groupLegend.length > 0 && (
+          <div className="absolute bottom-5 left-3 z-[1000] glass-strong px-3 py-2 max-w-md flex flex-col gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
+              {colorBy === "sector" ? "Sector" : "Theme"}
+            </span>
+            <div className="flex items-center gap-x-3 gap-y-1 text-xs text-text-muted flex-wrap">
+              {groupLegend.map(([g, n]) => (
+                <span key={g} className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: groupColorMap.get(g) || "#6b7280" }} />
+                  {g.replace(/_/g, " ").toLowerCase()} <span className="opacity-50 num">{n}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         {isLoading && (
           <div className="absolute inset-0 z-[500] flex items-center justify-center bg-bg-primary/60 text-text-muted text-sm">Loading map…</div>
         )}

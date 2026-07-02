@@ -33,6 +33,7 @@ import {
   List,
 } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
+import { Chip, Segmented } from "../../components/Glass";
 import { relativeAge, absoluteAge } from "../../lib/utils";
 import {
   useVoicesByTheme,
@@ -112,7 +113,7 @@ function VoiceInitials({ name }: { name: string }) {
       style={{
         width: 24,
         height: 24,
-        background: "rgba(167,139,250,0.15)",
+        background: "color-mix(in srgb, var(--accent-purple) 14%, transparent)",
         color: "var(--accent-purple)",
       }}
     >
@@ -137,11 +138,11 @@ function TickerChip({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono font-semibold transition-colors hover:brightness-110"
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold transition-colors hover:brightness-110"
       style={{
-        background: active ? color : `${color}20`,
+        background: active ? color : `color-mix(in srgb, ${color} 14%, transparent)`,
         color: active ? "var(--bg-primary)" : color,
-        border: `1px solid ${color}40`,
+        border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
       }}
     >
       {sentiment && <SentimentDot s={sentiment} size={6} />}
@@ -165,11 +166,15 @@ function ThemeChip({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium transition-colors hover:brightness-110"
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-colors hover:brightness-110"
       style={{
-        background: active ? "var(--accent-purple)" : "rgba(255,255,255,0.04)",
+        background: active ? "var(--accent-purple)" : "var(--glass-bg)",
         color: active ? "var(--bg-primary)" : "var(--text-secondary)",
-        border: `1px solid ${kind === "sector" ? "rgba(167,139,250,0.3)" : "rgba(255,255,255,0.08)"}`,
+        border: `1px solid ${
+          kind === "sector"
+            ? "color-mix(in srgb, var(--accent-purple) 30%, transparent)"
+            : "var(--border)"
+        }`,
       }}
     >
       {label}
@@ -199,14 +204,15 @@ function HeaderBar({
   stats: { total: number; analyzed: number; latest: string | null };
 }) {
   return (
-    <div className="flex items-center gap-3 flex-wrap pb-2 border-b border-border">
+    <div className="flex items-center gap-3 flex-wrap pb-2">
       {/* Voice selector */}
-      <div className="flex items-center gap-1">
-        <span className="text-xs uppercase text-text-muted font-semibold">Voice</span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs uppercase tracking-[0.08em] text-text-secondary font-semibold">Voice</span>
         <select
           value={voiceUsername ?? ""}
           onChange={(e) => onVoiceChange(e.target.value || null)}
-          className="bg-bg-card border border-border rounded px-2 py-1 text-xs text-text-primary font-mono"
+          className="border border-border px-2 py-1 text-xs text-text-primary font-mono"
+          style={{ borderRadius: "var(--radius-control)", background: "var(--glass-bg)" }}
         >
           <option value="">All voices</option>
           {voices.map((v) => (
@@ -218,56 +224,38 @@ function HeaderBar({
       </div>
 
       {/* Window selector */}
-      <div className="flex items-center gap-1">
-        <span className="text-xs uppercase text-text-muted font-semibold">Window</span>
-        <div className="flex items-center rounded border border-border overflow-hidden">
-          {WINDOW_OPTIONS.map((w) => {
-            const active = w.days === windowDays;
-            return (
-              <button
-                key={w.label}
-                type="button"
-                onClick={() => onWindowChange(w.days)}
-                className="px-2 py-1 text-xs font-semibold transition-colors"
-                style={{
-                  background: active ? "var(--accent-blue)" : "transparent",
-                  color: active ? "var(--bg-primary)" : "var(--text-secondary)",
-                }}
-              >
-                {w.label}
-              </button>
-            );
-          })}
-        </div>
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs uppercase tracking-[0.08em] text-text-secondary font-semibold">Window</span>
+        <Segmented
+          value={String(windowDays)}
+          onChange={(v) => onWindowChange(Number(v))}
+          options={WINDOW_OPTIONS.map((w) => ({ value: String(w.days), label: w.label }))}
+        />
       </div>
 
       {/* Active filter chip */}
       {activeFilter.kind !== "all" && (
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-bg-card-hover border border-border">
-          <Filter size={11} className="text-text-muted" />
-          <span className="text-xs text-text-muted">
-            {activeFilter.kind === "ticker" ? "Ticker" : "Theme"}
-          </span>
-          <span className="text-xs font-mono font-semibold text-text-primary">
-            {activeFilter.value}
-          </span>
+        <Chip tone="blue">
+          <Filter size={11} />
+          <span>{activeFilter.kind === "ticker" ? "Ticker" : "Theme"}</span>
+          <span className="font-mono font-semibold">{activeFilter.value}</span>
           <button
             type="button"
             onClick={onClearFilter}
-            className="p-0.5 rounded hover:bg-bg-card text-text-muted hover:text-text-primary"
+            className="p-0.5 rounded-full opacity-60 hover:opacity-100 transition-opacity"
             aria-label="Clear filter"
           >
             <X size={11} />
           </button>
-        </div>
+        </Chip>
       )}
 
       {/* Stats */}
       <div className="ml-auto flex items-center gap-3 text-xs text-text-muted">
         <span>
-          <span className="font-mono text-text-primary">{stats.analyzed}</span> analyzed
+          <span className="num text-text-primary">{stats.analyzed}</span> analyzed
           {stats.total !== stats.analyzed && (
-            <span className="ml-1 text-text-muted">/ {stats.total} total</span>
+            <span className="ml-1 text-text-muted num">/ {stats.total} total</span>
           )}
         </span>
         {stats.latest && (
@@ -302,10 +290,10 @@ function TrendingStrip({
   const activeTicker = activeFilter.kind === "ticker" ? activeFilter.value : null;
   const activeTheme = activeFilter.kind === "theme" ? activeFilter.value : null;
   return (
-    <div className="flex flex-col gap-1.5 py-2 border-b border-border">
+    <div className="flex flex-col gap-1.5 py-2">
       {tickers.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1 text-xs uppercase text-text-muted font-semibold">
+          <span className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.08em] text-text-secondary font-semibold">
             <TrendingUp size={11} />
             Tickers
           </span>
@@ -326,7 +314,7 @@ function TrendingStrip({
       )}
       {themes.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1 text-xs uppercase text-text-muted font-semibold">
+          <span className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.08em] text-text-secondary font-semibold">
             <Sparkles size={11} />
             Themes
           </span>
@@ -366,19 +354,17 @@ function TweetRow({
   return (
     <div
       onClick={onSelect}
-      className="cursor-pointer p-3 border-b border-border transition-colors"
+      className={`cursor-pointer p-3 border-b border-border transition-colors ${
+        selected ? "" : "hover:bg-bg-card-hover"
+      }`}
       style={{
-        background: selected ? "rgba(88,166,255,0.06)" : "transparent",
+        background: selected
+          ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)"
+          : undefined,
         borderLeft: selected
           ? "2px solid var(--accent-blue)"
           : "2px solid transparent",
       }}
-      onMouseEnter={(e) =>
-        !selected && (e.currentTarget.style.background = "var(--bg-card-hover)")
-      }
-      onMouseLeave={(e) =>
-        !selected && (e.currentTarget.style.background = "transparent")
-      }
     >
       <div className="flex items-start gap-2">
         <VoiceInitials name={tweet.voice_display_name || tweet.voice_username} />
@@ -475,7 +461,7 @@ function TweetRow({
           )}
 
           {/* Engagement */}
-          <div className="flex items-center gap-3 mt-1.5 text-xs text-text-muted font-mono">
+          <div className="flex items-center gap-3 mt-1.5 text-xs text-text-muted num">
             <span className="inline-flex items-center gap-1">
               <Heart size={10} /> {tweet.like_count.toLocaleString()}
             </span>
@@ -543,14 +529,17 @@ function TweetDetail({
           href={xUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold border border-border text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold border border-border text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors"
         >
           Open on X <ExternalLink size={11} />
         </a>
       </div>
 
       {/* Full text */}
-      <div className="p-3 rounded border border-border bg-bg-card whitespace-pre-wrap text-text-primary">
+      <div
+        className="p-3 border border-border whitespace-pre-wrap text-text-primary"
+        style={{ borderRadius: "var(--radius-control)", background: "var(--glass-bg)" }}
+      >
         {tweet.text}
       </div>
 
@@ -624,7 +613,7 @@ function TweetDetail({
                     }}
                   />
                 </div>
-                <span className="text-xs font-mono text-text-muted w-8 text-right">
+                <span className="text-xs num text-text-muted w-8 text-right">
                   {Math.round(t.confidence * 100)}%
                 </span>
               </div>
@@ -651,7 +640,7 @@ function TweetDetail({
       )}
 
       {/* Engagement */}
-      <div className="flex items-center gap-4 pt-2 border-t border-border text-xs text-text-muted font-mono">
+      <div className="flex items-center gap-4 pt-2 border-t border-border text-xs text-text-muted num">
         <span className="inline-flex items-center gap-1">
           <Heart size={12} /> {tweet.like_count.toLocaleString()}
         </span>
@@ -748,31 +737,22 @@ export function VoicesTab() {
       />
 
       {/* Mode switcher — Feed / Patterns / Synthesis */}
-      <div className="flex items-center gap-1">
-        {MODE_TABS.map((m) => {
-          const active = mode === m.id;
+      <Segmented<VoicesMode>
+        value={mode}
+        onChange={setMode}
+        options={MODE_TABS.map((m) => {
           const Icon = m.icon;
-          return (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => setMode(m.id)}
-              title={m.hint}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded transition-colors"
-              style={{
-                background: active ? "rgba(167,139,250,0.12)" : "transparent",
-                color: active ? "var(--accent-purple)" : "var(--text-muted)",
-                border: active
-                  ? "1px solid rgba(167,139,250,0.4)"
-                  : "1px solid transparent",
-              }}
-            >
-              <Icon size={11} />
-              {m.label}
-            </button>
-          );
+          return {
+            value: m.id,
+            label: (
+              <span className="inline-flex items-center gap-1.5" title={m.hint}>
+                <Icon size={11} />
+                {m.label}
+              </span>
+            ),
+          };
         })}
-      </div>
+      />
 
       {mode === "feed" && (
         <>
@@ -801,7 +781,7 @@ export function VoicesTab() {
             style={{ height: "calc(100vh - 460px)", minHeight: 420 }}
           >
             {/* Feed */}
-            <div className="col-span-12 lg:col-span-7 h-full overflow-y-auto border border-border rounded">
+            <div className="card col-span-12 lg:col-span-7 h-full overflow-y-auto" style={{ padding: 0 }}>
               {isLoading && tweets.length === 0 ? (
                 <div className="p-6 text-sm text-text-muted text-center">
                   Loading tweets…
@@ -833,7 +813,7 @@ export function VoicesTab() {
             </div>
 
             {/* Detail */}
-            <div className="col-span-12 lg:col-span-5 h-full overflow-y-auto p-3 border border-border rounded bg-bg-card">
+            <div className="card col-span-12 lg:col-span-5 h-full overflow-y-auto">
               <TweetDetail
                 tweet={selectedTweet}
                 onPickTicker={(t) => {

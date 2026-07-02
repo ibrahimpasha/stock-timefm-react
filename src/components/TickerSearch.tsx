@@ -123,7 +123,10 @@ export function TickerSearch({
 
   return (
     <div ref={wrapRef} className={`relative ${className}`}>
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-bg-card px-3 py-2 focus-within:border-accent-blue transition-colors">
+      <div
+        className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 focus-within:border-accent-blue transition-colors"
+        style={{ background: "var(--glass-bg)", boxShadow: "var(--shadow-1)" }}
+      >
         <Search size={16} className="text-text-muted shrink-0" />
         <input
           type="text"
@@ -143,7 +146,10 @@ export function TickerSearch({
       </div>
 
       {open && matches.length > 0 && (
-        <div className="absolute left-0 z-50 mt-1 w-72 max-h-80 overflow-y-auto rounded-lg border border-border bg-bg-card shadow-xl">
+        <div
+          className="glass-strong absolute left-0 z-50 mt-1.5 w-72 max-h-80 overflow-y-auto py-1"
+          style={{ boxShadow: "var(--shadow-3)" }}
+        >
           {matches.map((m, i) => (
             <button
               key={m.ticker}
@@ -158,7 +164,7 @@ export function TickerSearch({
                 i === highlight ? "bg-bg-card-hover" : ""
               }`}
             >
-              <span className="font-mono text-sm text-text-primary w-14 shrink-0">
+              <span className="num text-sm text-text-primary w-14 shrink-0">
                 {m.ticker}
               </span>
               <span className="text-xs text-text-muted truncate">{m.name}</span>

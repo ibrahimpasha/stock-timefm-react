@@ -44,6 +44,7 @@ import {
 } from "../../api/commandBrief";
 import { useAppStore } from "../../store/useAppStore";
 import { changeColor, relativeAge } from "../../lib/utils";
+import { ThemeTrendsChart } from "./ThemeTrendsChart";
 
 const PLAY_COLOR: Record<string, string> = {
   ACCUMULATE: "var(--accent-green)",
@@ -68,7 +69,7 @@ function useSetTicker() {
 
 function SectionLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="text-xs uppercase tracking-wider text-text-muted mb-1.5 flex items-center gap-1">
+    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-1.5 flex items-center gap-1">
       {icon}
       {children}
     </div>
@@ -80,21 +81,21 @@ function RegimePill({ r }: { r: BriefRegime }) {
   const color = POSTURE_COLOR[r.posture] || "var(--text-muted)";
   return (
     <div
-      className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs"
+      className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs"
       style={{ background: tint(color, 8), border: `1px solid ${tint(color, 22)}` }}
     >
       <Activity size={12} style={{ color }} />
       <span className="font-semibold uppercase" style={{ color }}>{r.posture}</span>
       <span className="text-text-muted">·</span>
-      <span className="font-mono text-text-secondary" title={`VIX regime: ${r.vix_regime}`}>
+      <span className="num text-text-secondary" title={`VIX regime: ${r.vix_regime}`}>
         VIX {r.vix.toFixed(1)}
       </span>
       <span className="text-text-muted">·</span>
-      <span className="font-mono" style={{ color: changeColor(r.spy_change_pct) }}>
+      <span className="num" style={{ color: changeColor(r.spy_change_pct) }}>
         SPY {r.spy_change_pct >= 0 ? "+" : ""}{r.spy_change_pct.toFixed(2)}%
       </span>
       <span className="text-text-muted">·</span>
-      <span className="font-mono text-text-secondary" title="VIX-based position sizing">
+      <span className="text-text-secondary" title="VIX-based position sizing">
         {r.sizing} size
       </span>
     </div>
@@ -124,8 +125,8 @@ function SessionTabs({
 }) {
   return (
     <div
-      className="inline-flex items-center gap-0.5 rounded-lg p-0.5"
-      style={{ background: tint("var(--text-muted)", 8) }}
+      className="inline-flex items-center gap-0.5 rounded-full border border-border p-0.5"
+      style={{ background: "var(--glass-bg)" }}
     >
       {SESSION_ORDER.map((s) => {
         const enabled = available.includes(s);
@@ -136,18 +137,20 @@ function SessionTabs({
             key={s}
             disabled={!enabled}
             onClick={() => enabled && onSelect(s)}
-            className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+              isActive ? "text-text-primary" : "text-text-secondary hover:text-text-primary"
+            }`}
             style={
               isActive
-                ? { background: "var(--accent-blue)", color: "#fff", fontWeight: 600 }
-                : { color: "var(--text-secondary)" }
+                ? { background: "var(--bg-card-hover)", boxShadow: "var(--shadow-1)" }
+                : undefined
             }
             title={enabled ? SESSION_LABELS[s] : `${SESSION_LABELS[s]} — not captured this day`}
           >
             {isLive && (
               <span
                 className="w-1.5 h-1.5 rounded-full"
-                style={{ background: isActive ? "#fff" : "var(--accent-green)" }}
+                style={{ background: "var(--accent-green)" }}
                 title="live session right now"
               />
             )}
@@ -166,7 +169,7 @@ function MoveChip({ m }: { m: BriefMover }) {
   return (
     <button
       onClick={() => setTicker(m.ticker)}
-      className="inline-flex items-center gap-1 font-mono text-xs px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity"
+      className="inline-flex items-center gap-1 num text-xs px-2 py-0.5 rounded-full hover:opacity-80 transition-opacity"
       style={{
         color,
         background: tint(color, 12),
@@ -205,14 +208,14 @@ function PlaysBlock({ plays }: { plays: BriefPlay[] }) {
             >
               <div className="flex items-center gap-2 mb-0.5">
                 <span
-                  className="font-bold uppercase tracking-wider px-1.5 py-0.5 rounded text-xs"
+                  className="font-bold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full text-xs"
                   style={{ color, background: tint(color, 14) }}
                 >
                   {p.action}
                 </span>
                 <button
                   onClick={() => setTicker(p.ticker)}
-                  className="font-mono font-bold text-text-primary hover:text-accent-blue"
+                  className="num font-bold text-text-primary hover:text-accent-blue"
                 >
                   {p.ticker}
                 </button>
@@ -247,7 +250,7 @@ function MoversExplained({ rows }: { rows: BriefRead["movers_explained"] }) {
             <div key={i} className="text-xs leading-snug">
               <button
                 onClick={() => setTicker(m.ticker)}
-                className="font-mono font-bold hover:underline"
+                className="num font-bold hover:underline"
                 style={{ color }}
                 title={`Open ${m.ticker}`}
               >
@@ -315,7 +318,7 @@ function EarningsBlock({ ctx }: { ctx: BriefContext }) {
             <button
               key={e.ticker}
               onClick={() => setTicker(e.ticker)}
-              className="inline-flex items-center gap-1 font-mono text-xs px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity"
+              className="inline-flex items-center gap-1 num text-xs px-2 py-0.5 rounded-full hover:opacity-80 transition-opacity"
               style={{
                 color: e.has_flow ? "var(--accent-blue)" : "var(--text-secondary)",
                 background: tint(e.has_flow ? "var(--accent-blue)" : "var(--text-muted)", 12),
@@ -335,10 +338,10 @@ function EarningsBlock({ ctx }: { ctx: BriefContext }) {
           {flow_into_earnings.map((e, i) => (
             <span key={e.ticker}>
               {i > 0 && ", "}
-              <button onClick={() => setTicker(e.ticker)} className="font-mono font-semibold text-accent-blue hover:underline">
+              <button onClick={() => setTicker(e.ticker)} className="num font-semibold text-accent-blue hover:underline">
                 {e.ticker}
               </button>
-              <span className="text-text-muted"> ({e.days_out}d)</span>
+              <span className="num text-text-muted"> ({e.days_out}d)</span>
             </span>
           ))}
         </div>
@@ -360,7 +363,7 @@ function FlowBlock({ ctx }: { ctx: BriefContext }) {
             <button
               key={f.ticker}
               onClick={() => setTicker(f.ticker)}
-              className="inline-flex items-center gap-1 font-mono text-xs px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity"
+              className="inline-flex items-center gap-1 num text-xs px-2 py-0.5 rounded-full hover:opacity-80 transition-opacity"
               style={{ color, background: tint(color, 12), border: `1px solid ${tint(color, 26)}` }}
               title={`${f.side} · ML ${f.ml ?? "?"} · $${Math.round(f.premium).toLocaleString()} premium${
                 f.earnings_in != null ? ` · reports in ${f.earnings_in}d` : ""
@@ -390,9 +393,9 @@ function ThemesBlock({ ctx }: { ctx: BriefContext }) {
           <div className="flex flex-wrap gap-1.5 items-center">
             <Flame size={11} className="text-accent-green" />
             {hot.slice(0, 4).map((t) => (
-              <span key={t.category} className="font-mono px-1.5 py-0.5 rounded"
+              <span key={t.category} className="px-2 py-0.5 rounded-full"
                 style={{ color: "var(--accent-green)", background: tint("var(--accent-green)", 12) }}>
-                {t.category} <span className="opacity-70">{t.ratio}x</span>
+                {t.category} <span className="num opacity-70">{t.ratio}x</span>
               </span>
             ))}
           </div>
@@ -401,9 +404,9 @@ function ThemesBlock({ ctx }: { ctx: BriefContext }) {
           <div className="flex flex-wrap gap-1.5 items-center">
             <Snowflake size={11} className="text-accent-red" />
             {cooling.slice(0, 3).map((t) => (
-              <span key={t.category} className="font-mono px-1.5 py-0.5 rounded"
+              <span key={t.category} className="px-2 py-0.5 rounded-full"
                 style={{ color: "var(--accent-red)", background: tint("var(--accent-red)", 12) }}>
-                {t.category} <span className="opacity-70">{t.ratio}x</span>
+                {t.category} <span className="num opacity-70">{t.ratio}x</span>
               </span>
             ))}
           </div>
@@ -417,9 +420,9 @@ function BooksFootnote({ ctx }: { ctx: BriefContext }) {
   if (!ctx.books || ctx.books.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted pt-2 border-t border-border">
-      <span className="uppercase tracking-wider">Your books</span>
+      <span className="font-semibold uppercase tracking-[0.08em]">Your books</span>
       {ctx.books.map((b) => (
-        <span key={b.label} className="font-mono">
+        <span key={b.label} className="num">
           {b.label}{" "}
           <span style={{ color: changeColor(b.return_pct ?? 0) }}>
             {(b.return_pct ?? 0) >= 0 ? "+" : ""}{(b.return_pct ?? 0).toFixed(1)}%
@@ -465,7 +468,7 @@ function DeltasStrip({ deltas }: { deltas: BriefDeltas }) {
           return (
             <span
               key={i}
-              className="font-mono text-xs px-1.5 py-0.5 rounded"
+              className="num text-xs px-2 py-0.5 rounded-full"
               style={{ color, background: tint(color, 10) }}
             >
               {d.text}
@@ -491,7 +494,7 @@ function FocusBlock({ ctx }: { ctx: BriefContext }) {
             <button
               key={f.ticker}
               onClick={() => setTicker(f.ticker)}
-              className="inline-flex items-center gap-1 font-mono text-xs px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity"
+              className="inline-flex items-center gap-1 num text-xs px-2 py-0.5 rounded-full hover:opacity-80 transition-opacity"
               style={{ color, background: tint(color, 12), border: `1px solid ${tint(color, 24)}` }}
               title={`Viewed ${f.views}x recently${f.in_book ? " · in a book" : ""}`}
             >
@@ -555,7 +558,7 @@ function AskDesk() {
         <div className="space-y-2 mb-2">
           {thread.map((t, i) => (
             <div key={i} className="space-y-1">
-              <div className="text-xs font-mono text-accent-blue">{t.q}</div>
+              <div className="text-xs font-medium text-accent-blue">{t.q}</div>
               <div className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap">{t.a}</div>
             </div>
           ))}
@@ -567,13 +570,13 @@ function AskDesk() {
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
           placeholder="e.g. should I worry about my U position? what's the read on AVGO?"
-          className="flex-1 bg-transparent text-xs text-text-primary placeholder:text-text-muted outline-none rounded px-2 py-1.5"
-          style={{ border: "1px solid var(--border)" }}
+          className="flex-1 bg-transparent text-xs text-text-primary placeholder:text-text-muted outline-none px-2.5 py-1.5"
+          style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-control)", background: "var(--glass-bg)" }}
         />
         <button
           onClick={submit}
           disabled={ask.isPending || !q.trim()}
-          className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full transition-colors disabled:opacity-50"
           style={{ color: "var(--accent-blue)", background: tint("var(--accent-blue)", 12) }}
         >
           {ask.isPending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
@@ -634,7 +637,7 @@ export function DailyBrief() {
 
   if (isLoading && !data) {
     return (
-      <div className="card flex items-center gap-2 text-xs text-text-muted">
+      <div className="glass-strong p-5 max-md:p-4 flex items-center gap-2 text-xs text-text-muted">
         <Loader2 size={14} className="animate-spin" />
         Assembling daily brief…
       </div>
@@ -649,7 +652,7 @@ export function DailyBrief() {
   const accent = hasRegime ? POSTURE_COLOR[regime.posture] || "var(--accent-purple)" : "var(--accent-purple)";
 
   return (
-    <div className="card" style={{ borderLeft: `3px solid ${accent}` }}>
+    <div className="glass-strong p-5 max-md:p-4" style={{ borderLeft: `3px solid ${accent}` }}>
       {/* Header strip */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <button
@@ -664,8 +667,8 @@ export function DailyBrief() {
           {hasRegime && !isHistory && <RegimePill r={regime} />}
           {/* History date picker — review past briefs to judge accuracy */}
           <div
-            className="inline-flex items-center gap-1 text-xs rounded px-1.5 py-1"
-            style={{ background: tint("var(--text-muted)", 8) }}
+            className="inline-flex items-center gap-1 text-xs rounded-full border border-border px-2 py-1"
+            style={{ background: "var(--glass-bg)" }}
             title="Review a past day's brief"
           >
             <History size={12} className="text-text-muted" />
@@ -686,7 +689,7 @@ export function DailyBrief() {
           </div>
           {isHistory ? (
             <span
-              className="text-xs px-1.5 py-0.5 rounded font-mono"
+              className="num text-xs px-2 py-0.5 rounded-full"
               style={{ color: "var(--accent-purple)", background: tint("var(--accent-purple)", 12) }}
             >
               historical · {data.pt_date}
@@ -701,7 +704,7 @@ export function DailyBrief() {
               <button
                 onClick={() => refresh.mutate()}
                 disabled={refresh.isPending}
-                className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors disabled:opacity-60"
+                className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border border-border text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors disabled:opacity-60"
                 title={`Regenerate the ${SESSION_LABELS[activeSession]} Read (~3 min)`}
               >
                 <RefreshCw size={12} className={refresh.isPending ? "animate-spin" : ""} />
@@ -758,11 +761,11 @@ export function DailyBrief() {
                   <button
                     key={i}
                     onClick={() => setTicker(w.ticker)}
-                    className="text-left rounded px-2 py-1 hover:bg-bg-card-hover transition-colors"
+                    className="text-left rounded-full px-2.5 py-1 hover:bg-bg-card-hover transition-colors"
                     style={{ background: tint("var(--accent-blue)", 6), border: "1px solid var(--border)" }}
                     title={w.why}
                   >
-                    <span className="font-mono text-xs font-bold text-accent-blue">{w.ticker}</span>
+                    <span className="num text-xs font-bold text-accent-blue">{w.ticker}</span>
                     <span className="text-xs text-text-muted ml-1.5">{w.why}</span>
                   </button>
                 ))}
@@ -791,6 +794,10 @@ export function DailyBrief() {
             <FlowBlock ctx={ctx} />
             <ThemesBlock ctx={ctx} />
           </div>
+
+          {/* Theme heat OVER TIME — full-width trend chart directly below the
+              Theme heat snapshot. Defaults to a 7-day window. */}
+          <ThemeTrendsChart embedded />
 
           {/* L5 — personalisation: your most-clicked names */}
           <FocusBlock ctx={ctx} />

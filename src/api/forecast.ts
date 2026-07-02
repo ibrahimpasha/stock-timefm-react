@@ -147,6 +147,10 @@ export interface SignalProfile {
   target_mean: number | null;
   target_high: number | null;
   target_low: number | null;
+  /** Durable company business summary (ticker_profiles, yfinance) — the same
+   *  "About" text that feeds the wiki / graphify. Shown as a dropdown by the
+   *  company name in SignalAnalysisCard. */
+  about: string | null;
 }
 
 export interface SignalAnalysisResult {

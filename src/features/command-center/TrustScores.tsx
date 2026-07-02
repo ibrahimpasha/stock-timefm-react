@@ -46,7 +46,7 @@ export function TrustScores({ scores, isLoading, pickedModels }: TrustScoresProp
   if (!scores || scores.length === 0) {
     return (
       <div className="card">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5 mb-3">
+        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-[0.08em] flex items-center gap-1.5 mb-3">
           <Shield size={13} />
           Trust Scores
         </h3>
@@ -62,7 +62,7 @@ export function TrustScores({ scores, isLoading, pickedModels }: TrustScoresProp
 
   return (
     <div className="card">
-      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center justify-between gap-1.5 mb-4">
+      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-[0.08em] flex items-center justify-between gap-1.5 mb-4">
         <span className="flex items-center gap-1.5">
           <Shield size={13} />
           Trust Scores
@@ -106,10 +106,10 @@ export function TrustScores({ scores, isLoading, pickedModels }: TrustScoresProp
                 </span>
                 <div className="flex items-center gap-1.5">
                   <TrendIcon trend={entry.trend} />
-                  <span className="font-mono font-semibold" style={{ color: barColor }}>
+                  <span className="num font-semibold" style={{ color: barColor }}>
                     {entry.score.toFixed(0)}
                   </span>
-                  <span className="text-text-muted">({entry.samples})</span>
+                  <span className="num text-text-muted">({entry.samples})</span>
                 </div>
               </div>
               <div
@@ -130,7 +130,7 @@ export function TrustScores({ scores, isLoading, pickedModels }: TrustScoresProp
       </div>
 
       {/* Scale labels */}
-      <div className="flex justify-between text-xs text-text-muted mt-3 pt-2 border-t border-border font-mono">
+      <div className="num flex justify-between text-xs text-text-muted mt-3 pt-2 border-t border-border">
         <span>0</span>
         <span>25</span>
         <span>50</span>

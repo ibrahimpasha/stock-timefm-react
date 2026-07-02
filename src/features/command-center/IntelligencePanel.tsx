@@ -178,7 +178,7 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
     if (catsLoading && ticker) return <SkeletonIntel />;
     return (
       <div className="card">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5 mb-3">
+        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-[0.08em] flex items-center gap-1.5 mb-3">
           <Brain size={13} />
           Intelligence
           {ticker && (
@@ -194,7 +194,7 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
               }}
               disabled={refresh.isPending}
               title="Fetch this ticker's intel via Perplexity / Claude web-search. Takes ~30-60s."
-              className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono text-accent-blue hover:bg-accent-blue/10 border border-accent-blue/30 transition-colors disabled:opacity-50"
+              className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium normal-case tracking-normal text-accent-blue hover:bg-accent-blue/10 border border-accent-blue/30 transition-colors disabled:opacity-50"
             >
               <RefreshCw
                 size={10}
@@ -205,7 +205,7 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
           )}
         </h3>
         {refreshError && (
-          <div className="mb-2 text-[10px] font-mono text-accent-red">
+          <div className="mb-2 text-xs text-accent-red">
             {refreshError}
           </div>
         )}
@@ -222,13 +222,13 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
 
   return (
     <div className="card">
-      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5 mb-4">
+      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-[0.08em] flex items-center gap-1.5 mb-4">
         <Brain size={13} />
         Intelligence
-        <div className="ml-auto flex items-center gap-2 normal-case font-normal">
+        <div className="ml-auto flex items-center gap-2 normal-case tracking-normal font-normal">
           {fromCache && (
             <span
-              className="text-[10px] font-mono text-text-muted"
+              className="text-xs text-text-muted"
               title="Showing cached web-search intel because no ML thesis exists yet. Click Analyze for a full ensemble-backed thesis."
             >
               web-search cache
@@ -236,7 +236,7 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
           )}
           {lastRefreshLabel && (
             <span
-              className="text-[10px] font-mono text-text-muted"
+              className="num text-xs text-text-muted"
               title={lastRefreshIso ? `Last refreshed ${absoluteAge(lastRefreshIso)}` : undefined}
             >
               updated {lastRefreshLabel}
@@ -252,7 +252,7 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
               }}
               disabled={refresh.isPending}
               title="Re-fetch this ticker's intel via Perplexity / Claude web-search. Takes ~30-60s."
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono text-accent-blue hover:bg-accent-blue/10 border border-accent-blue/30 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-accent-blue hover:bg-accent-blue/10 border border-accent-blue/30 transition-colors disabled:opacity-50"
             >
               <RefreshCw size={10} className={refresh.isPending ? "animate-spin" : ""} />
               {refresh.isPending ? "fetching…" : "refresh"}
@@ -261,7 +261,7 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
         </div>
       </h3>
       {refreshError && (
-        <div className="mb-2 text-[10px] font-mono text-accent-red">
+        <div className="mb-2 text-xs text-accent-red">
           {refreshError}
         </div>
       )}

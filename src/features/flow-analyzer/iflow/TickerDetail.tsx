@@ -176,13 +176,13 @@ export function TickerDetail({
             <Eye size={14} className="text-accent-cyan" />
             <span className="font-mono font-bold text-lg text-text-primary">{ticker}</span>
           </div>
-          <span className="text-xs text-text-muted">{trackedData.total_entries} total</span>
+          <span className="text-xs text-text-muted num">{trackedData.total_entries} total</span>
         </div>
         <BullBearBar bull={trackedData.bullish} total={total} />
         <div className="flex items-center justify-between mt-2 text-xs">
           <span className="text-text-muted">
             Net Premium:{" "}
-            <span className="text-text-secondary font-mono">{trackedData.net_premium}</span>
+            <span className="text-text-secondary num">{trackedData.net_premium}</span>
           </span>
           <EarningsBadge
             isoDate={earningsData?.earnings_date ?? null}
@@ -193,7 +193,7 @@ export function TickerDetail({
 
       {tickerPicks.length > 0 && (
         <div>
-          <h4 className="text-xs font-semibold text-text-muted uppercase mb-2">
+          <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-2">
             Picks ({tickerPicks.length})
           </h4>
           <div className="space-y-2">
@@ -205,7 +205,7 @@ export function TickerDetail({
       )}
 
       <div>
-        <h4 className="text-xs font-semibold text-text-muted uppercase mb-2">
+        <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-2">
           {tradersOnly ? (
             <span className="text-accent-purple">
               Trader Positions ({totalTraderPositions})
@@ -228,7 +228,9 @@ export function TickerDetail({
         {loading ? (
           <div className="text-xs text-text-muted animate-pulse">Loading...</div>
         ) : dateKeys.length === 0 ? (
-          <div className="text-xs text-text-muted">No entries match filters</div>
+          <div className="text-sm text-text-muted text-center py-4">
+            No entries match filters
+          </div>
         ) : (
           <div className="space-y-3">
             {dateKeys.map((date) => (

@@ -131,10 +131,7 @@ function SectionHeader({
 }) {
   return (
     <div className="flex items-center justify-between mb-2">
-      <span
-        className="text-[10px] font-mono font-semibold uppercase tracking-wider"
-        style={{ color: "var(--text-muted)" }}
-      >
+      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
         {label}
       </span>
       {right ? <div className="flex items-center gap-2">{right}</div> : null}
@@ -219,7 +216,7 @@ function ForwardCalendar({
               >
                 <div className="grid items-center gap-2 text-xs" style={{ gridTemplateColumns: "78px 1fr auto auto" }}>
                   <span
-                    className="font-mono"
+                    className="num"
                     style={{ color: "var(--text-primary)" }}
                     title={fmtCalendarDateFull(ev.date)}
                   >
@@ -242,17 +239,17 @@ function ForwardCalendar({
                     )}
                   </span>
                   <span
-                    className="font-mono text-[10px] uppercase whitespace-nowrap"
+                    className="num text-[10px] uppercase whitespace-nowrap"
                     style={{ color: urgencyTone(dn) }}
                     title={fmtCalendarDateFull(ev.date)}
                   >
                     {inLabel}
                   </span>
                   <span
-                    className="font-mono text-[9px] uppercase tracking-wider px-1 py-px rounded"
+                    className="text-[9px] font-medium uppercase tracking-wider px-1.5 py-px rounded-full"
                     style={{
                       color: categoryColor(ev.category),
-                      background: `${categoryColor(ev.category)}14`,
+                      background: `color-mix(in srgb, ${categoryColor(ev.category)} 12%, transparent)`,
                     }}
                     title={ev.source ? `Source: ${ev.source}` : undefined}
                   >
@@ -266,7 +263,7 @@ function ForwardCalendar({
                 </div>
                 {explainer && (
                   <div
-                    className="text-[10.5px] leading-snug mt-0.5 pl-[80px] truncate"
+                    className="text-xs leading-snug mt-0.5 pl-[80px] truncate"
                     style={{ color: "var(--text-muted)" }}
                     title={explainer}
                   >
@@ -294,13 +291,13 @@ function IntelDetailCollapsible({ ticker }: { ticker: string | null }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-1.5 text-xs font-mono font-semibold uppercase tracking-wider py-1 hover:bg-bg-card-hover rounded transition-colors"
+        className="w-full flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] py-1 px-1.5 hover:bg-bg-card-hover rounded-full transition-colors"
         style={{ color: "var(--text-secondary)" }}
       >
         {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         Intel Detail (8 categories)
         <span
-          className="ml-auto text-[10px] font-normal normal-case"
+          className="ml-auto text-xs font-normal normal-case tracking-normal"
           style={{ color: "var(--text-muted)" }}
         >
           {open ? "hide" : "click to expand"}

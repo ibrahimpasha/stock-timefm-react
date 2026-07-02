@@ -30,7 +30,7 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
   if (!models || models.length === 0) {
     return (
       <div className="card">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5 mb-3">
+        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-[0.08em] flex items-center gap-1.5 mb-3">
           <BarChart3 size={13} />
           Model Breakdown
         </h3>
@@ -58,7 +58,7 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
 
   return (
     <div className="card">
-      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5 mb-4">
+      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-[0.08em] flex items-center gap-1.5 mb-4">
         <BarChart3 size={13} />
         Model Breakdown
       </h3>
@@ -95,7 +95,7 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
                     }}
                   >
                     <span
-                      className="text-xs font-mono font-semibold whitespace-nowrap"
+                      className="num text-xs font-semibold whitespace-nowrap"
                       style={{ color }}
                     >
                       {formatCurrency(model.end_price)}
@@ -114,7 +114,7 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
 
                 {/* Pct change */}
                 <span
-                  className="text-xs font-mono w-14 text-right shrink-0"
+                  className="num text-xs w-14 text-right shrink-0"
                   style={{
                     color: pctChange >= 0 ? "var(--accent-green)" : "var(--accent-red)",
                   }}

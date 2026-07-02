@@ -17,9 +17,12 @@
  */
 
 import { useState, useMemo, useRef, useEffect } from "react";
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Eye, Search, Filter, Download, X, Star, Layers, Grid, List } from "lucide-react";
+import { Search, Download, X, Star, Grid, List } from "lucide-react";
 import apiClient from "../../api/client";
+import { Chip, Segmented } from "../../components/Glass";
+import type { ChipTone } from "../../components/Glass";
 import { useAppStore } from "../../store/useAppStore";
 import { useDashboardFilters } from "../../store/useDashboardFilters";
 import { formatPremium } from "../../lib/utils";
@@ -51,6 +54,40 @@ import { EntryTape } from "./iflow/EntryTape";
 
 type WatchView = "tickers" | "contracts" | "both";
 type GroupMode = "subcat" | "macro" | "flat";
+
+/** Clickable wrapper around the shared `Chip` primitive — used for every
+ *  toggleable filter chip in the control strip (dates, bias, DTE, earnings,
+ *  traders…). Active state re-expresses the pre-remodel accent colors via
+ *  the Chip tone so both themes track automatically. */
+function ChipButton({
+  active,
+  tone,
+  onClick,
+  title,
+  children,
+}: {
+  active: boolean;
+  tone: ChipTone;
+  onClick: () => void;
+  title?: string;
+  children: ReactNode;
+}) {
+  return (
+    <button type="button" onClick={onClick} title={title} className="rounded-full">
+      <Chip
+        tone={active ? tone : "neutral"}
+        className={active ? "" : "hover:text-text-primary transition-colors cursor-pointer"}
+      >
+        {children}
+      </Chip>
+    </button>
+  );
+}
+
+/** Tiny muted label preceding a control group in the strip. */
+function StripLabel({ children }: { children: ReactNode }) {
+  return <span className="text-xs text-text-muted">{children}</span>;
+}
 
 export function IFlowTracker() {
   // Filter/view state lives in the shared dashboard-filters store so it
@@ -443,38 +480,35 @@ export function IFlowTracker() {
 
   return (
     <div>
-      {/* ── Date bar + Search ────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <div className="flex items-center rounded-lg border border-border overflow-hidden">
-          <button
+      {/* ── Control strip: dates + search + view/group/sort/filters ── */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <div className="flex items-center gap-1 flex-wrap">
+          <ChipButton
+            active={isAllDates}
+            tone="blue"
             onClick={() => {
               patchIFlow({ selectedDates: new Set() });
               setSelectedTicker(null);
             }}
-            className="px-3 py-1.5 text-xs font-semibold transition-colors"
-            style={{
-              background: isAllDates ? "rgba(88,166,255,0.15)" : "transparent",
-              color: isAllDates ? "var(--accent-blue)" : "var(--text-muted)",
-            }}
           >
             All Dates
-          </button>
+          </ChipButton>
           {dates.slice(0, 8).map((d) => (
-            <button
+            <ChipButton
               key={d.date}
+              active={selectedDates.has(d.date)}
+              tone="blue"
               onClick={() => toggleDate(d.date)}
-              className="px-2.5 py-1.5 text-xs font-mono transition-colors border-l border-border"
-              style={{
-                background: selectedDates.has(d.date) ? "rgba(88,166,255,0.15)" : "transparent",
-                color: selectedDates.has(d.date) ? "var(--accent-blue)" : "var(--text-muted)",
-              }}
             >
-              {d.date.slice(5)}
-              <span className="ml-1 opacity-60">{d.entries}</span>
-            </button>
+              <span className="num">{d.date.slice(5)}</span>
+              <span className="num opacity-60">{d.entries}</span>
+            </ChipButton>
           ))}
         </div>
-        <div className="relative flex items-center gap-2 rounded-lg border border-border bg-bg-primary px-3 py-1.5 flex-1 max-w-xs focus-within:border-accent-blue transition-colors">
+        <div
+          className="relative flex items-center gap-2 rounded-full border border-border px-3 py-1.5 flex-1 max-w-xs focus-within:border-accent-blue transition-colors"
+          style={{ background: "var(--glass-bg)" }}
+        >
           <Search size={14} className="text-text-muted" />
           <input
             ref={searchInputRef}
@@ -533,194 +567,167 @@ export function IFlowTracker() {
           isAllDates={isAllDates}
           dte={dte}
         />
-      </div>
 
-      {/* ── View toggle: which watchlist surface(s) to show ─────────── */}
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <Star size={13} className="text-accent-orange" />
-        <span className="text-xs text-text-muted font-semibold uppercase tracking-wider">
-          View
+        {/* Watchlist surface(s) to show */}
+        <StripLabel>View</StripLabel>
+        <Segmented<WatchView>
+          value={watchView}
+          onChange={(v) => patchIFlow({ watchView: v })}
+          options={[
+            {
+              value: "tickers",
+              label: "Tickers",
+              badge: watchlist.length > 0 ? (
+                <span className="num opacity-70">{watchlist.length}</span>
+              ) : undefined,
+            },
+            {
+              value: "contracts",
+              label: "Contracts",
+              badge: watchedContracts.length > 0 ? (
+                <span className="num opacity-70">{watchedContracts.length}</span>
+              ) : undefined,
+            },
+            {
+              value: "both",
+              label: "Both",
+              badge: watchlist.length + watchedContracts.length > 0 ? (
+                <span className="num opacity-70">
+                  {watchlist.length + watchedContracts.length}
+                </span>
+              ) : undefined,
+            },
+          ]}
+        />
+
+        <StripLabel>Group</StripLabel>
+        <span
+          title={
+            "Subcat: by sector → broad clustered subcategory (84 buckets, e.g. EUV Litho WFE).\n" +
+            "Macro: by sector → primary macro driver (M1-M10).\n" +
+            "Flat: no grouping — flat grid sorted by the chosen sort mode."
+          }
+        >
+          <Segmented<GroupMode>
+            value={groupMode}
+            onChange={(v) => patchIFlow({ groupMode: v })}
+            options={[
+              { value: "subcat", label: "Subcat" },
+              { value: "macro", label: "Macro" },
+              { value: "flat", label: "Flat" },
+            ]}
+          />
         </span>
-        <div className="flex items-center rounded-lg border border-border overflow-hidden">
-          {(
-            [
-              ["Tickers", "tickers", watchlist.length],
-              ["Contracts", "contracts", watchedContracts.length],
-              ["Both", "both", watchlist.length + watchedContracts.length],
-            ] as const
-          ).map(([label, v, count]) => (
-            <button
-              key={v}
-              onClick={() => patchIFlow({ watchView: v as WatchView })}
-              className="px-3 py-1 text-xs font-semibold transition-colors"
-              style={{
-                background:
-                  watchView === v ? "rgba(227,127,46,0.12)" : "transparent",
-                color:
-                  watchView === v ? "var(--accent-orange)" : "var(--text-muted)",
-                borderRight: "1px solid var(--border)",
-              }}
-            >
-              {label}
-              {count > 0 && (
-                <span className="ml-1 opacity-70 font-mono">{count}</span>
-              )}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2 ml-2">
-          <Layers size={13} className="text-text-muted" />
-          <span className="text-xs text-text-muted font-semibold uppercase tracking-wider">
-            Group
-          </span>
-          <div className="flex items-center rounded-lg border border-border overflow-hidden">
-            {(
-              [
-                ["Subcat", "subcat", "By sector → broad clustered subcategory (84 buckets, e.g. EUV Litho WFE)."],
-                ["Macro", "macro", "By sector → primary macro driver (M1-M10)."],
-                ["Flat", "flat", "No grouping — flat grid sorted by the chosen sort mode."],
-              ] as const
-            ).map(([label, v, tip]) => (
-              <button
-                key={v}
-                onClick={() => patchIFlow({ groupMode: v as GroupMode })}
-                className="px-3 py-1 text-xs font-semibold transition-colors"
-                style={{
-                  background:
-                    groupMode === v ? "rgba(88,166,255,0.15)" : "transparent",
-                  color:
-                    groupMode === v ? "var(--accent-blue)" : "var(--text-muted)",
-                  borderRight: "1px solid var(--border)",
-                }}
-                title={tip}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
 
-      {/* ── Filters: Bias + DTE + Sort + Earnings ───────────────────── */}
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <Filter size={13} className="text-text-muted" />
-        <div className="flex items-center rounded-lg border border-border overflow-hidden">
+        {/* Bias — green/red is the bull/bear encoding, kept via Chip tones */}
+        <StripLabel>Bias</StripLabel>
+        <div className="flex items-center gap-1">
           {(
             [
-              ["All", "all", "var(--text-secondary)"],
-              ["Bullish", "bullish", "var(--accent-green)"],
-              ["Bearish", "bearish", "var(--accent-red)"],
+              ["All", "all", "blue"],
+              ["Bullish", "bullish", "green"],
+              ["Bearish", "bearish", "red"],
             ] as const
-          ).map(([l, v, c]) => (
-            <button
+          ).map(([l, v, tone]) => (
+            <ChipButton
               key={v}
+              active={bias === v}
+              tone={tone as ChipTone}
               onClick={() => patchIFlow({ bias: v as BiasFilter })}
-              className="px-3 py-1 text-xs font-semibold transition-colors"
-              style={{
-                background: bias === v ? `${c}15` : "transparent",
-                color: bias === v ? c : "var(--text-muted)",
-                borderRight: "1px solid var(--border)",
-              }}
             >
               {l}
-            </button>
+            </ChipButton>
           ))}
         </div>
-        <div className="flex items-center rounded-lg border border-border overflow-hidden">
+
+        {/* DTE — orange/blue/cyan mirror the lotto/swing/leap tag colors */}
+        <StripLabel>DTE</StripLabel>
+        <div className="flex items-center gap-1">
           {(
             [
-              ["All DTE", "all", "var(--text-secondary)"],
-              ["Lotto", "lotto", "var(--accent-orange)"],
-              ["Swing", "swing", "var(--accent-blue)"],
-              ["Leap", "leap", "var(--accent-cyan)"],
+              ["All DTE", "all", "blue"],
+              ["Lotto", "lotto", "orange"],
+              ["Swing", "swing", "blue"],
+              ["Leap", "leap", "cyan"],
             ] as const
-          ).map(([l, v, c]) => (
-            <button
+          ).map(([l, v, tone]) => (
+            <ChipButton
               key={v}
+              active={dte === v}
+              tone={tone as ChipTone}
               onClick={() => {
                 patchIFlow({ dte: v as DteFilter });
                 setSelectedTicker(null);
               }}
-              className="px-3 py-1 text-xs font-semibold transition-colors"
-              style={{
-                background: dte === v ? `${c}15` : "transparent",
-                color: dte === v ? c : "var(--text-muted)",
-                borderRight: "1px solid var(--border)",
-              }}
             >
               {l}
-            </button>
+            </ChipButton>
           ))}
         </div>
-        <span className="text-text-muted text-xs">View:</span>
-        <div className="flex items-center rounded-lg border border-border overflow-hidden">
-          {([["Grid", "grid", Grid], ["Tape", "tape", List]] as const).map(([l, v, Icon]) => {
-            const isTape = v === "tape";
-            const handleClick = () => {
-              patchIFlow({ viewMode: isTape ? "tape" : "grid" });
+
+        <StripLabel>Layout</StripLabel>
+        <span title="Grid: per-ticker cards. Tape: chronological feed of every entry — single, multi-date, or defaults to today if you haven't picked dates.">
+          <Segmented<"grid" | "tape">
+            value={viewMode}
+            onChange={(v) => {
+              patchIFlow({ viewMode: v });
               // Tape now supports multi-date. We no longer force a snap
               // to a single date; the Tape itself defaults to today when
               // no dates are selected.
-            };
-            return (
-              <button
-                key={v}
-                onClick={handleClick}
-                title={isTape
-                  ? "Chronological feed of every entry. Single, multi-date, or defaults to today if you haven't picked dates."
-                  : "Per-ticker cards"}
-                className="px-2.5 py-1 text-xs font-semibold transition-colors flex items-center gap-1"
-                style={{
-                  background: viewMode === v ? "rgba(88,166,255,0.15)" : "transparent",
-                  color: viewMode === v ? "var(--accent-blue)" : "var(--text-muted)",
-                  borderRight: "1px solid var(--border)",
-                }}
-              >
-                <Icon size={12} />
-                {l}
-              </button>
-            );
-          })}
-        </div>
+            }}
+            options={[
+              {
+                value: "grid",
+                label: (
+                  <span className="flex items-center gap-1">
+                    <Grid size={12} />
+                    Grid
+                  </span>
+                ),
+              },
+              {
+                value: "tape",
+                label: (
+                  <span className="flex items-center gap-1">
+                    <List size={12} />
+                    Tape
+                  </span>
+                ),
+              },
+            ]}
+          />
+        </span>
+
         <span
           className="text-text-muted text-xs"
           style={{ opacity: viewMode === "tape" ? 0.4 : 1 }}
         >
-          Sort:
+          Sort
         </span>
-        <div
-          className="flex items-center rounded-lg border border-border overflow-hidden"
-          style={{ opacity: viewMode === "tape" ? 0.4 : 1, pointerEvents: viewMode === "tape" ? "none" : "auto" }}
+        <span
+          style={{
+            opacity: viewMode === "tape" ? 0.4 : 1,
+            pointerEvents: viewMode === "tape" ? "none" : "auto",
+          }}
         >
-          {(
-            [
-              ["Most Recent", "recent"],
-              ["Entries", "entries"],
-              ["Premium", "premium"],
-              ["Conviction", "score"],
-              ["Escalating", "escalating"],
-              ["Highest Returns", "returns"],
-            ] as const
-          ).map(([l, v]) => (
-            <button
-              key={v}
-              onClick={() => patchIFlow({ sort: v as SortMode })}
-              className="px-3 py-1 text-xs font-semibold transition-colors"
-              style={{
-                background: sort === v ? "rgba(88,166,255,0.15)" : "transparent",
-                color: sort === v ? "var(--accent-blue)" : "var(--text-muted)",
-                borderRight: "1px solid var(--border)",
-              }}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
+          <Segmented<SortMode>
+            value={sort}
+            onChange={(v) => patchIFlow({ sort: v })}
+            options={[
+              { value: "recent", label: "Most Recent" },
+              { value: "entries", label: "Entries" },
+              { value: "premium", label: "Premium" },
+              { value: "score", label: "Conviction" },
+              { value: "escalating", label: "Escalating" },
+              { value: "returns", label: "Highest Returns" },
+            ]}
+          />
+        </span>
         {sort === "returns" && returnsLoading && (
           <span className="text-xs text-accent-blue animate-pulse">loading returns…</span>
         )}
         {sort === "returns" && !returnsLoading && flowReturnsMeta?.earliest_date && (
-          <span className="text-xs text-text-muted font-mono">
+          <span className="text-xs text-text-muted num">
             flow since {flowReturnsMeta.earliest_date} · {flowReturnsMeta.days_covered}d ·{" "}
             {flowReturnsMeta.entry_count.toLocaleString()} entries
           </span>
@@ -729,8 +736,8 @@ export function IFlowTracker() {
             irrelevant in the chronological Tape view. */}
         {viewMode !== "tape" && (
           <>
-            <span className="text-text-muted text-xs">Highlight:</span>
-            <div className="flex items-center rounded-lg border border-border overflow-hidden">
+            <StripLabel>Highlight</StripLabel>
+            <div className="flex items-center gap-1">
               {(
                 [
                   ["Off", "off", "No green border"],
@@ -739,31 +746,25 @@ export function IFlowTracker() {
                   ["Play", "play", "Theme-Pulse play score ≥ threshold — capital-preservation tuned (accumulation + catalyst + technicals, penalizes stretched names)"],
                   ["ML", "ml", "Best ML score ≥ threshold — P[option doubles] on recent flow"],
                 ] as const
-              ).map(([l, v, tip]) => {
-                const active = highlightMode === v;
-                return (
-                  <button
-                    key={v}
-                    onClick={() => patchIFlow({ highlightMode: v as IfHighlight })}
-                    title={tip}
-                    className="px-3 py-1 text-xs font-semibold transition-colors"
-                    style={{
-                      background: active ? "rgba(63,185,80,0.15)" : "transparent",
-                      color: active ? "var(--accent-green)" : "var(--text-muted)",
-                      borderRight: "1px solid var(--border)",
-                    }}
-                  >
-                    {l}
-                  </button>
-                );
-              })}
+              ).map(([l, v, tip]) => (
+                <ChipButton
+                  key={v}
+                  active={highlightMode === v}
+                  tone="green"
+                  title={tip}
+                  onClick={() => patchIFlow({ highlightMode: v as IfHighlight })}
+                >
+                  {l}
+                </ChipButton>
+              ))}
             </div>
             {(highlightMode === "play" || highlightMode === "ml") && (
               <label
-                className="flex items-center gap-1.5 rounded-lg border border-border bg-bg-card px-2 py-1"
+                className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1"
+                style={{ background: "var(--glass-bg)" }}
                 title="Minimum 0–100 score a ticker needs to get the green border"
               >
-                <span className="text-[10px] uppercase tracking-wide text-text-muted">≥</span>
+                <span className="text-xs text-text-muted">≥</span>
                 <input
                   type="number"
                   min={0}
@@ -773,14 +774,14 @@ export function IFlowTracker() {
                   onChange={(e) =>
                     patchIFlow({ highlightMin: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })
                   }
-                  className="w-12 bg-transparent text-xs text-text-primary outline-none font-mono"
+                  className="w-12 bg-transparent text-xs text-text-primary outline-none num"
                 />
               </label>
             )}
           </>
         )}
-        <span className="text-text-muted text-xs">Earnings:</span>
-        <div className="flex items-center rounded-lg border border-border overflow-hidden">
+        <StripLabel>Earnings</StripLabel>
+        <div className="flex items-center gap-1">
           {(
             [
               ["Any", "all"],
@@ -789,79 +790,60 @@ export function IFlowTracker() {
               ["1M", "1m"],
               ["2M", "2m"],
             ] as const
-          ).map(([l, v]) => {
-            const active = earningsWindow === v;
-            return (
-              <button
-                key={v}
-                onClick={() => patchIFlow({ earningsWindow: v as EarningsWindow })}
-                className="px-3 py-1 text-xs font-semibold transition-colors"
-                style={{
-                  background: active ? "rgba(227,127,46,0.15)" : "transparent",
-                  color: active ? "var(--accent-orange)" : "var(--text-muted)",
-                  borderRight: "1px solid var(--border)",
-                }}
-              >
-                {l}
-              </button>
-            );
-          })}
+          ).map(([l, v]) => (
+            <ChipButton
+              key={v}
+              active={earningsWindow === v}
+              tone="orange"
+              onClick={() => patchIFlow({ earningsWindow: v as EarningsWindow })}
+            >
+              {l}
+            </ChipButton>
+          ))}
         </div>
         {earningsWindow !== "all" && earningsLoading && !earningsMap && (
           <span className="text-xs text-accent-orange animate-pulse">loading earnings…</span>
         )}
-        <div className="flex items-center rounded-lg border border-border overflow-hidden">
-          <button
-            onClick={() => {
-              const next = !tradersOnly;
-              // Clearing Traders also clears any author selection so a stale
-              // author filter doesn't silently apply next time it's enabled.
-              patchIFlow(
-                next
-                  ? { tradersOnly: true }
-                  : { tradersOnly: false, selectedAuthors: new Set() },
-              );
-            }}
-            className="px-3 py-1 text-xs font-semibold transition-colors"
-            style={{
-              background: tradersOnly ? "rgba(188,140,255,0.15)" : "transparent",
-              color: tradersOnly ? "var(--accent-purple)" : "var(--text-muted)",
-            }}
-          >
-            Traders
-          </button>
-        </div>
+        <ChipButton
+          active={tradersOnly}
+          tone="purple"
+          onClick={() => {
+            const next = !tradersOnly;
+            // Clearing Traders also clears any author selection so a stale
+            // author filter doesn't silently apply next time it's enabled.
+            patchIFlow(
+              next
+                ? { tradersOnly: true }
+                : { tradersOnly: false, selectedAuthors: new Set() },
+            );
+          }}
+        >
+          Traders
+        </ChipButton>
         {tradersOnly && traderList.length > 0 && (
           <div className="flex items-center gap-1 flex-wrap">
-            {traderList.map((t) => {
-              const active = selectedAuthors.has(t.author);
-              return (
-                <button
-                  key={t.author}
-                  onClick={() => {
-                    const next = new Set(selectedAuthors);
-                    if (next.has(t.author)) next.delete(t.author);
-                    else next.add(t.author);
-                    patchIFlow({ selectedAuthors: next });
-                    setSelectedTicker(null);
-                  }}
-                  className="px-2 py-1 rounded text-xs font-semibold transition-colors border"
-                  style={{
-                    background: active ? "rgba(188,140,255,0.15)" : "transparent",
-                    color: active ? "var(--accent-purple)" : "var(--text-muted)",
-                    borderColor: active ? "var(--accent-purple)" : "var(--border)",
-                  }}
-                  title={`${t.n_calls} calls · top ${t.top_ticker ?? "—"}`}
-                >
-                  {t.author}
-                  <span className="ml-1 opacity-60 font-mono">{t.n_calls}</span>
-                </button>
-              );
-            })}
+            {traderList.map((t) => (
+              <ChipButton
+                key={t.author}
+                active={selectedAuthors.has(t.author)}
+                tone="purple"
+                title={`${t.n_calls} calls · top ${t.top_ticker ?? "—"}`}
+                onClick={() => {
+                  const next = new Set(selectedAuthors);
+                  if (next.has(t.author)) next.delete(t.author);
+                  else next.add(t.author);
+                  patchIFlow({ selectedAuthors: next });
+                  setSelectedTicker(null);
+                }}
+              >
+                {t.author}
+                <span className="num opacity-60">{t.n_calls}</span>
+              </ChipButton>
+            ))}
             {selectedAuthors.size > 0 && (
               <button
                 onClick={() => patchIFlow({ selectedAuthors: new Set() })}
-                className="px-2 py-1 rounded text-xs font-semibold text-text-muted hover:text-text-primary transition-colors"
+                className="px-2 py-1 rounded-full text-xs font-semibold text-text-muted hover:text-text-primary transition-colors"
                 title="Clear trader selection"
               >
                 <X size={12} />
@@ -985,7 +967,6 @@ export function IFlowTracker() {
               if (filtered.length === 0 && watchedShown.length === 0) {
                 return (
                   <div className="card text-center py-8">
-                    <Eye size={24} className="mx-auto mb-2 text-text-muted opacity-40" />
                     <p className="text-sm text-text-muted">No tickers match your filters</p>
                   </div>
                 );
@@ -995,7 +976,7 @@ export function IFlowTracker() {
                 <>
                   {watchlist.length > 0 && (
                     <div className="mb-3">
-                      <h4 className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5 text-accent-orange">
+                      <h4 className="text-xs font-semibold uppercase tracking-[0.08em] mb-2 flex items-center gap-1.5 text-accent-orange">
                         <Star size={12} style={{ fill: "var(--accent-orange)" }} />
                         Watchlist ({watchedShown.length}
                         {watchedShown.length < watchlist.length && (
@@ -1012,13 +993,12 @@ export function IFlowTracker() {
                           {watchedShown.map(renderCard)}
                         </div>
                       )}
-                      <div className="mt-3 border-t border-border opacity-40" />
                     </div>
                   )}
                   {othersShown.length > 0 && (
                     <>
                       {watchlist.length > 0 && (
-                        <h4 className="text-xs font-semibold uppercase tracking-wider mb-2 text-text-muted">
+                        <h4 className="text-xs font-semibold uppercase tracking-[0.08em] mb-2 text-text-secondary">
                           All Tickers ({othersShown.length})
                         </h4>
                       )}
@@ -1227,7 +1207,7 @@ function DownloadCsvButton({
           ? "No tickers match the current filters"
           : `Download CSV of ${filteredTickers.length} ticker(s) with full P/L`
       }
-      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-accent-blue hover:bg-accent-blue/15 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-accent-blue hover:bg-accent-blue/15 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
     >
       <Download size={12} />
       {busy ? "exporting…" : "CSV"}

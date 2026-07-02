@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { relativeAge, absoluteAge } from "../../lib/utils";
+import { Chip, Segmented, type ChipTone } from "../../components/Glass";
 import {
   useTraderBrief,
   useGenerateTraderBrief,
@@ -35,12 +36,12 @@ const WINDOW_OPTIONS: { label: string; days: number }[] = [
   { label: "30d", days: 30 },
 ];
 
-const STYLE_COLORS: Record<string, string> = {
-  scalp: "var(--accent-orange)",
-  swing: "var(--accent-blue)",
-  leap: "var(--accent-purple)",
-  mixed: "var(--text-secondary)",
-  defensive: "var(--accent-green)",
+const STYLE_TONES: Record<string, ChipTone> = {
+  scalp: "orange",
+  swing: "blue",
+  leap: "purple",
+  mixed: "neutral",
+  defensive: "green",
 };
 
 function sectorLeanColor(lean: string): string {
@@ -91,7 +92,7 @@ function Section({
 }
 
 function BriefBody({ content }: { content: TraderBriefContent }) {
-  const styleColor = STYLE_COLORS[content.trading_style] ?? "var(--text-secondary)";
+  const styleTone = STYLE_TONES[content.trading_style] ?? "neutral";
   return (
     <div className="space-y-3">
       {/* Hero — current view + trading style */}
@@ -100,16 +101,9 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
           <span className="text-xs uppercase text-text-muted font-semibold">
             Style
           </span>
-          <span
-            className="inline-flex items-center px-1.5 py-0.5 rounded text-xs uppercase font-bold"
-            style={{
-              background: `${styleColor}20`,
-              color: styleColor,
-              border: `1px solid ${styleColor}40`,
-            }}
-          >
+          <Chip tone={styleTone} className="uppercase font-semibold">
             {content.trading_style}
-          </span>
+          </Chip>
         </div>
         <p className="text-sm text-text-primary leading-relaxed">
           {content.current_view}
@@ -147,7 +141,7 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
                     }}
                   />
                 </div>
-                <span className="text-xs font-mono text-text-muted w-10 text-right">
+                <span className="num text-xs text-text-muted w-10 text-right">
                   {s.weight_pct}%
                 </span>
                 <span
@@ -240,7 +234,7 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
                 >
                   <PickTicker t={o.ticker} />
                   <span
-                    className="font-mono font-semibold text-xs"
+                    className="num font-semibold text-xs"
                     style={{ color }}
                   >
                     {o.outcome}
@@ -301,7 +295,7 @@ export function TraderBrief({ author }: { author: string }) {
   const hasContent = !!content;
 
   return (
-    <div className="card p-3">
+    <div className="glass-strong p-3">
       {/* Collapsed header */}
       <button
         type="button"
@@ -340,30 +334,17 @@ export function TraderBrief({ author }: { author: string }) {
             <span className="text-xs uppercase text-text-muted font-semibold">
               Window
             </span>
-            <div className="flex items-center rounded border border-border overflow-hidden">
-              {WINDOW_OPTIONS.map((w) => {
-                const active = w.days === windowDays;
-                return (
-                  <button
-                    key={w.label}
-                    type="button"
-                    onClick={() => setWindowDays(w.days)}
-                    className="px-2 py-1 text-xs font-semibold transition-colors"
-                    style={{
-                      background: active ? "var(--accent-blue)" : "transparent",
-                      color: active
-                        ? "var(--bg-primary)"
-                        : "var(--text-secondary)",
-                    }}
-                  >
-                    {w.label}
-                  </button>
-                );
-              })}
-            </div>
+            <Segmented
+              options={WINDOW_OPTIONS.map((w) => ({
+                value: String(w.days),
+                label: w.label,
+              }))}
+              value={String(windowDays)}
+              onChange={(v) => setWindowDays(Number(v))}
+            />
 
             {data?.n_messages != null && (
-              <span className="text-xs text-text-muted">
+              <span className="num text-xs text-text-muted">
                 {data.n_messages} msgs
               </span>
             )}

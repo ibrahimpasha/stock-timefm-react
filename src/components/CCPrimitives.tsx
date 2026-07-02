@@ -157,9 +157,9 @@ export function Tag({ children, color = "var(--text-secondary)", bg = "transpare
         textTransform: "uppercase",
         color,
         background: bg,
-        padding: "2px 5px",
+        padding: "2px 7px",
         border: border ? `1px solid ${border}` : "none",
-        borderRadius: 2,
+        borderRadius: "var(--radius-chip)",
         fontWeight: 600,
       }}
     >
@@ -188,14 +188,16 @@ export function Panel({ title, accent, right, children, padding = 10, className 
     <section
       className={className}
       style={{
-        background: "var(--bg-card)",
-        border: `1px solid ${borderColor || "var(--border)"}`,
-        borderRadius: 8,
+        background: "var(--glass-bg)",
+        border: `1px solid ${borderColor || "var(--glass-border)"}`,
+        borderRadius: "var(--radius-panel)",
+        backdropFilter: "blur(var(--glass-blur))",
+        WebkitBackdropFilter: "blur(var(--glass-blur))",
+        boxShadow: boxShadow || "var(--shadow-1), inset 0 1px 0 var(--glass-highlight)",
         display: "flex",
         flexDirection: "column",
         minHeight: 0,
         overflow: "hidden",
-        ...(boxShadow ? { boxShadow } : {}),
       }}
     >
       <header
@@ -203,21 +205,20 @@ export function Panel({ title, accent, right, children, padding = 10, className 
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "6px 10px",
-          borderBottom: "1px solid var(--border)",
-          background: "var(--bg-card-hover)",
+          padding: "7px 12px",
+          borderBottom: "1px solid var(--glass-border)",
+          background: "color-mix(in srgb, var(--bg-card-hover) 60%, transparent)",
           gap: 12,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {accent && <div style={{ width: 3, height: 11, background: accent }} />}
+          {accent && <div style={{ width: 3, height: 11, borderRadius: 2, background: accent }} />}
           <span
-            className="font-mono"
             style={{
-              fontSize: 10,
-              letterSpacing: 1.2,
+              fontSize: "0.75rem",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "var(--text-primary)",
+              color: "var(--text-secondary)",
               fontWeight: 600,
             }}
           >

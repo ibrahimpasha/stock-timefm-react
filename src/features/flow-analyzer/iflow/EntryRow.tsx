@@ -103,25 +103,25 @@ export function EntryRow({
           {side}
         </span>
         <span className="text-text-muted italic w-16 shrink-0">{action}</span>
-        <span className="font-mono font-bold text-text-primary">
+        <span className="num font-bold text-text-primary">
           ${entry.strike} {optType}
         </span>
-        <span className="text-text-muted">{entry.expiry}</span>
+        <span className="num text-text-muted">{entry.expiry}</span>
         {dl && (
-          <span className="font-mono px-1 rounded" style={{ color: dl.color, background: dl.bg }}>
+          <span className="num px-1 rounded-full" style={{ color: dl.color, background: dl.bg }}>
             {dl.text}
           </span>
         )}
         {entry.vol_oi_ratio > 0 && (
-          <span className="text-accent-cyan font-mono">
+          <span className="text-accent-cyan num">
             {Number(entry.vol_oi_ratio).toFixed(1)}x
           </span>
         )}
         {entry.ask_pct > 0 && (
-          <span className="text-accent-orange font-mono">{entry.ask_pct}%ask</span>
+          <span className="text-accent-orange num">{entry.ask_pct}%ask</span>
         )}
         <span
-          className="font-mono font-bold shrink-0"
+          className="num font-bold shrink-0"
           style={{ color: pnlColor, minWidth: 48, textAlign: "right" }}
           title={
             pnl !== null
@@ -133,7 +133,7 @@ export function EntryRow({
         >
           {pnlLabel}
         </span>
-        <span className="text-text-secondary ml-auto font-mono">{entry.premium}</span>
+        <span className="text-text-secondary ml-auto num">{entry.premium}</span>
       </div>
       {expanded && entry.analysis && (
         <div
@@ -142,7 +142,7 @@ export function EntryRow({
         >
           {entry.analysis}
           {(entry.underlying_price || entry.avg_price) && (
-            <div className="mt-1 font-mono text-text-muted">
+            <div className="mt-1 num text-text-muted">
               {entry.underlying_price ? `Underlying @ fill: $${entry.underlying_price}` : ""}
               {price > 0 ? ` | Now: $${price.toFixed(2)}` : ""}
               {entry.underlying_price && price > 0

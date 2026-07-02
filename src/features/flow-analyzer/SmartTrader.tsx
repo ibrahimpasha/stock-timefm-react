@@ -25,6 +25,8 @@ import {
 import apiClient from "../../api/client";
 import { formatCurrency, changeColor } from "../../lib/utils";
 import { useAppStore } from "../../store/useAppStore";
+import { GlassPanel, Chip, Stat, Segmented } from "../../components/Glass";
+import type { ChipTone } from "../../components/Glass";
 
 type PersonaName = "smart" | "aggressive" | "gemfinder" | "supercycle" | "conviction";
 
@@ -284,15 +286,11 @@ const RULE_LABELS: Record<string, { id: number; label: string; why: string }> = 
 };
 
 function ScoreChip({ score, label }: { score: number; label: string }) {
-  const color =
-    score >= 85 ? "var(--accent-green)" : score >= 70 ? "var(--accent-blue)" : "var(--text-muted)";
+  const tone: ChipTone = score >= 85 ? "green" : score >= 70 ? "blue" : "neutral";
   return (
-    <span
-      className="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
-      style={{ color, background: `${color}15`, border: `1px solid ${color}30` }}
-    >
+    <Chip tone={tone} className="num">
       {label} {score}
-    </span>
+    </Chip>
   );
 }
 
@@ -368,25 +366,17 @@ function GraphContextPanel({ ticker }: { ticker: string }) {
     data.competitors_text ||
     (data.competitors || []).map((c) => c.name).filter(Boolean).join(", ");
 
-  const chip = (label: string, color: string) => (
-    <span
-      className="font-mono text-xs px-1.5 py-0.5 rounded"
-      style={{ color, background: tint(color, 12), border: `1px solid ${tint(color, 28)}` }}
-    >
-      {label}
-    </span>
-  );
-
   return (
     <div className="space-y-2.5 pt-2 border-t border-border">
       {/* taxonomy + community + freshness */}
       <div className="flex items-center gap-1.5 flex-wrap text-xs">
-        {data.sector && chip(data.sector, "var(--accent-blue)")}
-        {data.theme && chip(data.theme, "var(--accent-cyan)")}
-        {data.community?.label &&
-          chip(data.community.label, "var(--accent-purple)")}
+        {data.sector && <Chip tone="blue">{data.sector}</Chip>}
+        {data.theme && <Chip tone="cyan">{data.theme}</Chip>}
+        {data.community?.label && (
+          <Chip tone="purple">{data.community.label}</Chip>
+        )}
         {data.intel_as_of && (
-          <span className="text-text-muted ml-auto font-mono">
+          <span className="text-text-muted ml-auto num">
             graph {data.intel_as_of}
           </span>
         )}
@@ -531,7 +521,7 @@ function InfoChip({
 }) {
   return (
     <span
-      className="inline-flex items-center gap-1 font-mono"
+      className="inline-flex items-center gap-1 num"
       style={{ color: color || "var(--text-secondary)" }}
       title={title}
     >
@@ -553,7 +543,7 @@ function GivebackBar({ peak, now }: { peak: number; now: number }) {
     held >= 0.8 ? "var(--accent-green)" : held >= 0.5 ? "var(--accent-orange)" : "var(--accent-red)";
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className="text-text-muted shrink-0 inline-flex items-center gap-1">
+      <span className="text-text-muted shrink-0 inline-flex items-center gap-1 num">
         <Flame size={10} /> peak +{peak.toFixed(0)}%
       </span>
       <div
@@ -568,7 +558,7 @@ function GivebackBar({ peak, now }: { peak: number; now: number }) {
           style={{ width: `${held * 100}%`, background: color }}
         />
       </div>
-      <span className="font-mono shrink-0" style={{ color }}>
+      <span className="num shrink-0" style={{ color }}>
         now {now >= 0 ? "+" : ""}
         {now.toFixed(0)}%
       </span>
@@ -600,7 +590,7 @@ function ScaleTimeline({
         <span className="inline-flex items-center gap-1 font-semibold" style={{ color: purple }}>
           <Scissors size={11} /> Scaled out {trims.length}x
         </span>
-        <span className="font-mono font-bold" style={{ color: "var(--accent-green)" }}>
+        <span className="num font-bold" style={{ color: "var(--accent-green)" }}>
           banked +${banked.toFixed(0)}
         </span>
       </div>
@@ -609,26 +599,26 @@ function ScaleTimeline({
           .slice()
           .sort((a, b) => (a.scale_stage ?? 0) - (b.scale_stage ?? 0))
           .map((t) => (
-            <span
+            <Chip
               key={t.id}
-              className="inline-flex items-center gap-1 font-mono text-xs px-1.5 py-0.5 rounded"
-              style={{ color: purple, background: tint(purple, 12) }}
+              tone="purple"
+              className="num"
               title={`Sold ${t.contracts} ct at ${rungLabel(t.exit_reason)} on ${t.exit_date} — banked $${(
                 t.realized_pnl_dollars ?? 0
               ).toFixed(0)}`}
             >
               {rungLabel(t.exit_reason)}
-              <span className="text-text-muted">×{t.contracts}</span>
-            </span>
+              <span className="text-text-muted">x{t.contracts}</span>
+            </Chip>
           ))}
         {remaining != null && original != null && remaining > 0 && (
-          <span
-            className="inline-flex items-center gap-1 font-mono text-xs px-1.5 py-0.5 rounded"
-            style={{ color: "var(--accent-cyan)", background: tint("var(--accent-cyan)", 12) }}
+          <Chip
+            tone="cyan"
+            className="num"
             title="Runner still open — rides with the stop trailed to breakeven (house money)"
           >
             <Anchor size={10} /> runner {remaining}/{original}
-          </span>
+          </Chip>
         )}
       </div>
       {remaining != null && remaining > 0 && (
@@ -669,13 +659,9 @@ function WhyPick({ reason, compact = false }: { reason: string | null; compact?:
           {rest.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {rest.map((c, i) => (
-                <span
-                  key={i}
-                  className="font-mono text-xs px-1.5 py-0.5 rounded"
-                  style={{ color: "var(--text-secondary)", background: tint("var(--text-muted)", 14) }}
-                >
+                <Chip key={i} tone="neutral" className="num">
                   {c}
-                </span>
+                </Chip>
               ))}
             </div>
           )}
@@ -730,101 +716,76 @@ function PositionCard({
             {p.ticker}
           </button>
           {isEquity ? (
-            <span className="font-mono text-sm text-text-primary">
+            <span className="num text-sm text-text-primary">
               ${p.premium_at_entry.toFixed(2)} entry
             </span>
           ) : (
             <>
-              <span className="font-mono text-sm text-text-primary">
+              <span className="num text-sm text-text-primary">
                 ${p.strike} {p.option_type}
               </span>
-              <span className="text-text-muted text-xs">
+              <span className="text-text-muted text-xs num">
                 exp {p.expiry} ({p.dte_at_entry}d)
               </span>
             </>
           )}
-          <span className="text-text-muted text-xs">
+          <span className="text-text-muted text-xs num">
             x{p.contracts} {unitWord}
           </span>
           {p.ml_score != null && <ScoreChip score={p.ml_score} label="ML" />}
           {p.n_score != null && <ScoreChip score={p.n_score} label="N" />}
           {p.graph_score != null && (
-            <span
-              className="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
-              style={{
-                color: "var(--accent-purple)",
-                background: "color-mix(in srgb, var(--accent-purple) 15%, transparent)",
-                border: "1px solid color-mix(in srgb, var(--accent-purple) 30%, transparent)",
-              }}
-              title="graph composite score"
-            >
+            <Chip tone="purple" className="num" title="graph composite score">
               G {p.graph_score.toFixed(0)}
-            </span>
+            </Chip>
           )}
           {p.structural_role &&
             !p.structural_role.startsWith("kw") && (
-              <span
-                className="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
-                style={{
-                  color: "var(--accent-green)",
-                  background: "color-mix(in srgb, var(--accent-green) 12%, transparent)",
-                  border: "1px solid color-mix(in srgb, var(--accent-green) 30%, transparent)",
-                }}
+              <Chip
+                tone="green"
                 title="structural position in the AI build-out"
               >
                 {p.structural_role}
-              </span>
+              </Chip>
             )}
           {p.theme_accel != null && p.theme_accel > 1 && (
-            <span
-              className="font-mono text-xs px-1.5 py-0.5 rounded"
-              style={{
-                color: "var(--accent-orange)",
-                background: "color-mix(in srgb, var(--accent-orange) 10%, transparent)",
-                border: "1px solid color-mix(in srgb, var(--accent-orange) 30%, transparent)",
-              }}
+            <Chip
+              tone="orange"
+              className="num"
               title="theme option-premium acceleration (window / baseline)"
             >
               {p.theme_accel.toFixed(1)}x
-            </span>
+            </Chip>
           )}
           {p.theme && (
-            <span
-              className="font-mono text-xs px-1.5 py-0.5 rounded"
-              style={{
-                color: "var(--accent-cyan)",
-                background: "color-mix(in srgb, var(--accent-cyan) 10%, transparent)",
-                border: "1px solid color-mix(in srgb, var(--accent-cyan) 30%, transparent)",
-              }}
-              title={p.category || ""}
-            >
+            <Chip tone="cyan" title={p.category || ""}>
               {p.theme}
-            </span>
+            </Chip>
           )}
         </div>
         <div className="flex items-center gap-3 text-xs shrink-0">
           <div className="text-right">
             <div className="text-text-muted">Cost</div>
-            <div className="font-mono text-text-primary">
+            <div className="num text-text-primary">
               {formatCurrency(p.cost_basis)}
             </div>
           </div>
           <div className="text-right">
             <div className="text-text-muted">Value</div>
-            <div className="font-mono text-text-primary">
+            <div className="num text-text-primary">
               {formatCurrency(p.current_value ?? p.cost_basis)}
             </div>
           </div>
           <div className="text-right">
             <div className="text-text-muted">P/L</div>
             <div
-              className="font-mono text-sm font-extrabold"
+              className="num text-sm font-extrabold"
               style={{ color: pnlColor }}
             >
               {pnl >= 0 ? "+" : ""}
               {pnl.toFixed(1)}%
             </div>
-            <div className="text-text-muted text-xs font-mono">
+            <div className="text-text-muted text-xs num">
               {pnlDollars >= 0 ? "+" : ""}${pnlDollars.toFixed(0)}
             </div>
           </div>
@@ -878,23 +839,21 @@ function PositionCard({
       )}
 
       <div className="mt-2 flex items-center gap-2 text-xs">
-        <span
-          className="text-text-muted shrink-0 inline-flex items-center gap-1"
-          title={scaled ? "Stop trailed to breakeven after first scale-out" : undefined}
-        >
-          {scaled ? (
-            <>
-              <Anchor size={10} style={{ color: "var(--accent-green)" }} />
-              <span style={{ color: "var(--accent-green)" }}>stop BE</span>
-            </>
-          ) : (
-            `stop ${stopPct}%`
-          )}
-        </span>
+        {scaled ? (
+          <Chip
+            tone="green"
+            className="shrink-0"
+            title="Stop trailed to breakeven after first scale-out"
+          >
+            <Anchor size={10} /> stop BE
+          </Chip>
+        ) : (
+          <span className="text-text-muted shrink-0 num">stop {stopPct}%</span>
+        )}
         <div className="flex-1">
           <StopProgressBar pnl={pnl} stopPct={effStop} />
         </div>
-        <span className="text-text-muted font-mono shrink-0">
+        <span className="text-text-muted num shrink-0">
           ${(p.current_premium ?? p.premium_at_entry).toFixed(2)} /{" "}
           ${p.premium_at_entry.toFixed(2)}
         </span>
@@ -928,40 +887,24 @@ function CategoryTrendPanel() {
   const maxRatio = Math.max(...trend.map((t) => t.hotness_ratio), 1);
 
   return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-        <div className="text-xs uppercase tracking-wider text-text-muted font-semibold flex items-center gap-1">
+    <GlassPanel
+      title={
+        <span className="inline-flex items-center gap-1">
           <Flame size={11} className="text-accent-orange" />
           Hot Categories
-        </div>
-        <div className="flex items-center gap-1">
-          {WINDOW_TABS.map((w) => {
-            const active = window === w.id;
-            return (
-              <button
-                key={w.id}
-                onClick={() => {
-                  setWindow(w.id);
-                  setExpanded(null);
-                }}
-                className="px-2.5 py-1 rounded text-xs font-semibold transition-colors"
-                style={{
-                  background: active
-                    ? "color-mix(in srgb, var(--accent-blue) 15%, transparent)"
-                    : "transparent",
-                  color: active
-                    ? "var(--accent-blue)"
-                    : "var(--text-muted)",
-                  border: `1px solid ${active ? "var(--accent-blue)" : "var(--border)"}`,
-                }}
-                title={w.sub}
-              >
-                {w.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+        </span>
+      }
+      actions={
+        <Segmented<CategoryWindow>
+          options={WINDOW_TABS.map((w) => ({ value: w.id, label: w.label }))}
+          value={window}
+          onChange={(w) => {
+            setWindow(w);
+            setExpanded(null);
+          }}
+        />
+      }
+    >
       <div className="text-xs text-text-muted mb-2">
         {data
           ? `${trend.length} categories with activity · ${
@@ -1026,12 +969,12 @@ function CategoryTrendPanel() {
                     />
                   </div>
                   <span
-                    className="font-mono font-bold"
+                    className="num font-bold"
                     style={{ color: heat }}
                   >
                     {t.hotness_ratio.toFixed(2)}x
                   </span>
-                  <span className="font-mono text-text-secondary text-right w-24">
+                  <span className="num text-text-secondary text-right w-24">
                     ${(t.premium_window / 1e6).toFixed(1)}M
                   </span>
                 </div>
@@ -1041,38 +984,24 @@ function CategoryTrendPanel() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-text-muted">top tickers:</span>
                     {t.top_tickers.map((tt) => (
-                      <span
-                        key={tt.ticker}
-                        className="font-mono px-1.5 py-0.5 rounded"
-                        style={{
-                          background: "color-mix(in srgb, var(--accent-blue) 10%, transparent)",
-                          color: "var(--accent-blue)",
-                        }}
-                      >
+                      <Chip key={tt.ticker} tone="blue" className="num">
                         {tt.ticker}{" "}
                         <span className="text-text-muted">
                           ${(tt.premium / 1e6).toFixed(1)}M
                         </span>
-                      </span>
+                      </Chip>
                     ))}
                   </div>
                   {t.themes.length > 0 && (
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-text-muted">themes:</span>
                       {t.themes.map((th) => (
-                        <span
-                          key={th.theme}
-                          className="font-mono px-1.5 py-0.5 rounded"
-                          style={{
-                            background: "color-mix(in srgb, var(--accent-cyan) 10%, transparent)",
-                            color: "var(--accent-cyan)",
-                          }}
-                        >
+                        <Chip key={th.theme} tone="cyan" className="num">
                           {th.theme}{" "}
                           <span className="text-text-muted">
                             ${(th.premium / 1e6).toFixed(1)}M
                           </span>
-                        </span>
+                        </Chip>
                       ))}
                     </div>
                   )}
@@ -1099,7 +1028,7 @@ function CategoryTrendPanel() {
         comparison unlocks ~March 2027.
         {data?.note && <div className="mt-1">{data.note}</div>}
       </div>
-    </div>
+    </GlassPanel>
   );
 }
 
@@ -1111,15 +1040,15 @@ function ClosedRow({ p, trims = [] }: { p: Position; trims?: Position[] }) {
   const tradeDollars = pnlDollars + bankedTrims; // runner + its scale-out trims
   const color = changeColor(pnl);
   const isEquity = p.instrument === "equity";
-  // Exit reason colors — red for stop-out, neutral for expiration,
+  // Exit reason tones — red for stop-out, neutral for expiration,
   // green for win-trigger / breakeven-after-scale, blue for trail / other.
   const reason = p.exit_reason || "";
-  const reasonColor = (() => {
-    if (reason.startsWith("stop_")) return "var(--accent-red)";
-    if (reason === "expiration") return "var(--text-muted)";
-    if (reason.startsWith("tp_") || reason === "manual_win") return "var(--accent-green)";
-    if (reason === "breakeven_after_scale") return "var(--accent-green)";
-    return "var(--accent-blue)";
+  const reasonTone: ChipTone = (() => {
+    if (reason.startsWith("stop_")) return "red";
+    if (reason === "expiration") return "neutral";
+    if (reason.startsWith("tp_") || reason === "manual_win") return "green";
+    if (reason === "breakeven_after_scale") return "green";
+    return "blue";
   })();
   const trailPeak = reason.match(/_off_(\d+)pct_peak/);
   const reasonLabel =
@@ -1155,57 +1084,44 @@ function ClosedRow({ p, trims = [] }: { p: Position; trims?: Position[] }) {
             {p.ticker}
           </button>
           {!isEquity ? (
-            <span className="font-mono text-text-primary">
+            <span className="num text-text-primary">
               ${p.strike} {p.option_type}
             </span>
           ) : (
             <span className="font-mono text-text-muted">equity</span>
           )}
-          <span className="text-text-muted">
+          <span className="text-text-muted num">
             x{p.contracts} {isEquity ? "sh" : "ct"}
           </span>
-          <span
-            className="px-1.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wider"
-            style={{ color: reasonColor, background: `${reasonColor}15` }}
+          <Chip
+            tone={reasonTone}
+            className="uppercase tracking-wider"
             title={`Exit reason: ${p.exit_reason}`}
           >
             {reasonLabel}
-          </span>
+          </Chip>
           {trims.length > 0 && (
-            <span
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold"
-              style={{
-                color: "var(--accent-purple)",
-                background: tint("var(--accent-purple)", 12),
-              }}
+            <Chip
+              tone="purple"
+              className="num"
               title={`Scaled out ${trims.length}x before the runner closed`}
             >
               <Scissors size={10} /> {trims.length}x
-            </span>
+            </Chip>
           )}
-          {p.theme && (
-            <span
-              className="font-mono text-xs px-1.5 py-0.5 rounded"
-              style={{
-                color: "var(--accent-cyan)",
-                background: "color-mix(in srgb, var(--accent-cyan) 10%, transparent)",
-              }}
-            >
-              {p.theme}
-            </span>
-          )}
+          {p.theme && <Chip tone="cyan">{p.theme}</Chip>}
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <span className="font-mono font-bold" style={{ color }}>
+          <span className="num font-bold" style={{ color }}>
             {pnl >= 0 ? "+" : ""}
             {pnl.toFixed(1)}%
           </span>
-          <span className="font-mono text-text-muted">
+          <span className="num text-text-muted">
             {pnlDollars >= 0 ? "+" : ""}${pnlDollars.toFixed(0)}
           </span>
         </div>
       </div>
-      <div className="flex items-center gap-3 flex-wrap text-text-muted text-xs font-mono">
+      <div className="flex items-center gap-3 flex-wrap text-text-muted text-xs num">
         <span>
           entry {p.entry_date} @ ${p.premium_at_entry.toFixed(2)}
         </span>
@@ -1229,7 +1145,7 @@ function ClosedRow({ p, trims = [] }: { p: Position; trims?: Position[] }) {
               Trade total (trims + runner)
             </span>
             <span
-              className="font-mono font-bold"
+              className="num font-bold"
               style={{ color: changeColor(tradeDollars) }}
             >
               {tradeDollars >= 0 ? "+" : ""}${tradeDollars.toFixed(0)}
@@ -1280,7 +1196,7 @@ function RejectionBlock({
           {entries.slice(0, 30).map((e, i) => (
             <div
               key={i}
-              className="flex items-center justify-between font-mono text-xs px-2 py-1 rounded"
+              className="flex items-center justify-between num text-xs px-2 py-1 rounded"
               style={{ background: "color-mix(in srgb, var(--bg-card) 40%, transparent)" }}
             >
               <div className="flex items-center gap-2">
@@ -1330,15 +1246,14 @@ function EquityCurve({ history }: { history: HistoryPoint[] }) {
   const color =
     last.return_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)";
   return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-xs uppercase tracking-wider text-text-muted font-semibold">
-          Equity Curve ({history.length}d)
-        </div>
-        <div className="text-xs text-text-muted">
+    <GlassPanel
+      title={`Equity Curve (${history.length}d)`}
+      actions={
+        <span className="text-xs text-text-muted num">
           {history[0].date} → {last.date}
-        </div>
-      </div>
+        </span>
+      }
+    >
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-20">
         <polyline
           fill="none"
@@ -1347,7 +1262,7 @@ function EquityCurve({ history }: { history: HistoryPoint[] }) {
           points={points}
         />
       </svg>
-    </div>
+    </GlassPanel>
   );
 }
 
@@ -1390,10 +1305,10 @@ function TradeDecisionHistory({
   const realizedColor = changeColor(totalRealized);
 
   return (
-    <div>
+    <section className="card">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between text-xs uppercase tracking-wider font-semibold mb-2 pb-1 border-b border-border hover:bg-bg-card-hover/30 transition-colors"
+        className="w-full flex items-center justify-between gap-2 text-xs uppercase tracking-[0.08em] font-semibold transition-colors hover:text-text-primary"
       >
         <div className="flex items-center gap-2">
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -1401,19 +1316,12 @@ function TradeDecisionHistory({
             Trade Decision History ({logical.length})
           </span>
           {todayExits.length > 0 && (
-            <span
-              className="px-1.5 py-0.5 rounded font-mono normal-case tracking-normal"
-              style={{
-                color: "var(--accent-orange)",
-                background: "color-mix(in srgb, var(--accent-orange) 12%, transparent)",
-                border: "1px solid color-mix(in srgb, var(--accent-orange) 30%, transparent)",
-              }}
-            >
+            <Chip tone="orange" className="num normal-case tracking-normal">
               {todayExits.length} closed today
-            </span>
+            </Chip>
           )}
         </div>
-        <div className="flex items-center gap-3 text-xs font-mono normal-case tracking-normal">
+        <div className="flex items-center gap-3 text-xs num normal-case tracking-normal">
           {logical.length > 0 ? (
             <>
               <span className="text-text-muted">
@@ -1436,7 +1344,7 @@ function TradeDecisionHistory({
         </div>
       </button>
       {expanded && (
-        <div className="space-y-3">
+        <div className="space-y-3 mt-3">
           {logical.length === 0 && (
             <div
               className="text-xs text-text-muted text-center py-4 rounded-md"
@@ -1480,7 +1388,7 @@ function TradeDecisionHistory({
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -1527,11 +1435,15 @@ function OpenPositionsGrouped({
   });
 
   return (
-    <div className="space-y-3">
-      <div className="text-xs uppercase tracking-wider text-accent-blue font-semibold flex items-center gap-1">
-        <CheckCircle2 size={11} />
-        Open Positions ({positions.length}) — grouped by category
-      </div>
+    <GlassPanel
+      title={
+        <span className="inline-flex items-center gap-1 text-accent-blue">
+          <CheckCircle2 size={11} />
+          Open Positions ({positions.length}) — grouped by category
+        </span>
+      }
+    >
+      <div className="space-y-3">
       {cats.map(([cat, themeMap]) => {
         const allInCat = Array.from(themeMap.values()).flat();
         const catCount = allInCat.length;
@@ -1550,7 +1462,7 @@ function OpenPositionsGrouped({
               onClick={() =>
                 setCollapsed((c) => ({ ...c, [cat]: !c[cat] }))
               }
-              className="w-full flex items-center justify-between text-xs font-semibold pb-1 border-b border-border hover:bg-bg-card-hover/30 transition-colors px-1"
+              className="w-full flex items-center justify-between text-xs font-semibold px-2 py-1.5 rounded-[var(--radius-control)] hover:bg-bg-card-hover transition-colors"
             >
               <div className="flex items-center gap-2">
                 {isCollapsed ? (
@@ -1566,7 +1478,7 @@ function OpenPositionsGrouped({
                   {themeMap.size} {themeMap.size === 1 ? "theme" : "themes"}
                 </span>
               </div>
-              <div className="flex items-center gap-3 font-mono text-xs">
+              <div className="flex items-center gap-3 num text-xs">
                 <span className="text-text-muted">
                   {formatCurrency(catValue)}
                 </span>
@@ -1606,7 +1518,8 @@ function OpenPositionsGrouped({
           </div>
         );
       })}
-    </div>
+      </div>
+    </GlassPanel>
   );
 }
 
@@ -1710,49 +1623,46 @@ export function SmartTrader() {
   const personaRows = personaList?.personas ?? [];
   return (
     <div className="space-y-4">
-      {/* Persona selector — three paper books at the same $20K starting capital */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex items-center gap-1 text-xs text-text-muted shrink-0">
-          <Users size={11} />
-          Persona
-        </div>
-        {personas.map((p) => {
-          const row = personaRows.find((r) => r.name === p);
-          const active = persona === p;
-          const meta = PERSONA_META[p];
-          const ret = row?.return_pct ?? 0;
-          const retColor = changeColor(ret);
-          return (
-            <button
-              key={p}
-              onClick={() => setPersona(p)}
-              className="px-3 py-2 rounded-lg text-xs font-semibold transition-all text-left"
-              style={{
-                background: active
-                  ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)"
-                  : "color-mix(in srgb, var(--bg-card) 40%, transparent)",
-                border: `1px solid ${active ? "var(--accent-blue)" : "var(--border)"}`,
-                color: active ? "var(--accent-blue)" : "var(--text-primary)",
-              }}
-              title={meta.tagline}
-            >
-              <div className="flex items-center gap-2">
-                <span>{meta.label}</span>
-                {row && (
-                  <span className="font-mono" style={{ color: retColor }}>
-                    {ret >= 0 ? "+" : ""}
-                    {ret.toFixed(2)}%
+      {/* Persona selector — five paper books at the same starting capital */}
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 text-xs text-text-muted shrink-0">
+            <Users size={11} />
+            Persona
+          </div>
+          <Segmented<PersonaName>
+            className="flex-wrap max-md:w-full"
+            options={personas.map((p) => {
+              const row = personaRows.find((r) => r.name === p);
+              const pRet = row?.return_pct ?? 0;
+              return {
+                value: p,
+                label: PERSONA_META[p].label,
+                badge: row ? (
+                  <span className="num" style={{ color: changeColor(pRet) }}>
+                    {pRet >= 0 ? "+" : ""}
+                    {pRet.toFixed(2)}%
                   </span>
-                )}
-              </div>
-              {row && (
-                <div className="text-xs text-text-muted font-normal mt-0.5">
-                  {row.open_positions} open · ${(row.total_value / 1000).toFixed(1)}K
-                </div>
-              )}
-            </button>
-          );
-        })}
+                ) : undefined,
+              };
+            })}
+            value={persona}
+            onChange={setPersona}
+          />
+        </div>
+        {/* Active book at a glance — tagline + size, replaces the old per-button sublines */}
+        <div className="text-xs text-text-muted">
+          {PERSONA_META[persona].tagline}
+          {(() => {
+            const row = personaRows.find((r) => r.name === persona);
+            return row ? (
+              <span className="num">
+                {" "}
+                · {row.open_positions} open · ${(row.total_value / 1000).toFixed(1)}K
+              </span>
+            ) : null;
+          })()}
+        </div>
       </div>
 
       {/* Action buttons — no manual "Run Picks": the cron is the only source
@@ -1787,22 +1697,17 @@ export function SmartTrader() {
       </div>
 
       {/* Portfolio Summary */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <div className="text-xs uppercase tracking-wider text-text-muted">
-              Smart Trader Portfolio
-            </div>
-            <div className="font-mono text-2xl font-extrabold text-text-primary">
-              {formatCurrency(summary.total_value)}
-            </div>
+      <GlassPanel title="Smart Trader Portfolio">
+        <div className="flex items-center justify-between mb-3 gap-3">
+          <div className="num text-2xl font-extrabold text-text-primary">
+            {formatCurrency(summary.total_value)}
           </div>
           <div className="text-right">
-            <div className="text-xs uppercase tracking-wider text-text-muted">
+            <div className="text-xs text-text-muted">
               Return vs ${(summary.starting_capital / 1000).toFixed(0)}K
             </div>
             <div
-              className="font-mono text-xl font-extrabold"
+              className="num text-lg font-extrabold"
               style={{ color: retColor }}
             >
               {ret >= 0 ? "+" : ""}
@@ -1810,58 +1715,41 @@ export function SmartTrader() {
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 text-xs">
-          <div>
-            <div className="text-text-muted">Cash</div>
-            <div className="font-mono text-text-primary">
-              {formatCurrency(summary.cash)}
-            </div>
-          </div>
-          <div>
-            <div className="text-text-muted">Positions</div>
-            <div className="font-mono text-text-primary">
-              {formatCurrency(summary.positions_value)}
-            </div>
-          </div>
-          <div>
-            <div className="text-text-muted">Realized</div>
-            <div className="font-mono" style={{ color: changeColor(summary.realized_pnl) }}>
-              {summary.realized_pnl >= 0 ? "+" : ""}
-              {formatCurrency(summary.realized_pnl)}
-            </div>
-            {(summary.banked_from_trims ?? 0) > 0 && (
-              <div
-                className="font-mono text-xs inline-flex items-center gap-1"
-                style={{ color: "var(--accent-purple)" }}
-                title="Realized gains banked from AbTrader-style scale-out trims"
-              >
-                <Scissors size={9} /> +{formatCurrency(summary.banked_from_trims ?? 0)} trims
-              </div>
-            )}
-          </div>
-          <div>
-            <div className="text-text-muted">Unrealized</div>
-            <div className="font-mono" style={{ color: changeColor(summary.unrealized_pnl) }}>
-              {summary.unrealized_pnl >= 0 ? "+" : ""}
-              {formatCurrency(summary.unrealized_pnl)}
-            </div>
-          </div>
-          <div>
-            <div className="text-text-muted">Open</div>
-            <div className="font-mono text-accent-blue">
-              {summary.open_positions}
-            </div>
-          </div>
-          <div>
-            <div className="text-text-muted">Win Rate</div>
-            <div className="font-mono text-text-primary">
-              {summary.closed_positions > 0
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+          <Stat label="Cash" value={formatCurrency(summary.cash)} />
+          <Stat label="Positions" value={formatCurrency(summary.positions_value)} />
+          <Stat
+            label="Realized"
+            tone={summary.realized_pnl >= 0 ? "green" : "red"}
+            value={`${summary.realized_pnl >= 0 ? "+" : ""}${formatCurrency(summary.realized_pnl)}`}
+            sub={
+              (summary.banked_from_trims ?? 0) > 0 ? (
+                <span
+                  className="num inline-flex items-center gap-1"
+                  style={{ color: "var(--accent-purple)" }}
+                  title="Realized gains banked from AbTrader-style scale-out trims"
+                >
+                  <Scissors size={9} /> +{formatCurrency(summary.banked_from_trims ?? 0)} trims
+                </span>
+              ) : undefined
+            }
+          />
+          <Stat
+            label="Unrealized"
+            tone={summary.unrealized_pnl >= 0 ? "green" : "red"}
+            value={`${summary.unrealized_pnl >= 0 ? "+" : ""}${formatCurrency(summary.unrealized_pnl)}`}
+          />
+          <Stat label="Open" value={summary.open_positions} />
+          <Stat
+            label="Win Rate"
+            value={
+              summary.closed_positions > 0
                 ? `${summary.win_rate.toFixed(0)}%`
-                : "—"}
-            </div>
-          </div>
+                : "—"
+            }
+          />
         </div>
-      </div>
+      </GlassPanel>
 
       {/* Why this works — explainer adapts to active persona */}
       <div
@@ -1888,14 +1776,17 @@ export function SmartTrader() {
 
       {/* Today — what got rejected, grouped by rule */}
       {today && (
-        <div>
-          <div className="text-xs uppercase tracking-wider text-text-muted font-semibold mb-2 flex items-center gap-1">
-            <Shield size={11} />
-            Today ({today.date}) — picks {today.picked.length} ·
-            rejections {today.rejected_count}
-          </div>
+        <GlassPanel
+          title={
+            <span className="inline-flex items-center gap-1">
+              <Shield size={11} />
+              Today ({today.date}) — picks {today.picked.length} · rejections{" "}
+              {today.rejected_count}
+            </span>
+          }
+        >
           {today.picked.length === 0 && today.rejected_count === 0 ? (
-            <div className="text-text-muted text-xs text-center py-4">
+            <div className="text-sm text-text-muted text-center py-4">
               No candidates yet today. Picks fire at 06:30 PT — or click Run
               Picks above.
             </div>
@@ -1906,13 +1797,13 @@ export function SmartTrader() {
                   <RejectionBlock key={rk} ruleKey={rk} entries={entries} />
                 ))
               ) : (
-                <div className="text-text-muted text-xs text-center py-2">
+                <div className="text-sm text-text-muted text-center py-2">
                   No rejected entries logged for {today.date}.
                 </div>
               )}
             </div>
           )}
-        </div>
+        </GlassPanel>
       )}
 
       {/* Trade Decision History — always visible, even when empty */}

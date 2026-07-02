@@ -5,6 +5,8 @@ import { MissedOpportunities } from "./MissedOpportunities";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../../api/client";
 import { formatCurrency, changeColor } from "../../lib/utils";
+import { GlassPanel, Chip, Stat } from "../../components/Glass";
+import type { ChipTone } from "../../components/Glass";
 import {
   Loader2,
   RefreshCw,
@@ -12,7 +14,6 @@ import {
   Eye,
   TrendingUp,
   TrendingDown,
-  Target,
   Zap,
   Shield,
   Activity,
@@ -220,29 +221,21 @@ function estimateWatchlistPnl(
 
 function PnlBadge({ pnl }: { pnl: number | null }) {
   if (pnl === null) return null;
-  const color = pnl >= 0 ? "var(--accent-green)" : "var(--accent-red)";
   return (
-    <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
-      style={{ color, background: `${color}12` }}>
-      {pnl >= 0 ? "+" : ""}{pnl}%
-    </span>
+    <Chip tone={pnl >= 0 ? "green" : "red"} className="num">
+      {pnl >= 0 ? "+" : ""}
+      {pnl}%
+    </Chip>
   );
 }
 
 function ScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 70
-      ? "var(--accent-green)"
-      : score >= 50
-        ? "var(--accent-orange)"
-        : "var(--text-muted)";
+  const tone: ChipTone =
+    score >= 70 ? "green" : score >= 50 ? "orange" : "neutral";
   return (
-    <span
-      className="font-mono text-[11px] font-extrabold px-1.5 py-0.5 rounded"
-      style={{ color, background: `${color}15` }}
-    >
+    <Chip tone={tone} className="num">
       {score}
-    </span>
+    </Chip>
   );
 }
 
@@ -254,19 +247,12 @@ function SideIcon({ side }: { side: string }) {
 
 function SourceTag({ source }: { source?: string }) {
   if (!source) return null;
-  const color =
-    source === "synthesis"
-      ? "var(--accent-cyan)"
-      : source === "flash"
-        ? "var(--accent-orange)"
-        : "var(--text-muted)";
+  const tone: ChipTone =
+    source === "synthesis" ? "cyan" : source === "flash" ? "orange" : "neutral";
   return (
-    <span
-      className="text-xs px-1 py-0.5 rounded uppercase tracking-wider font-semibold"
-      style={{ color, background: `${color}18`, border: `1px solid ${color}30` }}
-    >
+    <Chip tone={tone} className="uppercase tracking-wider">
       {source}
-    </span>
+    </Chip>
   );
 }
 
@@ -431,22 +417,15 @@ export function FlowPaperTrading() {
       <SystemRiskStatus />
 
       {/* Portfolio Summary */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <div className="text-xs uppercase tracking-wider text-text-muted">
-              Flow Trader Portfolio
-            </div>
-            <div className="font-mono text-2xl font-extrabold text-text-primary">
-              {formatCurrency(summary.total_value)}
-            </div>
+      <GlassPanel title="Flow Trader Portfolio">
+        <div className="flex items-center justify-between mb-3 gap-3">
+          <div className="num text-2xl font-extrabold text-text-primary">
+            {formatCurrency(summary.total_value)}
           </div>
           <div className="text-right">
-            <div className="text-xs uppercase tracking-wider text-text-muted">
-              Return
-            </div>
+            <div className="text-xs text-text-muted">Return</div>
             <div
-              className="font-mono text-xl font-extrabold"
+              className="num text-lg font-extrabold"
               style={{ color: retColor }}
             >
               {ret >= 0 ? "+" : ""}
@@ -455,55 +434,22 @@ export function FlowPaperTrading() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 text-xs">
-          <div>
-            <div className="text-text-muted">Cash</div>
-            <div className="font-mono text-text-primary">
-              {formatCurrency(summary.cash)}
-            </div>
-          </div>
-          <div>
-            <div className="text-text-muted">Positions</div>
-            <div className="font-mono text-text-primary">
-              {formatCurrency(summary.positions_value)}
-            </div>
-          </div>
-          <div>
-            <div className="text-text-muted">Realized</div>
-            <div
-              className="font-mono"
-              style={{ color: changeColor(summary.realized_pnl) }}
-            >
-              {summary.realized_pnl >= 0 ? "+" : ""}
-              {formatCurrency(summary.realized_pnl)}
-            </div>
-          </div>
-          <div>
-            <div className="text-text-muted">Win Rate</div>
-            <div className="font-mono text-text-primary">
-              {summary.win_rate.toFixed(0)}%
-            </div>
-          </div>
-          <div>
-            <div className="text-text-muted flex items-center gap-1">
-              <Eye size={10} />
-              Watching
-            </div>
-            <div className="font-mono text-accent-orange">
-              {summary.watching}
-            </div>
-          </div>
-          <div>
-            <div className="text-text-muted flex items-center gap-1">
-              <Target size={10} />
-              Open
-            </div>
-            <div className="font-mono text-accent-blue">
-              {summary.open_positions}
-            </div>
-          </div>
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+          <Stat label="Cash" value={formatCurrency(summary.cash)} />
+          <Stat
+            label="Positions"
+            value={formatCurrency(summary.positions_value)}
+          />
+          <Stat
+            label="Realized"
+            tone={summary.realized_pnl >= 0 ? "green" : "red"}
+            value={`${summary.realized_pnl >= 0 ? "+" : ""}${formatCurrency(summary.realized_pnl)}`}
+          />
+          <Stat label="Win Rate" value={`${summary.win_rate.toFixed(0)}%`} />
+          <Stat label="Watching" value={summary.watching} />
+          <Stat label="Open" value={summary.open_positions} />
         </div>
-      </div>
+      </GlassPanel>
 
       {/* Macro Status Bar */}
       {macro && (
@@ -516,7 +462,7 @@ export function FlowPaperTrading() {
               <Activity size={10} />
               <span>Macro</span>
             </div>
-            <span className="font-mono">
+            <span className="num">
               SPY ${macro.spy_price.toFixed(2)}{" "}
               <span
                 style={{
@@ -530,7 +476,7 @@ export function FlowPaperTrading() {
                 {macro.spy_change_pct.toFixed(2)}%
               </span>
             </span>
-            <span className="font-mono">
+            <span className="num">
               VIX{" "}
               <span
                 style={{
@@ -545,24 +491,13 @@ export function FlowPaperTrading() {
                 {macro.vix.toFixed(1)}
               </span>
             </span>
-            <span
-              className="text-xs px-2 py-0.5 rounded font-semibold uppercase tracking-wider"
-              style={{
-                color: macro.is_safe
-                  ? "var(--accent-green)"
-                  : "var(--accent-red)",
-                background: macro.is_safe
-                  ? "color-mix(in srgb, var(--accent-green) 12%, transparent)"
-                  : "color-mix(in srgb, var(--accent-red) 12%, transparent)",
-                border: `1px solid ${macro.is_safe ? "color-mix(in srgb, var(--accent-green) 30%, transparent)" : "color-mix(in srgb, var(--accent-red) 30%, transparent)"}`,
-              }}
+            <Chip
+              tone={macro.is_safe ? "green" : "red"}
+              className="uppercase tracking-wider"
             >
-              <Shield
-                size={9}
-                style={{ display: "inline", marginRight: 3, verticalAlign: "middle" }}
-              />
+              <Shield size={9} />
               {macro.is_safe ? "SAFE" : "UNSAFE"}
-            </span>
+            </Chip>
           </div>
           <span className="text-sm text-text-muted">{macro.market_status}</span>
         </div>
@@ -596,7 +531,7 @@ export function FlowPaperTrading() {
                 />
               ))}
             </div>
-            <span className="text-text-muted font-mono text-xs">
+            <span className="text-text-muted num text-xs">
               {slots.day_trade.used}/{slots.day_trade.max}
             </span>
           </div>
@@ -618,7 +553,7 @@ export function FlowPaperTrading() {
                 />
               ))}
             </div>
-            <span className="text-text-muted font-mono text-xs">
+            <span className="text-text-muted num text-xs">
               {slots.swing.used}/{slots.swing.max}
             </span>
           </div>
@@ -649,23 +584,25 @@ export function FlowPaperTrading() {
               return (
                 <div
                   key={pos.id}
-                  className="card cursor-pointer transition-all hover:brightness-110"
+                  className="card card-interactive cursor-pointer"
                   style={{ borderLeft: `3px solid ${sideColor}` }}
                   onClick={() => setExpandedPos(isExpanded ? null : pos.id)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono px-1 py-0.5 rounded" style={{
-                        background: pos.slot_type === "day_trade" ? "color-mix(in srgb, var(--accent-blue) 15%, transparent)" : "color-mix(in srgb, var(--accent-purple) 15%, transparent)",
-                        color: pos.slot_type === "day_trade" ? "var(--accent-blue)" : "var(--accent-purple)",
-                      }}>{slotLabel}</span>
+                      <Chip
+                        tone={pos.slot_type === "day_trade" ? "blue" : "purple"}
+                        className="num"
+                      >
+                        {slotLabel}
+                      </Chip>
                       <span className="font-mono text-base font-extrabold text-text-primary">
                         {pos.ticker}
                       </span>
-                      <span className="font-mono text-sm text-text-primary">
+                      <span className="num text-sm text-text-primary">
                         ${pos.strike} {pos.option_type}
                       </span>
-                      <span className="text-text-muted text-xs">
+                      <span className="text-text-muted text-xs num">
                         x{pos.contracts}
                         {pos.scaled_out ? " (scaled)" : ""}
                       </span>
@@ -673,20 +610,20 @@ export function FlowPaperTrading() {
                     <div className="flex items-center gap-4">
                       <div className="text-right text-xs">
                         <div className="text-text-muted">Cost</div>
-                        <div className="font-mono text-text-primary">
+                        <div className="num text-text-primary">
                           {formatCurrency(pos.cost_basis)}
                         </div>
                       </div>
                       <div className="text-right text-xs">
                         <div className="text-text-muted">Value</div>
-                        <div className="font-mono text-text-primary">
+                        <div className="num text-text-primary">
                           {formatCurrency(pos.current_value ?? 0)}
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="text-text-muted text-xs">P/L</div>
                         <div
-                          className="font-mono text-sm font-extrabold"
+                          className="num text-sm font-extrabold"
                           style={{ color: pnlColor }}
                         >
                           {pos.pnl_pct >= 0 ? "+" : ""}
@@ -701,41 +638,41 @@ export function FlowPaperTrading() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                         <div>
                           <div className="text-text-muted">Side</div>
-                          <div className="font-mono font-semibold" style={{ color: sideColor }}>
+                          <div className="font-semibold" style={{ color: sideColor }}>
                             {pos.side === "Bull" ? "Bullish" : "Bearish"}
                           </div>
                         </div>
                         <div>
                           <div className="text-text-muted">Entry</div>
-                          <div className="font-mono text-text-primary">${pos.entry_premium?.toFixed(2)}</div>
+                          <div className="num text-text-primary">${pos.entry_premium?.toFixed(2)}</div>
                         </div>
                         <div>
                           <div className="text-text-muted">Current</div>
-                          <div className="font-mono" style={{ color: pnlColor }}>
+                          <div className="num" style={{ color: pnlColor }}>
                             ${pos.current_premium?.toFixed(2)}
                           </div>
                         </div>
                         <div>
                           <div className="text-text-muted">P/L $</div>
-                          <div className="font-mono font-semibold" style={{ color: pnlColor }}>
+                          <div className="num font-semibold" style={{ color: pnlColor }}>
                             {pnlDollars >= 0 ? "+" : ""}${pnlDollars.toFixed(0)}
                           </div>
                         </div>
                         <div>
                           <div className="text-text-muted">Entry Date</div>
-                          <div className="font-mono text-text-primary">{pos.entry_date}</div>
+                          <div className="num text-text-primary">{pos.entry_date}</div>
                         </div>
                         <div>
                           <div className="text-text-muted">Hold Days</div>
-                          <div className="font-mono text-text-primary">{pos.hold_days ?? "—"}</div>
+                          <div className="num text-text-primary">{pos.hold_days ?? "—"}</div>
                         </div>
                         <div>
                           <div className="text-text-muted">Expiry</div>
-                          <div className="font-mono text-text-primary">{pos.expiry}</div>
+                          <div className="num text-text-primary">{pos.expiry}</div>
                         </div>
                         <div>
                           <div className="text-text-muted">Slot</div>
-                          <div className="font-mono" style={{
+                          <div style={{
                             color: pos.slot_type === "day_trade" ? "var(--accent-blue)" : "var(--accent-purple)"
                           }}>{pos.slot_type === "day_trade" ? "Day Trade" : "Swing"}</div>
                         </div>
@@ -748,7 +685,7 @@ export function FlowPaperTrading() {
                         </div>
                       )}
 
-                      <div className="flex items-center gap-3 text-xs font-mono pt-1">
+                      <div className="flex items-center gap-3 text-xs num pt-1">
                         <span className="text-text-muted">Targets:</span>
                         <span className="text-accent-red">
                           Stop ${stopTarget.toFixed(2)} (-30%)
@@ -837,23 +774,23 @@ export function FlowPaperTrading() {
                         <span className="font-mono text-sm font-bold text-text-primary">
                           {w.ticker}
                         </span>
-                        <span className="font-mono text-xs text-text-primary">
+                        <span className="num text-xs text-text-primary">
                           ${w.strike}
                         </span>
                         <span className="text-xs" style={{ color: optColor }}>
                           {w.option_type}
                         </span>
-                        <span className="text-xs text-accent-blue">
+                        <span className="text-xs text-accent-blue num">
                           exp {w.expiry}
                         </span>
                         <SourceTag source={w.source} />
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-sm text-text-muted">
+                        <span className="text-sm text-text-muted num">
                           ref ${typeof w.ref_premium === "number" ? w.ref_premium.toFixed(2) : w.ref_premium}
                         </span>
                         {w.gate_price != null && (
-                          <span className="font-mono text-xs text-accent-green font-semibold">
+                          <span className="num text-xs text-accent-green font-semibold">
                             gate ${typeof w.gate_price === "number" ? w.gate_price.toFixed(2) : w.gate_price}
                           </span>
                         )}
@@ -896,20 +833,20 @@ export function FlowPaperTrading() {
                         <span className="font-mono text-sm font-bold text-text-primary">
                           {w.ticker}
                         </span>
-                        <span className="font-mono text-xs text-text-primary">
+                        <span className="num text-xs text-text-primary">
                           ${w.strike}
                         </span>
                         <span className="text-xs" style={{ color: optColor }}>
                           {w.option_type}
                         </span>
-                        <span className="text-xs text-accent-blue">
+                        <span className="text-xs text-accent-blue num">
                           exp {w.expiry}
                         </span>
                         <SourceTag source={w.source} />
                       </div>
                       <div className="flex items-center gap-3">
                         <PnlBadge pnl={pnl} />
-                        <span className="text-sm text-text-muted">
+                        <span className="text-sm text-text-muted num">
                           ref ${typeof w.ref_premium === "number" ? w.ref_premium.toFixed(2) : w.ref_premium}
                         </span>
                         <span className="text-xs text-text-muted italic">
@@ -934,21 +871,23 @@ export function FlowPaperTrading() {
       </details>
 
       {/* Synthesis Report Panel + trigger */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-xs uppercase tracking-wider text-accent-cyan font-semibold flex items-center gap-1">
+      <GlassPanel
+        title={
+          <span className="inline-flex items-center gap-1 text-accent-cyan">
             <Activity size={10} />
             Daily Synthesis
             {synthesis?.date && (
-              <span className="text-text-muted font-normal ml-1 normal-case tracking-normal">
+              <span className="text-text-muted font-normal ml-1 normal-case tracking-normal num">
                 — {synthesis.date}
               </span>
             )}
-          </div>
+          </span>
+        }
+        actions={
           <button
             onClick={() => synthesisMutation.mutate()}
             disabled={synthesisMutation.isPending}
-            className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-semibold bg-accent-cyan/15 text-accent-cyan hover:bg-accent-cyan/25 transition-colors disabled:opacity-40"
+            className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-accent-cyan/15 text-accent-cyan hover:bg-accent-cyan/25 transition-colors disabled:opacity-40"
           >
             {synthesisMutation.isPending ? (
               <>
@@ -962,7 +901,8 @@ export function FlowPaperTrading() {
               </>
             )}
           </button>
-        </div>
+        }
+      >
         {synthesisMutation.isPending && (
           <div className="flex items-center gap-2 py-3 text-sm text-accent-cyan">
             <Loader2 size={14} className="animate-spin" />
@@ -972,11 +912,11 @@ export function FlowPaperTrading() {
         {synthesis?.report ? (
           <SynthesisReport report={synthesis.report} />
         ) : (
-          <p className="text-xs text-text-muted text-center py-3">
+          <p className="text-sm text-text-muted text-center py-3">
             No synthesis report yet — click Generate to create one
           </p>
         )}
-      </div>
+      </GlassPanel>
 
       {/* Empty state */}
       {positions.length === 0 && wla.length === 0 && wlb.length === 0 && (

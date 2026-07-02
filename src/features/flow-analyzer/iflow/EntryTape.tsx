@@ -92,25 +92,25 @@ const NOTABLE_STYLE: Record<FilterMode, { label: string; fg: string; bg: string;
   },
   notable_nscore: {
     label: "Top NScore",
-    fg: "var(--accent-yellow, #eab308)",
+    fg: "var(--accent-yellow)",
     bg: "color-mix(in srgb, var(--accent-yellow) 18%, transparent)",
     bd: "color-mix(in srgb, var(--accent-yellow) 50%, transparent)",
   },
   notable_ml: {
     label: "Top ML",
-    fg: "var(--accent-cyan, #22d3ee)",
+    fg: "var(--accent-cyan)",
     bg: "color-mix(in srgb, var(--accent-cyan) 18%, transparent)",
     bd: "color-mix(in srgb, var(--accent-cyan) 50%, transparent)",
   },
   notable_both: {
     label: "Top Both",
-    fg: "var(--accent-purple, #c084fc)",
+    fg: "var(--accent-purple)",
     bg: "color-mix(in srgb, var(--accent-purple) 18%, transparent)",
     bd: "color-mix(in srgb, var(--accent-purple) 50%, transparent)",
   },
   avg_sweet: {
     label: "AVG 75-85",
-    fg: "var(--accent-green, #4ade80)",
+    fg: "var(--accent-green)",
     bg: "color-mix(in srgb, var(--accent-green) 18%, transparent)",
     bd: "color-mix(in srgb, var(--accent-green) 50%, transparent)",
   },
@@ -305,9 +305,9 @@ function setupScore(
 function setupTextColor(score: number | null): string {
   if (score == null) return "var(--text-muted)";
   if (score >= 70) return "var(--accent-green)";
-  if (score >= 55) return "var(--accent-orange, #e37f2e)";
+  if (score >= 55) return "var(--accent-orange)";
   if (score >= 45) return "var(--text-secondary)";
-  return "var(--accent-red, #ef4444)"; // underlying setup contradicts the trade
+  return "var(--accent-red)"; // underlying setup contradicts the trade
 }
 
 /** Average-score helper. Returns (nscore + ml) / 2 when both present,
@@ -329,7 +329,7 @@ function avgScore(nscore: number | null | undefined,
 function avgTextColor(score: number | null): string {
   if (score == null) return "var(--text-muted)";
   if (score >= 80) return "var(--accent-green)";
-  if (score >= 65) return "var(--accent-orange, #e37f2e)";
+  if (score >= 65) return "var(--accent-orange)";
   if (score >= 50) return "var(--text-secondary)";
   return "var(--text-muted)";
 }
@@ -339,24 +339,24 @@ function scoreBorderStyle(score: number | null, fallbackColor: string) {
   if (score == null) return { borderLeft: `2px solid ${fallbackColor}`, boxShadow: undefined };
   if (score >= 85) {
     return {
-      borderLeft: "3px solid var(--accent-yellow, #eab308)",
+      borderLeft: "3px solid var(--accent-yellow)",
       boxShadow: "0 0 6px color-mix(in srgb, var(--accent-yellow) 35%, transparent)",
     };
   }
   if (score >= 70) {
-    return { borderLeft: "3px solid var(--accent-yellow, #eab308)", boxShadow: undefined };
+    return { borderLeft: "3px solid var(--accent-yellow)", boxShadow: undefined };
   }
   if (score >= 55) {
-    return { borderLeft: `2px solid var(--accent-yellow, #eab308)`, boxShadow: undefined };
+    return { borderLeft: `2px solid var(--accent-yellow)`, boxShadow: undefined };
   }
   return { borderLeft: `2px solid ${fallbackColor}`, boxShadow: undefined };
 }
 
 function scoreTextColor(score: number | null): string {
   if (score == null) return "var(--text-muted)";
-  if (score >= 85) return "var(--accent-yellow, #eab308)";
-  if (score >= 70) return "var(--accent-yellow, #eab308)";
-  if (score >= 55) return "var(--accent-orange, #e37f2e)";
+  if (score >= 85) return "var(--accent-yellow)";
+  if (score >= 70) return "var(--accent-yellow)";
+  if (score >= 55) return "var(--accent-orange)";
   return "var(--text-secondary)";
 }
 
@@ -365,10 +365,10 @@ function scoreTextColor(score: number | null): string {
  *  chip semantic (different system). */
 function mlTextColor(score: number | null): string {
   if (score == null) return "var(--text-muted)";
-  if (score >= 80) return "var(--accent-cyan, #22d3ee)";
-  if (score >= 60) return "var(--accent-blue, #60a5fa)";
+  if (score >= 80) return "var(--accent-cyan)";
+  if (score >= 60) return "var(--accent-blue)";
   if (score >= 40) return "var(--text-secondary)";
-  return "var(--accent-red, #ef4444)";
+  return "var(--accent-red)";
 }
 
 interface Props {
@@ -963,7 +963,7 @@ export function EntryTape({
   );
 
   return (
-    <div className="space-y-0.5 font-mono text-xs">
+    <div className="space-y-0.5 text-xs">
       <div className="flex items-center justify-between px-2 py-1 max-md:px-1 max-md:flex-wrap max-md:gap-1">
         <div className="flex items-center gap-2 max-md:gap-1 max-md:overflow-x-auto max-md:flex-nowrap max-md:w-full">
           {(() => {
@@ -1009,12 +1009,12 @@ export function EntryTape({
               <button
                 type="button"
                 onClick={onClick}
-                className="px-2 py-0.5 rounded text-xs font-semibold transition-colors flex items-center gap-1.5"
+                className="px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5"
                 style={{ background: style.bg, color: style.fg, border: `1px solid ${style.bd}` }}
                 title={tooltipFor[currentNotable]}
               >
                 {style.label}
-                <span className="opacity-70 font-mono">{count > 0 ? `(${count})` : ""}</span>
+                <span className="opacity-70 num">{count > 0 ? `(${count})` : ""}</span>
               </button>
             );
           })()}
@@ -1030,10 +1030,10 @@ export function EntryTape({
                 patchTape({ filterMode: next });
               }
             }}
-            className="px-2 py-0.5 rounded text-xs font-semibold transition-colors flex items-center gap-1.5"
+            className="px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5"
             style={{
               background: filterMode === "kian" ? "color-mix(in srgb, var(--accent-cyan) 18%, transparent)" : "transparent",
-              color: filterMode === "kian" ? "var(--accent-cyan, #22d3ee)" : "var(--text-muted)",
+              color: filterMode === "kian" ? "var(--accent-cyan)" : "var(--text-muted)",
               border: `1px solid ${filterMode === "kian" ? "color-mix(in srgb, var(--accent-cyan) 50%, transparent)" : "var(--border)"}`,
             }}
             title={
@@ -1045,7 +1045,7 @@ export function EntryTape({
           >
             <Activity size={11} />
             {filterMode === "kian" ? "Showing Flowseidon" : "Flowseidon"}
-            <span className="opacity-70 font-mono">{kianCount > 0 ? `(${kianCount})` : ""}</span>
+            <span className="opacity-70 num">{kianCount > 0 ? `(${kianCount})` : ""}</span>
           </button>
           {/* "Someone knows something" — deep-OTM convexity bets (strike far
               out of the money). The 40C-on-a-$13-stock kind of print. */}
@@ -1060,10 +1060,10 @@ export function EntryTape({
                 patchTape({ filterMode: next });
               }
             }}
-            className="px-2 py-0.5 rounded text-xs font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap"
+            className="px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap"
             style={{
               background: filterMode === "outliers" ? "color-mix(in srgb, var(--accent-fuchsia) 18%, transparent)" : "transparent",
-              color: filterMode === "outliers" ? "var(--accent-fuchsia, #d946ef)" : "var(--text-muted)",
+              color: filterMode === "outliers" ? "var(--accent-fuchsia)" : "var(--text-muted)",
               border: `1px solid ${filterMode === "outliers" ? "color-mix(in srgb, var(--accent-fuchsia) 50%, transparent)" : "var(--border)"}`,
             }}
             title={
@@ -1075,15 +1075,15 @@ export function EntryTape({
           >
             <Sparkles size={11} />
             Someone knows something
-            <span className="opacity-70 font-mono">{outlierCount > 0 ? `(${outlierCount})` : ""}</span>
+            <span className="opacity-70 num">{outlierCount > 0 ? `(${outlierCount})` : ""}</span>
           </button>
           {filterMode === "outliers" && (
             <label
-              className="flex items-center gap-1 rounded px-1.5 py-0.5 border whitespace-nowrap"
+              className="flex items-center gap-1 rounded-full px-2 py-0.5 border whitespace-nowrap"
               style={{ borderColor: "color-mix(in srgb, var(--accent-fuchsia) 40%, transparent)", background: "color-mix(in srgb, var(--accent-fuchsia) 8%, transparent)" }}
               title="Minimum % out-of-the-money to qualify"
             >
-              <span className="text-[10px] uppercase tracking-wide text-text-muted">≥</span>
+              <span className="text-xs text-text-muted">≥</span>
               <input
                 type="number"
                 min={0}
@@ -1093,18 +1093,21 @@ export function EntryTape({
                 onChange={(e) =>
                   patchTape({ outlierMin: Math.max(0, Math.min(1000, Number(e.target.value) || 0)) })
                 }
-                className="w-12 bg-transparent text-xs text-text-primary outline-none font-mono"
+                className="w-12 bg-transparent text-xs text-text-primary outline-none num"
               />
-              <span className="text-[10px] text-text-muted">% OTM</span>
+              <span className="text-xs text-text-muted">% OTM</span>
             </label>
           )}
         </div>
-        <span className="text-[10px] text-text-muted">
+        <span className="text-xs text-text-muted num">
           {sortedRows.length} of {entries.length} entries
           {dates.length > 1 ? ` · ${dates.length} dates` : ""}
         </span>
       </div>
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-text-muted px-2 py-1 border-b border-border max-md:gap-1">
+      <div
+        className="flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-text-muted px-2 py-1 max-md:gap-1 sticky top-0 z-10 glass-strong"
+        style={{ borderRadius: "var(--radius-control)" }}
+      >
         {renderHeader("avg", "avg", "w-12 justify-center")}
         {renderHeader("nscore", "score", "w-10 justify-center max-md:hidden")}
         {renderHeader("ml", "ml", "w-10 justify-center max-md:hidden")}
@@ -1195,7 +1198,7 @@ export function EntryTape({
                   `Empirically the strongest single signal (Pearson +0.246 vs realized peak P/L).`;
               return (
                 <span
-                  className="w-12 text-center font-bold text-sm"
+                  className="w-12 text-center font-bold text-sm num"
                   style={{ color: avgTextColor(avg) }}
                   title={title}
                 >
@@ -1207,7 +1210,7 @@ export function EntryTape({
                 with empirically-recalibrated weights. Component breakdown
                 in the hover tooltip. */}
             <span
-              className="w-10 text-center font-semibold max-md:hidden"
+              className="w-10 text-center font-semibold num max-md:hidden"
               style={{ color: scoreTextColor(scoreNum) }}
               title={scoreTitle}
             >
@@ -1223,7 +1226,7 @@ export function EntryTape({
                   `Source: notable_ml_v4 (gradient boosting, peak-graded labels)`;
               return (
                 <span
-                  className="w-10 text-center font-semibold max-md:hidden"
+                  className="w-10 text-center font-semibold num max-md:hidden"
                   style={{ color: mlTextColor(ml) }}
                   title={mlTitle}
                 >
@@ -1248,7 +1251,7 @@ export function EntryTape({
                   `weights 0.40 / 0.35 / 0.25. Heuristic context — not a calibrated predictor like ML.`;
               return (
                 <span
-                  className="w-10 text-center font-semibold max-md:hidden"
+                  className="w-10 text-center font-semibold num max-md:hidden"
                   style={{ color: setupTextColor(s.score) }}
                   title={title}
                 >
@@ -1256,26 +1259,26 @@ export function EntryTape({
                 </span>
               );
             })()}
-            <span className="w-12 text-text-secondary max-md:hidden">{r.timeLabel}</span>
-            <span className="w-14 font-semibold text-text-primary">{r.ticker}</span>
+            <span className="w-12 num text-text-secondary max-md:hidden">{r.timeLabel}</span>
+            <span className="w-14 font-mono font-semibold text-text-primary">{r.ticker}</span>
             <span
-              className="w-12 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase text-center max-md:w-10 max-md:px-1"
+              className="w-12 px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase text-center max-md:w-10 max-md:px-1"
               style={{
-                background: `${sideColor}1f`,
+                background: `color-mix(in srgb, ${sideColor} 14%, transparent)`,
                 color: sideColor,
-                border: `1px solid ${sideColor}40`,
+                border: `1px solid color-mix(in srgb, ${sideColor} 30%, transparent)`,
               }}
             >
               {r.side}
             </span>
             <span className="w-24 text-text-secondary max-md:hidden">{r.action}</span>
-            <span className="flex-1 min-w-[160px] text-text-primary truncate flex items-center gap-1.5 max-md:min-w-[80px]" title={r.contractLabel}>
+            <span className="flex-1 min-w-[160px] num text-text-primary truncate flex items-center gap-1.5 max-md:min-w-[80px]" title={r.contractLabel}>
               <span className="truncate">{r.contractLabel}</span>
               {r.printCount > 1 && (
                 <span
-                  className="px-1 rounded text-[9px] font-mono font-bold shrink-0"
+                  className="px-1 rounded-full text-[9px] num font-bold shrink-0"
                   style={{
-                    color: "var(--accent-cyan, #22d3ee)",
+                    color: "var(--accent-cyan)",
                     background: "color-mix(in srgb, var(--accent-cyan) 10%, transparent)",
                     border: "1px solid color-mix(in srgb, var(--accent-cyan) 30%, transparent)",
                   }}
@@ -1285,7 +1288,7 @@ export function EntryTape({
                 </span>
               )}
             </span>
-            <span className="w-14 flex items-center gap-1 text-text-muted max-md:hidden">
+            <span className="w-14 flex items-center gap-1 num text-text-muted max-md:hidden">
               {r.dte ? <span>{r.dte}d</span> : null}
               {r.dteCategory ? (
                 <span
@@ -1300,7 +1303,7 @@ export function EntryTape({
               ) : null}
             </span>
             <span
-              className="w-14 text-right max-md:hidden"
+              className="w-14 text-right num max-md:hidden"
               style={{
                 color: r.voiRatio != null && r.voiRatio >= 2
                   ? "var(--accent-green)"
@@ -1310,7 +1313,7 @@ export function EntryTape({
               {r.voiRatio != null ? `${r.voiRatio.toFixed(1)}×` : "—"}
             </span>
             <span
-              className="w-14 text-right max-md:hidden"
+              className="w-14 text-right num max-md:hidden"
               style={{
                 color: r.askPct == null
                   ? "var(--text-muted)"
@@ -1323,12 +1326,12 @@ export function EntryTape({
             >
               {r.askPct != null ? `${r.askPct}%` : "—"}
             </span>
-            <span className="w-16 text-right max-md:hidden" style={{ color: moneyColor }}>
+            <span className="w-16 text-right num max-md:hidden" style={{ color: moneyColor }}>
               {r.moneyness != null
                 ? `${r.moneyness >= 0 ? "+" : ""}${r.moneyness.toFixed(1)}%`
                 : "—"}
             </span>
-            <span className="w-20 text-right text-text-primary max-md:hidden">
+            <span className="w-20 text-right num text-text-primary max-md:hidden">
               {r.premium > 0 ? formatPremium(r.premium) : "—"}
             </span>
             {(() => {
@@ -1351,7 +1354,7 @@ export function EntryTape({
                   : "var(--text-muted)";
               return (
                 <span
-                  className="w-16 text-right font-semibold"
+                  className="w-16 text-right font-semibold num"
                   style={{ color }}
                   title={cur > 0 ? `current ${r.ticker} $${cur.toFixed(2)} vs entry $${r.underlyingFill.toFixed(2)}` : "price loading…"}
                 >
@@ -1373,7 +1376,7 @@ export function EntryTape({
               const ml = r.notable?.ml_score;
               if (raw == null) {
                 return (
-                  <span className="w-20 text-right text-text-muted max-md:hidden" title="Predicted peak unavailable">
+                  <span className="w-20 text-right num text-text-muted max-md:hidden" title="Predicted peak unavailable">
                     —
                   </span>
                 );
@@ -1383,7 +1386,7 @@ export function EntryTape({
               const weight = ml != null ? Math.max(0, Math.min(1, ml / 100)) : 0.5;
               const effective = raw * weight;
               const color = effective >= 0
-                ? "var(--accent-cyan, #22d3ee)" : "var(--accent-red)";
+                ? "var(--accent-cyan)" : "var(--accent-red)";
               const display = effective >= 999 ? "+999%"
                             : effective <= -100 ? "-100%"
                             : `${effective >= 0 ? "+" : ""}${Math.round(effective)}%`;
@@ -1399,7 +1402,7 @@ export function EntryTape({
                 `order-of-magnitude estimates.`;
               return (
                 <span
-                  className="w-20 text-right font-semibold max-md:hidden"
+                  className="w-20 text-right font-semibold num max-md:hidden"
                   style={{ color }}
                   title={title}
                 >

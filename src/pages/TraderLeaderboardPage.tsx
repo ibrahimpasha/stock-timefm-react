@@ -3,9 +3,9 @@ import { Users, TrendingUp, ArrowUpDown } from "lucide-react";
 
 import { useAppStore } from "../store/useAppStore";
 import { useLeaderboard, useAlertsPositions, useTradersToday } from "../api/alerts";
-import { Panel, Sparkline, RangeBar } from "../components/CCPrimitives";
+import { Sparkline, RangeBar } from "../components/CCPrimitives";
+import { Segmented, Stat } from "../components/Glass";
 import {
-  classNames,
   formatPercentRaw,
   relativeAge,
   absoluteAge,
@@ -37,6 +37,16 @@ const SORT_LABELS: Record<SortMode, string> = {
   author: "Author",
 };
 
+/** Segmented sort options — short labels so the pill fits the column. */
+const SORT_OPTIONS: { value: SortMode; label: string }[] = [
+  { value: "n_calls", label: "Calls" },
+  { value: "today", label: "Today" },
+  { value: "win_rate", label: "Win" },
+  { value: "mean_pl_pct", label: "Mean" },
+  { value: "latest", label: "Last" },
+  { value: "author", label: "A-Z" },
+];
+
 /**
  * Per-position headline P/L: realized cumulative when the position has been
  * trimmed/closed (status in {closed, stopped, partial}), otherwise the latest
@@ -65,51 +75,15 @@ function cmpTs(a: string | null, b: string | null): number {
 
 function EmptyState({ title, body }: { title: string; body: string }) {
   return (
-    <div
-      className="flex items-center justify-center"
-      style={{ minHeight: 320 }}
-    >
-      <div
-        style={{
-          maxWidth: 520,
-          padding: 24,
-          background: "var(--bg-card)",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          textAlign: "center",
-        }}
-      >
-        <div
-          className="font-mono"
-          style={{
-            fontSize: 11,
-            letterSpacing: 1.2,
-            textTransform: "uppercase",
-            color: "var(--text-muted)",
-            marginBottom: 8,
-          }}
-        >
+    <div className="flex items-center justify-center min-h-80">
+      <div className="card max-w-lg text-center">
+        <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-2">
           Alerts feed
         </div>
-        <h2
-          style={{
-            fontSize: 16,
-            fontWeight: 600,
-            color: "var(--text-primary)",
-            marginBottom: 8,
-          }}
-        >
+        <h2 className="text-sm font-semibold text-text-primary mb-2">
           {title}
         </h2>
-        <p
-          style={{
-            fontSize: 13,
-            color: "var(--text-secondary)",
-            lineHeight: 1.5,
-          }}
-        >
-          {body}
-        </p>
+        <p className="text-sm text-text-muted leading-relaxed">{body}</p>
       </div>
     </div>
   );
@@ -121,9 +95,9 @@ function SkeletonCard({ height = 96 }: { height?: number }) {
       className="animate-pulse"
       style={{
         height,
-        background: "var(--bg-card)",
-        border: "1px solid var(--border)",
-        borderRadius: 8,
+        background: "var(--glass-bg)",
+        border: "1px solid var(--glass-border)",
+        borderRadius: "var(--radius-panel)",
       }}
     />
   );
@@ -159,30 +133,23 @@ function LeaderboardHeader({
   return (
     <th
       onClick={() => onSort(mode)}
+      className={`px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap cursor-pointer select-none ${
+        active ? "text-text-secondary" : "text-text-muted"
+      }`}
       style={{
-        padding: "6px 10px",
         textAlign: align,
-        cursor: "pointer",
-        userSelect: "none",
-        fontSize: 10,
-        letterSpacing: 0.8,
-        textTransform: "uppercase",
-        color: active ? "var(--accent-blue)" : "var(--text-muted)",
-        fontWeight: 600,
-        fontFamily: "var(--font-mono, ui-monospace, monospace)",
-        borderBottom: "1px solid var(--border)",
-        background: "color-mix(in srgb, var(--bg-card-hover) 40%, transparent)",
         position: "sticky",
         top: 0,
         zIndex: 1,
-        whiteSpace: "nowrap",
+        background: "var(--glass-bg-strong)",
+        backdropFilter: "blur(var(--glass-blur))",
+        WebkitBackdropFilter: "blur(var(--glass-blur))",
+        borderBottom: "1px solid var(--border)",
       }}
     >
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+      <span className="inline-flex items-center gap-1">
         {label}
-        {active && (
-          <ArrowUpDown size={10} style={{ opacity: 0.7 }} />
-        )}
+        {active && <ArrowUpDown size={10} className="opacity-70" />}
       </span>
     </th>
   );
@@ -226,15 +193,11 @@ function LeaderboardTable({
     return copy;
   }, [rows, sortMode, sortDesc, todayMap]);
 
+  const tdBorder = { borderBottom: "1px solid var(--border)" } as const;
+
   return (
-    <div style={{ overflow: "auto", maxHeight: "calc(100vh - 240px)" }}>
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          fontSize: 12,
-        }}
-      >
+    <div className="overflow-auto" style={{ maxHeight: "calc(100vh - 240px)" }}>
+      <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
             <LeaderboardHeader mode="author" label="Trader" sortMode={sortMode} onSort={onSort} />
@@ -253,66 +216,39 @@ function LeaderboardTable({
               <tr
                 key={r.author}
                 onClick={() => onSelect(r.author)}
+                className="cursor-pointer hover:bg-bg-card-hover transition-colors"
                 style={{
-                  cursor: "pointer",
-                  background: isSel ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)" : "transparent",
+                  background: isSel
+                    ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)"
+                    : undefined,
                   borderLeft: isSel
                     ? "2px solid var(--accent-blue)"
                     : "2px solid transparent",
                 }}
               >
-                <td
-                  style={{
-                    padding: "8px 10px",
-                    borderBottom: "1px solid var(--border)",
-                  }}
-                >
+                <td className="px-2.5 py-2" style={tdBorder}>
                   <div
-                    className="font-mono"
-                    style={{
-                      color: "var(--text-primary)",
-                      fontWeight: isSel ? 700 : 600,
-                      fontSize: 14,
-                      maxWidth: 160,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
+                    className={`num text-sm text-text-primary max-w-40 truncate ${
+                      isSel ? "font-bold" : "font-semibold"
+                    }`}
                     title={r.author}
                   >
                     {r.author}
                   </div>
                   {r.top_ticker && (
-                    <div
-                      className="font-mono"
-                      style={{
-                        fontSize: 11,
-                        color: "var(--text-muted)",
-                        marginTop: 2,
-                      }}
-                    >
+                    <div className="num text-xs text-text-muted mt-0.5">
                       top: {r.top_ticker}
                     </div>
                   )}
                 </td>
                 <td
-                  className="font-mono"
-                  style={{
-                    padding: "8px 10px",
-                    textAlign: "right",
-                    color: "var(--text-secondary)",
-                    fontSize: 14,
-                    borderBottom: "1px solid var(--border)",
-                  }}
+                  className="num px-2.5 py-2 text-right text-sm text-text-secondary"
+                  style={tdBorder}
                 >
                   {r.n_calls}
                   {r.n_realized > 0 && (
                     <span
-                      style={{
-                        color: "var(--text-muted)",
-                        fontSize: 11,
-                        marginLeft: 4,
-                      }}
+                      className="text-xs text-text-muted ml-1"
                       title={`${r.n_realized} realized (closed)`}
                     >
                       /{r.n_realized}
@@ -320,73 +256,45 @@ function LeaderboardTable({
                   )}
                 </td>
                 <td
-                  className="font-mono"
+                  className={`num px-2.5 py-2 text-right text-sm ${
+                    (todayMap[r.author] || 0) > 0 ? "font-semibold" : ""
+                  }`}
                   style={{
-                    padding: "8px 10px",
-                    textAlign: "right",
-                    fontSize: 14,
-                    borderBottom: "1px solid var(--border)",
+                    ...tdBorder,
                     color:
                       (todayMap[r.author] || 0) > 0
                         ? "var(--accent-orange)"
                         : "var(--text-muted)",
-                    fontWeight: (todayMap[r.author] || 0) > 0 ? 600 : 400,
                   }}
                   title="Events extracted today (open/add/trim/close/stop/status/recap)"
                 >
                   {todayMap[r.author] || 0}
                 </td>
-                <td
-                  style={{
-                    padding: "8px 10px",
-                    borderBottom: "1px solid var(--border)",
-                    minWidth: 90,
-                  }}
-                >
+                <td className="px-2.5 py-2 min-w-24" style={tdBorder}>
                   {winPct != null ? (
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 6 }}
-                    >
+                    <div className="flex items-center gap-1.5">
                       <span
-                        className="font-mono"
-                        style={{
-                          fontSize: 13,
-                          color: changeColor(winPct - 50),
-                          minWidth: 36,
-                          textAlign: "right",
-                          fontWeight: 600,
-                        }}
+                        className="num text-sm font-semibold min-w-9 text-right"
+                        style={{ color: changeColor(winPct - 50) }}
                       >
                         {winPct.toFixed(0)}%
                       </span>
-                      <div style={{ flex: 1, minWidth: 40 }}>
+                      <div className="flex-1 min-w-10">
                         <RangeBar low={0} high={100} last={winPct} width="100%" />
                       </div>
                     </div>
                   ) : (
-                    <span
-                      className="font-mono"
-                      style={{
-                        fontSize: 13,
-                        color: "var(--text-muted)",
-                      }}
-                    >
-                      —
-                    </span>
+                    <span className="num text-sm text-text-muted">—</span>
                   )}
                 </td>
                 <td
-                  className="font-mono"
+                  className="num px-2.5 py-2 text-right text-sm font-semibold"
                   style={{
-                    padding: "8px 10px",
-                    textAlign: "right",
-                    fontSize: 13,
-                    fontWeight: 600,
+                    ...tdBorder,
                     color:
                       r.mean_pl_pct != null
                         ? changeColor(r.mean_pl_pct)
                         : "var(--text-muted)",
-                    borderBottom: "1px solid var(--border)",
                   }}
                 >
                   {r.mean_pl_pct != null
@@ -394,15 +302,8 @@ function LeaderboardTable({
                     : "—"}
                 </td>
                 <td
-                  className="font-mono"
-                  style={{
-                    padding: "8px 10px",
-                    textAlign: "right",
-                    fontSize: 11,
-                    color: "var(--text-muted)",
-                    borderBottom: "1px solid var(--border)",
-                    whiteSpace: "nowrap",
-                  }}
+                  className="num px-2.5 py-2 text-right text-xs text-text-muted whitespace-nowrap"
+                  style={tdBorder}
                   title={absoluteAge(r.latest_call_ts) || ""}
                 >
                   {relativeAge(r.latest_call_ts) || "—"}
@@ -533,70 +434,32 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
     meanPl != null ? changeColor(meanPl) : "var(--text-muted)";
 
   return (
-    <div className="space-y-3" style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
-      {/* Header card */}
-      <div
-        style={{
-          background: "var(--bg-card)",
-          border: "1px solid var(--border)",
-          borderRadius: 8,
-          padding: 14,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: 16,
-          }}
-        >
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div
-              className="font-mono text-xs uppercase"
-              style={{
-                letterSpacing: 1.4,
-                color: "var(--text-muted)",
-                marginBottom: 4,
-              }}
-            >
+    <div className="flex flex-col gap-3 min-h-0">
+      {/* Header card — glass-strong so the detail column reads as the
+          focused layer over the ambient field. */}
+      <section className="glass-strong p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-1">
               Trader
             </div>
             <div
-              className="font-mono"
-              style={{
-                fontSize: 24,
-                fontWeight: 700,
-                color: "var(--text-primary)",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
+              className="num text-lg font-bold text-text-primary truncate"
               title={author}
             >
               {author}
             </div>
             {leaderboardRow?.top_ticker && (
-              <div
-                style={{
-                  marginTop: 6,
-                  fontSize: 13,
-                  color: "var(--text-secondary)",
-                }}
-              >
+              <div className="mt-1.5 text-sm text-text-secondary">
                 top ticker:{" "}
                 <button
                   type="button"
                   onClick={() => setActiveTicker(leaderboardRow.top_ticker!)}
-                  className="font-mono"
+                  className="num text-sm font-bold cursor-pointer p-0"
                   style={{
                     color: "var(--accent-blue)",
                     background: "transparent",
                     border: "none",
-                    cursor: "pointer",
-                    padding: 0,
-                    fontWeight: 700,
-                    fontSize: 14,
                   }}
                 >
                   {leaderboardRow.top_ticker}
@@ -605,17 +468,10 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
             )}
           </div>
 
-          {/* Cumulative P/L sparkline */}
+          {/* Cumulative P/L sparkline — the hero number of the panel */}
           {sparkPoints.length >= 2 && (
-            <div style={{ textAlign: "right" }}>
-              <div
-                className="font-mono text-xs uppercase"
-                style={{
-                  letterSpacing: 1.4,
-                  color: "var(--text-muted)",
-                  marginBottom: 4,
-                }}
-              >
+            <div className="text-right">
+              <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-1">
                 Cumulative P/L
               </div>
               <Sparkline
@@ -630,11 +486,8 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
                 fill
               />
               <div
-                className="font-mono"
+                className="num text-lg font-bold mt-0.5"
                 style={{
-                  fontSize: 16,
-                  marginTop: 2,
-                  fontWeight: 700,
                   color: changeColor(sparkPoints[sparkPoints.length - 1]),
                 }}
               >
@@ -644,57 +497,57 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
           )}
         </div>
 
-        {/* Metric strip — 5 columns, big numbers (derived from positions) */}
+        {/* Metric strip — summary Stats (derived from positions) */}
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(5, 1fr)",
-            gap: 12,
-            marginTop: 14,
-            paddingTop: 14,
-            borderTop: "1px solid var(--border)",
-          }}
+          className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-3.5 pt-3.5"
+          style={{ borderTop: "1px solid var(--border)" }}
         >
-          <Metric label="Positions" value={String(nPositions)} />
-          <Metric
+          <Stat label="Positions" value={String(nPositions)} />
+          <Stat
             label="Realized"
             value={String(nRealized)}
-            sub={
-              nPositions ? `${nRealized}/${nPositions}` : undefined
-            }
+            sub={nPositions ? `${nRealized}/${nPositions}` : undefined}
           />
-          <Metric
+          <Stat
             label="Win"
             value={winPct}
-            valueColor={
+            tone={
               winRate != null
-                ? changeColor(winRate * 100 - 50)
+                ? winRate * 100 - 50 >= 0
+                  ? "green"
+                  : "red"
                 : undefined
             }
           />
-          <Metric
+          <Stat
             label="Mean P/L"
-            value={meanPlStr}
-            valueColor={meanPlColor}
+            value={
+              <span style={{ color: meanPlColor }}>{meanPlStr}</span>
+            }
           />
-          <Metric
+          <Stat
             label="Cumulative P/L"
             value={
-              sparkPoints.length >= 1
-                ? formatPercentRaw(
+              sparkPoints.length >= 1 ? (
+                <span
+                  style={{
+                    color: changeColor(
+                      sparkPoints[sparkPoints.length - 1] || 0,
+                    ),
+                  }}
+                >
+                  {formatPercentRaw(
                     sparkPoints[sparkPoints.length - 1] || 0,
                     1,
-                  )
-                : "—"
-            }
-            valueColor={
-              sparkPoints.length >= 1
-                ? changeColor(sparkPoints[sparkPoints.length - 1] || 0)
-                : undefined
+                  )}
+                </span>
+              ) : (
+                "—"
+              )
             }
           />
         </div>
-      </div>
+      </section>
 
       {/* Trader Brief — collapsible LLM digest. Sits above positions because
           it gives the meta-context (style, sectors, watching) the per-position
@@ -703,24 +556,21 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
       <TraderBrief author={author} />
 
       {/* Positions list */}
-      <Panel
-        title={`Positions (${positions.length})`}
-        accent="var(--accent-purple)"
-        padding={0}
-      >
+      <section className="glass-strong overflow-hidden">
+        <header
+          className="flex items-center justify-between px-4 py-3"
+          style={{ borderBottom: "1px solid var(--border)" }}
+        >
+          <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
+            Positions (<span className="num">{positions.length}</span>)
+          </h3>
+        </header>
         {positions.length === 0 ? (
-          <div
-            className="text-base"
-            style={{
-              padding: 20,
-              color: "var(--text-muted)",
-              textAlign: "center",
-            }}
-          >
+          <div className="py-5 text-center text-sm text-text-muted">
             No positions in window.
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column" }}>
+          <div className="flex flex-col">
             {positions.map((p) => {
               const k = positionKeyString(p.position_key);
               return (
@@ -740,57 +590,7 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
             })}
           </div>
         )}
-      </Panel>
-    </div>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  sub,
-  valueColor,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  valueColor?: string;
-}) {
-  return (
-    <div>
-      <div
-        className="font-mono text-xs uppercase"
-        style={{
-          letterSpacing: 1.4,
-          color: "var(--text-muted)",
-          marginBottom: 4,
-        }}
-      >
-        {label}
-      </div>
-      <div
-        className="font-mono"
-        style={{
-          fontSize: 24,
-          fontWeight: 700,
-          color: valueColor || "var(--text-primary)",
-          lineHeight: 1.1,
-        }}
-      >
-        {value}
-      </div>
-      {sub && (
-        <div
-          className="font-mono"
-          style={{
-            fontSize: 11,
-            color: "var(--text-muted)",
-            marginTop: 4,
-          }}
-        >
-          {sub}
-        </div>
-      )}
+      </section>
     </div>
   );
 }
@@ -843,43 +643,17 @@ export function TraderLeaderboardPage() {
       : `Last ${lookback} days · ${nTraders} trader${nTraders === 1 ? "" : "s"}`;
 
   return (
-    <div className="space-y-4" style={{ display: "flex", flexDirection: "column" }}>
+    <div className="flex flex-col space-y-4">
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Users size={22} className="text-accent-purple" />
-          <h1
-            style={{
-              fontSize: 20,
-              fontWeight: 600,
-              color: "var(--text-primary)",
-              margin: 0,
-            }}
-          >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Users size={20} className="text-accent-purple" />
+          <h1 className="text-lg font-semibold text-text-primary m-0">
             Trader Leaderboard
           </h1>
-          <span
-            className="font-mono"
-            style={{ fontSize: 12, color: "var(--text-muted)" }}
-          >
-            {headerSub}
-          </span>
+          <span className="num text-xs text-text-muted">{headerSub}</span>
         </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontSize: 11,
-            color: "var(--text-muted)",
-          }}
-        >
+        <div className="flex items-center gap-2 text-xs text-text-muted">
           <TrendingUp size={13} />
           <span>Auto-refresh 60s</span>
         </div>
@@ -919,46 +693,32 @@ export function TraderLeaderboardPage() {
         />
       ) : (
         <div className="grid grid-cols-12 gap-4 items-start">
-          {/* Left: leaderboard table */}
+          {/* Left: leaderboard list */}
           <div
-            className={classNames("col-span-12 lg:col-span-4")}
-            style={{
-              background: "var(--bg-card)",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              overflow: "hidden",
-            }}
+            className="col-span-12 lg:col-span-4 card overflow-hidden"
+            style={{ padding: 0 }}
           >
             <div
-              style={{
-                padding: "8px 12px",
-                borderBottom: "1px solid var(--border)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
+              className="flex flex-col gap-2 px-3 pt-3 pb-2"
+              style={{ borderBottom: "1px solid var(--border)" }}
             >
-              <span
-                className="font-mono"
-                style={{
-                  fontSize: 10,
-                  letterSpacing: 1.2,
-                  textTransform: "uppercase",
-                  color: "var(--text-primary)",
-                  fontWeight: 600,
-                }}
-              >
-                Leaderboard
-              </span>
-              <span
-                className="font-mono"
-                style={{
-                  fontSize: 10,
-                  color: "var(--text-muted)",
-                }}
-              >
-                sort: {SORT_LABELS[sortMode]} {sortDesc ? "↓" : "↑"}
-              </span>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
+                  Leaderboard
+                </h3>
+                <span className="text-xs text-text-muted inline-flex items-center gap-1">
+                  {SORT_LABELS[sortMode]}
+                  <ArrowUpDown size={10} className="opacity-70" />
+                  {sortDesc ? "desc" : "asc"}
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <Segmented<SortMode>
+                  options={SORT_OPTIONS}
+                  value={sortMode}
+                  onChange={handleSort}
+                />
+              </div>
             </div>
             <LeaderboardTable
               rows={rows}

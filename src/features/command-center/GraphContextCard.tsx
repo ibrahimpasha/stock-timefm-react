@@ -22,6 +22,9 @@ interface Props {
   ticker: string;
 }
 
+/** Translucent tint of a CSS-var color — var() can't take a hex-alpha suffix. */
+const tint = (c: string, pct: number) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
+
 /** Edge color tokens — keep in sync with the row icons + SVG spokes. */
 const EDGE_COLOR = {
   related: "var(--accent-cyan, #22d3ee)",
@@ -48,7 +51,7 @@ function confidenceDot(conf: string | undefined, color: string) {
   if (conf === "EXTRACTED")
     return { background: color, border: `1px solid ${color}` };
   if (conf === "AMBIGUOUS")
-    return { background: "transparent", border: `1px solid ${color}55`, opacity: 0.5 };
+    return { background: "transparent", border: `1px solid ${tint(color, 33)}`, opacity: 0.5 };
   return { background: "transparent", border: `1px solid ${color}` }; // INFERRED
 }
 
@@ -115,8 +118,8 @@ function RolePill({ role, reason }: { role: StructuralRole; reason?: string }) {
   return (
     <span
       title={reason}
-      className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider"
-      style={{ background: `${color}1a`, color, border: `1px solid ${color}40` }}
+      className="px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider"
+      style={{ background: tint(color, 12), color, border: `1px solid ${tint(color, 28)}` }}
     >
       {role}
     </span>
@@ -142,8 +145,8 @@ function TickerChip({
       type="button"
       onClick={() => onClick(ticker)}
       title={confidence ? `${confidence.toLowerCase()} edge` : undefined}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono hover:bg-bg-card-hover cursor-pointer transition-colors"
-      style={{ background: `${color}14`, color, border: `1px solid ${color}33` }}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs num hover:bg-bg-card-hover cursor-pointer transition-colors"
+      style={{ background: tint(color, 12), color, border: `1px solid ${tint(color, 26)}` }}
     >
       {confidence && (
         <span className="inline-block w-1.5 h-1.5 rounded-full" style={confidenceDot(confidence, color)} />
@@ -163,8 +166,8 @@ function ConceptChip({ name, color, confidence }: { name: string; color: string;
   return (
     <span
       title={confidence ? `${confidence.toLowerCase()} edge` : undefined}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs cursor-default"
-      style={{ background: `${color}12`, color, border: `1px solid ${color}2e` }}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs cursor-default"
+      style={{ background: tint(color, 10), color, border: `1px solid ${tint(color, 22)}` }}
     >
       {confidence && (
         <span className="inline-block w-1.5 h-1.5 rounded-full" style={confidenceDot(confidence, color)} />
@@ -189,7 +192,7 @@ function Row({
   return (
     <div className="flex items-start gap-2 py-1">
       <div
-        className="flex items-center gap-1 min-w-[104px] pt-0.5 text-[10px] font-mono uppercase tracking-wider"
+        className="flex items-center gap-1 min-w-[104px] pt-0.5 text-xs font-semibold uppercase tracking-[0.08em]"
         style={{ color }}
       >
         {icon}
@@ -241,13 +244,13 @@ export function GraphContextCard({ ticker }: Props) {
   return (
     <div className="card flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-text-secondary">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
           <Network size={14} className="text-accent-purple" />
           Graph context
           {role && <RolePill role={role.role} reason={role.reason} />}
         </div>
-        <div className="text-[10px] font-mono text-text-muted text-right">
-          {totalSignals} signals
+        <div className="text-xs text-text-muted text-right">
+          <span className="num">{totalSignals}</span> signals
           {data.sector && (
             <span className="ml-2">
               · {data.sector}
@@ -265,7 +268,7 @@ export function GraphContextCard({ ticker }: Props) {
       {keyFacts.length > 0 && (
         <div className="flex items-start gap-2 py-1">
           <div
-            className="flex items-center gap-1 min-w-[104px] pt-0.5 text-[10px] font-mono uppercase tracking-wider"
+            className="flex items-center gap-1 min-w-[104px] pt-0.5 text-xs font-semibold uppercase tracking-[0.08em]"
             style={{ color: "var(--accent-orange, #e37f2e)" }}
           >
             <Zap size={11} />
@@ -282,7 +285,7 @@ export function GraphContextCard({ ticker }: Props) {
               </div>
             ))}
             {data.intel_as_of && (
-              <div className="text-[10px] text-text-muted font-mono">intel {data.intel_as_of}</div>
+              <div className="num text-xs text-text-muted">intel {data.intel_as_of}</div>
             )}
           </div>
         </div>
@@ -319,8 +322,12 @@ export function GraphContextCard({ ticker }: Props) {
               <span
                 key={g.id}
                 title={g.rationale}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono cursor-default"
-                style={{ background: "var(--accent-blue)10", color: "var(--accent-blue)", border: "1px solid var(--accent-blue)30" }}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs cursor-default"
+                style={{
+                  background: tint("var(--accent-blue)", 10),
+                  color: "var(--accent-blue)",
+                  border: `1px solid ${tint("var(--accent-blue)", 22)}`,
+                }}
               >
                 {g.id.replace(/_members$/, "").replace(/_/g, " ")}
                 <span className="opacity-50">· {g.members.length + 1}</span>

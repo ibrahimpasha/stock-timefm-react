@@ -196,11 +196,12 @@ layout — but the file remains on disk.
 ## Conventions
 
 ### Always
+- **Read `DESIGN_SPEC.md` (repo root) before styling anything** — the 2026-07 "modern glass" remodel defines the surface/type/motion language. Use the shared primitives in `src/components/Glass.tsx` (`GlassPanel`, `Chip`, `Stat`, `Segmented`) instead of ad-hoc badges/tab rows; numerics get the `num` class. `backdrop-filter` blur belongs ONLY on `.glass-strong` chrome — never on repeated cards (compositing cost).
 - Use `apiClient` from `src/api/client.ts` — never inline axios or fetch
 - Wrap every data fetch in a typed `useQuery<T>` with an explicit `queryKey` array
 - Read tickers from `useAppStore((s) => s.activeTicker)` — never from a local prop
-- Run `npx --no-install tsc --noEmit -p tsconfig.json` after every batch of edits
-- Use only colors from CSS vars: `var(--accent-green)`, `var(--accent-red)`, `var(--text-muted)`, `var(--border)`, etc. Tailwind classes that map to these (`text-accent-blue`, `bg-bg-card`) are also fine
+- Run `npx --no-install tsc -b` after every batch of edits (NOT `-p tsconfig.json` — the root tsconfig is a solution file and checks nothing)
+- Use only colors from CSS vars: `var(--accent-green)`, `var(--accent-red)`, `var(--text-muted)`, `var(--border)`, etc. Tailwind classes that map to these (`text-accent-blue`, `bg-bg-card`) are also fine. Tinted backgrounds via `color-mix(in srgb, var(--accent-x) 14%, transparent)` — never `${var}14` hex-alpha suffixes (invalid CSS, silently dropped)
 
 ### Never
 - Don't add a global state library beyond Zustand

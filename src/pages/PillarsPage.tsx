@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
-import { Layers, AlertTriangle, Cpu, Activity, ChevronRight, Network, Compass, Rocket } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Layers, AlertTriangle, Cpu, Activity, ChevronRight, Network, Compass, Rocket, BookOpen } from "lucide-react";
 import {
   usePillars,
   usePillar,
+  useWeeklyReport,
   type PillarBottleneck,
   type PillarCompany,
   type PillarTickerBrief,
@@ -11,6 +12,7 @@ import {
   type PreIpoCompany,
 } from "../api/pillars";
 import { useAppStore } from "../store/useAppStore";
+import { Chip, type ChipTone } from "../components/Glass";
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 
@@ -26,6 +28,12 @@ const SEV: Record<string, { color: string; bg: string }> = {
   Critical: { color: "var(--accent-red)", bg: "color-mix(in srgb, var(--accent-red) 14%, transparent)" },
   High: { color: "var(--accent-orange, #e3a008)", bg: "color-mix(in srgb, var(--accent-orange) 14%, transparent)" },
   Moderate: { color: "var(--accent-yellow, #d4a72c)", bg: "color-mix(in srgb, var(--accent-yellow) 12%, transparent)" },
+};
+
+const SEV_TONE: Record<string, ChipTone> = {
+  Critical: "red",
+  High: "orange",
+  Moderate: "yellow",
 };
 
 function accumColor(label?: string): string {
@@ -48,7 +56,6 @@ function TickerChip({
   tone: "gated" | "owns";
   onClick: (t: string) => void;
 }) {
-  const color = tone === "owns" ? "var(--accent-green)" : "var(--accent-red)";
   return (
     <button
       type="button"
@@ -56,24 +63,21 @@ function TickerChip({
       title={`${b.name || b.ticker}${b.play_score != null ? ` · play ${b.play_score}` : ""}${
         b.accum_label ? ` · ${b.accum_label.replace(/_/g, " ").toLowerCase()}` : ""
       }`}
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono hover:bg-bg-card-hover transition-colors cursor-pointer"
-      style={{ background: `${color}14`, color, border: `1px solid ${color}33` }}
+      className="cursor-pointer"
     >
-      <span className="font-semibold">{b.ticker}</span>
-      {b.play_score != null && <span className="opacity-60 tabular-nums">{b.play_score}</span>}
+      <Chip tone={tone === "owns" ? "green" : "red"}>
+        <span className="font-mono font-semibold">{b.ticker}</span>
+        {b.play_score != null && <span className="opacity-60 num">{b.play_score}</span>}
+      </Chip>
     </button>
   );
 }
 
 function SeverityBadge({ severity }: { severity: string }) {
-  const s = SEV[severity] || { color: "var(--text-muted)", bg: "transparent" };
   return (
-    <span
-      className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider"
-      style={{ color: s.color, background: s.bg, border: `1px solid ${s.color}40` }}
-    >
+    <Chip tone={SEV_TONE[severity] ?? "neutral"} className="uppercase tracking-[0.08em]">
       {severity}
-    </span>
+    </Chip>
   );
 }
 
@@ -86,31 +90,27 @@ function BottleneckCard({
   b: PillarBottleneck;
   onTicker: (t: string) => void;
 }) {
-  const s = SEV[b.severity] || { color: "var(--text-muted)", bg: "transparent" };
   return (
-    <div
-      className="card flex flex-col gap-2 border-l-2"
-      style={{ borderLeftColor: s.color }}
-    >
+    <div className="card card-interactive flex flex-col gap-2">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-semibold text-text-primary">{b.name}</span>
           <SeverityBadge severity={b.severity} />
           {b.timeline && (
-            <span className="text-[10px] font-mono text-text-muted">{b.timeline}</span>
+            <span className="text-xs num text-text-muted">{b.timeline}</span>
           )}
         </div>
       </div>
       {b.detail && <p className="text-xs leading-relaxed text-text-secondary">{b.detail}</p>}
       {b.graphify_concept && (
-        <div className="text-[10px] font-mono text-accent-cyan opacity-80">
+        <div className="text-xs font-mono text-accent-cyan opacity-80">
           graph: {b.graphify_concept}
         </div>
       )}
       <div className="flex flex-col gap-1.5 pt-1">
         {b.beneficiaries.length > 0 && (
           <div className="flex items-start gap-1.5 flex-wrap">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-accent-green pt-0.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-accent-green pt-0.5">
               owns
             </span>
             {b.beneficiaries.map((t) => (
@@ -120,7 +120,7 @@ function BottleneckCard({
         )}
         {b.gated.length > 0 && (
           <div className="flex items-start gap-1.5 flex-wrap">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-accent-red pt-0.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-accent-red pt-0.5">
               gated
             </span>
             {b.gated.map((t) => (
@@ -157,7 +157,7 @@ function PurityScatter({
 
   if (pts.length < 3) {
     return (
-      <div className="text-xs text-text-muted italic px-1 py-4">
+      <div className="text-sm text-text-muted text-center px-1 py-6">
         Value × purity scatter needs PEG + purity estimates from the research pass
         (still generating, or sparse for this pillar). The company table below has the full universe.
       </div>
@@ -243,7 +243,7 @@ function CompanyTable({
   const rows = showAll ? companies : companies.slice(0, 24);
   return (
     <div className="flex flex-col">
-      <div className="grid grid-cols-[60px_1fr_44px_48px_44px_52px_52px_50px] gap-2 px-2 py-1 text-[10px] uppercase tracking-wider text-text-muted border-b border-border font-mono">
+      <div className="grid grid-cols-[64px_1fr_44px_52px_44px_52px_56px_56px] gap-2 px-2 py-1.5 text-xs text-text-muted uppercase tracking-[0.08em]">
         <span>ticker</span>
         <span>why / role</span>
         <span className="text-right">play</span>
@@ -258,7 +258,7 @@ function CompanyTable({
           key={c.ticker}
           type="button"
           onClick={() => onTicker(c.ticker)}
-          className="grid grid-cols-[60px_1fr_44px_48px_44px_52px_52px_50px] gap-2 px-2 py-1.5 text-xs items-center text-left hover:bg-bg-card-hover transition-colors border-b border-border/40"
+          className="grid grid-cols-[64px_1fr_44px_52px_44px_52px_56px_56px] gap-2 px-2 py-1.5 text-xs items-center text-left rounded-[var(--radius-control)] hover:bg-bg-card-hover transition-colors"
           style={{ background: c.ticker === active ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : undefined }}
         >
           <span className="font-mono font-semibold text-text-primary flex items-center gap-1">
@@ -267,44 +267,44 @@ function CompanyTable({
           </span>
           <span className="min-w-0">
             <span className="block truncate text-text-secondary">{c.one_liner || c.name || ""}</span>
-            <span className="text-[10px] font-mono" style={{ color: accumColor(c.accum_label) }}>
+            <span className="text-xs" style={{ color: accumColor(c.accum_label) }}>
               {c.role || ""}
               {c.accum_label ? ` · ${c.accum_label.replace(/_/g, " ").toLowerCase()}` : ""}
             </span>
           </span>
-          <span className="text-right font-mono tabular-nums" style={{ color: c.play_score != null && c.play_score >= 60 ? "var(--accent-green)" : "var(--text-secondary)" }}>
+          <span className="text-right num" style={{ color: c.play_score != null && c.play_score >= 60 ? "var(--accent-green)" : "var(--text-secondary)" }}>
             {c.play_score ?? "—"}
           </span>
-          <span className="text-right font-mono tabular-nums text-text-secondary">
+          <span className="text-right num text-text-secondary">
             {typeof c.purity === "number" ? `${Math.round(c.purity * 100)}%` : "—"}
           </span>
           <span
-            className="text-right font-mono tabular-nums"
+            className="text-right num"
             style={{ color: typeof c.peg !== "number" ? "var(--text-muted)" : c.peg <= 1 ? "var(--accent-green)" : c.peg <= 1.5 ? "var(--text-secondary)" : "var(--accent-orange)" }}
             title="PEG (lower = cheaper vs growth)"
           >
             {typeof c.peg === "number" ? c.peg.toFixed(1) : "—"}
           </span>
           <span
-            className="text-right font-mono tabular-nums"
+            className="text-right num"
             style={{ color: c.return_30d == null ? "var(--text-muted)" : c.return_30d >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}
           >
             {c.return_30d == null ? "—" : `${c.return_30d >= 0 ? "+" : ""}${c.return_30d.toFixed(0)}%`}
           </span>
           <span
-            className="text-right font-mono tabular-nums"
+            className="text-right num"
             style={{ color: c.target_pct == null ? "var(--text-muted)" : c.target_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}
           >
             {c.target_pct == null ? "—" : `${c.target_pct >= 0 ? "+" : ""}${c.target_pct.toFixed(0)}%`}
           </span>
-          <span className="text-right font-mono tabular-nums text-text-muted">{fmtCap(c.market_cap)}</span>
+          <span className="text-right num text-text-muted">{fmtCap(c.market_cap)}</span>
         </button>
       ))}
       {companies.length > 24 && (
         <button
           type="button"
           onClick={() => setShowAll((v) => !v)}
-          className="text-[10px] font-mono text-text-muted hover:text-text-secondary py-1.5 text-left"
+          className="text-xs text-text-muted hover:text-text-secondary transition-colors py-1.5 text-left"
         >
           {showAll ? "show fewer" : `show all ${companies.length} names →`}
         </button>
@@ -324,11 +324,12 @@ function PlainTickerChip({ b, onClick }: { b: PillarTickerBrief; onClick: (t: st
       title={`${b.name || b.ticker}${b.play_score != null ? ` · play ${b.play_score}` : ""}${
         b.accum_label ? ` · ${b.accum_label.replace(/_/g, " ").toLowerCase()}` : ""
       }`}
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono border border-border hover:bg-bg-card-hover transition-colors cursor-pointer"
-      style={{ color: lit ? "var(--accent-green)" : "var(--text-secondary)" }}
+      className="cursor-pointer"
     >
-      <span className="font-semibold">{b.ticker}</span>
-      {b.play_score != null && <span className="opacity-60 tabular-nums">{b.play_score}</span>}
+      <Chip tone={lit ? "green" : "neutral"}>
+        <span className="font-mono font-semibold">{b.ticker}</span>
+        {b.play_score != null && <span className="opacity-60 num">{b.play_score}</span>}
+      </Chip>
     </button>
   );
 }
@@ -400,13 +401,10 @@ function PreIpoSection({ items, onTicker }: { items: PreIpoCompany[]; onTicker: 
             <div className="flex items-center gap-1 flex-wrap pt-0.5">
               <span className="text-[10px] font-mono text-text-muted">proxy:</span>
               {c.public_proxies.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => onTicker(t)}
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-mono border border-border text-text-secondary hover:bg-bg-card-hover transition-colors cursor-pointer"
-                >
-                  {t}
+                <button key={t} type="button" onClick={() => onTicker(t)} className="cursor-pointer">
+                  <Chip tone="neutral">
+                    <span className="font-mono font-semibold">{t}</span>
+                  </Chip>
                 </button>
               ))}
             </div>
@@ -556,6 +554,77 @@ function PillarBody({ d, onTicker, active }: { d: PillarDetail; onTicker: (t: st
 
 /* ── page ────────────────────────────────────────────────────────────── */
 
+/* ── Weekly AI Report — lightweight markdown render of the wiki synthesis ──── */
+
+function mdInline(text: string): ReactNode[] {
+  // **bold** and *italic* only — the report uses no other inline syntax.
+  return text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).map((p, i) => {
+    if (p.startsWith("**") && p.endsWith("**"))
+      return <strong key={i} className="text-text-primary font-semibold">{p.slice(2, -2)}</strong>;
+    if (p.length > 2 && p.startsWith("*") && p.endsWith("*"))
+      return <em key={i} className="italic">{p.slice(1, -1)}</em>;
+    return <span key={i}>{p}</span>;
+  });
+}
+
+function MarkdownLite({ md }: { md: string }) {
+  const out: ReactNode[] = [];
+  let bullets: ReactNode[] = [];
+  const flush = (k: string) => {
+    if (bullets.length) {
+      out.push(
+        <ul key={`ul-${k}`} className="list-disc pl-5 my-1.5 space-y-1">{bullets}</ul>,
+      );
+      bullets = [];
+    }
+  };
+  md.split("\n").forEach((raw, i) => {
+    const line = raw.trimEnd();
+    if (line.startsWith("- ")) {
+      bullets.push(
+        <li key={i} className="text-xs leading-relaxed text-text-secondary">{mdInline(line.slice(2))}</li>,
+      );
+      return;
+    }
+    flush(String(i));
+    if (line === "") return;
+    if (line === "---") { out.push(<hr key={i} className="my-3 border-border" />); return; }
+    if (line.startsWith("#### ")) { out.push(<h4 key={i} className="text-sm font-semibold text-text-primary mt-3 mb-1">{mdInline(line.slice(5))}</h4>); return; }
+    if (line.startsWith("### ")) { out.push(<h3 key={i} className="text-sm font-bold text-accent-blue mt-3 mb-1">{mdInline(line.slice(4))}</h3>); return; }
+    if (line.startsWith("## ")) { out.push(<h2 key={i} className="text-base font-bold text-text-primary mt-4 mb-1.5">{mdInline(line.slice(3))}</h2>); return; }
+    if (line.startsWith("# ")) { out.push(<h1 key={i} className="text-lg font-bold text-text-primary mt-2 mb-2">{mdInline(line.slice(2))}</h1>); return; }
+    out.push(<p key={i} className="text-xs leading-relaxed text-text-secondary my-1.5">{mdInline(line)}</p>);
+  });
+  flush("end");
+  return <div>{out}</div>;
+}
+
+function WeeklyReportSection() {
+  const { data } = useWeeklyReport();
+  const [open, setOpen] = useState(true);
+  if (!data?.available || !data.markdown) return null;
+  return (
+    <div className="card border-l-2" style={{ borderLeftColor: "var(--accent-purple)" }}>
+      <button type="button" onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2 text-left">
+        <BookOpen size={16} className="text-accent-purple shrink-0" />
+        <span className="text-sm font-semibold text-text-primary">{data.title || "Weekly AI Report"}</span>
+        {data.date && <span className="text-[10px] font-mono text-text-muted">{data.date}</span>}
+        <span className="ml-auto text-[10px] font-mono text-text-muted">{open ? "hide" : "show"}</span>
+        <ChevronRight
+          size={15}
+          className="text-text-muted shrink-0"
+          style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}
+        />
+      </button>
+      {open && (
+        <div className="mt-2 pt-2 border-t border-border max-h-[72vh] overflow-y-auto pr-1">
+          <MarkdownLite md={data.markdown} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PillarsPage() {
   const { data: overview } = usePillars();
   const setActiveTicker = useAppStore((s) => s.setActiveTicker);
@@ -580,6 +649,9 @@ export function PillarsPage() {
           <p className="text-sm text-text-secondary mt-2 leading-relaxed max-w-4xl">{overview.intro}</p>
         )}
       </div>
+
+      {/* Weekly AI Report — the latest cross-layer synthesis (wiki-archived) */}
+      <WeeklyReportSection />
 
       {/* cross-pillar chokepoints */}
       {!!overview?.cross_pillar_chokepoints?.length && (

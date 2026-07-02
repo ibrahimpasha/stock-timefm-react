@@ -58,7 +58,7 @@ export function TickerCard({
     <div
       onClick={onClick}
       title={highlightTitle}
-      className="card text-left transition-all py-2 px-3 cursor-pointer relative"
+      className="card card-interactive text-left py-2 px-3 cursor-pointer relative"
       style={{
         borderColor: selected ? "var(--accent-blue)" : lit ? "color-mix(in srgb, var(--accent-green) 55%, transparent)" : undefined,
         background: selected ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : lit ? "color-mix(in srgb, var(--accent-green) 6%, transparent)" : undefined,
@@ -108,11 +108,11 @@ export function TickerCard({
           )}
           {esc && <TrendingUp size={10} style={{ color: "var(--accent-green)" }} />}
           {intel?.exitSignals ? (
-            <span className="text-[9px] font-mono" style={{ color: "var(--accent-orange)" }}>
+            <span className="text-[9px] num" style={{ color: "var(--accent-orange)" }}>
               {intel.exitSignals}x
             </span>
           ) : null}
-          <span className="text-xs font-mono text-text-muted">{t.total_entries}</span>
+          <span className="text-xs num text-text-muted">{t.total_entries}</span>
         </div>
       </div>
       <BullBearBar bull={t.bullish} total={t.bullish + t.bearish} height={6} showLabels={false} />
@@ -124,11 +124,11 @@ export function TickerCard({
           {net ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
           {net ? "Bullish" : "Bearish"}
         </span>
-        <span className="text-text-muted font-mono">{t.net_premium}</span>
+        <span className="text-text-muted num">{t.net_premium}</span>
       </div>
       {showReturn && (
         <div
-          className="mt-1 text-[10px] font-mono flex items-center justify-between"
+          className="mt-1 text-xs num flex items-center justify-between"
           title="Premium-weighted P/L across this ticker's flow entries across all available history (delta-estimated). Ranking uses %P/L × entry count — frequency multiplies score, so a ticker with many strong entries outranks single-shot outliers."
         >
           <span className="text-text-muted">
@@ -153,7 +153,7 @@ export function TickerCard({
       )}
       {hasAccum && (
         <div
-          className="mt-1 text-[9px] font-mono"
+          className="mt-1 text-[9px] num uppercase tracking-wide"
           style={{
             color: accum.includes("BULL")
               ? "var(--accent-green)"
@@ -222,8 +222,12 @@ export function EarningsBadge({
       : "";
   return (
     <span
-      className="font-mono px-2 py-0.5 rounded text-xs"
-      style={{ color, background: bg, border: `1px solid ${color}33` }}
+      className="num px-2 py-0.5 rounded-full text-xs"
+      style={{
+        color,
+        background: bg,
+        border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
+      }}
       title={`Next earnings: ${fmt}${sessLabel ? ` · ${sessTitle}` : ""}`}
     >
       EPS {rel} · {fmt}

@@ -12,6 +12,7 @@ import {
   Sigma,
 } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
+import { Chip, Segmented } from "../../components/Glass";
 import { useDashboardFilters } from "../../store/useDashboardFilters";
 import { useTickerNames } from "../../api/tickerNames";
 import { useTickerMeta, type TickerMeta } from "../../api/tickerMeta";
@@ -477,22 +478,28 @@ export function FlowHeatmap() {
   const isAll = selectedDates.size > 0 && selectedDates.size === dates.length;
 
   const viewToggle = (
-    <div className="flex items-center rounded-lg border border-border overflow-hidden">
-      {(["treemap", "map"] as const).map((v) => (
-        <button
-          key={v}
-          onClick={() => setView(v)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors"
-          style={{
-            background: view === v ? "color-mix(in srgb, var(--accent-blue) 15%, transparent)" : "transparent",
-            color: view === v ? "var(--accent-blue)" : "var(--text-muted)",
-          }}
-        >
-          {v === "treemap" ? <LayoutGrid size={13} /> : <MapIcon size={13} />}
-          {v === "treemap" ? "Treemap" : "Map"}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      value={view}
+      onChange={setView}
+      options={[
+        {
+          value: "treemap",
+          label: (
+            <span className="inline-flex items-center gap-1.5">
+              <LayoutGrid size={13} /> Treemap
+            </span>
+          ),
+        },
+        {
+          value: "map",
+          label: (
+            <span className="inline-flex items-center gap-1.5">
+              <MapIcon size={13} /> Map
+            </span>
+          ),
+        },
+      ]}
+    />
   );
 
   if (view === "map") {
@@ -512,7 +519,10 @@ export function FlowHeatmap() {
         {viewToggle}
         {/* Date strip — a mini entry-volume histogram: each day's bar height is
             its flow entry count, so heavy days stand out at a glance. */}
-        <div className="flex items-stretch rounded-lg border border-border overflow-hidden bg-bg-card">
+        <div
+          className="flex items-stretch border border-border overflow-hidden"
+          style={{ borderRadius: "var(--radius-control)", background: "var(--glass-bg)" }}
+        >
           <button
             onClick={() => patchHeatmap({ selectedDates: new Set(dates.map((d) => d.date)) })}
             className="px-3 text-xs font-semibold transition-colors flex items-center"
@@ -548,7 +558,7 @@ export function FlowHeatmap() {
                     }}
                   />
                   <span
-                    className="text-[9px] font-mono leading-none"
+                    className="text-[9px] num leading-none"
                     style={{ color: on ? "var(--accent-blue)" : "var(--text-muted)" }}
                   >
                     {isToday ? "Today" : d.date.slice(5)}
@@ -561,14 +571,15 @@ export function FlowHeatmap() {
 
         <MetricSelect label="Size" icon={Maximize2} accent="var(--accent-blue)" value={sizeMetric} onChange={(v) => patchHeatmap({ sizeMetric: v as SizeMetric })} options={SIZE_OPTIONS} />
         <MetricSelect label="Color" icon={Palette} accent="var(--accent-purple)" value={colorMetric} onChange={(v) => patchHeatmap({ colorMetric: v as ColorMetric })} options={COLOR_OPTIONS} />
-        <MetricSelect label="Group" icon={Layers} accent="var(--accent-cyan, #22d3ee)" value={groupBy} onChange={(v) => patchHeatmap({ groupBy: v as GroupBy })} options={GROUP_OPTIONS} />
-        <MetricSelect label="Pulse" icon={Radio} accent="var(--accent-orange, #f59e0b)" value={pulse} onChange={(v) => patchHeatmap({ pulse: v as Pulse })} options={PULSE_OPTIONS} />
+        <MetricSelect label="Group" icon={Layers} accent="var(--accent-cyan)" value={groupBy} onChange={(v) => patchHeatmap({ groupBy: v as GroupBy })} options={GROUP_OPTIONS} />
+        <MetricSelect label="Pulse" icon={Radio} accent="var(--accent-orange)" value={pulse} onChange={(v) => patchHeatmap({ pulse: v as Pulse })} options={PULSE_OPTIONS} />
 
         {/* Threshold for the score-based pulses (ML / TA / pattern).
             Earnings pulses gate on the ≤10/20/30d window instead. */}
         {(pulse === "ml" || pulse === "play" || pulse === "technical" || pulse === "pattern") && (
           <label
-            className="flex items-center gap-1.5 rounded-lg border border-border bg-bg-card px-2 py-1.5"
+            className="flex items-center gap-1.5 border border-border px-2 py-1.5"
+            style={{ borderRadius: "var(--radius-control)", background: "var(--glass-bg)" }}
             title="Minimum 0–100 strength a ticker needs to pulse (e.g. ML ≥ 80)"
           >
             <span className="text-[10px] uppercase tracking-wide text-text-muted">≥</span>
@@ -579,7 +590,7 @@ export function FlowHeatmap() {
               step={5}
               value={pulseThreshold}
               onChange={(e) => patchHeatmap({ pulseThreshold: clamp(Number(e.target.value) || 0, 0, 100) })}
-              className="w-12 bg-transparent text-xs text-text-primary outline-none font-mono"
+              className="w-12 bg-transparent text-xs text-text-primary outline-none num"
             />
           </label>
         )}
@@ -587,11 +598,12 @@ export function FlowHeatmap() {
         {/* Pulse the whole sector/theme frame instead of individual tiles. */}
         {pulse !== "off" && (
           <label
-            className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs select-none ${
+            className={`flex items-center gap-1.5 border px-2 py-1.5 text-xs select-none ${
               groupBy === "none"
                 ? "border-border text-text-muted opacity-50 cursor-not-allowed"
                 : "border-border text-text-secondary cursor-pointer"
             }`}
+            style={{ borderRadius: "var(--radius-control)", background: "var(--glass-bg)" }}
             title={
               groupBy === "none"
                 ? "Pick a Group (Sector / Theme / Sub-category) to enable group pulsing"
@@ -629,36 +641,31 @@ export function FlowHeatmap() {
 
         <div className="ml-auto flex items-center gap-2 text-xs">
           {activeDates.length > 1 && (
-            <span
-              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 font-semibold"
-              style={{
-                color: "var(--accent-blue)",
-                borderColor: "color-mix(in srgb, var(--accent-blue) 35%, var(--border))",
-                background: "color-mix(in srgb, var(--accent-blue) 10%, transparent)",
-              }}
+            <Chip
+              tone="blue"
               title="Flow from these dates is merged (unioned). Click a single date to view just that day."
             >
               {activeDates.length} days merged
-            </span>
+            </Chip>
           )}
-          <span className="inline-flex items-center gap-1 rounded-md border border-border bg-bg-card px-2 py-1">
+          <Chip>
             <Grid3x3 size={12} className="text-accent-blue" />
-            <span className="font-mono font-semibold text-text-primary">
+            <span className="num font-semibold text-text-primary">
               {filtersActive ? `${vcells.length}/${cells.length}` : cells.length}
             </span>
             <span className="text-text-muted">tickers</span>
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-md border border-border bg-bg-card px-2 py-1">
+          </Chip>
+          <Chip>
             <Sigma size={12} className="text-accent-green" />
-            <span className="font-mono font-semibold text-text-primary">{formatPremium(totalPremium)}</span>
+            <span className="num font-semibold text-text-primary">{formatPremium(totalPremium)}</span>
             <span className="text-text-muted">total</span>
-          </span>
+          </Chip>
           <ColorLegend metric={colorMetric} />
           <a
             href="/api/intel-graph/theme-pulse/export?format=csv"
             download
             title="Download all theme pulses (CSV) for manual analysis"
-            className="inline-flex items-center gap-1 rounded-md border border-border bg-bg-card px-2 py-1 text-text-muted hover:text-accent-cyan hover:border-accent-cyan/40 transition-colors"
+            className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs font-medium text-text-muted hover:text-accent-cyan transition-colors"
           >
             <Download size={12} /> pulses
           </a>
@@ -668,8 +675,14 @@ export function FlowHeatmap() {
       {/* ── Treemap ──────────────────────────────────────────── */}
       <div
         ref={boxRef}
-        className="relative w-full rounded-lg border border-border bg-bg-primary overflow-hidden"
-        style={{ height: "calc(100vh - 320px)", minHeight: 460 }}
+        className="relative w-full border overflow-hidden bg-bg-primary"
+        style={{
+          height: "calc(100vh - 320px)",
+          minHeight: 460,
+          borderRadius: "var(--radius-panel)",
+          borderColor: "var(--glass-border)",
+          boxShadow: "var(--shadow-1)",
+        }}
       >
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center text-text-muted text-sm animate-pulse">
@@ -928,10 +941,11 @@ function FilterSlider({
   return (
     <label
       title={title}
-      className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 cursor-pointer select-none transition-all"
+      className="flex items-center gap-2 border px-2.5 py-1.5 cursor-pointer select-none transition-colors"
       style={{
+        borderRadius: "var(--radius-control)",
         borderColor: on ? `color-mix(in srgb, ${accent} 50%, var(--border))` : "var(--border)",
-        background: on ? `color-mix(in srgb, ${accent} 10%, var(--bg-card))` : "var(--bg-card)",
+        background: on ? `color-mix(in srgb, ${accent} 10%, var(--glass-bg))` : "var(--glass-bg)",
       }}
     >
       <input
@@ -957,7 +971,7 @@ function FilterSlider({
         style={{ opacity: on ? 1 : 0.5 }}
       />
       <span
-        className="font-mono text-xs font-semibold w-9 text-center tabular-nums rounded px-1 py-0.5"
+        className="num text-xs font-semibold w-9 text-center rounded px-1 py-0.5"
         style={{
           color: on ? accent : "var(--text-muted)",
           background: on ? `color-mix(in srgb, ${accent} 14%, transparent)` : "transparent",
@@ -990,10 +1004,11 @@ function MetricSelect({
   const active = options.find((o) => o.id === value);
   return (
     <label
-      className="relative flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 cursor-pointer transition-all hover:brightness-125"
+      className="relative flex items-center gap-1.5 border px-2.5 py-1.5 cursor-pointer transition-colors hover:brightness-110"
       style={{
+        borderRadius: "var(--radius-control)",
         borderColor: `color-mix(in srgb, ${accent} 35%, var(--border))`,
-        background: `color-mix(in srgb, ${accent} 8%, var(--bg-card))`,
+        background: `color-mix(in srgb, ${accent} 8%, var(--glass-bg))`,
       }}
       title={active?.hint}
     >
@@ -1031,7 +1046,10 @@ function ColorLegend({ metric }: { metric: ColorMetric }) {
   };
   const [lo, hi] = ends[metric];
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-bg-card px-2 py-1 text-[10px]">
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-1 text-[10px]"
+      style={{ background: "var(--glass-bg)" }}
+    >
       <span style={{ color: "var(--accent-red)" }}>{lo}</span>
       <span
         className="inline-block h-2.5 w-16 rounded-full"

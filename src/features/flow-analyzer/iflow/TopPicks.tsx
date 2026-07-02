@@ -21,8 +21,9 @@ export function TopPicks({ date, dteFilter }: { date: string; dteFilter: DteFilt
   if (!scored.length) return null;
   return (
     <div className="mb-4">
-      <h4 className="text-xs font-semibold text-accent-green uppercase tracking-wider mb-2 flex items-center gap-1.5">
-        <TrendingUp size={12} /> Top Conviction Flow — {formatDate(date)} ({scored.length})
+      <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-2 flex items-center gap-1.5">
+        <TrendingUp size={12} className="text-accent-green" />
+        Top Conviction Flow — {formatDate(date)} ({scored.length})
       </h4>
       <div className="space-y-1">
         {scored.map((e: any, i: number) => {
@@ -47,35 +48,35 @@ export function TopPicks({ date, dteFilter }: { date: string; dteFilter: DteFilt
                 border: mega ? "1px solid color-mix(in srgb, var(--accent-green) 25%, transparent)" : "1px solid transparent",
               }}
             >
-              <span className="font-mono text-xs font-bold text-accent-cyan w-6">
+              <span className="num text-xs font-bold text-accent-cyan w-6">
                 {e._score.toFixed(1)}
               </span>
               <span className="font-mono font-bold text-text-primary w-14">{e.ticker}</span>
-              <span className="font-mono text-text-primary">
+              <span className="num text-text-primary">
                 ${e.strike} {e.type || e.option_type}
               </span>
               <span style={{ color }} className="font-semibold">
                 {side}
               </span>
               <span className="text-text-muted italic">{action}</span>
-              <span className="text-text-muted">{e.expiry}</span>
+              <span className="num text-text-muted">{e.expiry}</span>
               {dl && (
                 <span
-                  className="font-mono px-1 rounded"
+                  className="num px-1 rounded-full"
                   style={{ color: dl.color, background: dl.bg }}
                 >
                   {dl.text}
                 </span>
               )}
               {e.vol_oi_ratio > 0 && (
-                <span className="text-accent-cyan font-mono">
+                <span className="text-accent-cyan num">
                   {Number(e.vol_oi_ratio).toFixed(1)}x
                 </span>
               )}
               {e.ask_pct > 0 && (
-                <span className="text-accent-orange font-mono">{e.ask_pct}%ask</span>
+                <span className="text-accent-orange num">{e.ask_pct}%ask</span>
               )}
-              <span className="text-text-secondary ml-auto font-mono">{e.premium}</span>
+              <span className="text-text-secondary ml-auto num">{e.premium}</span>
               {mega && <span className="text-xs font-bold text-accent-green">MEGA</span>}
             </div>
           );

@@ -125,6 +125,80 @@ export interface CalendarResponse {
   events: CalendarEvent[];
 }
 
+export type NarrativeSource =
+  | "news"
+  | "iflow"
+  | "voices"
+  | "traders"
+  | "forecast"
+  | "earnings"
+  | "macro"
+  | string;
+
+export interface NarrativeEvent {
+  id?: string;
+  ts: string;
+  source: NarrativeSource;
+  kind: string;
+  title: string;
+  detail?: string;
+  sentiment?: string;
+  strength?: number;
+  ref?: Record<string, unknown>;
+}
+
+export interface NarrativeSummary {
+  first_signal_ts: string | null;
+  sources_seen: string[];
+  event_count: number;
+}
+
+export interface NarrativeResponse {
+  ticker: string;
+  window_hours: number;
+  events: NarrativeEvent[];
+  summary: NarrativeSummary;
+}
+
+export interface ConvergenceGraphSummary {
+  convergence?: ConvergenceVerdict;
+  sources_seen?: string[];
+  event_count?: number;
+  structural_context?: boolean;
+  node_count?: number;
+  edge_count?: number;
+}
+
+export interface ConvergenceGraphNode {
+  id: string;
+  type: string;
+  label: string;
+  score?: number;
+  source?: string;
+  ts?: string;
+  meta?: Record<string, unknown>;
+}
+
+export interface ConvergenceGraphEdge {
+  id?: string;
+  source: string;
+  target: string;
+  type: string;
+  weight?: number;
+  meta?: Record<string, unknown>;
+}
+
+export interface ConvergenceGraphResponse {
+  ticker: string;
+  window_hours: number;
+  available?: boolean;
+  reason?: string | null;
+  as_of?: string;
+  summary: ConvergenceGraphSummary;
+  nodes: ConvergenceGraphNode[];
+  edges: ConvergenceGraphEdge[];
+}
+
 /** Parsed daily-brief row. `top_themes` / `top_tickers` / `forward_catalysts`
  *  arrive from the backend as JSON-encoded strings; the hook decodes them
  *  before handing the row back so callers can treat them as objects. */
@@ -233,6 +307,44 @@ export function useCalendar(daysAhead: number = 14, ticker?: string) {
     },
     staleTime: STALE_TIMES.flow,
     refetchInterval: REFETCH_MS,
+  });
+}
+
+/** Chronological narrative timeline for the active ticker. */
+export function useNarrative(ticker: string, hours: number = 72) {
+  const tk = ticker.trim().toUpperCase();
+  return useQuery<NarrativeResponse>({
+    queryKey: ["intel-v3", "narrative", tk, hours],
+    queryFn: () =>
+      apiClient
+        .get<NarrativeResponse>(
+          `/intel-v3/narrative/${encodeURIComponent(tk)}?hours=${hours}`,
+        )
+        .then((r) => r.data),
+    staleTime: STALE_TIMES.flow,
+    refetchInterval: REFETCH_MS,
+    enabled: !!tk,
+  });
+}
+
+/** Ticker-centered graphify + convergence graph for the active ticker. */
+export function useConvergenceGraph(
+  ticker: string,
+  hours: number = 72,
+  limit: number = 50,
+) {
+  const tk = ticker.trim().toUpperCase();
+  return useQuery<ConvergenceGraphResponse>({
+    queryKey: ["intel-graph", "ticker-graph", tk, hours, limit],
+    queryFn: () =>
+      apiClient
+        .get<ConvergenceGraphResponse>(
+          `/intel-graph/ticker-graph?ticker=${encodeURIComponent(tk)}&hours=${hours}&limit=${limit}`,
+        )
+        .then((r) => r.data),
+    staleTime: STALE_TIMES.flow,
+    refetchInterval: REFETCH_MS,
+    enabled: !!tk,
   });
 }
 

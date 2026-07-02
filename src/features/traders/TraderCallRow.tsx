@@ -7,14 +7,17 @@
  * conviction chip. Click to toggle a detail block with the full Discord
  * message + LLM rationale + compact computation tags.
  *
- * Reuses the `dteTag` helper from `iflow/utils.ts` so the DTE pill color
- * scheme stays consistent across both views.
+ * Glass remodel: every ad-hoc badge is a `Chip` primitive, numerals carry the
+ * `num` class. Outcome chips follow the shared tone rules — CLOSED green on
+ * profit / red on loss, STOPPED red, TRIMMED yellow. Behavior unchanged.
+ *
+ * Reuses the `dteTag` helper from `iflow/utils.ts` so the DTE pill bucket
+ * stays consistent across both views.
  */
 import { useMemo } from "react";
 
 import { dteTag } from "../flow-analyzer/iflow/utils";
-import { Tag } from "../../components/CCPrimitives";
-import { catalystTagColor } from "../../lib/constants";
+import { Chip, type ChipTone } from "../../components/Glass";
 import {
   absoluteAge,
   formatPercentRaw,
@@ -32,13 +35,14 @@ function rowPct(c: AlertCallRow): number | null {
 }
 
 /**
- * Summarize a call's linked exit events into a single visible status chip.
+ * Summarize a call's linked exit events into a single visible outcome chip.
  * Priority: close > stop > trim. The chip's pct (when present) is the latest
  * exit_pct the trader stated for that event type.
+ * Tones: CLOSED green on profit / red on loss, STOPPED red, TRIMMED yellow.
  */
 function deriveExitStatus(
   exits: AlertCallRow["exits"],
-): { label: string; color: string; bg: string; pct: number | null; title: string } | null {
+): { label: string; tone: ChipTone; pct: number | null; title: string } | null {
   if (!exits || exits.length === 0) return null;
   const sorted = [...exits].sort((a, b) => (a.ts < b.ts ? 1 : -1));
   const closes = sorted.filter((e) => e.event_type === "close");
@@ -48,8 +52,7 @@ function deriveExitStatus(
     const pct = closes.find((e) => e.exit_pct != null)?.exit_pct ?? null;
     return {
       label: "CLOSED",
-      color: "var(--accent-red)",
-      bg: "color-mix(in srgb, var(--accent-red) 10%, transparent)",
+      tone: pct != null && pct > 0 ? "green" : "red",
       pct,
       title: closes[0].rationale || "Position fully closed",
     };
@@ -58,8 +61,7 @@ function deriveExitStatus(
     const pct = stops.find((e) => e.exit_pct != null)?.exit_pct ?? null;
     return {
       label: "STOPPED",
-      color: "var(--accent-red)",
-      bg: "color-mix(in srgb, var(--accent-red) 10%, transparent)",
+      tone: "red",
       pct,
       title: stops[0].rationale || "Stopped out",
     };
@@ -68,8 +70,7 @@ function deriveExitStatus(
     const pct = trims.find((e) => e.exit_pct != null)?.exit_pct ?? null;
     return {
       label: "TRIMMED",
-      color: "var(--accent-orange)",
-      bg: "color-mix(in srgb, var(--accent-orange) 10%, transparent)",
+      tone: "yellow",
       pct,
       title: `${trims.length} trim event${trims.length > 1 ? "s" : ""}`,
     };
@@ -88,26 +89,26 @@ function directionBadge(direction: string | null | undefined): {
   return { label: "NEUT", color: "var(--text-muted)" };
 }
 
-/** Pick a chip color for a sizing tag (matches Discord trader vocabulary). */
-function sizingColor(tag: string): string {
+/** Pick a Chip tone for a sizing tag (matches Discord trader vocabulary). */
+function sizingTone(tag: string): ChipTone {
   const t = tag.trim().toLowerCase();
-  if (t === "lotto") return "var(--accent-purple)";
-  if (t === "starter" || t === "add") return "var(--accent-blue)";
-  if (t === "trim") return "var(--accent-orange)";
-  if (t === "close") return "var(--accent-red)";
-  if (t === "swing" || t === "scalp") return "var(--accent-cyan)";
-  if (t === "leap" || t === "hedge") return "var(--text-secondary)";
-  return catalystTagColor(t);
+  if (t === "lotto") return "purple";
+  if (t === "starter" || t === "add") return "blue";
+  if (t === "trim") return "orange";
+  if (t === "close") return "red";
+  if (t === "swing" || t === "scalp") return "cyan";
+  if (t === "leap" || t === "hedge") return "neutral";
+  return "neutral";
 }
 
-/** Pick a chip color for a conviction tag. */
-function convictionColor(c: string | null | undefined): string | null {
+/** Pick a Chip tone for a conviction tag. */
+function convictionTone(c: string | null | undefined): ChipTone | null {
   if (!c) return null;
   const u = c.toUpperCase();
-  if (u === "HIGH") return "var(--accent-green)";
-  if (u === "MEDIUM" || u === "MED") return "var(--accent-orange)";
-  if (u === "LOTTO" || u === "LOW") return "var(--accent-red)";
-  return "var(--text-secondary)";
+  if (u === "HIGH") return "green";
+  if (u === "MEDIUM" || u === "MED") return "orange";
+  if (u === "LOTTO" || u === "LOW") return "red";
+  return "neutral";
 }
 
 function convictionLabel(c: string | null | undefined): string | null {
@@ -115,6 +116,14 @@ function convictionLabel(c: string | null | undefined): string | null {
   const u = c.toUpperCase();
   if (u === "MEDIUM") return "MED";
   return u;
+}
+
+/** DTE bucket → Chip tone (mirrors the iflow color language). */
+function dteTone(text: string): ChipTone {
+  if (text === "LOTTO") return "orange";
+  if (text === "SWING") return "blue";
+  if (text === "LEAP") return "cyan";
+  return "neutral";
 }
 
 /**
@@ -190,7 +199,7 @@ export function TraderCallRow({
   const dte = useMemo(() => computeDte(call.expiry), [call.expiry]);
   const dl = dteTag(dte);
 
-  const convColor = convictionColor(call.conviction);
+  const convTone = convictionTone(call.conviction);
   const convLabel = convictionLabel(call.conviction);
 
   const sizing = Array.isArray(call.sizing) ? call.sizing : [];
@@ -203,26 +212,16 @@ export function TraderCallRow({
   const hasStrike = strike != null;
 
   return (
-    <div
-      style={{
-        borderBottom: "1px solid var(--border)",
-      }}
-    >
+    <div style={{ borderBottom: "1px solid var(--border)" }}>
       {/* Main row — clickable */}
       <div
-        className="text-sm py-2 px-3 hover:bg-bg-card-hover transition-colors cursor-pointer"
+        className="text-sm py-2 px-3 hover:bg-bg-card-hover transition-colors cursor-pointer flex items-center gap-2.5 flex-wrap"
         onClick={() => onToggle(call.alert_id)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          flexWrap: "wrap",
-        }}
       >
         {/* Direction badge */}
         <span
-          className="font-mono font-semibold shrink-0"
-          style={{ color: dir.color, width: 44, fontSize: 12 }}
+          className="num font-semibold shrink-0 text-xs w-11"
+          style={{ color: dir.color }}
         >
           {dir.label}
         </span>
@@ -235,44 +234,32 @@ export function TraderCallRow({
               e.stopPropagation();
               onTickerClick?.(call.ticker!);
             }}
-            className="font-mono font-bold shrink-0"
+            className="num font-bold shrink-0 text-sm cursor-pointer rounded-[var(--radius-control)]"
             style={{
-              fontSize: 13,
               color: tickerHi ? "var(--accent-blue)" : "var(--text-primary)",
-              background: tickerHi ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)" : "transparent",
+              background: tickerHi
+                ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)"
+                : "transparent",
               border: "none",
               padding: tickerHi ? "1px 6px" : 0,
-              borderRadius: 3,
-              cursor: "pointer",
             }}
           >
             {call.ticker}
           </button>
         ) : (
-          <span
-            className="font-mono shrink-0"
-            style={{ fontSize: 13, color: "var(--text-muted)" }}
-          >
-            —
-          </span>
+          <span className="num shrink-0 text-sm text-text-muted">—</span>
         )}
 
         {/* Sizing chips */}
         {sizing.length > 0 &&
-          sizing.map((s) => {
-            const sc = sizingColor(s);
-            return (
-              <Tag key={s} color={sc} border={sc} bg="rgba(0,0,0,0)">
-                {s}
-              </Tag>
-            );
-          })}
+          sizing.map((s) => (
+            <Chip key={s} tone={sizingTone(s)} className="shrink-0 uppercase">
+              {s}
+            </Chip>
+          ))}
 
         {/* Strike + opt type, or SHARES fallback */}
-        <span
-          className="font-mono font-bold shrink-0"
-          style={{ color: "var(--text-primary)" }}
-        >
+        <span className="num font-bold shrink-0 text-sm text-text-primary">
           {hasStrike ? (
             <>
               ${strike}
@@ -285,40 +272,25 @@ export function TraderCallRow({
 
         {/* Expiry */}
         {call.expiry && (
-          <span
-            className="font-mono text-text-muted shrink-0"
-            style={{ fontSize: 12 }}
-          >
+          <span className="num text-text-muted shrink-0 text-xs">
             {call.expiry}
           </span>
         )}
 
         {/* DTE chip */}
         {dl && (
-          <span
-            className="font-mono shrink-0"
-            style={{
-              color: dl.color,
-              background: dl.bg,
-              padding: "1px 6px",
-              borderRadius: 3,
-              fontSize: 10,
-              letterSpacing: 0.6,
-              fontWeight: 600,
-            }}
-          >
+          <Chip tone={dteTone(dl.text)} className="shrink-0">
             {dl.text}
-            <span style={{ marginLeft: 4, opacity: 0.85 }}>
+            <span className="num opacity-85">
               {dte != null ? `${dte}d` : ""}
             </span>
-          </span>
+          </Chip>
         )}
 
         {/* Premium */}
         {call.premium != null && (
           <span
-            className="font-mono text-text-secondary shrink-0"
-            style={{ fontSize: 12 }}
+            className="num text-text-secondary shrink-0 text-xs"
             title="Entry premium"
           >
             @{Number(call.premium).toFixed(2)}
@@ -328,104 +300,71 @@ export function TraderCallRow({
         {/* Entry underlying */}
         {call.entry_underlying != null && (
           <span
-            className="font-mono text-text-muted shrink-0"
-            style={{ fontSize: 12 }}
+            className="num text-text-muted shrink-0 text-xs"
             title="Underlying at fill"
           >
             und {Number(call.entry_underlying).toFixed(2)}
           </span>
         )}
 
-        {/* Exit-status badge (CLOSED / TRIMMED / STOPPED) */}
+        {/* Outcome chip (CLOSED / TRIMMED / STOPPED) with stated exit pct */}
         {exitStatus && (
-          <span
-            className="font-mono font-bold shrink-0"
-            style={{
-              color: exitStatus.color,
-              background: exitStatus.bg,
-              padding: "2px 7px",
-              borderRadius: 3,
-              fontSize: 11,
-              letterSpacing: 0.6,
-              border: `1px solid ${exitStatus.color}`,
-              marginLeft: "auto",
-            }}
+          <Chip
+            tone={exitStatus.tone}
+            className="shrink-0 ml-auto font-semibold"
             title={exitStatus.title}
           >
             {exitStatus.label}
             {exitStatus.pct != null && (
-              <span style={{ marginLeft: 4 }}>
+              <span className="num">
                 {exitStatus.pct >= 0 ? "+" : ""}
                 {exitStatus.pct}%
               </span>
             )}
-          </span>
+          </Chip>
         )}
 
         {/* P/L badge — right aligned (estimated, unrealized) */}
         <span
-          className="font-mono font-bold shrink-0"
-          style={{
-            color: pnlColor,
-            minWidth: 56,
-            textAlign: "right",
-            marginLeft: exitStatus ? 0 : "auto",
-            fontSize: 13,
-            opacity: exitStatus?.label === "CLOSED" ? 0.4 : 1,
-            textDecoration:
-              exitStatus?.label === "CLOSED" ? "line-through" : "none",
-          }}
+          className={`num font-bold shrink-0 text-sm min-w-14 text-right ${
+            exitStatus ? "" : "ml-auto"
+          } ${exitStatus?.label === "CLOSED" ? "opacity-40 line-through" : ""}`}
+          style={{ color: pnlColor }}
           title={pnlTitle}
         >
           {pnlLabel}
         </span>
 
         {/* Conviction chip */}
-        {convLabel && convColor && (
-          <Tag color={convColor} border={convColor} bg="rgba(0,0,0,0)">
+        {convLabel && convTone && (
+          <Chip tone={convTone} className="shrink-0">
             {convLabel}
-          </Tag>
+          </Chip>
         )}
       </div>
 
       {/* Expanded detail block — mirrors EntryRow's detail panel idiom */}
       {expanded && (
         <div
-          className="text-xs"
+          className="text-xs py-2 pr-3 pb-2.5 pl-14 text-text-secondary flex flex-col gap-1.5 leading-relaxed"
           style={{
-            padding: "8px 12px 10px 56px",
             background: "color-mix(in srgb, var(--bg-card) 50%, transparent)",
-            color: "var(--text-secondary)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 6,
-            lineHeight: 1.5,
           }}
         >
           {call.rationale && (
-            <div
-              style={{
-                fontStyle: "italic",
-                color: "var(--text-muted)",
-                fontSize: 12,
-              }}
-            >
+            <div className="italic text-xs text-text-muted">
               {call.rationale}
             </div>
           )}
 
           {call.content && (
             <div
+              className="whitespace-pre-wrap text-xs text-text-secondary p-2 max-h-56 overflow-auto"
               style={{
-                whiteSpace: "pre-wrap",
-                fontSize: 12,
-                color: "var(--text-secondary)",
-                background: "color-mix(in srgb, var(--bg-card-hover) 50%, transparent)",
-                padding: 8,
-                borderRadius: 4,
+                background:
+                  "color-mix(in srgb, var(--bg-card-hover) 50%, transparent)",
+                borderRadius: "var(--radius-control)",
                 border: "1px solid var(--border)",
-                maxHeight: 220,
-                overflow: "auto",
               }}
             >
               {call.content}
@@ -434,37 +373,19 @@ export function TraderCallRow({
 
           {call.exits && call.exits.length > 0 && (
             <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-                paddingTop: 4,
-                borderTop: "1px solid var(--border)",
-              }}
+              className="flex flex-col gap-1 pt-1"
+              style={{ borderTop: "1px solid var(--border)" }}
             >
-              <div
-                style={{
-                  fontSize: 11,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  color: "var(--text-muted)",
-                  fontWeight: 600,
-                }}
-              >
-                Exits ({call.exits.length})
+              <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-muted">
+                Exits (<span className="num">{call.exits.length}</span>)
               </div>
               {call.exits.map((ex) => (
                 <div
                   key={ex.alert_id}
-                  className="font-mono"
-                  style={{
-                    fontSize: 12,
-                    display: "flex",
-                    gap: 8,
-                    alignItems: "baseline",
-                  }}
+                  className="num text-xs flex gap-2 items-baseline"
                 >
                   <span
+                    className="font-bold uppercase min-w-11"
                     style={{
                       color:
                         ex.event_type === "close"
@@ -472,24 +393,19 @@ export function TraderCallRow({
                           : ex.event_type === "trim"
                             ? "var(--accent-orange)"
                             : "var(--accent-red)",
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      minWidth: 44,
                     }}
                   >
                     {ex.event_type}
                   </span>
-                  <span style={{ color: "var(--text-muted)" }}>
-                    {ex.ts.slice(5, 10)}
-                  </span>
+                  <span className="text-text-muted">{ex.ts.slice(5, 10)}</span>
                   {ex.exit_pct != null && (
                     <span
+                      className="font-bold"
                       style={{
                         color:
                           ex.exit_pct >= 0
                             ? "var(--accent-green)"
                             : "var(--accent-red)",
-                        fontWeight: 700,
                       }}
                     >
                       {ex.exit_pct >= 0 ? "+" : ""}
@@ -497,12 +413,7 @@ export function TraderCallRow({
                     </span>
                   )}
                   {ex.rationale && (
-                    <span
-                      style={{
-                        color: "var(--text-secondary)",
-                        fontStyle: "italic",
-                      }}
-                    >
+                    <span className="italic text-text-secondary font-sans">
                       — {ex.rationale}
                     </span>
                   )}
@@ -512,10 +423,7 @@ export function TraderCallRow({
           )}
 
           {/* Compact computation tags — modeled after EntryRow's "Entry / Now / DTE / Est" line */}
-          <div
-            className="font-mono"
-            style={{ fontSize: 11, color: "var(--text-muted)" }}
-          >
+          <div className="num text-xs text-text-muted">
             {call.entry_underlying != null
               ? `Entry $${Number(call.entry_underlying).toFixed(2)}`
               : "Entry —"}
@@ -532,14 +440,13 @@ export function TraderCallRow({
           </div>
 
           <div
-            className="font-mono"
-            style={{ fontSize: 11, color: "var(--text-muted)" }}
+            className="num text-xs text-text-muted"
             title={absoluteAge(call.ts) || ""}
           >
             {absoluteAge(call.ts) || ""}
-            <span style={{ marginLeft: 8 }}>· {relativeAge(call.ts)}</span>
+            <span className="ml-2">· {relativeAge(call.ts)}</span>
             {call.channel_name && (
-              <span style={{ marginLeft: 8 }}>· #{call.channel_name}</span>
+              <span className="ml-2">· #{call.channel_name}</span>
             )}
           </div>
         </div>

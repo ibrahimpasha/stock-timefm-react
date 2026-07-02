@@ -191,7 +191,7 @@ export function TraderEventRow({
       style={{
         background: "color-mix(in srgb, var(--accent-purple) 6%, transparent)",
         borderLeft: "2px solid var(--accent-purple)",
-        borderRadius: 3,
+        borderRadius: "var(--radius-control)",
       }}
     >
       {/* Header row — clickable */}
@@ -201,7 +201,7 @@ export function TraderEventRow({
         title={`${match.author} — alert ${match.alert_id} — ${match.ts}`}
       >
         <span
-          className="font-mono font-bold shrink-0"
+          className="font-bold uppercase shrink-0"
           style={{
             color: "var(--accent-purple)",
             fontSize: 10,
@@ -216,9 +216,10 @@ export function TraderEventRow({
           className="font-mono font-bold shrink-0"
           style={{
             color: dirColor,
-            border: `1px solid ${dirColor}`,
+            background: `color-mix(in srgb, ${dirColor} 12%, transparent)`,
+            border: `1px solid color-mix(in srgb, ${dirColor} 40%, transparent)`,
             padding: "1px 6px",
-            borderRadius: 3,
+            borderRadius: 999,
             fontSize: 11,
           }}
         >
@@ -236,9 +237,10 @@ export function TraderEventRow({
           className="font-mono font-bold shrink-0"
           style={{
             color: evColor,
-            border: `1px solid ${evColor}`,
+            background: `color-mix(in srgb, ${evColor} 12%, transparent)`,
+            border: `1px solid color-mix(in srgb, ${evColor} 40%, transparent)`,
             padding: "1px 6px",
-            borderRadius: 3,
+            borderRadius: 999,
             fontSize: 10,
             letterSpacing: 0.5,
           }}
@@ -247,14 +249,14 @@ export function TraderEventRow({
         </span>
 
         <span
-          className="font-mono font-bold shrink-0 text-text-primary"
+          className="num font-bold shrink-0 text-text-primary"
           style={{ fontSize: 12 }}
         >
           {strike != null ? `$${strike}${opt ? ` ${opt}` : ""}` : "SHARES"}
         </span>
         {exp && (
           <span
-            className="font-mono text-text-muted shrink-0"
+            className="num text-text-muted shrink-0"
             style={{ fontSize: 11 }}
           >
             {exp}
@@ -266,12 +268,13 @@ export function TraderEventRow({
             multi-step timeline rather than just one message. */}
         {eventCount && eventCount > 1 && (
           <span
-            className="font-mono shrink-0"
+            className="num shrink-0"
             style={{
               color: "var(--accent-purple)",
-              border: "1px solid var(--accent-purple)",
+              background: "color-mix(in srgb, var(--accent-purple) 12%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--accent-purple) 40%, transparent)",
               padding: "1px 6px",
-              borderRadius: 3,
+              borderRadius: 999,
               fontSize: 10,
               letterSpacing: 0.5,
               opacity: 0.85,
@@ -287,13 +290,13 @@ export function TraderEventRow({
             it's the headline realized exit. */}
         {outcome && (
           <span
-            className="font-mono font-bold shrink-0 ml-auto"
+            className="num font-bold shrink-0 ml-auto"
             style={{
               color: outcome.color,
-              border: `1px solid ${outcome.color}`,
+              border: `1px solid color-mix(in srgb, ${outcome.color} 40%, transparent)`,
               background: outcome.bg,
               padding: "2px 7px",
-              borderRadius: 3,
+              borderRadius: 999,
               fontSize: 11,
               letterSpacing: 0.6,
             }}
@@ -314,14 +317,14 @@ export function TraderEventRow({
         )}
 
         <span
-          className="font-mono text-text-muted shrink-0"
+          className="num text-text-muted shrink-0"
           style={{ fontSize: 11, marginLeft: outcome ? 0 : "auto" }}
         >
           {match.days_offset >= 0 ? "+" : ""}
           {match.days_offset}d vs flow
         </span>
         <span
-          className="font-mono shrink-0"
+          className="shrink-0"
           style={{ fontSize: 10, color: "var(--text-muted)" }}
         >
           {expanded ? "▾" : "▸"}
@@ -404,7 +407,7 @@ export function TraderEventRow({
                         {eType.toUpperCase()}
                       </span>
                       <span
-                        className="font-mono text-text-muted"
+                        className="num text-text-muted"
                         style={{ fontSize: 12 }}
                         title={absoluteAge(e.ts) || ""}
                       >
@@ -412,7 +415,7 @@ export function TraderEventRow({
                       </span>
                       {e.exit_pct != null && (
                         <span
-                          className="font-mono"
+                          className="num"
                           style={{
                             color: changeColor(e.exit_pct),
                             fontWeight: 700,
@@ -425,7 +428,7 @@ export function TraderEventRow({
                       )}
                       {e.premium != null && (
                         <span
-                          className="font-mono text-text-secondary"
+                          className="num text-text-secondary"
                           style={{ fontSize: 12 }}
                           title="premium"
                         >
@@ -434,7 +437,7 @@ export function TraderEventRow({
                       )}
                       {e.entry_underlying != null && (
                         <span
-                          className="font-mono text-text-muted"
+                          className="num text-text-muted"
                           style={{ fontSize: 12 }}
                           title="underlying at event"
                         >
@@ -443,7 +446,7 @@ export function TraderEventRow({
                       )}
                       {e.pl_underlying != null && (
                         <span
-                          className="font-mono"
+                          className="num"
                           style={{
                             color: changeColor(e.pl_underlying),
                             fontSize: 12,
@@ -491,8 +494,8 @@ export function TraderEventRow({
                     fontSize: 11,
                     letterSpacing: 0.6,
                     textTransform: "uppercase",
-                    padding: "3px 8px",
-                    borderRadius: 3,
+                    padding: "3px 10px",
+                    borderRadius: 999,
                     cursor: "pointer",
                     alignSelf: "flex-start",
                   }}
@@ -529,7 +532,7 @@ export function TraderEventRow({
                             color: "var(--text-secondary)",
                             background: "color-mix(in srgb, var(--bg-card-hover) 50%, transparent)",
                             padding: 8,
-                            borderRadius: 4,
+                            borderRadius: "var(--radius-control)",
                             border: "1px solid var(--border)",
                             maxHeight: 180,
                             overflow: "auto",

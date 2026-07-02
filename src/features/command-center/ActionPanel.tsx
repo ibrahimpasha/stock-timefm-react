@@ -65,7 +65,7 @@ function TradeSetupCard({
 
   return (
     <div className="card flex flex-col gap-3">
-      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-[0.08em] flex items-center gap-1.5">
         <Zap size={13} />
         Trade Setup
       </h3>
@@ -73,15 +73,15 @@ function TradeSetupCard({
       {/* Action badge */}
       <div className="flex items-center justify-between">
         <div
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold text-sm uppercase"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-sm uppercase"
           style={{ color: actionColor, background: `${actionColor}18` }}
         >
           <ActionIcon size={16} />
           {action}
         </div>
         <span
-          className="text-xs font-mono font-semibold px-2 py-1 rounded"
-          style={{ color: triggerColor, background: `${triggerColor}15` }}
+          className="text-xs font-semibold px-2.5 py-1 rounded-full"
+          style={{ color: triggerColor, background: `color-mix(in srgb, ${triggerColor} 10%, transparent)` }}
         >
           {triggerStatus}
         </span>
@@ -91,7 +91,7 @@ function TradeSetupCard({
       <div className="flex items-center gap-2 text-sm">
         <Target size={14} className="text-accent-blue shrink-0" />
         <span className="text-text-secondary">Entry:</span>
-        <span className="font-mono text-text-primary">
+        <span className="num text-text-primary">
           {formatCurrency(signal.entry_low)} - {formatCurrency(signal.entry_high)}
         </span>
       </div>
@@ -100,15 +100,15 @@ function TradeSetupCard({
       <div className="flex items-center gap-2 text-sm">
         <ShieldAlert size={14} className="text-accent-red shrink-0" />
         <span className="text-text-secondary">Stop:</span>
-        <span className="font-mono text-accent-red">{formatCurrency(stopLoss)}</span>
+        <span className="num text-accent-red">{formatCurrency(stopLoss)}</span>
       </div>
 
       {/* Risk / Reward rough display */}
       {currentPrice && (
         <div className="text-xs text-text-muted border-t border-border pt-2 mt-1">
-          Current: <span className="font-mono text-text-primary">{formatCurrency(currentPrice)}</span>
+          Current: <span className="num text-text-primary">{formatCurrency(currentPrice)}</span>
           {" | "}
-          Risk: <span className="font-mono text-accent-red">
+          Risk: <span className="num text-accent-red">
             {formatPercentRaw(((stopLoss - currentPrice) / currentPrice) * 100)}
           </span>
         </div>
@@ -141,7 +141,7 @@ function OptionPickCard({ option }: { option?: OptionPickData }) {
   if (!hasUsableOption) {
     return (
       <div className="card flex flex-col gap-3">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-[0.08em] flex items-center gap-1.5">
           <CircleDot size={13} />
           Option Pick
         </h3>
@@ -156,7 +156,7 @@ function OptionPickCard({ option }: { option?: OptionPickData }) {
 
   return (
     <div className="card flex flex-col gap-3">
-      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-[0.08em] flex items-center gap-1.5">
         <CircleDot size={13} />
         Option Pick
       </h3>
@@ -164,12 +164,12 @@ function OptionPickCard({ option }: { option?: OptionPickData }) {
       {/* Contract line */}
       <div className="flex items-center gap-2">
         <span
-          className="text-xs font-bold px-2 py-0.5 rounded"
-          style={{ color: typeColor, background: `${typeColor}18` }}
+          className="text-xs font-bold px-2 py-0.5 rounded-full"
+          style={{ color: typeColor, background: `color-mix(in srgb, ${typeColor} 12%, transparent)` }}
         >
           {option.type}
         </span>
-        <span className="font-mono text-text-primary text-sm">
+        <span className="num text-text-primary text-sm">
           ${option.strike}
         </span>
       </div>
@@ -178,22 +178,22 @@ function OptionPickCard({ option }: { option?: OptionPickData }) {
         <div className="flex items-center gap-1">
           <Calendar size={11} className="text-text-muted" />
           <span className="text-text-secondary">Expiry:</span>
-          <span className="font-mono text-text-primary">{option.expiry}</span>
+          <span className="num text-text-primary">{option.expiry}</span>
         </div>
         <div className="flex items-center gap-1">
           <DollarSign size={11} className="text-text-muted" />
           <span className="text-text-secondary">Premium:</span>
-          <span className="font-mono text-text-primary">{formatCurrency(option.premium)}</span>
+          <span className="num text-text-primary">{formatCurrency(option.premium)}</span>
         </div>
         <div>
           <span className="text-text-secondary">Bid/Ask:</span>{" "}
-          <span className="font-mono text-text-primary">
+          <span className="num text-text-primary">
             {formatCurrency(option.bid ?? 0)} / {formatCurrency(option.ask ?? 0)}
           </span>
         </div>
         <div>
           <span className="text-text-secondary">IV:</span>{" "}
-          <span className="font-mono text-accent-purple">
+          <span className="num text-accent-purple">
             {((option.iv ?? 0) * 100).toFixed(1)}%
           </span>
         </div>
@@ -228,7 +228,7 @@ function TargetsCard({
 
   return (
     <div className="card flex flex-col gap-3">
-      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-[0.08em] flex items-center gap-1.5">
         <BarChart3 size={13} />
         Targets
       </h3>
@@ -237,13 +237,13 @@ function TargetsCard({
       <div>
         <div className="flex items-center justify-between text-xs mb-1">
           <span className="text-text-secondary">
-            T1: <span className="font-mono text-text-primary">{formatCurrency(signal.t1)}</span>
+            T1: <span className="num text-text-primary">{formatCurrency(signal.t1)}</span>
           </span>
-          <span className="font-mono" style={{ color: changeColor(t1PnL) }}>
+          <span className="num" style={{ color: changeColor(t1PnL) }}>
             {formatPercentRaw(t1PnL)}
           </span>
         </div>
-        <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "rgba(72,79,88,0.3)" }}>
+        <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "color-mix(in srgb, var(--text-muted) 25%, transparent)" }}>
           <div
             className="h-full rounded-full transition-all duration-700"
             style={{
@@ -252,7 +252,7 @@ function TargetsCard({
             }}
           />
         </div>
-        <div className="text-right text-xs text-text-muted mt-0.5 font-mono">
+        <div className="num text-right text-xs text-text-muted mt-0.5">
           {t1Progress.toFixed(0)}%
         </div>
       </div>
@@ -261,13 +261,13 @@ function TargetsCard({
       <div>
         <div className="flex items-center justify-between text-xs mb-1">
           <span className="text-text-secondary">
-            T2: <span className="font-mono text-text-primary">{formatCurrency(signal.t2)}</span>
+            T2: <span className="num text-text-primary">{formatCurrency(signal.t2)}</span>
           </span>
-          <span className="font-mono" style={{ color: changeColor(t2PnL) }}>
+          <span className="num" style={{ color: changeColor(t2PnL) }}>
             {formatPercentRaw(t2PnL)}
           </span>
         </div>
-        <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "rgba(72,79,88,0.3)" }}>
+        <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "color-mix(in srgb, var(--text-muted) 25%, transparent)" }}>
           <div
             className="h-full rounded-full transition-all duration-700"
             style={{
@@ -276,7 +276,7 @@ function TargetsCard({
             }}
           />
         </div>
-        <div className="text-right text-xs text-text-muted mt-0.5 font-mono">
+        <div className="num text-right text-xs text-text-muted mt-0.5">
           {t2Progress.toFixed(0)}%
         </div>
       </div>

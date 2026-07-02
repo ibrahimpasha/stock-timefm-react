@@ -11,33 +11,27 @@ import { useState } from "react";
 import { Clock, ChevronDown, ChevronRight } from "lucide-react";
 import { useTradersToday, type TraderTodayEvent } from "../../api/alerts";
 import { useAppStore } from "../../store/useAppStore";
+import { Chip, type ChipTone } from "../../components/Glass";
 
-const EVENT_COLORS: Record<string, { bg: string; fg: string; label: string }> = {
-  open:   { bg: "rgba(63,185,80,0.12)",  fg: "var(--accent-green)",  label: "OPEN" },
-  add:    { bg: "rgba(56,211,168,0.12)", fg: "var(--accent-cyan)",   label: "ADD" },
-  trim:   { bg: "rgba(227,127,46,0.12)", fg: "var(--accent-orange)", label: "TRIM" },
-  close:  { bg: "rgba(248,81,73,0.12)",  fg: "var(--accent-red)",    label: "CLOSE" },
-  stop:   { bg: "rgba(248,81,73,0.16)",  fg: "var(--accent-red)",    label: "STOP" },
-  status: { bg: "rgba(88,166,255,0.10)", fg: "var(--accent-blue)",   label: "STATUS" },
-  recap:  { bg: "rgba(167,139,250,0.10)", fg: "var(--accent-purple)", label: "RECAP" },
+const EVENT_TONES: Record<string, { tone: ChipTone; label: string }> = {
+  open:   { tone: "green",  label: "OPEN" },
+  add:    { tone: "cyan",   label: "ADD" },
+  trim:   { tone: "orange", label: "TRIM" },
+  close:  { tone: "red",    label: "CLOSE" },
+  stop:   { tone: "red",    label: "STOP" },
+  status: { tone: "blue",   label: "STATUS" },
+  recap:  { tone: "purple", label: "RECAP" },
 };
 
 function EventTypePill({ type }: { type: string | null }) {
-  const c = type ? EVENT_COLORS[type.toLowerCase()] : undefined;
+  const c = type ? EVENT_TONES[type.toLowerCase()] : undefined;
   if (!c) {
-    return (
-      <span className="font-mono text-xs px-1.5 py-px rounded text-text-muted border border-border">
-        —
-      </span>
-    );
+    return <Chip className="shrink-0">—</Chip>;
   }
   return (
-    <span
-      className="font-mono text-xs px-1.5 py-px rounded font-semibold"
-      style={{ background: c.bg, color: c.fg }}
-    >
+    <Chip tone={c.tone} className="shrink-0">
       {c.label}
-    </span>
+    </Chip>
   );
 }
 
@@ -81,7 +75,7 @@ function EventRow({ ev }: { ev: TraderTodayEvent }) {
         ) : (
           <ChevronRight size={11} className="text-text-muted shrink-0" />
         )}
-        <span className="font-mono text-text-muted w-16 shrink-0">
+        <span className="num text-text-muted w-16 shrink-0">
           {fmtTime(ev.ts)}
         </span>
         <EventTypePill type={ev.event_type} />
@@ -92,13 +86,13 @@ function EventRow({ ev }: { ev: TraderTodayEvent }) {
               e.stopPropagation();
               setActiveTicker(ev.ticker!);
             }}
-            className="font-mono font-bold text-text-primary hover:text-accent-blue transition-colors"
+            className="num font-bold text-text-primary hover:text-accent-blue transition-colors"
           >
             {ContractStr(ev)}
           </button>
         )}
         {ev.exit_pct !== null && (
-          <span className="font-mono text-accent-orange">{ev.exit_pct}%</span>
+          <span className="num text-accent-orange">{ev.exit_pct}%</span>
         )}
         <span className="text-text-secondary truncate flex-1">
           {ev.rationale || ""}
@@ -140,8 +134,10 @@ export function TradersTodayFeed() {
     <div className="card p-3">
       <div className="flex items-center gap-2 mb-3">
         <Clock size={14} className="text-accent-purple" />
-        <h3 className="text-sm font-semibold text-text-primary">Today's Activity</h3>
-        <span className="text-xs text-text-muted font-mono">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
+          Today's Activity
+        </h3>
+        <span className="num text-xs text-text-muted">
           {data.date} · {data.total_events} event{data.total_events === 1 ? "" : "s"} ·{" "}
           {authors.length} trader{authors.length === 1 ? "" : "s"}
         </span>
@@ -175,7 +171,7 @@ export function TradersTodayFeed() {
                   <span className="font-semibold text-sm text-text-primary">
                     {a.author}
                   </span>
-                  <span className="text-xs text-text-muted font-mono">
+                  <span className="num text-xs text-text-muted">
                     {a.count} event{a.count === 1 ? "" : "s"}
                   </span>
                 </button>

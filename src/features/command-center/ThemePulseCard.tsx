@@ -8,6 +8,9 @@ interface Props {
   ticker: string;
 }
 
+/** Translucent tint of a CSS-var color — var() can't take a hex-alpha suffix. */
+const tint = (c: string, pct: number) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
+
 const BUCKET = {
   play: { label: "Plays now", color: "var(--accent-green)", icon: <TrendingUp size={11} /> },
   watch: { label: "Watch", color: "var(--accent-yellow, #eab308)", icon: <Eye size={11} /> },
@@ -41,14 +44,14 @@ function PulseRow({
       <button
         type="button"
         onClick={() => onClick(r.ticker)}
-        className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono hover:bg-bg-card-hover cursor-pointer transition-colors"
-        style={{ background: `${color}14`, color, border: `1px solid ${color}33`, minWidth: 56 }}
+        className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs num hover:bg-bg-card-hover cursor-pointer transition-colors"
+        style={{ background: tint(color, 12), color, border: `1px solid ${tint(color, 26)}`, minWidth: 56 }}
       >
         <span className="font-semibold">{r.ticker}</span>
         {r.role && <span className="text-[9px] opacity-60">{ROLE_ABBR[r.role] ?? ""}</span>}
       </button>
       <div
-        className="shrink-0 font-mono text-xs tabular-nums pt-0.5"
+        className="num shrink-0 text-xs pt-0.5"
         style={{ color, width: 22, textAlign: "right" }}
         title="play score (flow + catalyst + technicals + momentum)"
       >
@@ -56,7 +59,7 @@ function PulseRow({
       </div>
       <div className="flex flex-col gap-0.5 min-w-0 flex-1">
         {r.why && <div className="text-xs leading-snug text-text-secondary">{r.why}</div>}
-        <div className="flex flex-wrap gap-1 text-[10px] font-mono text-text-muted">
+        <div className="num flex flex-wrap gap-1 text-xs text-text-muted">
           {accum && <span style={{ color: r.bucket === "wait" ? "var(--text-muted)" : color }}>{accum}</span>}
           {typeof r.days_to_earnings === "number" && <span>· ER {r.days_to_earnings}d</span>}
           {typeof r.ret_30d === "number" && (
@@ -86,12 +89,12 @@ function Bucket({
   return (
     <div className="flex flex-col gap-0.5">
       <div
-        className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider pt-1"
+        className="flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] pt-1"
         style={{ color: b.color }}
       >
         {b.icon}
         {b.label}
-        <span className="opacity-50">· {rows.length}</span>
+        <span className="num opacity-50">· {rows.length}</span>
       </div>
       {rows.map((r) => (
         <PulseRow key={r.ticker} r={r} color={b.color} active={r.ticker === active} onClick={onClick} />
@@ -133,15 +136,15 @@ export function ThemePulseCard({ ticker }: Props) {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:opacity-90 transition-opacity text-xs font-mono uppercase tracking-wider text-text-secondary"
+          className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:opacity-90 transition-opacity text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary"
         >
           {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
           <Activity size={14} className="text-accent-cyan" />
           Theme Pulse
         </button>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] font-mono text-text-muted">
-            {theme} · {data.n} names
+          <span className="text-xs text-text-muted">
+            {theme} · <span className="num">{data.n}</span> names
           </span>
           <a
             href="/api/intel-graph/theme-pulse/export?format=csv"
@@ -158,7 +161,7 @@ export function ThemePulseCard({ ticker }: Props) {
       {!expanded ? (
         // Collapsed (~quarter height): bucket tally + the top plays as chips.
         <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2 text-[10px] font-mono">
+          <div className="num flex items-center gap-2 text-xs">
             <span style={{ color: BUCKET.play.color }}>{plays.length} plays</span>
             <span className="text-text-muted">·</span>
             <span style={{ color: BUCKET.watch.color }}>{watch.length} watch</span>
@@ -173,26 +176,26 @@ export function ThemePulseCard({ ticker }: Props) {
                   type="button"
                   onClick={() => setActiveTicker(r.ticker)}
                   title={r.why}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono hover:bg-bg-card-hover cursor-pointer transition-colors"
+                  className="num inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs hover:bg-bg-card-hover cursor-pointer transition-colors"
                   style={{
-                    background: `${BUCKET.play.color}14`,
+                    background: tint(BUCKET.play.color, 12),
                     color: BUCKET.play.color,
-                    border: `1px solid ${BUCKET.play.color}33`,
+                    border: `1px solid ${tint(BUCKET.play.color, 26)}`,
                   }}
                 >
                   <span className="font-semibold">{r.ticker}</span>
-                  <span className="opacity-60 tabular-nums">{r.play_score}</span>
+                  <span className="opacity-60">{r.play_score}</span>
                 </button>
               ))}
               {plays.length > 5 && (
-                <span className="text-[10px] font-mono text-text-muted">+{plays.length - 5}</span>
+                <span className="num text-xs text-text-muted">+{plays.length - 5}</span>
               )}
             </div>
           )}
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="text-[10px] font-mono text-text-muted hover:text-text-secondary text-left cursor-pointer"
+            className="text-xs text-text-muted hover:text-text-secondary text-left cursor-pointer transition-colors"
           >
             show theme read + all {data.n} names →
           </button>
@@ -207,7 +210,7 @@ export function ThemePulseCard({ ticker }: Props) {
           <Bucket kind="watch" rows={watch} active={ticker} onClick={setActiveTicker} />
           <Bucket kind="wait" rows={wait} active={ticker} onClick={setActiveTicker} />
 
-          <div className="text-[10px] font-mono text-text-muted pt-1 border-t border-border">
+          <div className="text-xs text-text-muted pt-1 border-t border-border">
             ranked by flow accumulation · catalyst proximity · technicals · momentum · role
           </div>
         </>
