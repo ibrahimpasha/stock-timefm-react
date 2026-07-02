@@ -87,12 +87,15 @@ export function changeColor(value: number): string {
 /**
  * Parse a flexible ISO/SQLite timestamp into a UTC epoch ms. SQLite stores
  * timestamps without a trailing Z; we treat those as UTC for delta math.
- * Returns NaN when input is unparseable.
+ * Timestamps that already carry tz info (Z or ±HH:MM offset, e.g. the
+ * backend's PT `-07:00` isoformats) are parsed as-is — appending Z to
+ * those produced NaN. Returns NaN when input is unparseable.
  */
-function parseTimestampMs(iso: string | undefined | null): number {
+export function parseTimestampMs(iso: string | undefined | null): number {
   if (!iso) return NaN;
   const ts = iso.includes("T") ? iso : iso.replace(" ", "T");
-  return new Date(ts.endsWith("Z") ? ts : ts + "Z").getTime();
+  const hasTz = /(?:Z|[+-]\d{2}:?\d{2})$/.test(ts);
+  return new Date(hasTz ? ts : ts + "Z").getTime();
 }
 
 /**

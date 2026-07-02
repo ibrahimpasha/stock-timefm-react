@@ -54,7 +54,7 @@ function SentBadge({ s }: { s?: string | null }) {
   return (
     <span
       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold uppercase"
-      style={{ background: `${c}18`, color: c, border: `1px solid ${c}40` }}
+      style={{ background: `color-mix(in srgb, ${c} 9%, transparent)`, color: c, border: `1px solid color-mix(in srgb, ${c} 25%, transparent)` }}
     >
       <Icon size={10} />
       {s ?? "—"}

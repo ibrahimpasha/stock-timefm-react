@@ -183,19 +183,19 @@ export function TraderPositionRow({
   const lastEvent = position.events[position.events.length - 1] ?? null;
 
   // How many events on this position happened today (local timezone)?
-  const todayPrefix = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }, []);
-  const todayEventCount = useMemo(
-    () =>
-      position.events.filter((ev) => (ev.ts || "").startsWith(todayPrefix)).length,
-    [position.events, todayPrefix],
-  );
+  // Event ts strings are UTC ISO ("...T20:02:25+00:00") — parse and compare
+  // local calendar days; a raw string-prefix match against the local date
+  // mislabels evening events in both directions.
   const todayEvents = useMemo(
-    () => position.events.filter((ev) => (ev.ts || "").startsWith(todayPrefix)),
-    [position.events, todayPrefix],
+    () =>
+      position.events.filter(
+        (ev) =>
+          !!ev.ts &&
+          new Date(ev.ts).toDateString() === new Date().toDateString(),
+      ),
+    [position.events],
   );
+  const todayEventCount = todayEvents.length;
   const lastTodayEvent = todayEvents[todayEvents.length - 1] ?? null;
 
   const dte = useMemo(() => computeDte(pk.expiry), [pk.expiry]);
@@ -248,7 +248,8 @@ export function TraderPositionRow({
             (position.events[0] ? position.events[0].ts : null);
           const latestTs = lastEvent?.ts || openTs;
           if (!latestTs) return null;
-          const isToday = (latestTs || "").startsWith(todayPrefix);
+          const isToday =
+            new Date(latestTs).toDateString() === new Date().toDateString();
           const sameAsOpen = !openTs || shortDate(openTs) === shortDate(latestTs);
           const title = sameAsOpen
             ? `entered ${absoluteAge(latestTs) || ""} (${relativeAge(latestTs)})`

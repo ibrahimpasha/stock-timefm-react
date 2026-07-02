@@ -96,7 +96,7 @@ function ReasonChips({ reasons, flags }: { reasons?: string[]; flags?: string[] 
     <div className="flex items-center gap-1 flex-wrap">
       {items.map((it, i) => (
         <span key={i} className="text-xs px-1.5 py-0.5 rounded font-mono"
-          style={{ color: it.color, background: `${it.color}12`, border: `1px solid ${it.color}30` }}>
+          style={{ color: it.color, background: `color-mix(in srgb, ${it.color} 7%, transparent)`, border: `1px solid color-mix(in srgb, ${it.color} 19%, transparent)` }}>
           {it.text}
         </span>
       ))}
@@ -129,7 +129,7 @@ function TradeRow({ pos }: { pos: ClosedPosition }) {
         <span className="text-text-muted">{pos.expiry}</span>
         <span
           className="ml-auto flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold"
-          style={{ color: exitInfo.color, background: exitInfo.bg, border: `1px solid ${exitInfo.color}40` }}
+          style={{ color: exitInfo.color, background: exitInfo.bg, border: `1px solid color-mix(in srgb, ${exitInfo.color} 25%, transparent)` }}
         >
           <ExitIcon size={10} />
           {exitInfo.label}
@@ -278,9 +278,9 @@ export function TradeDecisionLog() {
             onClick={() => setFilter(id as typeof filter)}
             className="px-2.5 py-1 text-xs font-semibold rounded-md transition-colors"
             style={{
-              background: filter === id ? `${color}15` : "transparent",
+              background: filter === id ? `color-mix(in srgb, ${color} 8%, transparent)` : "transparent",
               color: filter === id ? color : "var(--text-muted)",
-              border: `1px solid ${filter === id ? `${color}40` : "var(--border)"}`,
+              border: `1px solid ${filter === id ? `color-mix(in srgb, ${color} 25%, transparent)` : "var(--border)"}`,
             }}
           >
             {label}

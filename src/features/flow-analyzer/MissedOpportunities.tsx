@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../../api/client";
+import { useTickerPricesBatch } from "./iflow/hooks";
 import { TrendingUp, TrendingDown, AlertTriangle, Eye } from "lucide-react";
 
 interface WatchlistEntry {
@@ -28,26 +29,6 @@ function useWatchlist() {
     queryFn: () => apiClient.get("/iflow-trader/watchlist").then((r) => r.data),
     staleTime: 30_000,
     refetchInterval: 60_000,
-  });
-}
-
-function useTickerPrices(tickers: string[]) {
-  return useQuery<Record<string, number>>({
-    queryKey: ["missed-prices", tickers.join(",")],
-    queryFn: async () => {
-      const prices: Record<string, number> = {};
-      const fetches = tickers.slice(0, 30).map(async (t) => {
-        try {
-          const { data } = await apiClient.get(`/market/price?ticker=${t}`);
-          prices[t] = data.price || 0;
-        } catch { /* skip */ }
-      });
-      await Promise.all(fetches);
-      return prices;
-    },
-    staleTime: 60_000,
-    refetchInterval: 120_000,
-    enabled: tickers.length > 0,
   });
 }
 
@@ -91,7 +72,8 @@ export function MissedOpportunities() {
   }, [wl]);
 
   const tickers = useMemo(() => [...new Set(candidates.map((c) => c.ticker))], [candidates]);
-  const { data: prices } = useTickerPrices(tickers);
+  const { data: pricesData } = useTickerPricesBatch(tickers);
+  const prices = pricesData?.prices;
 
   if (isLoading) {
     return (
@@ -198,7 +180,7 @@ export function MissedOpportunities() {
                   {isHighlighted && <AlertTriangle size={11} style={{ color: "var(--accent-green)" }} />}
                   <span
                     className="font-mono text-xs font-bold px-1.5 py-0.5 rounded"
-                    style={{ color: pnlColor, background: `${pnlColor}12` }}
+                    style={{ color: pnlColor, background: `color-mix(in srgb, ${pnlColor} 7%, transparent)` }}
                   >
                     {(e.estimatedPnl ?? 0) >= 0 ? "+" : ""}{e.estimatedPnl}%
                   </span>

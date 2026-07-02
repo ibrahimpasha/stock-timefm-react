@@ -604,7 +604,9 @@ export function TraderLeaderboardPage() {
   const [selected, setSelected] = useState<string | null>(null);
 
   const { data, isLoading, isFetching } = useLeaderboard(lookback);
-  const { data: todayData } = useTradersToday();
+  // Pass the user's LOCAL calendar day — the backend defaults to the UTC day,
+  // which rolls over at 5pm PT and blanks the evening review window.
+  const { data: todayData } = useTradersToday(new Date().toLocaleDateString("en-CA"));
   const todayMap = useMemo<Record<string, number>>(() => {
     const m: Record<string, number> = {};
     todayData?.authors?.forEach((a) => {

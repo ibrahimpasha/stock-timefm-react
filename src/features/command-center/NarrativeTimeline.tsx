@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, GitBranch, Info } from "lucide-react";
 
 import { useNarrative } from "../../api/intelV3";
 import type { NarrativeEvent } from "../../api/intelV3";
+import { parseTimestampMs } from "../../lib/utils";
 
 const SOURCE_COLOR: Record<string, string> = {
   news: "var(--accent-blue)",
@@ -19,7 +20,9 @@ function colorForSource(source: string): string {
 }
 
 function fmtTime(ts: string): string {
-  const d = new Date(ts);
+  // backend strips tz info from event timestamps (naive UTC) — parse as UTC,
+  // not local, or every event renders 7-8h in the future for a PT user
+  const d = new Date(parseTimestampMs(ts));
   if (Number.isNaN(d.getTime())) return ts;
   return d.toLocaleString("en-US", {
     month: "short",
@@ -166,8 +169,8 @@ export function NarrativeTimeline({
   const events = useMemo(
     () =>
       [...(data?.events ?? [])].sort((a, b) => {
-        const at = new Date(a.ts).getTime();
-        const bt = new Date(b.ts).getTime();
+        const at = parseTimestampMs(a.ts);
+        const bt = parseTimestampMs(b.ts);
         if (Number.isNaN(at) || Number.isNaN(bt)) return a.ts.localeCompare(b.ts);
         return at - bt;
       }),

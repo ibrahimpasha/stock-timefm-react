@@ -177,9 +177,9 @@ function ClusterCard({
               onClick={() => onPick(t)}
               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono font-semibold transition-colors hover:brightness-110"
               style={{
-                background: `${c}18`,
+                background: `color-mix(in srgb, ${c} 9%, transparent)`,
                 color: c,
-                border: `1px solid ${c}40`,
+                border: `1px solid color-mix(in srgb, ${c} 25%, transparent)`,
               }}
               title={`${ns.mentions} mentions · ${ns.bullish}B / ${ns.bearish}S`}
             >

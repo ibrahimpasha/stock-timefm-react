@@ -26,6 +26,7 @@ import type { ChipTone } from "../../components/Glass";
 import { useAppStore } from "../../store/useAppStore";
 import { useDashboardFilters } from "../../store/useDashboardFilters";
 import { formatPremium } from "../../lib/utils";
+import { parseLocalDate, daysFromToday } from "../../lib/dateOnly";
 import type { TrackedTicker } from "../../lib/types";
 import { useLeaderboard } from "../../api/alerts";
 import { useVoicesTrending } from "../../api/voices";
@@ -371,17 +372,16 @@ export function IFlowTracker() {
     const earningsActive = earningsWindow !== "all" && !!earningsMap;
     if (earningsActive) {
       const maxDays = EARNINGS_WINDOW_DAYS[earningsWindow];
-      const now = Date.now();
       list = list.filter((t) => {
         const d = earningsMap![t.ticker];
         if (!d) return false;
-        const days = (new Date(d).getTime() - now) / 86_400_000;
+        const days = daysFromToday(d);
         return days >= 0 && days <= maxDays;
       });
       // Earnings-window mode overrides the regular sort: nearest first.
       list.sort((a, b) => {
-        const da = earningsMap![a.ticker] ? new Date(earningsMap![a.ticker]!).getTime() : Infinity;
-        const db = earningsMap![b.ticker] ? new Date(earningsMap![b.ticker]!).getTime() : Infinity;
+        const da = earningsMap![a.ticker] ? parseLocalDate(earningsMap![a.ticker]!).getTime() : Infinity;
+        const db = earningsMap![b.ticker] ? parseLocalDate(earningsMap![b.ticker]!).getTime() : Infinity;
         return da - db;
       });
       return list;

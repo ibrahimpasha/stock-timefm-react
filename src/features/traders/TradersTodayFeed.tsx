@@ -118,7 +118,10 @@ function EventRow({ ev }: { ev: TraderTodayEvent }) {
 }
 
 export function TradersTodayFeed() {
-  const { data, isFetching } = useTradersToday();
+  // Pass the user's LOCAL calendar day — the backend defaults to the UTC day,
+  // which rolls over at 5pm PT and blanks the evening review window.
+  const localDay = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
+  const { data, isFetching } = useTradersToday(localDay);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   if (!data) {

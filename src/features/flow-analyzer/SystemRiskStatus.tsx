@@ -159,7 +159,11 @@ function SectorWarnings({ warnings }: { warnings: RiskData["risk"]["sector_warni
           <span
             key={i}
             className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
-            style={{ background: `${color}15`, color, border: `1px solid ${color}40` }}
+            style={{
+              background: `color-mix(in srgb, ${color} 8%, transparent)`,
+              color,
+              border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`,
+            }}
             title="3+ same-direction positions in one sector"
           >
             <AlertTriangle size={10} />

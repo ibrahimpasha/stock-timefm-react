@@ -594,7 +594,7 @@ export function DailyBrief() {
   const isHistory = !!histDate;
   const live = currentSession();
   const [activeSession, setActiveSession] = useState<BriefSession>(live);
-  const { data, isLoading } = useCommandBrief(histDate || undefined, activeSession);
+  const { data, isLoading, refetch } = useCommandBrief(histDate || undefined, activeSession);
   const { data: datesData } = useBriefDates();
   const refresh = useRefreshBrief(activeSession);
   const [expanded, setExpanded] = useState(true);
@@ -635,6 +635,33 @@ export function DailyBrief() {
     if (activeTicker) trackTicker(activeTicker);
   }, [activeTicker]);
 
+  // History date picker — shared by the normal render and the error shell so a
+  // failed fetch (missing past session, backend restart) never strands the user
+  // without a way back to "Today (live)".
+  const datePicker = (
+    <div
+      className="inline-flex items-center gap-1 text-xs rounded-full border border-border px-2 py-1"
+      style={{ background: "var(--glass-bg)" }}
+      title="Review a past day's brief"
+    >
+      <History size={12} className="text-text-muted" />
+      <select
+        value={histDate}
+        onChange={(e) => selectDate(e.target.value)}
+        className="bg-transparent text-text-secondary outline-none cursor-pointer"
+      >
+        <option value="">Today (live)</option>
+        {(datesData?.dates || [])
+          .filter((d) => d.pt_date !== data?.pt_date || isHistory)
+          .map((d) => (
+            <option key={d.pt_date} value={d.pt_date}>
+              {d.pt_date}
+            </option>
+          ))}
+      </select>
+    </div>
+  );
+
   if (isLoading && !data) {
     return (
       <div className="glass-strong p-5 max-md:p-4 flex items-center gap-2 text-xs text-text-muted">
@@ -643,7 +670,42 @@ export function DailyBrief() {
       </div>
     );
   }
-  if (!data) return null;
+  if (!data) {
+    // Error / missing brief: keep the shell + pickers mounted (retry:false and
+    // no history refetch means unmounting here would be unrecoverable in-place).
+    return (
+      <div className="glass-strong p-5 max-md:p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 text-text-primary">
+            <Sparkles size={16} style={{ color: "var(--accent-purple)" }} />
+            <span className="text-sm font-semibold">Daily Brief</span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">{datePicker}</div>
+        </div>
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
+          <SessionTabs
+            available={availableSessions}
+            active={activeSession}
+            live={isHistory ? null : live}
+            onSelect={setActiveSession}
+          />
+        </div>
+        <div className="mt-3 flex items-center gap-2 text-xs text-text-secondary">
+          <span>
+            {isHistory
+              ? `No ${SESSION_LABELS[activeSession]} brief captured for ${histDate}.`
+              : "Brief unavailable right now."}
+          </span>
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-border text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors"
+          >
+            <RefreshCw size={11} /> retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const ctx = data.context;
   const read = (data.read || {}) as Partial<BriefRead>;
@@ -666,27 +728,7 @@ export function DailyBrief() {
         <div className="flex items-center gap-2 flex-wrap">
           {hasRegime && !isHistory && <RegimePill r={regime} />}
           {/* History date picker — review past briefs to judge accuracy */}
-          <div
-            className="inline-flex items-center gap-1 text-xs rounded-full border border-border px-2 py-1"
-            style={{ background: "var(--glass-bg)" }}
-            title="Review a past day's brief"
-          >
-            <History size={12} className="text-text-muted" />
-            <select
-              value={histDate}
-              onChange={(e) => selectDate(e.target.value)}
-              className="bg-transparent text-text-secondary outline-none cursor-pointer"
-            >
-              <option value="">Today (live)</option>
-              {(datesData?.dates || [])
-                .filter((d) => d.pt_date !== data.pt_date || isHistory)
-                .map((d) => (
-                  <option key={d.pt_date} value={d.pt_date}>
-                    {d.pt_date}
-                  </option>
-                ))}
-            </select>
-          </div>
+          {datePicker}
           {isHistory ? (
             <span
               className="num text-xs px-2 py-0.5 rounded-full"

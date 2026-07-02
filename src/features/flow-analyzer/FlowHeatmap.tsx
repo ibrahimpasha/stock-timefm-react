@@ -20,6 +20,7 @@ import { useTickerTaxonomy } from "../../api/tickerTaxonomy";
 import { useTickerTechnicals, type TickerTechnical } from "../../api/tickerTechnicals";
 import { useThemePulseScores } from "../../api/intelGraph";
 import { formatPremium } from "../../lib/utils";
+import { daysFromToday } from "../../lib/dateOnly";
 import { CompanyMapView } from "../../pages/BayAreaMapPage";
 import {
   useIFlowDates,
@@ -307,7 +308,7 @@ export function FlowHeatmap() {
     (ticker: string): number | null => {
       const iso = earnings?.[ticker];
       if (!iso) return null;
-      const days = (new Date(iso).getTime() - Date.now()) / 86400000;
+      const days = daysFromToday(iso); // 0 = reports today (local calendar)
       return days < 0 ? null : days;
     },
     [earnings]

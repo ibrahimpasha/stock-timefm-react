@@ -236,7 +236,13 @@ export function useRefreshBrief(session?: BriefSession) {
   return useMutation({
     mutationFn: () =>
       apiClient
-        .post<CommandBrief>(`/command-brief/refresh${session ? `?session=${session}` : ""}`)
+        // backend runs a synchronous claude -p Read (CLAUDE_TIMEOUT_S=300);
+        // override the shared 60s client timeout or axios aborts mid-synthesis
+        .post<CommandBrief>(
+          `/command-brief/refresh${session ? `?session=${session}` : ""}`,
+          undefined,
+          { timeout: 320_000 },
+        )
         .then((r) => r.data),
     onSuccess: (data) =>
       qc.setQueryData(["command-brief", "live", session || "current"], data),
@@ -248,7 +254,10 @@ export function useAskDesk() {
   return useMutation({
     mutationFn: (vars: { question: string; history: AskTurn[] }) =>
       apiClient
-        .post<{ answer: string; tickers: string[] }>("/command-brief/ask", vars)
+        // same 300s backend claude budget as refresh — needs the long timeout
+        .post<{ answer: string; tickers: string[] }>("/command-brief/ask", vars, {
+          timeout: 320_000,
+        })
         .then((r) => r.data),
   });
 }

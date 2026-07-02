@@ -12,7 +12,7 @@
  * tables follow the spec treatment (muted sticky header, hover rows, `num`
  * on all metrics). Behavior and data flow are unchanged.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { TrendingUp, Flame, Award, BarChart3, X } from "lucide-react";
 
 import {
@@ -611,8 +611,11 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
   const [draft, setDraft] = useState<string>(defaultTicker);
 
   // Keep the input in sync when caller's default changes (e.g., new trending
-  // top ticker arrived while user hadn't typed anything yet).
+  // top ticker arrived) — but ONLY while the user hasn't typed anything yet,
+  // otherwise a trending refetch wipes their ticker mid-read.
+  const dirty = useRef(false);
   useEffect(() => {
+    if (dirty.current) return;
     setTicker(defaultTicker);
     setDraft(defaultTicker);
   }, [defaultTicker]);
@@ -642,7 +645,10 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
 
   function applyTicker() {
     const t = draft.trim().toUpperCase();
-    if (t) setTicker(t);
+    if (t) {
+      dirty.current = true;
+      setTicker(t);
+    }
   }
 
   return (
@@ -655,7 +661,10 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
         <input
           type="text"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            dirty.current = true;
+            setDraft(e.target.value);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") applyTicker();
           }}

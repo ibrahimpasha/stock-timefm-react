@@ -318,7 +318,9 @@ export function useGenerateTraderBrief() {
       const windowDays = args.windowDays ?? 7;
       const maxMessages = args.maxMessages ?? 120;
       const url = `/alerts/trader-brief?author=${encodeURIComponent(args.author)}&window_days=${windowDays}&max_messages=${maxMessages}`;
-      const { data } = await apiClient.post<TraderBriefRecord & { ok: boolean }>(url);
+      // backend runs a synchronous claude -p brief (180-300s); override the
+      // shared 60s client timeout or axios aborts mid-generation
+      const { data } = await apiClient.post<TraderBriefRecord & { ok: boolean }>(url, undefined, { timeout: 320_000 });
       return data;
     },
     onSuccess: (_d, args) => {

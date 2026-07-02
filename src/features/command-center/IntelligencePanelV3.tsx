@@ -322,24 +322,18 @@ export default function IntelligencePanelV3() {
   // Removed: PanelHeader, TodayBlock/TickerBriefBlock, SignalsStrip,
   // ReactionTimeline, ConvergenceList, ThemesBlock, DirectionHint —
   // all were mostly empty/quiet noise on typical tickers.
-  const calendarTickerQ = useCalendar(14, ticker || undefined);
-  const calendarAllQ = useCalendar(14);
+  // One hook covers both scopes: with no ticker the qs param is omitted and the
+  // backend returns the all-tickers calendar. A second unconditional
+  // useCalendar(14) here used to poll every 60s with its result discarded.
+  const calendarQ = useCalendar(14, ticker || undefined);
 
   return (
     <div className="card" style={{ maxHeight: "calc(100vh - 220px)", overflowY: "auto" }}>
-      {ticker ? (
-        <ForwardCalendar
-          events={calendarTickerQ.data?.events ?? []}
-          scopedTicker={ticker}
-          isLoading={calendarTickerQ.isLoading && !calendarTickerQ.data}
-        />
-      ) : (
-        <ForwardCalendar
-          events={calendarAllQ.data?.events ?? []}
-          scopedTicker={null}
-          isLoading={calendarAllQ.isLoading && !calendarAllQ.data}
-        />
-      )}
+      <ForwardCalendar
+        events={calendarQ.data?.events ?? []}
+        scopedTicker={ticker || null}
+        isLoading={calendarQ.isLoading && !calendarQ.data}
+      />
 
       {ticker && <IntelDetailCollapsible ticker={ticker} />}
     </div>

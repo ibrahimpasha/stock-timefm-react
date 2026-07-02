@@ -96,9 +96,9 @@ function BriefBody({ content }: { content: SynthesisContent }) {
           <span
             className="inline-flex items-center px-1.5 py-0.5 rounded text-xs uppercase font-bold"
             style={{
-              background: `${sentColor(content.overall_sentiment)}20`,
+              background: `color-mix(in srgb, ${sentColor(content.overall_sentiment)} 12%, transparent)`,
               color: sentColor(content.overall_sentiment),
-              border: `1px solid ${sentColor(content.overall_sentiment)}40`,
+              border: `1px solid color-mix(in srgb, ${sentColor(content.overall_sentiment)} 25%, transparent)`,
             }}
           >
             {content.overall_sentiment}

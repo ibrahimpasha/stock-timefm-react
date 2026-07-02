@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../../api/client";
 import { formatCurrency, changeColor } from "../../lib/utils";
 import { GlassPanel, Chip, Stat } from "../../components/Glass";
+import { useTickerPricesBatch } from "./iflow/hooks";
 import type { ChipTone } from "../../components/Glass";
 import {
   Loader2,
@@ -152,26 +153,6 @@ function useIFlowSynthesis() {
   });
 }
 
-function useTickerPrices(tickers: string[]) {
-  return useQuery<Record<string, number>>({
-    queryKey: ["ticker-prices-batch", tickers.join(",")],
-    queryFn: async () => {
-      const prices: Record<string, number> = {};
-      const fetches = tickers.slice(0, 30).map(async (t) => {
-        try {
-          const { data } = await apiClient.get(`/market/price?ticker=${t}`);
-          prices[t] = data.price || 0;
-        } catch { /* skip */ }
-      });
-      await Promise.all(fetches);
-      return prices;
-    },
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    enabled: tickers.length > 0,
-  });
-}
-
 /**
  * Estimate option P/L % using delta approximation.
  * underlyingAtFill is unknown for watchlist items, so we estimate from strike + option type.
@@ -230,8 +211,10 @@ function PnlBadge({ pnl }: { pnl: number | null }) {
 }
 
 function ScoreBadge({ score }: { score: number }) {
+  // Watchlist scores are on the backend's 0-10 prescore scale (capped at 10);
+  // >= 7 matches MissedOpportunities' high-conviction cutoff.
   const tone: ChipTone =
-    score >= 70 ? "green" : score >= 50 ? "orange" : "neutral";
+    score >= 7 ? "green" : score >= 5 ? "orange" : "neutral";
   return (
     <Chip tone={tone} className="num">
       {score}
@@ -370,7 +353,8 @@ export function FlowPaperTrading() {
     for (const w of wlb) if (w.ticker) set.add(w.ticker);
     return [...set];
   }, [wla, wlb]);
-  const { data: wlPrices } = useTickerPrices(wlTickers);
+  const { data: wlPricesData } = useTickerPricesBatch(wlTickers);
+  const wlPrices = wlPricesData?.prices;
 
   if (isLoading || !summary) {
     return (
