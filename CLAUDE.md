@@ -6,7 +6,9 @@ You are an AI engineer working on this codebase. Read this before making changes
 
 React + TypeScript + Vite dashboard for the Stock-TimeFM trading system. Pure visualization layer — all logic lives in the sister backend repo.
 
-- **Backend**: `~/stock-timefm` — FastAPI server on `:8001`, OpenAI-compatible Claude wrapper on `:8000`, Perplexity MCP on `:8080`. See its `CLAUDE.md` for endpoint contract.
+- **Backend**: `~/stock-timefm` — FastAPI server on `:8001`. See its
+  `CLAUDE.md` for the endpoint contract. The retired local Claude wrapper and
+  Perplexity MCP are not dashboard dependencies.
 - **This repo**: Vite dev server on `:3000`, proxies `/api/*` to `localhost:8001`.
 
 ## Architecture
@@ -30,13 +32,11 @@ Don't reach for Redux or Context. If a piece of state spans pages, put it in Zus
 
 | Route | Page | Purpose |
 |---|---|---|
-| `/` | `ForecastPage` | 7-model ensemble forecast charts |
-| `/command-center` | `CommandCenterPage` | v1 — ActionPanel + ModelBreakdown + Trust + Intelligence + IFlowTracker (right column, sticky) |
-| `/command-center-v2` | `CommandCenterPageV2` | v2 — restructured: FlowTape (full-width tape) → TickerHero band → 8/4 split (ScanGrid+small panels \| IntelligencePanelV2) |
-| `/eval` | `ModelEvalPage` | Model trust scores, calibration tables |
-| `/intel` | `IntelligencePage` | 8-category web-search intel browser |
-| `/signals` | `SignalAnalysisPage` | Live signal analysis with execution panel |
+| `/` | `CommandCenterPage` | Main command center: flow, analysis, forecast, intelligence |
+| `/command-center` | `CommandCenterPage` | Alias for the main command center |
+| `/pillars` | `PillarsPage` | Cross-source intelligence pillars |
 | `/traders` | `TraderLeaderboardPage` | Master/detail trader leaderboard. Left: ranked traders. Right: selected trader's positions (one row per position, click to expand event timeline) + the `SignalsView` panel on top (Trending / Leaders / Sentiment). |
+| `/map` | `BayAreaMapPage` | Bay Area company and campus map |
 
 Nav order is in `src/lib/constants.ts::NAV_ITEMS`. Adding a route = add to `App.tsx` Routes + push to NAV_ITEMS.
 
@@ -48,7 +48,7 @@ Nav order is in `src/lib/constants.ts::NAV_ITEMS`. Adding a route = add to `App.
 | `src/store/useAppStore.ts` | Zustand store with `activeTicker` (single source of truth) |
 | `src/api/client.ts` | Shared axios instance with `/api` baseURL → Vite proxy → backend `:8001` |
 | `src/api/cacheKey.ts` | `tickersKey(tickers)` — canonical sort/dedupe/encode for batched query keys |
-| `src/api/forecast.ts` | `useMarketPrice`, forecast hooks |
+| `src/api/forecast.ts` | Market hooks plus `runForecastModels()` request normalization |
 | `src/api/signals.ts` | `useSignal`, `useGenerateSignal`, signal list |
 | `src/api/flow.ts` | `useTrackedTickers`, `useFlowPicks`, `useFlowChat`, alerts/picks/chat mutations |
 | `src/api/intel.ts` | `/intel/latest`, `/intel/refresh` hooks |
@@ -58,7 +58,7 @@ Nav order is in `src/lib/constants.ts::NAV_ITEMS`. Adding a route = add to `App.
 | `src/lib/types.ts` | Shared TS types (Signal, MarketPrice, TrackedTicker, …) |
 | `src/lib/utils.ts` | Formatters (`formatCurrency`, `formatDate`, `formatPremium`) + `relativeAge`/`absoluteAge` |
 | `src/components/CCPrimitives.tsx` | Pure atoms: `Sparkline`, `RangeBar`, `DotGauge`, `Tag`, `Panel`, `useSparkSeed` |
-| `src/features/command-center/` | All CC v1 + v2 panels (ActionPanel, ModelBreakdown, TrustScores, FlowTape, TickerHero, ScanGrid, IntelligencePanel(V2)) |
+| `src/features/command-center/` | Brief, analysis, graph context, intelligence, and model breakdown panels |
 | `src/features/command-center/IntelligencePanelV3.tsx` | intel-v3 panel — replaces `IntelligencePanel` in the Command Center right column. See "Intelligence panel v3" below. |
 | `src/features/flow-analyzer/IFlowTracker.tsx` | Main orchestrator (~400 lines). Splits the heavy logic into `iflow/` submodules. |
 | `src/features/flow-analyzer/iflow/` | `types.ts`, `utils.ts`, `estimator.ts`, `hooks.ts`, `EntryRow.tsx`, `TickerCard.tsx`, `TopPicks.tsx`, `TickerDetail.tsx`, `TraderEventRow.tsx`, `TraderMatchChips.tsx` |
@@ -235,7 +235,8 @@ const refresh = useMutation({
 });
 ```
 
-Examples: `IntelligencePanel.tsx`, `IntelligencePanelV2.tsx` — both have the `<RefreshCw>` icon button next to a `"updated 23m ago"` relative-time label. Copy that pattern.
+`IntelligencePanelV3.tsx` is the active intelligence surface. Keep refresh
+controls icon-based and pair relative age with an absolute-time tooltip.
 
 ## Loading-State Pattern
 
@@ -253,12 +254,12 @@ This prevents a flash during cache-hit refetches. Background re-validations stay
 # Backend must be running on :8001 (sister repo)
 npm install
 npm run dev       # vite on :3000
-npx --no-install tsc --noEmit -p tsconfig.json  # before committing
+npm run typecheck
 ```
 
 Common URLs while dev'ing:
-- `http://localhost:3000/command-center` — v1 page (where IFlowTracker lives in the right column)
-- `http://localhost:3000/command-center-v2` — v2 redesign
+- `http://localhost:3000/` — Command Center
+- `http://localhost:3000/command-center` — alias for Command Center
 
 ## Recent Changes (2026-05 batch)
 

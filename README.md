@@ -31,4 +31,6 @@ npm run preview    # serve dist/ on :3000 with backend proxy
   them directly.
 - Active navigation is defined in `src/lib/constants.ts::NAV_ITEMS`; route
   components are wired in `src/App.tsx`.
-- The deprecated forecast/eval/intel/signals standalone pages were removed.
+- Forecast controls live in the Command Center. The API defaults to the
+  validated random-walk baseline; learned models are experimental until they
+  pass the backend's serving-parity router gate.
