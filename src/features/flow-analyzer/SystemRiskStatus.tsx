@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import apiClient from "../../api/client";
 import {
   Shield, AlertTriangle, AlertOctagon, Lock, TrendingDown,
-  Layers, Coins, Activity,
+  Layers, Coins, Activity, RefreshCw,
 } from "lucide-react";
 
 interface RiskData {
@@ -176,13 +176,29 @@ function SectorWarnings({ warnings }: { warnings: RiskData["risk"]["sector_warni
 }
 
 export function SystemRiskStatus() {
-  const { data, isLoading } = useRiskStatus();
+  const { data, isLoading, isError, refetch } = useRiskStatus();
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <div className="card flex items-center gap-3 py-2 px-3 text-xs text-text-muted">
         <Activity size={12} className="animate-pulse" />
         Loading risk status...
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="card flex items-center gap-2 py-2 px-3 text-xs text-accent-red">
+        <AlertTriangle size={12} />
+        <span>Unable to load risk status.</span>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="ml-auto inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-secondary hover:text-text-primary"
+        >
+          <RefreshCw size={11} /> Retry
+        </button>
       </div>
     );
   }

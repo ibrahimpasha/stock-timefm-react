@@ -9,6 +9,19 @@ export function parseLocalDate(iso: string): Date {
   return new Date(y, (m || 1) - 1, d || 1);
 }
 
+/** Serialize a Date as a local calendar date. Unlike toISOString(), this does
+ * not jump to the next day after 5pm Pacific time. */
+export function toLocalDateOnly(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export function todayLocalDate(): string {
+  return toLocalDateOnly(new Date());
+}
+
 /** Whole calendar days from today (local) to a date-only string. 0 = today,
  *  positive = future, negative = past. */
 export function daysFromToday(iso: string): number {

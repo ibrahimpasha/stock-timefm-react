@@ -56,34 +56,48 @@ export function TickerCard({
 
   return (
     <div
-      onClick={onClick}
       title={highlightTitle}
-      className="card card-interactive text-left py-2 px-3 cursor-pointer relative"
+      className="card card-interactive text-left py-2 px-3 relative"
       style={{
         borderColor: selected ? "var(--accent-blue)" : lit ? "color-mix(in srgb, var(--accent-green) 55%, transparent)" : undefined,
         background: selected ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : lit ? "color-mix(in srgb, var(--accent-green) 6%, transparent)" : undefined,
       }}
     >
+      <button
+        type="button"
+        onClick={() => toggleWatchlist(t.ticker)}
+        className="absolute left-2.5 top-2 z-10 min-h-6 min-w-6 rounded hover:bg-bg-card-hover transition-colors"
+        title={watched ? "Remove from watchlist" : "Add to watchlist"}
+        aria-label={watched ? `Remove ${t.ticker} from watchlist` : `Add ${t.ticker} to watchlist`}
+        aria-pressed={watched}
+      >
+        <Star
+          size={12}
+          className="mx-auto"
+          aria-hidden="true"
+          style={{
+            color: watched ? "var(--accent-orange)" : "var(--text-muted)",
+            fill: watched ? "var(--accent-orange)" : "none",
+            opacity: watched ? 1 : 0.55,
+          }}
+        />
+      </button>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        aria-pressed={selected}
+        aria-label={`Select ${t.ticker}, ${net ? "bullish" : "bearish"}, ${t.total_entries} entries`}
+        className="block min-h-6 w-full text-left"
+      >
       <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleWatchlist(t.ticker);
-            }}
-            className="p-0.5 -ml-0.5 rounded hover:bg-bg-card-hover transition-colors"
-            title={watched ? "Remove from watchlist" : "Add to watchlist"}
-          >
-            <Star
-              size={12}
-              style={{
-                color: watched ? "var(--accent-orange)" : "var(--text-muted)",
-                fill: watched ? "var(--accent-orange)" : "none",
-                opacity: watched ? 1 : 0.55,
-              }}
-            />
-          </button>
+        <div className="flex items-center gap-1.5 pl-5">
           <span className="font-mono font-bold text-sm text-text-primary">{t.ticker}</span>
         </div>
         <div className="flex items-center gap-1">
@@ -165,6 +179,7 @@ export function TickerCard({
           {accum.replace(/_/g, " ")}
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   useRef,
   useEffect,
   useCallback,
+  useId,
   type KeyboardEvent,
 } from "react";
 import { Search } from "lucide-react";
@@ -43,6 +44,9 @@ export function TickerSearch({
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const inputId = useId();
+  const listboxId = `${inputId}-listbox`;
+  const statusId = `${inputId}-status`;
 
   // Keep the box in sync when the ticker changes elsewhere (watchlist click, etc.)
   useEffect(() => {
@@ -97,15 +101,27 @@ export function TickerSearch({
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
+      const wasOpen = open;
       setOpen(true);
-      setHighlight((h) => Math.min(h + 1, matches.length - 1));
+      setHighlight((h) => (wasOpen ? Math.min(h + 1, matches.length - 1) : 0));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlight((h) => Math.max(h - 1, 0));
+      const wasOpen = open;
+      setOpen(true);
+      setHighlight((h) => (wasOpen ? Math.max(h - 1, 0) : Math.max(matches.length - 1, 0)));
+    } else if (e.key === "Home" && open) {
+      e.preventDefault();
+      setHighlight(0);
+    } else if (e.key === "End" && open) {
+      e.preventDefault();
+      setHighlight(Math.max(matches.length - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
       commit();
     } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+    } else if (e.key === "Tab") {
       setOpen(false);
     }
   };
@@ -123,13 +139,25 @@ export function TickerSearch({
 
   return (
     <div ref={wrapRef} className={`relative ${className}`}>
+      <label htmlFor={inputId} className="sr-only">
+        Ticker or company
+      </label>
       <div
-        className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 focus-within:border-accent-blue transition-colors"
-        style={{ background: "var(--glass-bg)", boxShadow: "var(--shadow-1)" }}
+        className="control-surface flex min-h-8 items-center gap-2 rounded-full border px-3 py-1.5 transition-colors"
+        style={{ boxShadow: "var(--shadow-1)" }}
       >
-        <Search size={16} className="text-text-muted shrink-0" />
+        <Search size={16} className="text-text-muted shrink-0" aria-hidden="true" />
         <input
+          id={inputId}
           type="text"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={open && matches.length > 0}
+          aria-controls={listboxId}
+          aria-activedescendant={
+            open && matches[highlight] ? `${listboxId}-option-${highlight}` : undefined
+          }
+          aria-describedby={statusId}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -145,22 +173,35 @@ export function TickerSearch({
         />
       </div>
 
+      <span id={statusId} className="sr-only" aria-live="polite">
+        {open && query.trim()
+          ? matches.length > 0
+            ? `${matches.length} ticker suggestions available.`
+            : "No ticker suggestions. Press Enter to use the typed symbol."
+          : ""}
+      </span>
+
       {open && matches.length > 0 && (
         <div
+          id={listboxId}
+          role="listbox"
+          aria-label="Ticker suggestions"
           className="glass-strong absolute left-0 z-50 mt-1.5 w-72 max-h-80 overflow-y-auto py-1"
           style={{ boxShadow: "var(--shadow-3)" }}
         >
           {matches.map((m, i) => (
-            <button
+            <div
               key={m.ticker}
-              type="button"
+              id={`${listboxId}-option-${i}`}
+              role="option"
+              aria-selected={i === highlight}
               onMouseEnter={() => setHighlight(i)}
               // onMouseDown (not onClick) so it fires before the input's blur
               onMouseDown={(e) => {
                 e.preventDefault();
                 choose(m.ticker);
               }}
-              className={`flex w-full items-center gap-3 px-3 py-1.5 text-left transition-colors ${
+              className={`flex min-h-7 w-full cursor-pointer items-center gap-3 px-3 py-1.5 text-left transition-colors ${
                 i === highlight ? "bg-bg-card-hover" : ""
               }`}
             >
@@ -168,7 +209,7 @@ export function TickerSearch({
                 {m.ticker}
               </span>
               <span className="text-xs text-text-muted truncate">{m.name}</span>
-            </button>
+            </div>
           ))}
         </div>
       )}

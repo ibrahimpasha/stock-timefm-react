@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Layers, AlertTriangle, Cpu, Activity, ChevronRight, Network, Compass, Rocket, BookOpen } from "lucide-react";
+import { Layers, AlertTriangle, Cpu, Activity, ChevronRight, Network, Compass, Rocket, BookOpen, RefreshCw } from "lucide-react";
 import {
   usePillars,
   usePillar,
@@ -13,6 +13,7 @@ import {
 } from "../api/pillars";
 import { useAppStore } from "../store/useAppStore";
 import { Chip, type ChipTone } from "../components/Glass";
+import { SupplyStackViz } from "../features/pillars/SupplyStackViz";
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 
@@ -202,7 +203,20 @@ function PurityScatter({
           const cy = y(c.purity as number);
           const col = accumColor(c.accum_label) === "var(--text-muted)" ? accent : accumColor(c.accum_label);
           return (
-            <g key={c.ticker} className="cursor-pointer" onClick={() => onTicker(c.ticker)}>
+            <g
+              key={c.ticker}
+              className="cursor-pointer"
+              role="button"
+              tabIndex={0}
+              aria-label={`Open ${c.ticker} details`}
+              onClick={() => onTicker(c.ticker)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onTicker(c.ticker);
+                }
+              }}
+            >
               <circle
                 cx={cx}
                 cy={cy}
@@ -600,22 +614,72 @@ function MarkdownLite({ md }: { md: string }) {
 }
 
 function WeeklyReportSection() {
-  const { data } = useWeeklyReport();
+  const [pick, setPick] = useState<string | null>(null);
+  const { data, isError, refetch } = useWeeklyReport(pick);
   const [open, setOpen] = useState(true);
+  const archive = data?.available_reports ?? [];
+  if (isError && !data) {
+    return (
+      <div className="card flex items-center gap-2 text-xs text-accent-red">
+        <AlertTriangle size={13} />
+        <span>Unable to load the weekly AI report.</span>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-secondary hover:text-text-primary"
+        >
+          <RefreshCw size={11} /> Retry
+        </button>
+      </div>
+    );
+  }
   if (!data?.available || !data.markdown) return null;
   return (
     <div className="card border-l-2" style={{ borderLeftColor: "var(--accent-purple)" }}>
-      <button type="button" onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2 text-left">
-        <BookOpen size={16} className="text-accent-purple shrink-0" />
-        <span className="text-sm font-semibold text-text-primary">{data.title || "Weekly AI Report"}</span>
-        {data.date && <span className="text-[10px] font-mono text-text-muted">{data.date}</span>}
-        <span className="ml-auto text-[10px] font-mono text-text-muted">{open ? "hide" : "show"}</span>
-        <ChevronRight
-          size={15}
-          className="text-text-muted shrink-0"
-          style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}
-        />
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+        >
+          <BookOpen size={16} className="text-accent-purple shrink-0" />
+          <span className="text-sm font-semibold text-text-primary truncate">
+            {data.title || "Weekly AI Report"}
+          </span>
+          {archive.length <= 1 && data.date && (
+            <span className="text-[10px] font-mono text-text-muted">{data.date}</span>
+          )}
+        </button>
+        {archive.length > 1 && (
+          // Archive picker — every past report stays reachable; nothing is
+          // overwritten, each run adds a new dated file. Default = newest.
+          <select
+            value={data.file ?? ""}
+            onChange={(e) => setPick(e.target.value || null)}
+            title="Pick a past weekly report"
+            className="num text-xs bg-bg-card border border-border rounded px-1.5 py-0.5 text-text-secondary shrink-0"
+          >
+            {archive.map((r, i) => (
+              <option key={r.file} value={r.file}>
+                {r.date}{i === 0 ? " (latest)" : ""}
+              </option>
+            ))}
+          </select>
+        )}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-1 shrink-0"
+          aria-label={open ? "hide report" : "show report"}
+        >
+          <span className="text-[10px] font-mono text-text-muted">{open ? "hide" : "show"}</span>
+          <ChevronRight
+            size={15}
+            className="text-text-muted"
+            style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}
+          />
+        </button>
+      </div>
       {open && (
         <div className="mt-2 pt-2 border-t border-border max-h-[72vh] overflow-y-auto pr-1">
           <MarkdownLite md={data.markdown} />
@@ -626,17 +690,20 @@ function WeeklyReportSection() {
 }
 
 export function PillarsPage() {
-  const { data: overview } = usePillars();
+  const overviewQuery = usePillars();
+  const { data: overview } = overviewQuery;
   const setActiveTicker = useAppStore((s) => s.setActiveTicker);
   const activeTicker = useAppStore((s) => s.activeTicker);
   const [selected, setSelected] = useState<string>("ai_inference");
-  const { data: detail, isLoading } = usePillar(selected);
+  const detailQuery = usePillar(selected);
+  const { data: detail, isLoading } = detailQuery;
 
   const tabs = useMemo(() => overview?.pillars ?? [], [overview?.pillars]);
   const sel = useMemo(() => tabs.find((t) => t.key === selected), [tabs, selected]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-4 space-y-4">
+    <div className="max-w-[110rem] mx-auto px-4 py-4 xl:flex xl:items-start xl:gap-4">
+      <div className="flex-1 min-w-0 space-y-4">
       {/* header */}
       <div>
         <h1 className="text-lg font-semibold text-text-primary flex items-center gap-2">
@@ -678,6 +745,19 @@ export function PillarsPage() {
       )}
 
       {/* pillar tabs */}
+      {overviewQuery.isError && !overview && (
+        <div className="card flex items-center gap-2 text-sm text-accent-red">
+          <AlertTriangle size={14} />
+          <span>Unable to load structural pillars.</span>
+          <button
+            type="button"
+            onClick={() => void overviewQuery.refetch()}
+            className="inline-flex items-center gap-1 rounded border border-border px-2.5 py-1 text-xs text-text-secondary hover:text-text-primary"
+          >
+            <RefreshCw size={11} /> Retry
+          </button>
+        </div>
+      )}
       <div className="flex items-stretch gap-2 flex-wrap">
         {tabs.map((t) => {
           const on = t.key === selected;
@@ -720,15 +800,33 @@ export function PillarsPage() {
 
       {/* detail */}
       <div className="card" style={{ borderTop: `2px solid ${sel?.accent || "var(--accent-blue)"}` }}>
-        {isLoading || !detail ? (
+        {isLoading ? (
           <div className="animate-pulse space-y-2">
             <div className="h-4 w-1/2 rounded bg-text-muted/20" />
             <div className="h-24 w-full rounded bg-text-muted/10" />
+          </div>
+        ) : detailQuery.isError || !detail ? (
+          <div className="flex items-center justify-center gap-2 py-8 text-sm text-accent-red">
+            <AlertTriangle size={14} />
+            <span>Unable to load this pillar.</span>
+            <button
+              type="button"
+              onClick={() => void detailQuery.refetch()}
+              className="inline-flex items-center gap-1 rounded border border-border px-2.5 py-1 text-xs text-text-secondary hover:text-text-primary"
+            >
+              <RefreshCw size={11} /> Retry
+            </button>
           </div>
         ) : (
           <PillarBody d={detail} onTicker={setActiveTicker} active={activeTicker} />
         )}
       </div>
+      </div>
+
+      {/* AI buildout stack — interactive supply-chain viz, sticky side rail */}
+      <aside className="mt-4 xl:mt-0 xl:w-[380px] shrink-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
+        <SupplyStackViz />
+      </aside>
     </div>
   );
 }

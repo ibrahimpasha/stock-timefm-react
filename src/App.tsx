@@ -83,9 +83,10 @@ function ThemeToggle() {
       onClick={toggle}
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-pressed={!isDark}
       className="ml-auto shrink-0 p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors max-md:p-1.5"
     >
-      {isDark ? <Sun size={18} /> : <Moon size={18} />}
+      {isDark ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
     </button>
   );
 }
@@ -93,8 +94,15 @@ function ThemeToggle() {
 function AppLayout() {
   return (
     <div className="min-h-screen flex flex-col bg-bg-primary">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
       <Navbar />
-      <main className="flex-1 px-4 py-4 max-md:px-2 max-md:py-2">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="flex-1 px-4 py-4 max-md:px-2 max-md:py-2"
+      >
         <Suspense
           fallback={
             <div className="p-8 text-sm text-text-muted animate-pulse">loading…</div>

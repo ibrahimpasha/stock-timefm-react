@@ -19,21 +19,8 @@ import {
   Shield,
   Activity,
   Layers,
+  AlertTriangle,
 } from "lucide-react";
-
-interface WatchlistItem {
-  id: number;
-  ticker: string;
-  strike: number;
-  option_type: string;
-  expiry: string;
-  dte: number;
-  side: string;
-  ref_premium: number;
-  current_premium: number | null;
-  score: number;
-  status: string;
-}
 
 interface Position {
   id: number;
@@ -71,8 +58,6 @@ interface FlowPaperSummary {
   win_rate: number;
   watching: number;
   positions: Position[];
-  closed: Position[];
-  watchlist: WatchlistItem[];
 }
 
 interface MacroData {
@@ -105,11 +90,7 @@ interface IFlowWatchlistItem {
   score: number;
   source?: string;
   list?: string;
-}
-
-interface IFlowWatchlist {
-  wla: IFlowWatchlistItem[];
-  wlb: IFlowWatchlistItem[];
+  tier?: string;
 }
 
 interface IFlowSynthesis {
@@ -128,17 +109,17 @@ function useFlowPaperSummary() {
 
 function useIFlowTraderStatus() {
   return useQuery<IFlowStatus>({
-    queryKey: ["iflow-trader-status"],
-    queryFn: () => apiClient.get("/iflow-trader/status").then((r) => r.data),
+    queryKey: ["flow-paper-status"],
+    queryFn: () => apiClient.get("/flow-paper/status").then((r) => r.data),
     staleTime: 15_000,
     refetchInterval: 30_000,
   });
 }
 
 function useIFlowTraderWatchlist() {
-  return useQuery<IFlowWatchlist>({
-    queryKey: ["iflow-trader-watchlist"],
-    queryFn: () => apiClient.get("/iflow-trader/watchlist").then((r) => r.data),
+  return useQuery<IFlowWatchlistItem[]>({
+    queryKey: ["flow-paper-watchlist"],
+    queryFn: () => apiClient.get("/flow-paper/watchlist").then((r) => r.data),
     staleTime: 15_000,
     refetchInterval: 30_000,
   });
@@ -281,7 +262,7 @@ function SynthesisReport({ report }: { report: string }) {
         if (/^[🥇🥈🥉]/u.test(trimmed)) {
           return (
             <div key={i} className="pl-3 py-1.5 rounded-md text-sm"
-                 style={{ background: "color-mix(in srgb, var(--accent-blue) 6%, transparent)", borderLeft: "3px solid var(--accent-blue)" }}>
+                 style={{ background: "color-mix(in srgb, var(--accent-blue) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--accent-blue) 28%, transparent)" }}>
               {renderLine(trimmed)}
             </div>
           );
@@ -294,7 +275,7 @@ function SynthesisReport({ report }: { report: string }) {
           const borderColor = isGreen ? "var(--accent-green)" : isRed ? "var(--accent-red)" : "var(--border)";
           return (
             <div key={i} className="pl-3 py-1 rounded-md text-sm"
-                 style={{ background: "color-mix(in srgb, var(--border) 12%, transparent)", borderLeft: `3px solid ${borderColor}` }}>
+                 style={{ background: "color-mix(in srgb, var(--border) 12%, transparent)", border: `1px solid color-mix(in srgb, ${borderColor} 28%, transparent)` }}>
               {renderLine(trimmed)}
             </div>
           );
@@ -311,39 +292,71 @@ function SynthesisReport({ report }: { report: string }) {
   );
 }
 
+function PaperQueryError({ label, onRetry }: { label: string; onRetry: () => void }) {
+  return (
+    <div className="card flex items-center gap-2 py-2 px-3 text-xs text-accent-red">
+      <AlertTriangle size={12} />
+      <span>{label}</span>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="ml-auto inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-secondary hover:text-text-primary"
+      >
+        <RefreshCw size={11} /> Retry
+      </button>
+    </div>
+  );
+}
+
 export function FlowPaperTrading() {
   const queryClient = useQueryClient();
-  const { data: summary, isLoading } = useFlowPaperSummary();
-  const { data: iflowStatus } = useIFlowTraderStatus();
-  const { data: iflowWatchlist } = useIFlowTraderWatchlist();
-  const { data: synthesis } = useIFlowSynthesis();
+  const { data: summary, isLoading, isError, refetch } = useFlowPaperSummary();
+  const statusQuery = useIFlowTraderStatus();
+  const watchlistQuery = useIFlowTraderWatchlist();
+  const synthesisQuery = useIFlowSynthesis();
+  const { data: iflowStatus } = statusQuery;
+  const { data: iflowWatchlist } = watchlistQuery;
+  const { data: synthesis } = synthesisQuery;
   const [expandedPos, setExpandedPos] = useState<number | null>(null);
+
+  const invalidateFlowTraderData = () => {
+    queryClient.invalidateQueries({ queryKey: ["flow-paper-summary"] });
+    queryClient.invalidateQueries({ queryKey: ["flow-paper-status"] });
+    queryClient.invalidateQueries({ queryKey: ["flow-paper-watchlist"] });
+    queryClient.invalidateQueries({ queryKey: ["iflow-trader-risk"] });
+    queryClient.invalidateQueries({ queryKey: ["iflow-trader-closed"] });
+    queryClient.invalidateQueries({ queryKey: ["iflow-trader-history"] });
+  };
 
   const scanMutation = useMutation({
     mutationFn: () => apiClient.post("/flow-paper/scan"),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["flow-paper-summary"] }),
+    onSuccess: invalidateFlowTraderData,
   });
 
   const resetMutation = useMutation({
     mutationFn: () => apiClient.post("/flow-paper/reset"),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["flow-paper-summary"] }),
+    onSuccess: invalidateFlowTraderData,
   });
 
   const synthesisMutation = useMutation({
     mutationFn: () => apiClient.post("/iflow-trader/scan", { type: "synthesis" }, { timeout: 200_000 }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["iflow-synthesis"] });
-      queryClient.invalidateQueries({ queryKey: ["flow-paper-summary"] });
+      invalidateFlowTraderData();
     },
   });
 
   // iFlow macro
   const macro = iflowStatus?.macro;
   const slots = iflowStatus?.slots;
-  const wla = useMemo(() => iflowWatchlist?.wla ?? [], [iflowWatchlist?.wla]);
-  const wlb = useMemo(() => iflowWatchlist?.wlb ?? [], [iflowWatchlist?.wlb]);
+  const wla = useMemo(
+    () => (iflowWatchlist ?? []).filter((item) => item.list === "A" || item.tier === "A"),
+    [iflowWatchlist],
+  );
+  const wlb = useMemo(
+    () => (iflowWatchlist ?? []).filter((item) => item.list === "B" || item.tier === "B"),
+    [iflowWatchlist],
+  );
 
   // Fetch current prices for all watchlist tickers to compute "what if" P/L
   // (must be before any early returns to satisfy React hooks rules)
@@ -353,14 +366,31 @@ export function FlowPaperTrading() {
     for (const w of wlb) if (w.ticker) set.add(w.ticker);
     return [...set];
   }, [wla, wlb]);
-  const { data: wlPricesData } = useTickerPricesBatch(wlTickers);
+  const wlPricesQuery = useTickerPricesBatch(wlTickers);
+  const { data: wlPricesData } = wlPricesQuery;
   const wlPrices = wlPricesData?.prices;
 
-  if (isLoading || !summary) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12 text-text-muted text-sm gap-2">
         <Loader2 size={16} className="animate-spin" />
         Loading flow trader...
+      </div>
+    );
+  }
+
+  if (isError || !summary) {
+    return (
+      <div className="flex items-center justify-center py-12 text-accent-red text-sm gap-2">
+        <AlertTriangle size={16} />
+        <span>Unable to load flow trader.</span>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="inline-flex items-center gap-1 rounded border border-border px-2.5 py-1 text-xs text-text-secondary hover:text-text-primary"
+        >
+          <RefreshCw size={12} /> Retry
+        </button>
       </div>
     );
   }
@@ -396,6 +426,19 @@ export function FlowPaperTrading() {
           Reset
         </button>
       </div>
+
+      {statusQuery.isError && !iflowStatus && (
+        <PaperQueryError label="Unable to load trader status." onRetry={() => void statusQuery.refetch()} />
+      )}
+      {watchlistQuery.isError && !iflowWatchlist && (
+        <PaperQueryError label="Unable to load trader watchlist." onRetry={() => void watchlistQuery.refetch()} />
+      )}
+      {synthesisQuery.isError && !synthesis && (
+        <PaperQueryError label="Unable to load trader synthesis." onRetry={() => void synthesisQuery.refetch()} />
+      )}
+      {wlPricesQuery.isError && wlTickers.length > 0 && !wlPricesData && (
+        <PaperQueryError label="Unable to load watchlist prices." onRetry={() => void wlPricesQuery.refetch()} />
+      )}
 
       {/* System Risk Status (drawdown, circuit breaker, slots, sector warnings) */}
       <SystemRiskStatus />
@@ -439,7 +482,7 @@ export function FlowPaperTrading() {
       {macro && (
         <div
           className="card flex items-center justify-between py-2 px-4"
-          style={{ borderLeft: "3px solid var(--accent-cyan)" }}
+          style={{ background: "color-mix(in srgb, var(--accent-cyan) 4%, var(--card-bg))" }}
         >
           <div className="flex items-center gap-4 text-xs">
             <div className="flex items-center gap-1 text-text-muted">
@@ -489,10 +532,7 @@ export function FlowPaperTrading() {
 
       {/* Slot Visualization */}
       {slots && (
-        <div
-          className="card flex items-center gap-6 py-2 px-4"
-          style={{ borderLeft: "3px solid var(--border)" }}
-        >
+        <div className="card flex items-center gap-6 py-2 px-4">
           <div className="flex items-center gap-1 text-xs text-text-muted">
             <Layers size={10} />
             <span>Slots</span>
@@ -569,8 +609,18 @@ export function FlowPaperTrading() {
                 <div
                   key={pos.id}
                   className="card card-interactive cursor-pointer"
-                  style={{ borderLeft: `3px solid ${sideColor}` }}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
+                  aria-label={`${isExpanded ? "Collapse" : "Expand"} ${pos.ticker} position`}
+                  style={{ borderColor: `color-mix(in srgb, ${sideColor} 35%, var(--border))` }}
                   onClick={() => setExpandedPos(isExpanded ? null : pos.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setExpandedPos(isExpanded ? null : pos.id);
+                    }
+                  }}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -749,7 +799,7 @@ export function FlowPaperTrading() {
                       className="flex items-center justify-between px-3 py-1.5 rounded-md"
                       style={{
                         background: "color-mix(in srgb, var(--accent-green) 5%, transparent)",
-                        borderLeft: "3px solid var(--accent-green)",
+                        border: "1px solid color-mix(in srgb, var(--accent-green) 24%, transparent)",
                       }}
                     >
                       <div className="flex items-center gap-2">
@@ -808,7 +858,7 @@ export function FlowPaperTrading() {
                       className="flex items-center justify-between px-3 py-1.5 rounded-md"
                       style={{
                         background: "color-mix(in srgb, var(--accent-orange) 5%, transparent)",
-                        borderLeft: "3px solid var(--accent-orange)",
+                        border: "1px solid color-mix(in srgb, var(--accent-orange) 24%, transparent)",
                       }}
                     >
                       <div className="flex items-center gap-2">

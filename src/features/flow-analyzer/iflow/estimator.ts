@@ -20,6 +20,8 @@
  * ╚══════════════════════════════════════════════════════════════════════════╝
  */
 
+import { daysFromToday } from "../../../lib/dateOnly";
+
 /**
  * Estimate option P/L % using delta approximation + linear time decay.
  *
@@ -72,11 +74,9 @@ export function estimateOptionPnl(
   // Linear time decay since the fill date.
   let daysElapsed = 0;
   if (flowDate) {
-    const fd = new Date(flowDate);
-    const now = new Date();
-    daysElapsed = Math.max(0, Math.round((now.getTime() - fd.getTime()) / 86400000));
+    daysElapsed = Math.max(0, -daysFromToday(flowDate));
   }
-  const effectiveDte = Math.max(dteAtFill || 30, 5);
+  const effectiveDte = Math.max(Number.isFinite(dteAtFill) ? dteAtFill : 30, 5);
   const dailyTheta = optFill / (effectiveDte * 1.8);
   const thetaLoss = Math.min(dailyTheta * daysElapsed, optFill * 0.6);
 

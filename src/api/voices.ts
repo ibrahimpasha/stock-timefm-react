@@ -354,6 +354,7 @@ export function useVoicesSynthesis(
       );
       return data;
     },
+    enabled: !!voice,
     staleTime: VOICES_STALE_MS,
   });
 }

@@ -43,6 +43,8 @@ function contractKey(c: { ticker: string; strike: number; opt_type: string; expi
   return `${c.ticker}|${c.strike}|${c.opt_type}|${c.expiry_norm}`;
 }
 
+const APP_STORAGE_KEY = "stock-timefm-app";
+
 export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
@@ -104,7 +106,7 @@ export const useAppStore = create<AppStore>()(
       },
     }),
     {
-      name: "stock-timefm-app",
+      name: APP_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
         watchlist: s.watchlist,
@@ -113,3 +115,18 @@ export const useAppStore = create<AppStore>()(
     },
   ),
 );
+
+// The storage event fires only in other tabs. Rehydrate through Zustand's
+// persist API so migrations/merge behavior stay identical to initial load.
+if (typeof window !== "undefined") {
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === APP_STORAGE_KEY && event.newValue !== null) {
+      void useAppStore.persist.rehydrate();
+    }
+  };
+
+  window.addEventListener("storage", handleStorage);
+  import.meta.hot?.dispose(() => {
+    window.removeEventListener("storage", handleStorage);
+  });
+}

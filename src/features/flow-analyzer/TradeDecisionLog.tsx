@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import apiClient from "../../api/client";
 import {
   TrendingUp, TrendingDown, ChevronDown, ChevronRight, Target,
-  AlertOctagon, Activity, History,
+  AlertOctagon, Activity, History, RefreshCw,
 } from "lucide-react";
 
 interface ClosedPosition {
@@ -221,13 +221,29 @@ function TradeRow({ pos }: { pos: ClosedPosition }) {
 
 export function TradeDecisionLog() {
   const [filter, setFilter] = useState<"all" | "wins" | "losses">("all");
-  const { data, isLoading } = useClosedTrades(50);
+  const { data, isLoading, isError, refetch } = useClosedTrades(50);
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <div className="text-xs text-text-muted py-8 text-center">
         <Activity size={14} className="inline animate-pulse mr-2" />
         Loading trade log...
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-8 text-xs text-accent-red">
+        <AlertOctagon size={14} />
+        <span>Unable to load trade history.</span>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-secondary hover:text-text-primary"
+        >
+          <RefreshCw size={11} /> Retry
+        </button>
       </div>
     );
   }

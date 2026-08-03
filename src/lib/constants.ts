@@ -14,6 +14,7 @@ export const MODEL_COLORS: Record<string, string> = {
   chronos2: "#ffa500",
   claude: "#cc785c",
   ensemble: "#f0c040",
+  rw: "#60a5fa",
 };
 
 /** Human-readable model labels */
@@ -32,6 +33,7 @@ export const MODEL_LABELS: Record<string, string> = {
   chronos2: "Chronos-2",
   claude: "Claude Opus",
   ensemble: "Ensemble (per-ticker top-N)",
+  rw: "Random Walk Baseline",
 };
 
 /** Quantile band colors (fill) */

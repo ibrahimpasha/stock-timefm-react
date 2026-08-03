@@ -9,6 +9,87 @@ import type {
   MarketContext,
 } from "../lib/types";
 
+export interface ForecastRunConfig {
+  forecastType: "daily" | "intraday";
+  forecastDays: number;
+  forecastMinutes: number;
+  interval: string;
+  historyDays: number;
+  historyPeriod: string;
+  selectedModels: string[];
+  useCovariates: boolean;
+  usePretrained: boolean;
+  forecastOrigin: string;
+}
+
+export interface ForecastRunResult {
+  forecasts: ModelForecast[];
+  failedModels: string[];
+}
+
+/** Execute the user-selected forecast models and normalize the daily direct
+ * and ensemble response shapes into one UI contract. */
+export async function runForecastModels(
+  ticker: string,
+  config: ForecastRunConfig,
+): Promise<ForecastRunResult> {
+  const isDaily = config.forecastType === "daily";
+  const endpoint = isDaily ? "/forecast/daily" : "/forecast/intraday";
+  const body = isDaily
+    ? {
+        ticker,
+        days: config.forecastDays,
+        history_days: config.historyDays,
+        use_covariates: config.useCovariates,
+        use_pretrained: config.usePretrained,
+        forecast_origin: config.forecastOrigin,
+      }
+    : {
+        ticker,
+        minutes: config.forecastMinutes,
+        interval: config.interval,
+        history_period: config.historyPeriod,
+        use_covariates: config.useCovariates,
+        use_pretrained: config.usePretrained,
+      };
+
+  const results = await Promise.allSettled(
+    config.selectedModels.map(async (model) => {
+      const { data } = await apiClient.post(endpoint, { ...body, model });
+      const predictions = (data.predictions ?? []).map(
+        (prediction: { timestamp?: string; date?: string; [key: string]: unknown }) => ({
+          ...prediction,
+          timestamp: String(prediction.timestamp ?? prediction.date ?? ""),
+        }),
+      );
+      const prices: number[] =
+        data.prices ?? predictions.map((prediction: { price: number }) => prediction.price);
+      return {
+        model,
+        prices,
+        end_price:
+          data.end_price ??
+          data.summary?.final_price ??
+          (prices.length ? prices[prices.length - 1] : 0),
+        predictions,
+        current_price: data.current_price ?? 0,
+        latency_ms: data.latency_ms ?? 0,
+      } as ModelForecast;
+    }),
+  );
+
+  const forecasts: ModelForecast[] = [];
+  const failedModels: string[] = [];
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      forecasts.push(result.value);
+    } else {
+      failedModels.push(config.selectedModels[index]);
+    }
+  });
+  return { forecasts, failedModels };
+}
+
 /** Fetch available model names */
 export function useModels() {
   return useQuery({

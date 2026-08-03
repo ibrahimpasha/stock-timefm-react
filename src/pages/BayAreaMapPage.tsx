@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   MapContainer, TileLayer, CircleMarker, Polygon, Tooltip, Popup, useMap,
 } from "react-leaflet";
@@ -110,9 +110,13 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
   const [signal, setSignal] = useState<Signal>("all");
   const [query, setQuery] = useState("");
   const [colorBy, setColorBy] = useState<ColorBy>("signal");
+  const [focusTicker, setFocusTicker] = useState<string | null>(null);
   const { data, isLoading } = useTickerMap(minCap);
   const { data: taxonomy } = useTickerTaxonomy();
+  const activeTicker = useAppStore((s) => s.activeTicker);
   const setActiveTicker = useAppStore((s) => s.setActiveTicker);
+  const searchId = useId();
+  const listHeadingId = useId();
   const all = useMemo(() => data?.companies ?? [], [data?.companies]);
 
   const groupOf = (c: BayAreaCompany): string =>
@@ -190,7 +194,14 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
   // building polygons once you zoom to street level.
   const heatMode = mode === "bullbear" || mode === "size";
   const showMarkers = true;
-  const focusKey = `${region}|${q}`;
+  const focusedCompany = filtered.find((c) => c.ticker === focusTicker);
+  const mapFocusCompanies = focusedCompany ? [focusedCompany] : filtered;
+  const focusKey = `${region}|${signal}|${q}|${minCap}|${focusTicker ?? ""}`;
+
+  const selectCompany = (c: BayAreaCompany) => {
+    setActiveTicker(c.ticker);
+    setFocusTicker(c.ticker);
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -205,24 +216,35 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
             filter to zero in.
           </p>
         </div>
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search ticker or name…"
-          className="px-3 py-1.5 rounded-full text-xs border border-border text-text-primary w-56 focus:outline-none focus:border-accent-blue transition-colors"
-          style={{ background: "var(--glass-bg)" }}
-        />
+        <div className="max-sm:w-full">
+          <label htmlFor={searchId} className="sr-only">
+            Search mapped companies by ticker or name
+          </label>
+          <input
+            id={searchId}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setFocusTicker(null);
+            }}
+            placeholder="Search ticker or name…"
+            className="control-surface min-h-8 w-56 rounded-full border px-3 py-1.5 text-xs text-text-primary transition-colors max-sm:min-h-11 max-sm:w-full"
+          />
+        </div>
       </div>
 
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)] gap-3 max-lg:grid-cols-1">
       <div className="overflow-hidden border border-border relative" style={{ height: `calc(100vh - ${heightOffset}px)`, minHeight: 460, borderRadius: "var(--radius-panel)" }}>
         {/* Floating control bar — chrome only; the map surface below is untouched */}
         <div className="absolute top-3 left-3 right-3 z-[1000] glass-strong px-3 py-2 flex items-center gap-2 flex-wrap text-xs">
           <Segmented<Mode>
+            ariaLabel="Map display mode"
             options={MODES.map((m) => ({ value: m.id, label: m.label }))}
             value={mode}
             onChange={setMode}
           />
           <Segmented<Region>
+            ariaLabel="Map region"
             options={[
               { value: "all", label: "All US" },
               { value: "bay", label: "Bay Area" },
@@ -231,6 +253,7 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
             onChange={setRegion}
           />
           <Segmented<Signal>
+            ariaLabel="Map signal filter"
             options={[
               { value: "all", label: "Any signal" },
               { value: "bull", label: "Bull" },
@@ -240,6 +263,7 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
             onChange={setSignal}
           />
           <Segmented<ColorBy>
+            ariaLabel="Map color grouping"
             options={[
               { value: "signal", label: "Color: signal" },
               { value: "sector", label: "Sector" },
@@ -250,12 +274,21 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
           />
           <div className="flex items-center gap-1">
             {CAP_FILTERS.map((f) => (
-              <button key={f.label} type="button" onClick={() => setMinCap(f.min)} className="cursor-pointer">
+              <button
+                key={f.label}
+                type="button"
+                onClick={() => {
+                  setMinCap(f.min);
+                  setFocusTicker(null);
+                }}
+                aria-pressed={minCap === f.min}
+                className="inline-flex min-h-6 shrink-0 cursor-pointer rounded-full"
+              >
                 <Chip tone={minCap === f.min ? "blue" : "neutral"}>{f.label}</Chip>
               </button>
             ))}
           </div>
-          <span className="text-text-muted ml-auto">
+          <span className="text-text-muted ml-auto" aria-live="polite">
             <span className="text-text-secondary num">{stats.shown}</span>
             {stats.shown !== stats.total && <span className="num">/{stats.total}</span>} shown ·{" "}
             <span className="text-accent-green num">{stats.bull}▲</span>{" "}
@@ -294,7 +327,7 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
         )}
         <MapContainer center={[37.8, -98]} zoom={4} style={{ height: "100%", width: "100%" }} scrollWheelZoom preferCanvas>
           <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap &copy; CARTO" subdomains="abcd" />
-          <FlyTo companies={filtered} focusKey={focusKey} />
+          <FlyTo companies={mapFocusCompanies} focusKey={focusKey} />
           {mode === "bullbear" && <HeatLayer points={bullPts} gradient={GREEN_GRAD} />}
           {mode === "bullbear" && <HeatLayer points={bearPts} gradient={RED_GRAD} />}
           {mode === "size" && <HeatLayer points={sizePts} gradient={SIZE_GRAD} />}
@@ -304,8 +337,8 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
                 <Polygon
                   key={`fp-${c.ticker}`}
                   positions={c.building}
-                  pathOptions={{ color: colorOf(c), weight: 1.5, fillColor: colorOf(c), fillOpacity: 0.55 }}
-                  eventHandlers={{ click: () => setActiveTicker(c.ticker) }}
+                  pathOptions={{ color: colorOf(c), weight: activeTicker === c.ticker ? 3 : 1.5, fillColor: colorOf(c), fillOpacity: 0.55 }}
+                  eventHandlers={{ click: () => selectCompany(c) }}
                 >
                   <Tooltip sticky>
                     <span style={{ fontWeight: 600 }}>{c.ticker}</span> · {fmtCap(c.market_cap)}
@@ -322,15 +355,15 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
               <CircleMarker
                 key={c.ticker}
                 center={[c.lat, c.lng]}
-                radius={heatMode ? 3 : radiusFor(c.market_cap)}
+                radius={(heatMode ? 3 : radiusFor(c.market_cap)) + (activeTicker === c.ticker ? 2 : 0)}
                 pathOptions={{
                   color: c.is_campus ? "#ffffff" : colorOf(c),
                   fillColor: colorOf(c),
                   fillOpacity: heatMode ? 0.6 : 0.72,
-                  weight: c.is_campus ? 1.6 : heatMode ? 0.4 : 1,
+                  weight: activeTicker === c.ticker ? 2.5 : c.is_campus ? 1.6 : heatMode ? 0.4 : 1,
                   dashArray: c.is_campus ? "3 3" : undefined,
                 }}
-                eventHandlers={{ click: () => setActiveTicker(c.ticker) }}
+                eventHandlers={{ click: () => selectCompany(c) }}
               >
                 <Tooltip direction="top" offset={[0, -4]} opacity={1}>
                   <span style={{ fontWeight: 600 }}>{c.ticker}</span> · {fmtCap(c.market_cap)}
@@ -345,7 +378,49 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
             ))}
         </MapContainer>
       </div>
-    </div>
+      <section
+        aria-labelledby={listHeadingId}
+        className="card flex max-h-[calc(100vh-220px)] min-h-0 flex-col overflow-hidden max-lg:max-h-80"
+      >
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 id={listHeadingId} className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
+            Companies
+          </h2>
+          <span className="num text-xs text-text-muted">{filtered.length}</span>
+        </div>
+        {filtered.length === 0 ? (
+          <p className="text-xs text-text-muted">No companies match the current filters.</p>
+        ) : (
+          <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
+            {filtered.map((c) => {
+              const selected = activeTicker === c.ticker;
+              const signalLabel =
+                c.score == null ? "No signal" : c.score > 8 ? "Bullish" : c.score < -8 ? "Bearish" : "Neutral";
+              return (
+                <li key={`list-${c.ticker}`}>
+                  <button
+                    type="button"
+                    onClick={() => selectCompany(c)}
+                    aria-pressed={selected}
+                    className={`flex min-h-8 w-full items-center gap-2 rounded px-2 py-1.5 text-left transition-colors max-lg:min-h-11 ${
+                      selected ? "segmented-option-active" : "text-text-secondary hover:bg-bg-card-hover hover:text-text-primary"
+                    }`}
+                  >
+                    <span className="num w-14 shrink-0 text-xs font-bold">{c.ticker}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs">{c.name}</span>
+                    <span className="sr-only">{signalLabel}, market cap {fmtCap(c.market_cap)}</span>
+                    <span className="num shrink-0 text-xs" aria-hidden="true">
+                      {c.score == null ? "—" : `${c.score > 0 ? "+" : ""}${c.score}`}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+      </div>
+      </div>
   );
 }
 

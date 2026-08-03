@@ -12,7 +12,7 @@
  * data carries the `num` class, and the expanded timeline reads as a quiet
  * sub-layer of the row. Behavior and data flow are unchanged.
  */
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import { dteTag } from "../flow-analyzer/iflow/utils";
 import { Chip, type ChipTone } from "../../components/Glass";
@@ -175,6 +175,8 @@ export function TraderPositionRow({
   onTickerClick,
 }: TraderPositionRowProps) {
   const [showMessages, setShowMessages] = useState(false);
+  const detailsId = useId();
+  const messagesId = useId();
 
   const pk = position.position_key;
   const key = positionKeyString(pk);
@@ -398,11 +400,25 @@ export function TraderPositionRow({
             {pnlLabel}
           </span>
         </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle(key);
+          }}
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          aria-label={`${expanded ? "Collapse" : "Expand"} ${ticker ?? "trade"} position details`}
+          className="min-h-6 min-w-6 shrink-0 rounded text-text-muted hover:text-text-primary"
+        >
+          <span aria-hidden="true">{expanded ? "▾" : "▸"}</span>
+        </button>
       </div>
 
       {/* Expanded — event timeline + optional raw messages */}
       {expanded && (
         <div
+          id={detailsId}
           className="text-xs py-2 pr-3 pb-3 pl-14 text-text-secondary flex flex-col gap-2 leading-relaxed"
           style={{
             background: "color-mix(in srgb, var(--bg-card) 50%, transparent)",
@@ -492,6 +508,8 @@ export function TraderPositionRow({
             <button
               type="button"
               onClick={() => setShowMessages((s) => !s)}
+              aria-expanded={showMessages}
+              aria-controls={messagesId}
               className="self-start text-xs font-medium uppercase tracking-wide text-text-muted cursor-pointer px-2 py-1 transition-colors hover:text-text-primary"
               style={{
                 background: "transparent",
@@ -506,7 +524,7 @@ export function TraderPositionRow({
           )}
 
           {showMessages && (
-            <div className="flex flex-col gap-1.5">
+            <div id={messagesId} className="flex flex-col gap-1.5">
               {position.events
                 .filter((e) => e.content)
                 .map((ev) => (

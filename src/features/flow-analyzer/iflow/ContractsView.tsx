@@ -206,8 +206,7 @@ export function ContractsView({
           return (
             <div
               key={key}
-              onClick={() => onSelectTicker(c.ticker)}
-              className="flex items-center gap-2 text-xs px-2 py-1.5 rounded border border-border bg-bg-card cursor-pointer hover:border-accent-blue/40 transition-colors"
+              className="flex items-center gap-2 text-xs px-2 py-1.5 rounded border border-border bg-bg-card hover:border-accent-blue/40 transition-colors"
               style={{ opacity: expired ? 0.55 : 1 }}
             >
               <button
@@ -218,12 +217,20 @@ export function ContractsView({
                 }}
                 className="p-0.5 -ml-0.5 rounded hover:bg-bg-card-hover transition-colors shrink-0"
                 title="Unwatch contract"
+                aria-label={`Unwatch ${c.ticker} ${c.strike} ${c.opt_type} contract`}
               >
                 <Star
                   size={11}
+                  aria-hidden="true"
                   style={{ color: "var(--accent-orange)", fill: "var(--accent-orange)" }}
                 />
               </button>
+              <button
+                type="button"
+                onClick={() => onSelectTicker(c.ticker)}
+                className="flex min-h-6 min-w-0 flex-1 items-center gap-2 rounded text-left"
+                aria-label={`Select ${c.ticker} ${c.strike} ${c.opt_type} contract`}
+              >
               <span className="font-mono font-bold text-text-primary w-14 shrink-0">{c.ticker}</span>
               <span
                 className="font-mono shrink-0"
@@ -283,6 +290,7 @@ export function ContractsView({
                   </span>
                 </>
               )}
+              </button>
               {noFlow && (
                 <button
                   type="button"
@@ -292,8 +300,9 @@ export function ContractsView({
                   }}
                   className="ml-auto p-0.5 rounded hover:bg-bg-card-hover text-text-muted"
                   title="Remove"
+                  aria-label={`Remove ${c.ticker} ${c.strike} ${c.opt_type} contract`}
                 >
-                  <XIcon size={11} />
+                  <XIcon size={11} aria-hidden="true" />
                 </button>
               )}
             </div>

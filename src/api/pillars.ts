@@ -149,6 +149,60 @@ export function usePillar(key?: string | null) {
   });
 }
 
+// ── AI buildout supply-chain stack ──────────────────────────────────────────
+
+export interface StackMember {
+  ticker: string;
+  name?: string | null;
+  play_score?: number | null;
+  accum_label?: string;
+  role?: string | null;
+  return_30d?: number | null;
+  trend?: string | null;
+  days_to_earnings?: number | null;
+}
+
+export interface StackGroupStats {
+  n: number;
+  median_play?: number | null;
+  n_bulls: number;
+  n_bears: number;
+  n_bottleneck: number;
+}
+
+export interface StackGroup {
+  key: string;
+  title: string;
+  note: string;
+  themes: string[];
+  /** theme -> member tickers (first-theme-wins), for the poster sub-boxes */
+  by_theme?: Record<string, string[]>;
+  members: StackMember[];
+  stats: StackGroupStats;
+}
+
+export interface SupplyStack {
+  available: boolean;
+  layers: StackGroup[];
+  rails: StackGroup[];
+  generated_at?: string;
+}
+
+/** The AI buildout supply-chain stack (application layer -> critical minerals)
+ *  live-enriched per ticker. Backed by GET /api/pillars/stack. */
+export function useSupplyStack() {
+  return useQuery<SupplyStack>({
+    queryKey: ["pillars", "stack"],
+    queryFn: () => apiClient.get("/pillars/stack").then((r) => r.data),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export interface WeeklyReportRef {
+  file: string;
+  date: string;
+}
+
 export interface WeeklyReport {
   available: boolean;
   date?: string | null;
@@ -156,14 +210,20 @@ export interface WeeklyReport {
   markdown?: string;
   file?: string;
   reason?: string;
+  /** Full archive, newest-first — every past report stays reachable. */
+  available_reports?: WeeklyReportRef[];
 }
 
-/** Latest weekly AI synthesis report (markdown), archived in
- *  intel-wiki/weekly-ai-report/. Backed by GET /api/pillars/weekly-report. */
-export function useWeeklyReport() {
+/** A weekly AI synthesis report (markdown), archived in
+ *  intel-wiki/weekly-ai-report/. Backed by GET /api/pillars/weekly-report.
+ *  Pass `file` to load an archived report; omit for the newest. */
+export function useWeeklyReport(file?: string | null) {
   return useQuery<WeeklyReport>({
-    queryKey: ["pillars", "weekly-report"],
-    queryFn: () => apiClient.get("/pillars/weekly-report").then((r) => r.data),
+    queryKey: ["pillars", "weekly-report", file ?? "latest"],
+    queryFn: () =>
+      apiClient
+        .get(`/pillars/weekly-report${file ? `?file=${encodeURIComponent(file)}` : ""}`)
+        .then((r) => r.data),
     staleTime: 30 * 60_000,
   });
 }

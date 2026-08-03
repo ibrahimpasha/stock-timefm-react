@@ -279,7 +279,7 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
 export function TraderBrief({ author }: { author: string }) {
   const [open, setOpen] = useState(false);
   const [windowDays, setWindowDays] = useState<number>(7);
-  const { data, isFetching, refetch } = useTraderBrief(author, windowDays, 720);
+  const { data, isFetching, isError, error, refetch } = useTraderBrief(author, windowDays, 720);
   const generate = useGenerateTraderBrief();
 
   const handleGenerate = async () => {
@@ -315,7 +315,7 @@ export function TraderBrief({ author }: { author: string }) {
               · {relativeAge(data.generated_at)}
             </span>
           )}
-          {!hasContent && !isFetching && (
+          {!hasContent && !isFetching && !isError && (
             <span className="text-xs text-text-muted">not generated yet</span>
           )}
         </div>
@@ -377,7 +377,32 @@ export function TraderBrief({ author }: { author: string }) {
             </div>
           )}
 
-          {!generate.isPending && !hasContent && (
+          {generate.isError && (
+            <div className="text-xs text-accent-red" role="alert">
+              {generate.error instanceof Error && generate.error.message
+                ? generate.error.message
+                : "The trader brief could not be generated. Try again."}
+            </div>
+          )}
+
+          {isError && !data && (
+            <div className="flex items-center justify-center gap-2 py-4 text-xs text-accent-red" role="alert">
+              <span>
+                {error instanceof Error && error.message
+                  ? error.message
+                  : "The cached trader brief could not be loaded."}
+              </span>
+              <button
+                type="button"
+                onClick={() => void refetch()}
+                className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-secondary hover:text-text-primary"
+              >
+                <RefreshCw size={11} /> Retry
+              </button>
+            </div>
+          )}
+
+          {!generate.isPending && !isError && !hasContent && (
             <div className="text-center py-4 text-sm text-text-muted">
               No brief cached. Click{" "}
               <span className="text-accent-purple">Generate</span> above (single

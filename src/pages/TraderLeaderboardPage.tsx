@@ -122,18 +122,20 @@ function LeaderboardHeader({
   align = "left",
   sortMode,
   onSort,
+  sortDesc,
 }: {
   mode: SortMode;
   label: string;
   align?: "left" | "right";
   sortMode: SortMode;
   onSort: (mode: SortMode) => void;
+  sortDesc: boolean;
 }) {
   const active = sortMode === mode;
   return (
     <th
-      onClick={() => onSort(mode)}
-      className={`px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap cursor-pointer select-none ${
+      aria-sort={active ? (sortDesc ? "descending" : "ascending") : undefined}
+      className={`px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap select-none ${
         active ? "text-text-secondary" : "text-text-muted"
       }`}
       style={{
@@ -147,10 +149,14 @@ function LeaderboardHeader({
         borderBottom: "1px solid var(--border)",
       }}
     >
-      <span className="inline-flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onSort(mode)}
+        className={`inline-flex min-h-6 w-full items-center gap-1 rounded ${align === "right" ? "justify-end" : "justify-start"}`}
+      >
         {label}
-        {active && <ArrowUpDown size={10} className="opacity-70" />}
-      </span>
+        {active && <ArrowUpDown size={10} className="opacity-70" aria-hidden="true" />}
+      </button>
     </th>
   );
 }
@@ -200,12 +206,12 @@ function LeaderboardTable({
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
-            <LeaderboardHeader mode="author" label="Trader" sortMode={sortMode} onSort={onSort} />
-            <LeaderboardHeader mode="n_calls" label="N" align="right" sortMode={sortMode} onSort={onSort} />
-            <LeaderboardHeader mode="today" label="Today" align="right" sortMode={sortMode} onSort={onSort} />
-            <LeaderboardHeader mode="win_rate" label="Win" align="right" sortMode={sortMode} onSort={onSort} />
-            <LeaderboardHeader mode="mean_pl_pct" label="Mean" align="right" sortMode={sortMode} onSort={onSort} />
-            <LeaderboardHeader mode="latest" label="Last" align="right" sortMode={sortMode} onSort={onSort} />
+            <LeaderboardHeader mode="author" label="Trader" sortMode={sortMode} onSort={onSort} sortDesc={sortDesc} />
+            <LeaderboardHeader mode="n_calls" label="N" align="right" sortMode={sortMode} onSort={onSort} sortDesc={sortDesc} />
+            <LeaderboardHeader mode="today" label="Today" align="right" sortMode={sortMode} onSort={onSort} sortDesc={sortDesc} />
+            <LeaderboardHeader mode="win_rate" label="Win" align="right" sortMode={sortMode} onSort={onSort} sortDesc={sortDesc} />
+            <LeaderboardHeader mode="mean_pl_pct" label="Mean" align="right" sortMode={sortMode} onSort={onSort} sortDesc={sortDesc} />
+            <LeaderboardHeader mode="latest" label="Last" align="right" sortMode={sortMode} onSort={onSort} sortDesc={sortDesc} />
           </tr>
         </thead>
         <tbody>
@@ -227,14 +233,20 @@ function LeaderboardTable({
                 }}
               >
                 <td className="px-2.5 py-2" style={tdBorder}>
-                  <div
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelect(r.author);
+                    }}
+                    aria-pressed={isSel}
                     className={`num text-sm text-text-primary max-w-40 truncate ${
                       isSel ? "font-bold" : "font-semibold"
-                    }`}
+                    } block min-h-6 w-full rounded text-left`}
                     title={r.author}
                   >
                     {r.author}
-                  </div>
+                  </button>
                   {r.top_ticker && (
                     <div className="num text-xs text-text-muted mt-0.5">
                       top: {r.top_ticker}
@@ -455,6 +467,7 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
                 <button
                   type="button"
                   onClick={() => setActiveTicker(leaderboardRow.top_ticker!)}
+                  aria-label={`Select ${leaderboardRow.top_ticker} ticker`}
                   className="num text-sm font-bold cursor-pointer p-0"
                   style={{
                     color: "var(--accent-blue)",
@@ -716,6 +729,7 @@ export function TraderLeaderboardPage() {
               </div>
               <div className="overflow-x-auto">
                 <Segmented<SortMode>
+                  ariaLabel="Leaderboard sort"
                   options={SORT_OPTIONS}
                   value={sortMode}
                   onChange={handleSort}

@@ -14,7 +14,7 @@
  * Reuses the `dteTag` helper from `iflow/utils.ts` so the DTE pill bucket
  * stays consistent across both views.
  */
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 
 import { dteTag } from "../flow-analyzer/iflow/utils";
 import { Chip, type ChipTone } from "../../components/Glass";
@@ -184,6 +184,7 @@ export function TraderCallRow({
   onToggle,
   onTickerClick,
 }: TraderCallRowProps) {
+  const detailsId = useId();
   const dir = directionBadge(call.direction);
   const pct = rowPct(call);
   const isRealized = Boolean(call.is_realized);
@@ -341,11 +342,25 @@ export function TraderCallRow({
             {convLabel}
           </Chip>
         )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle(call.alert_id);
+          }}
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          aria-label={`${expanded ? "Collapse" : "Expand"} ${call.ticker ?? "trade"} call details`}
+          className="min-h-6 min-w-6 shrink-0 rounded text-text-muted hover:text-text-primary"
+        >
+          <span aria-hidden="true">{expanded ? "▾" : "▸"}</span>
+        </button>
       </div>
 
       {/* Expanded detail block — mirrors EntryRow's detail panel idiom */}
       {expanded && (
         <div
+          id={detailsId}
           className="text-xs py-2 pr-3 pb-2.5 pl-14 text-text-secondary flex flex-col gap-1.5 leading-relaxed"
           style={{
             background: "color-mix(in srgb, var(--bg-card) 50%, transparent)",

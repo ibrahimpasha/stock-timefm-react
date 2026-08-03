@@ -7,7 +7,7 @@
  * saturated, neutral rows are transparent. Reading the column of colors
  * top-down tells you market direction faster than any text summary.
  */
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Filter, X, Globe, Clock } from "lucide-react";
 import { Chip, Segmented } from "../../components/Glass";
 import { useAppStore } from "../../store/useAppStore";
@@ -99,9 +99,10 @@ function NewsRow({ item }: { item: NewsItem }) {
   const score = item.sentiment_score ?? 0;
   const sentColor = sentimentColor(item.sentiment);
   const rowAlpha = confidenceAlpha(item.sentiment_score);
+  const detailsId = useId();
   return (
     <div
-      className="border-l-2 pl-3 py-1.5 transition-colors hover:bg-bg-card-hover/40 cursor-pointer rounded-r"
+      className="border pl-3 py-1.5 transition-colors hover:bg-bg-card-hover/40 cursor-pointer rounded"
       style={{
         borderColor: sentColor,
         background: sentimentBgColor(item.sentiment, rowAlpha),
@@ -151,6 +152,8 @@ function NewsRow({ item }: { item: NewsItem }) {
             {item.tickers.map((t) => (
               <button
                 key={t}
+                type="button"
+                aria-label={`Select ${t} ticker`}
                 onClick={(e) => {
                   e.stopPropagation();
                   setActiveTicker(t);
@@ -164,9 +167,20 @@ function NewsRow({ item }: { item: NewsItem }) {
               {item.author_username}
             </span>
           </div>
-          <div className="text-text-primary leading-snug">{item.headline}</div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
+            aria-expanded={expanded}
+            aria-controls={item.sentiment_score !== null ? detailsId : undefined}
+            className="block min-h-6 w-full rounded text-left text-text-primary leading-snug"
+          >
+            {item.headline}
+          </button>
           {expanded && item.sentiment_score !== null && (
-            <div className="mt-2 pt-2 border-t border-border/50 text-[10px] text-text-muted/70 font-mono">
+            <div id={detailsId} className="mt-2 pt-2 border-t border-border/50 text-[10px] text-text-muted/70 font-mono">
               tagged by LLM · sentiment_score {item.sentiment_score?.toFixed(2)}
               {item.tickers.length > 0 && ` · ${item.tickers.length} ticker(s) extracted`}
             </div>
@@ -249,7 +263,9 @@ export function NewsTab() {
             <Filter size={11} />
             <span className="font-mono font-bold">{tickerFilter}</span>
             <button
+              type="button"
               onClick={() => setTickerFilter(null)}
+              aria-label={`Clear ${tickerFilter} ticker filter`}
               className="p-0.5 rounded-full opacity-60 hover:opacity-100 transition-opacity"
               title="clear ticker filter"
             >
@@ -263,6 +279,7 @@ export function NewsTab() {
               window
             </span>
             <Segmented
+              ariaLabel="News window"
               value={String(windowDays)}
               onChange={(v) => setWindowDays(Number(v))}
               options={WINDOW_OPTIONS.map((opt) => ({
@@ -275,6 +292,7 @@ export function NewsTab() {
 
         {!tickerFilter && activeTicker && (
           <button
+            type="button"
             onClick={() => setTickerFilter(activeTicker)}
             className="text-xs text-text-muted hover:text-accent-blue underline"
           >

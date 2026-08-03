@@ -6,12 +6,10 @@ Feature components — organized by surface, not by tech.
 
 | Dir | Components | Used on routes |
 |---|---|---|
-| `command-center/` | ActionPanel, ModelBreakdown, TrustScores, IntelligencePanel, IntelligencePanelV2, FlowTape, TickerHero, ScanGrid, DecisionHero | `/command-center`, `/command-center-v2` |
-| `flow-analyzer/` | **IFlowTracker** (the big one), SystemRiskStatus, PickHistory, etc. | `/command-center` (right column) |
-| `forecast/` | ForecastChart, ModelLegend, etc. | `/` |
-| `intelligence/` | Category browser, history view | `/intel` |
-| `model-eval/` | Trust score tables, calibration plots | `/eval` |
-| `signal-analysis/` | LiveExecution, SignalThesis, etc. | `/signals` |
+| `command-center/` | Brief, signal analysis, graph context, intelligence panels, model breakdown | `/`, `/command-center` |
+| `flow-analyzer/` | **IFlowTracker**, smart trader, alerts, news, voices | Command Center |
+| `forecast/` | Forecast configuration and chart overlays | Command Center |
+| `traders/` | Trader leaderboard, positions, signals | `/traders` |
 
 ## Cross-Cutting Patterns
 
@@ -43,7 +41,8 @@ export function useSomething(arg: string) {
 
 ### Refresh + relative timestamp pattern
 
-Both Intelligence panels expose a refresh button + "updated 23m ago" tag. Copy from `IntelligencePanel.tsx` or `IntelligencePanelV2.tsx`:
+`IntelligencePanelV3.tsx` is the active intelligence surface and exposes the
+refresh button plus an "updated 23m ago" tag:
 
 ```ts
 const refresh = useMutation({

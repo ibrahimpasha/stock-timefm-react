@@ -8,13 +8,14 @@ const STATUS_VAR: Record<HealthStatus, string> = {
   amber: "var(--accent-yellow)",
   red: "var(--accent-red)",
   unknown: "var(--text-muted)",
+  paused: "var(--text-muted)",
 };
 
 function Dot({ status, pulse }: { status: HealthStatus; pulse?: boolean }) {
   return (
     <span
       className={`inline-block w-2 h-2 rounded-full shrink-0 ${
-        pulse && status !== "green" ? "animate-pulse" : ""
+        pulse && status !== "green" && status !== "paused" ? "animate-pulse" : ""
       }`}
       style={{ backgroundColor: STATUS_VAR[status] }}
     />

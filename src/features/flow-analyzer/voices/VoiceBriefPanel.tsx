@@ -283,7 +283,7 @@ export function VoiceBriefPanel({
   // Render nothing when no voice is selected.
   const enabled = !!voiceUsername;
 
-  const { data, isFetching, refetch } = useVoicesSynthesis(
+  const { data, isFetching, isError, error, refetch } = useVoicesSynthesis(
     voiceUsername ?? "",
     windowDays,
     720,
@@ -328,7 +328,7 @@ export function VoiceBriefPanel({
               · {relativeAge(data.generated_at)}
             </span>
           )}
-          {!hasContent && !isFetching && (
+          {!hasContent && !isFetching && !isError && (
             <span className="text-xs text-text-muted">not generated yet</span>
           )}
         </div>
@@ -405,7 +405,33 @@ export function VoiceBriefPanel({
             </div>
           )}
 
-          {!generate.isPending && !hasContent && (
+
+          {generate.isError && (
+            <div className="text-xs text-accent-red" role="alert">
+              {generate.error instanceof Error && generate.error.message
+                ? generate.error.message
+                : "The voice brief could not be generated. Try again."}
+            </div>
+          )}
+
+          {isError && !data && (
+            <div className="flex items-center justify-center gap-2 py-4 text-xs text-accent-red" role="alert">
+              <span>
+                {error instanceof Error && error.message
+                  ? error.message
+                  : "The cached voice brief could not be loaded."}
+              </span>
+              <button
+                type="button"
+                onClick={() => void refetch()}
+                className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-secondary hover:text-text-primary"
+              >
+                <RefreshCw size={11} /> Retry
+              </button>
+            </div>
+          )}
+
+          {!generate.isPending && !isError && !hasContent && (
             <div className="text-center py-4 text-sm text-text-muted">
               No brief cached for this window. Click{" "}
               <span className="text-accent-purple">Generate</span>{" "}

@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Star } from "lucide-react";
 import { useAppStore } from "../../../store/useAppStore";
 import { classifySide, dteTag, normExpiry } from "./utils";
@@ -30,6 +31,7 @@ export function EntryRow({
   const { side, action } = classifySide(optType, entry.ask_pct, entry.vol_oi_ratio, entry.side);
   const color = side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
   const expanded = expandedKey === entryKey;
+  const detailsId = useId();
   const dl = dteTag(entry.dte);
 
   // Star toggles "watch this contract" — keyed on ticker|strike|type|normExpiry.
@@ -57,7 +59,7 @@ export function EntryRow({
   const uf = entry.underlying_price || 0;
   const optFill = entry.avg_price || 0;
   const strike = entry.strike || 0;
-  const dte = entry.dte || 30;
+  const dte = entry.dte ?? 30;
   const flowDate = entry._date || entry.flow_date || "";
 
   let pnl: number | null = null;
@@ -79,7 +81,6 @@ export function EntryRow({
     <div>
       <div
         className="flex items-center gap-2 text-xs py-1.5 px-2 rounded hover:bg-bg-card-hover transition-colors cursor-pointer"
-        onClick={() => onToggle(entryKey)}
       >
         <button
           type="button"
@@ -89,9 +90,12 @@ export function EntryRow({
           }}
           className="p-0.5 -ml-0.5 rounded hover:bg-bg-card-hover transition-colors shrink-0"
           title={watched ? "Unwatch contract" : "Watch contract"}
+          aria-label={watched ? `Unwatch ${ticker} contract` : `Watch ${ticker} contract`}
+          aria-pressed={watched}
         >
           <Star
             size={11}
+            aria-hidden="true"
             style={{
               color: watched ? "var(--accent-orange)" : "var(--text-muted)",
               fill: watched ? "var(--accent-orange)" : "none",
@@ -99,44 +103,53 @@ export function EntryRow({
             }}
           />
         </button>
-        <span className="font-mono font-semibold w-10 shrink-0" style={{ color }}>
-          {side}
-        </span>
-        <span className="text-text-muted italic w-16 shrink-0">{action}</span>
-        <span className="num font-bold text-text-primary">
-          ${entry.strike} {optType}
-        </span>
-        <span className="num text-text-muted">{entry.expiry}</span>
-        {dl && (
-          <span className="num px-1 rounded-full" style={{ color: dl.color, background: dl.bg }}>
-            {dl.text}
-          </span>
-        )}
-        {entry.vol_oi_ratio > 0 && (
-          <span className="text-accent-cyan num">
-            {Number(entry.vol_oi_ratio).toFixed(1)}x
-          </span>
-        )}
-        {entry.ask_pct > 0 && (
-          <span className="text-accent-orange num">{entry.ask_pct}%ask</span>
-        )}
-        <span
-          className="num font-bold shrink-0"
-          style={{ color: pnlColor, minWidth: 48, textAlign: "right" }}
-          title={
-            pnl !== null
-              ? "Estimated P/L since fill"
-              : priceLoading
-              ? "Loading current price…"
-              : "No fill data"
-          }
+        <button
+          type="button"
+          onClick={() => onToggle(entryKey)}
+          aria-expanded={expanded}
+          aria-controls={entry.analysis ? detailsId : undefined}
+          className="flex min-h-6 min-w-0 flex-1 items-center gap-2 rounded text-left"
         >
-          {pnlLabel}
-        </span>
-        <span className="text-text-secondary ml-auto num">{entry.premium}</span>
+          <span className="font-mono font-semibold w-10 shrink-0" style={{ color }}>
+            {side}
+          </span>
+          <span className="text-text-muted italic w-16 shrink-0">{action}</span>
+          <span className="num font-bold text-text-primary">
+            ${entry.strike} {optType}
+          </span>
+          <span className="num text-text-muted">{entry.expiry}</span>
+          {dl && (
+            <span className="num px-1 rounded-full" style={{ color: dl.color, background: dl.bg }}>
+              {dl.text}
+            </span>
+          )}
+          {entry.vol_oi_ratio > 0 && (
+            <span className="text-accent-cyan num">
+              {Number(entry.vol_oi_ratio).toFixed(1)}x
+            </span>
+          )}
+          {entry.ask_pct > 0 && (
+            <span className="text-accent-orange num">{entry.ask_pct}%ask</span>
+          )}
+          <span
+            className="num font-bold shrink-0"
+            style={{ color: pnlColor, minWidth: 48, textAlign: "right" }}
+            title={
+              pnl !== null
+                ? "Estimated P/L since fill"
+                : priceLoading
+                ? "Loading current price…"
+                : "No fill data"
+            }
+          >
+            {pnlLabel}
+          </span>
+          <span className="text-text-secondary ml-auto num">{entry.premium}</span>
+        </button>
       </div>
       {expanded && entry.analysis && (
         <div
+          id={detailsId}
           className="ml-12 mr-2 mb-2 px-2 py-1.5 rounded text-xs text-text-secondary leading-relaxed"
           style={{ background: "color-mix(in srgb, var(--bg-card) 50%, transparent)" }}
         >

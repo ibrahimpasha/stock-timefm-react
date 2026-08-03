@@ -8,9 +8,11 @@ import {
   Settings2,
 } from "lucide-react";
 import { MODEL_LABELS, MODEL_COLORS } from "../../lib/constants";
+import { todayLocalDate } from "../../lib/dateOnly";
 
 const AVAILABLE_MODELS = [
   "ensemble",
+  "rw",
   "timexer",
   "itransformer",
   "timemixer",
@@ -62,10 +64,10 @@ export const DEFAULT_SETTINGS: ForecastSettings = {
   interval: "4h",
   historyDays: 365,
   historyPeriod: "60d",
-  selectedModels: ["ensemble", "timexer", "itransformer", "timemixer"],
+  selectedModels: ["ensemble"],
   useCovariates: true,
   usePretrained: true,
-  forecastOrigin: new Date().toISOString().split("T")[0],
+  forecastOrigin: todayLocalDate(),
   showMA: ["MA20", "MA50"],
   showBB: false,
   showVWAP: false,
@@ -121,7 +123,17 @@ export function ForecastConfig({
             {(["daily", "intraday"] as const).map((t) => (
               <button
                 key={t}
-                onClick={() => update({ forecastType: t })}
+                type="button"
+                aria-pressed={settings.forecastType === t}
+                onClick={() => update({
+                  forecastType: t,
+                  selectedModels:
+                    t === "intraday" && settings.selectedModels.includes("ensemble")
+                      ? settings.selectedModels.filter((model) => model !== "ensemble").concat(
+                          settings.selectedModels.some((model) => model !== "ensemble") ? [] : ["rw"],
+                        )
+                      : settings.selectedModels,
+                })}
                 className={`flex-1 px-2 py-1.5 rounded text-xs font-mono capitalize transition-all ${
                   settings.forecastType === t
                     ? "bg-accent-blue/15 border border-accent-blue/40 text-accent-blue"
@@ -136,12 +148,13 @@ export function ForecastConfig({
 
         {/* Horizon */}
         <div>
-          <label className="text-xs uppercase tracking-wider text-text-muted mb-1 block">
+          <label htmlFor="forecast-horizon" className="text-xs uppercase tracking-wider text-text-muted mb-1 block">
             {settings.forecastType === "daily" ? "Horizon (days)" : "Minutes"}
           </label>
           {settings.forecastType === "daily" ? (
             <div className="flex items-center gap-2">
               <input
+                id="forecast-horizon"
                 type="range"
                 min={1}
                 max={30}
@@ -158,6 +171,7 @@ export function ForecastConfig({
           ) : (
             <div className="flex items-center gap-2">
               <input
+                id="forecast-horizon"
                 type="range"
                 min={60}
                 max={1920}
@@ -177,12 +191,13 @@ export function ForecastConfig({
 
         {/* History */}
         <div>
-          <label className="text-xs uppercase tracking-wider text-text-muted mb-1 block">
+          <label htmlFor="forecast-history" className="text-xs uppercase tracking-wider text-text-muted mb-1 block">
             {settings.forecastType === "daily" ? "History (days)" : "Interval"}
           </label>
           {settings.forecastType === "daily" ? (
             <div className="flex items-center gap-2">
               <input
+                id="forecast-history"
                 type="range"
                 min={60}
                 max={730}
@@ -198,6 +213,7 @@ export function ForecastConfig({
             </div>
           ) : (
             <select
+              id="forecast-history"
               value={settings.interval}
               onChange={(e) => update({ interval: e.target.value })}
               className="w-full bg-bg-primary border border-border rounded px-2 py-1.5 text-xs font-mono text-text-primary"
@@ -213,12 +229,14 @@ export function ForecastConfig({
 
         {/* Forecast Origin */}
         <div>
-          <label className="text-xs uppercase tracking-wider text-text-muted mb-1 flex items-center gap-1">
+          <label htmlFor="forecast-origin" className="text-xs uppercase tracking-wider text-text-muted mb-1 flex items-center gap-1">
             <Calendar size={10} /> Origin Date
           </label>
           <input
+            id="forecast-origin"
             type="date"
             value={settings.forecastOrigin}
+            max={todayLocalDate()}
             onChange={(e) => update({ forecastOrigin: e.target.value })}
             className="w-full bg-bg-primary border border-border rounded px-2 py-1.5 text-xs font-mono text-text-primary"
           />
@@ -233,12 +251,14 @@ export function ForecastConfig({
           </label>
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={selectAll}
               className="text-xs text-accent-blue hover:underline"
             >
               All
             </button>
             <button
+              type="button"
               onClick={clearAll}
               className="text-xs text-text-muted hover:underline"
             >
@@ -253,6 +273,8 @@ export function ForecastConfig({
             return (
               <button
                 key={m}
+                type="button"
+                aria-pressed={selected}
                 onClick={() => toggleModel(m)}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all ${
                   selected
@@ -283,6 +305,8 @@ export function ForecastConfig({
       {/* Row 3: Advanced + Run */}
       <div className="flex items-center justify-between">
         <button
+          type="button"
+          aria-expanded={showAdvanced}
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="flex items-center gap-1 text-xs text-text-muted hover:text-text-secondary transition-colors"
         >
@@ -292,6 +316,7 @@ export function ForecastConfig({
         </button>
 
         <button
+          type="button"
           onClick={onRunForecast}
           disabled={runDisabled}
           title={disabledReason || "Run forecast across selected models"}
@@ -323,6 +348,10 @@ export function ForecastConfig({
           <div className="flex items-center justify-between">
             <span className="text-xs text-text-secondary">Covariates</span>
             <button
+              type="button"
+              role="switch"
+              aria-label="Use covariates"
+              aria-checked={settings.useCovariates}
               onClick={() =>
                 update({ useCovariates: !settings.useCovariates })
               }
@@ -340,6 +369,10 @@ export function ForecastConfig({
           <div className="flex items-center justify-between">
             <span className="text-xs text-text-secondary">Pretrained</span>
             <button
+              type="button"
+              role="switch"
+              aria-label="Use pretrained weights"
+              aria-checked={settings.usePretrained}
               onClick={() =>
                 update({ usePretrained: !settings.usePretrained })
               }
@@ -364,6 +397,8 @@ export function ForecastConfig({
               {["MA20", "MA50", "MA100", "MA200"].map((ma) => (
                 <button
                   key={ma}
+                  type="button"
+                  aria-pressed={settings.showMA.includes(ma)}
                   onClick={() => {
                     const showMA = settings.showMA.includes(ma)
                       ? settings.showMA.filter((m) => m !== ma)
@@ -380,6 +415,8 @@ export function ForecastConfig({
                 </button>
               ))}
               <button
+                type="button"
+                aria-pressed={settings.showBB}
                 onClick={() => update({ showBB: !settings.showBB })}
                 className={`px-1.5 py-0.5 rounded text-xs font-mono ${
                   settings.showBB
@@ -390,6 +427,8 @@ export function ForecastConfig({
                 BB
               </button>
               <button
+                type="button"
+                aria-pressed={settings.showVWAP}
                 onClick={() => update({ showVWAP: !settings.showVWAP })}
                 className={`px-1.5 py-0.5 rounded text-xs font-mono ${
                   settings.showVWAP
@@ -415,6 +454,8 @@ export function ForecastConfig({
               ].map(({ key, label }) => (
                 <button
                   key={key}
+                  type="button"
+                  aria-pressed={settings[key]}
                   onClick={() => update({ [key]: !settings[key] })}
                   className={`px-1.5 py-0.5 rounded text-xs font-mono ${
                     settings[key]

@@ -251,11 +251,31 @@ function useGraphContext(ticker: string, enabled: boolean) {
   });
 }
 
+function QueryErrorState({ label, onRetry }: { label: string; onRetry: () => void }) {
+  return (
+    <div className="flex items-center gap-2 py-2 text-xs text-accent-red">
+      <XCircle size={13} />
+      <span>{label}</span>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-secondary hover:text-text-primary"
+      >
+        <RefreshCw size={11} /> Retry
+      </button>
+    </div>
+  );
+}
+
 // Rule meta — labels + plain-English explanations for the transparency panel.
+// Labels are persona-agnostic — the exact threshold (e.g. "ml_score 36 < 50",
+// "dte=64 outside [1, 45]") lives in each entry's own `reason` string and is
+// rendered per-row. Don't hardcode numbers here; they differ per persona
+// (aggressive is ML 50 / DTE 1-45, smart is ML 70 / DTE 8-30).
 const RULE_LABELS: Record<string, { id: number; label: string; why: string }> = {
   no_0_7_DTE: {
     id: 1,
-    label: "Rule 1 — DTE outside 8 to 30",
+    label: "Rule 1 — DTE out of range",
     why: "Short-dated and far-dated entries are the dominant loss driver in your history.",
   },
   no_averaging_down: {
@@ -265,7 +285,7 @@ const RULE_LABELS: Record<string, { id: number; label: string; why: string }> = 
   },
   max_2pct_per_series: {
     id: 4,
-    label: "Rule 4 — position size over 2 percent",
+    label: "Rule 4 — position over size cap",
     why: "Oversized series caused the deepest single-name drawdowns.",
   },
   no_BTO_3d_after_2k_loss: {
@@ -280,8 +300,13 @@ const RULE_LABELS: Record<string, { id: number; label: string; why: string }> = 
   },
   low_ml_score: {
     id: 99,
-    label: "ML score under threshold (70)",
+    label: "ML score below threshold",
     why: "Filter is a quality gate, not a rule from the trade-check skill itself.",
+  },
+  liquidity_cap: {
+    id: 11,
+    label: "Rule 11 — contract too illiquid to size",
+    why: "Thin open-interest/volume contracts can't absorb an executable size; sizing rejects them.",
   },
 };
 
@@ -340,7 +365,7 @@ const roleColor = (r?: string | null) =>
   ROLE_COLORS[(r || "").toUpperCase()] || "var(--accent-cyan)";
 
 function GraphContextPanel({ ticker }: { ticker: string }) {
-  const { data, isLoading } = useGraphContext(ticker, true);
+  const { data, isLoading, isError, refetch } = useGraphContext(ticker, true);
   const setActiveTicker = useAppStore((s) => s.setActiveTicker);
   if (isLoading) {
     return (
@@ -349,6 +374,9 @@ function GraphContextPanel({ ticker }: { ticker: string }) {
         loading graph context...
       </div>
     );
+  }
+  if (isError) {
+    return <QueryErrorState label={`Unable to load graph context for ${ticker}.`} onRetry={() => void refetch()} />;
   }
   if (!data || !data.available) {
     return (
@@ -685,7 +713,11 @@ function PositionCard({
   const isEquity = p.instrument === "equity";
   const pnl = p.pnl_pct ?? 0;
   const pnlDollars = p.pnl_dollars ?? 0;
-  const scaled = (p.scale_stage ?? 0) > 0 || trims.length > 0;
+  // Floor arms when the first ladder rung was CROSSED (scale_stage >= 1) —
+  // mirror the backend. A 1-lot can't spare a contract to trim, but it still
+  // earns the breakeven floor by crossing +30%; keying off the trim left
+  // every 1-lot position (most of a $20K book) showing/riding the -60 stop.
+  const scaled = (p.scale_stage ?? 0) >= 1;
   const held = daysHeld(p.entry_date);
   const be = breakeven(p);
   const peak = p.peak_pnl_pct;
@@ -881,7 +913,7 @@ function CategoryTrendPanel() {
   const [window, setWindow] = useState<CategoryWindow>("today");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
-  const { data, isLoading } = useCategories(window);
+  const { data, isLoading, isError, refetch } = useCategories(window);
   const trend = data?.trend ?? [];
   const visible = showAll ? trend : trend.slice(0, 8);
   const maxRatio = Math.max(...trend.map((t) => t.hotness_ratio), 1);
@@ -918,7 +950,10 @@ function CategoryTrendPanel() {
           loading...
         </div>
       )}
-      {!isLoading && trend.length === 0 && (
+      {isError && !data && (
+        <QueryErrorState label="Unable to load category activity." onRetry={() => void refetch()} />
+      )}
+      {!isLoading && !isError && trend.length === 0 && (
         <div className="text-text-muted text-xs italic py-2">
           No category activity for this window.
         </div>
@@ -1558,10 +1593,14 @@ export function SmartTrader() {
   const queryClient = useQueryClient();
   const [persona, setPersona] = useState<PersonaName>("smart");
   const [showClosed, setShowClosed] = useState(false);
-  const { data: summary, isLoading } = useSummary(persona);
-  const { data: today } = useToday(persona);
-  const { data: history } = useHistory(persona);
-  const { data: personaList } = usePersonaList();
+  const summaryQuery = useSummary(persona);
+  const todayQuery = useToday(persona);
+  const historyQuery = useHistory(persona);
+  const personaQuery = usePersonaList();
+  const { data: summary, isLoading } = summaryQuery;
+  const { data: today } = todayQuery;
+  const { data: history } = historyQuery;
+  const { data: personaList } = personaQuery;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["smart-trader-summary"] });
@@ -1585,16 +1624,27 @@ export function SmartTrader() {
     onSuccess: invalidate,
   });
   const resetMutation = useMutation({
-    mutationFn: () =>
-      apiClient.post(`/smart-trader/reset?persona=${persona}`),
+    mutationFn: (capital: number) =>
+      apiClient.post(
+        `/smart-trader/reset?persona=${persona}&capital=${capital}`,
+      ),
     onSuccess: invalidate,
   });
+  const [resetCapital, setResetCapital] = useState("20000");
 
-  if (isLoading || !summary) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12 text-text-muted text-sm gap-2">
         <Loader2 size={16} className="animate-spin" />
         Loading smart trader...
+      </div>
+    );
+  }
+
+  if (summaryQuery.isError || !summary) {
+    return (
+      <div className="card flex items-center justify-center py-10">
+        <QueryErrorState label="Unable to load smart trader." onRetry={() => void summaryQuery.refetch()} />
       </div>
     );
   }
@@ -1663,6 +1713,9 @@ export function SmartTrader() {
             ) : null;
           })()}
         </div>
+        {personaQuery.isError && !personaList && (
+          <QueryErrorState label="Unable to load persona summaries." onRetry={() => void personaQuery.refetch()} />
+        )}
       </div>
 
       {/* Action buttons — no manual "Run Picks": the cron is the only source
@@ -1680,20 +1733,43 @@ export function SmartTrader() {
           )}
           Mark to Market
         </button>
-        <button
-          onClick={() => {
-            if (
-              confirm(
-                `Reset ${PERSONA_META[persona].label} book to starting capital? All picks and history will be erased.`,
+        <div className="flex items-center gap-1.5">
+          <span className="text-text-muted text-sm">$</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1000}
+            step={1000}
+            value={resetCapital}
+            onChange={(e) => setResetCapital(e.target.value)}
+            aria-label="Reset starting capital"
+            className="num w-24 px-2 py-2 rounded-lg border border-border bg-bg-card text-text-primary text-sm focus:outline-none focus:border-accent-blue/50"
+          />
+          <button
+            onClick={() => {
+              const amt = Math.round(Number(resetCapital));
+              if (!Number.isFinite(amt) || amt < 1000) {
+                alert("Enter a starting balance of at least $1,000.");
+                return;
+              }
+              if (
+                confirm(
+                  `Reset ${PERSONA_META[persona].label} book to $${amt.toLocaleString()}? All picks and history will be erased.`,
+                )
               )
-            )
-              resetMutation.mutate();
-          }}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-text-secondary text-xs hover:text-accent-red hover:border-accent-red/40 transition-all"
-        >
-          <RotateCcw size={12} />
-          Reset
-        </button>
+                resetMutation.mutate(amt);
+            }}
+            disabled={resetMutation.isPending}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-text-secondary text-sm hover:text-accent-red hover:border-accent-red/40 transition-all disabled:opacity-40"
+          >
+            {resetMutation.isPending ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <RotateCcw size={12} />
+            )}
+            Reset
+          </button>
+        </div>
       </div>
 
       {/* Portfolio Summary */}
@@ -1760,6 +1836,11 @@ export function SmartTrader() {
       </div>
 
       {/* Equity Curve */}
+      {historyQuery.isError && !history && (
+        <div className="card">
+          <QueryErrorState label="Unable to load equity history." onRetry={() => void historyQuery.refetch()} />
+        </div>
+      )}
       {history && history.length >= 2 && <EquityCurve history={history} />}
 
       {/* Hot categories — Today / 7d / 30d windows, self-fetches */}
@@ -1775,6 +1856,11 @@ export function SmartTrader() {
       )}
 
       {/* Today — what got rejected, grouped by rule */}
+      {todayQuery.isError && !today && (
+        <div className="card">
+          <QueryErrorState label="Unable to load today's decisions." onRetry={() => void todayQuery.refetch()} />
+        </div>
+      )}
       {today && (
         <GlassPanel
           title={

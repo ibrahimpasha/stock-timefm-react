@@ -8,7 +8,7 @@ React Query hooks. Every server interaction in the app goes through here.
 |---|---|
 | `client.ts` | Shared axios instance, baseURL `/api` (Vite proxy → :8001) |
 | `cacheKey.ts` | `tickersKey(tickers)` — sort/dedupe/encode helper for batched query cache keys |
-| `forecast.ts` | `useMarketPrice`, forecast model hooks |
+| `forecast.ts` | Market hooks plus `runForecastModels()` for imperative forecast execution |
 | `signals.ts` | `useSignal(ticker)`, `useGenerateSignal()`, `useSignalTickers()` |
 | `flow.ts` | `useTrackedTickers`, `useFlowAlerts`, `useFlowPicks`, `useFlowChat`, and the flow mutations |
 | `intel.ts` | `useIntelLatest`, `useIntelRefresh` |
@@ -66,7 +66,8 @@ Don't open-code another sort/dedupe — every batched hook should go through `ti
 
 - If it'll be reused → add here.
 - If it's truly one-shot UI state plumbing → fine to keep inline.
-- If it touches the server, even once → here. Never call `apiClient.get` inside a component.
+- If it touches the server, even once → here. Never call `apiClient` directly
+  inside a component; imperative operations belong in a typed API function.
 
 ## Endpoints Map
 

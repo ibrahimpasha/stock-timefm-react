@@ -1,10 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../../api/client";
 import { Chip, GlassPanel, Segmented } from "../../components/Glass";
 import { useTrackedTickers } from "../../api/flow";
 import { STALE_TIMES } from "../../lib/constants";
 import { formatPremium } from "../../lib/utils";
+import type { OHLCV } from "../../lib/types";
+import { useAppStore } from "../../store/useAppStore";
 import {
   BarChart, Bar, LineChart, Line, ComposedChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -13,7 +15,7 @@ import {
 import {
   TrendingUp, AlertTriangle, Activity,
   ArrowUpRight, ArrowDownRight, Layers, Search, X, Plus,
-  Zap, Target, Calendar, Crosshair,
+  Zap, Target, Calendar, Crosshair, RefreshCw,
 } from "lucide-react";
 
 /* ── Types ─────────────────────────────────────────────────── */
@@ -60,13 +62,19 @@ function useMultiTickerHistories(tickers: string[]) {
     queryKey: ["iflow", "multi-history", tickers.join(",")],
     queryFn: async () => {
       const results: Record<string, HistoryResponse> = {};
+      let failures = 0;
       const fetches = tickers.slice(0, 15).map(async (t) => {
         try {
           const { data } = await apiClient.get(`/flow/iflow/history?ticker=${t}&days=14`);
           results[t] = data;
-        } catch { /* skip */ }
+        } catch {
+          failures += 1;
+        }
       });
       await Promise.all(fetches);
+      if (fetches.length > 0 && failures === fetches.length) {
+        throw new Error("Unable to load flow histories");
+      }
       return results;
     },
     staleTime: STALE_TIMES.flow * 5,
@@ -87,15 +95,21 @@ function useAllEntriesForDates(dates: string[]) {
     queryKey: ["iflow", "all-entries", dates.join(",")],
     queryFn: async () => {
       const all: any[] = [];
+      let failures = 0;
       const fetches = dates.slice(0, 10).map(async (d) => {
         try {
           const { data } = await apiClient.get(`/flow/iflow/entries?date=${d}`);
           for (const e of data.entries || []) {
             all.push({ ...e, _date: d });
           }
-        } catch { /* skip */ }
+        } catch {
+          failures += 1;
+        }
       });
       await Promise.all(fetches);
+      if (fetches.length > 0 && failures === fetches.length) {
+        throw new Error("Unable to load flow entries");
+      }
       return all;
     },
     staleTime: STALE_TIMES.flow * 2,
@@ -104,12 +118,28 @@ function useAllEntriesForDates(dates: string[]) {
 }
 
 function usePriceHistory(ticker: string) {
-  return useQuery<{ prices: { date: string; close: number }[] }>({
+  return useQuery<OHLCV[]>({
     queryKey: ["market-history-short", ticker],
     queryFn: () => apiClient.get(`/market/history?ticker=${ticker}&days=30`).then((r) => r.data),
     staleTime: STALE_TIMES.flow * 5,
     enabled: !!ticker,
   });
+}
+
+function QueryErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex items-center justify-center gap-2 py-6 text-xs text-accent-red">
+      <AlertTriangle size={13} />
+      <span>{message}</span>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-secondary hover:text-text-primary"
+      >
+        <RefreshCw size={11} /> Retry
+      </button>
+    </div>
+  );
 }
 
 /* ── Utility ───────────────────────────────────────────────── */
@@ -130,7 +160,7 @@ const CYAN = "#58a6ff";
 /* ── Accumulation Chart ────────────────────────────────────── */
 
 function AccumulationChart({ ticker }: { ticker: string }) {
-  const { data, isLoading } = useFlowHistory(ticker);
+  const { data, isLoading, isError, refetch } = useFlowHistory(ticker);
 
   const chartData = useMemo(() => {
     if (!data?.by_date) return [];
@@ -146,6 +176,7 @@ function AccumulationChart({ ticker }: { ticker: string }) {
   }, [data]);
 
   if (isLoading) return <div className="h-48 bg-bg-card-hover rounded-lg animate-pulse" />;
+  if (isError) return <QueryErrorState message={`Failed to load history for ${ticker}`} onRetry={() => void refetch()} />;
   if (!data || chartData.length === 0) return <div className="text-xs text-text-muted py-4 text-center">No history for {ticker}</div>;
 
   const label = data.accumulation_label || "UNKNOWN";
@@ -205,7 +236,7 @@ function AccumulationChart({ ticker }: { ticker: string }) {
 /* ── Strike Escalation Chart ───────────────────────────────── */
 
 function StrikeChart({ ticker }: { ticker: string }) {
-  const { data, isLoading } = useFlowHistory(ticker);
+  const { data, isLoading, isError, refetch } = useFlowHistory(ticker);
 
   const chartData = useMemo(() => {
     if (!data?.by_date) return [];
@@ -225,6 +256,7 @@ function StrikeChart({ ticker }: { ticker: string }) {
   }, [data]);
 
   if (isLoading) return <div className="h-48 bg-bg-card-hover rounded-lg animate-pulse" />;
+  if (isError) return <QueryErrorState message={`Failed to load history for ${ticker}`} onRetry={() => void refetch()} />;
   if (chartData.length < 2) return <div className="text-xs text-text-muted py-4 text-center">Not enough data for strike chart</div>;
 
   const escalating = data?.summary?.strikes_escalating;
@@ -282,7 +314,7 @@ const SECTOR_MAP: Record<string, string[]> = {
 };
 
 function SectorClustering() {
-  const { data: allTickers, isLoading } = useTrackedTickers(7, 1);
+  const { data: allTickers, isLoading, isError, refetch } = useTrackedTickers(7, 1);
 
   const sectorData = useMemo(() => {
     if (!allTickers) return [];
@@ -314,6 +346,7 @@ function SectorClustering() {
   }, [allTickers]);
 
   if (isLoading) return <div className="h-48 bg-bg-card-hover rounded-lg animate-pulse" />;
+  if (isError) return <QueryErrorState message="Failed to load sector flow" onRetry={() => void refetch()} />;
   if (sectorData.length === 0) return <div className="text-xs text-text-muted py-4 text-center">No sector data</div>;
 
   return (
@@ -380,9 +413,11 @@ function SectorClustering() {
 /* ── Top Movers (multi-day accumulation ranking) ───────────── */
 
 function TopMovers() {
-  const { data: allTickers, isLoading: tickersLoading } = useTrackedTickers(7, 2);
+  const tickersQuery = useTrackedTickers(7, 2);
+  const { data: allTickers, isLoading: tickersLoading } = tickersQuery;
   const topTickers = useMemo(() => (allTickers ?? []).slice(0, 12).map((t) => t.ticker), [allTickers]);
-  const { data: histories, isLoading: histLoading } = useMultiTickerHistories(topTickers);
+  const historiesQuery = useMultiTickerHistories(topTickers);
+  const { data: histories, isLoading: histLoading } = historiesQuery;
 
   const movers = useMemo(() => {
     if (!histories) return [];
@@ -415,6 +450,14 @@ function TopMovers() {
   }, [histories]);
 
   if (tickersLoading || histLoading) return <div className="h-32 bg-bg-card-hover rounded-lg animate-pulse" />;
+  if (tickersQuery.isError || historiesQuery.isError) {
+    return (
+      <QueryErrorState
+        message="Failed to load multi-day movers"
+        onRetry={() => void Promise.all([tickersQuery.refetch(), historiesQuery.refetch()])}
+      />
+    );
+  }
   if (movers.length === 0) return <div className="text-xs text-text-muted py-4 text-center">No multi-day data</div>;
 
   return (
@@ -446,9 +489,11 @@ function TopMovers() {
 /* ── Unusual Activity Scanner ──────────────────────────────── */
 
 function UnusualActivity() {
-  const { data: datesData } = useRecentEntries();
+  const datesQuery = useRecentEntries();
+  const { data: datesData } = datesQuery;
   const recentDates = useMemo(() => (datesData?.dates ?? []).slice(0, 5).map((d) => d.date), [datesData]);
-  const { data: entries, isLoading } = useAllEntriesForDates(recentDates);
+  const entriesQuery = useAllEntriesForDates(recentDates);
+  const { data: entries, isLoading } = entriesQuery;
 
   const unusual = useMemo(() => {
     if (!entries || entries.length === 0) return [];
@@ -496,7 +541,10 @@ function UnusualActivity() {
       .slice(0, 30);
   }, [entries]);
 
-  if (isLoading) return <div className="h-48 bg-bg-card-hover rounded-lg animate-pulse" />;
+  if (datesQuery.isLoading || isLoading) return <div className="h-48 bg-bg-card-hover rounded-lg animate-pulse" />;
+  if (datesQuery.isError || entriesQuery.isError) {
+    return <QueryErrorState message="Failed to load unusual activity" onRetry={() => void Promise.all([datesQuery.refetch(), entriesQuery.refetch()])} />;
+  }
   if (unusual.length === 0) return <div className="text-xs text-text-muted py-8 text-center">No unusual activity detected in the last 5 days</div>;
 
   return (
@@ -529,9 +577,11 @@ function UnusualActivity() {
 /* ── Contract Tracker ─────────────────────────────────────── */
 
 function ContractTracker() {
-  const { data: datesData } = useRecentEntries();
+  const datesQuery = useRecentEntries();
+  const { data: datesData } = datesQuery;
   const recentDates = useMemo(() => (datesData?.dates ?? []).slice(0, 10).map((d) => d.date), [datesData]);
-  const { data: entries, isLoading } = useAllEntriesForDates(recentDates);
+  const entriesQuery = useAllEntriesForDates(recentDates);
+  const { data: entries, isLoading } = entriesQuery;
 
   const contracts = useMemo(() => {
     if (!entries) return [];
@@ -574,7 +624,10 @@ function ContractTracker() {
 
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  if (isLoading) return <div className="h-48 bg-bg-card-hover rounded-lg animate-pulse" />;
+  if (datesQuery.isLoading || isLoading) return <div className="h-48 bg-bg-card-hover rounded-lg animate-pulse" />;
+  if (datesQuery.isError || entriesQuery.isError) {
+    return <QueryErrorState message="Failed to load repeated contracts" onRetry={() => void Promise.all([datesQuery.refetch(), entriesQuery.refetch()])} />;
+  }
   if (contracts.length === 0) return <div className="text-xs text-text-muted py-8 text-center">No repeated contracts in the last 10 days</div>;
 
   return (
@@ -621,16 +674,18 @@ function ContractTracker() {
 /* ── Flow vs Price ────────────────────────────────────────── */
 
 function FlowVsPrice({ ticker }: { ticker: string }) {
-  const { data: histData, isLoading: histLoading } = useFlowHistory(ticker);
-  const { data: priceData, isLoading: priceLoading } = usePriceHistory(ticker);
+  const historyQuery = useFlowHistory(ticker);
+  const priceQuery = usePriceHistory(ticker);
+  const { data: histData, isLoading: histLoading } = historyQuery;
+  const { data: priceData, isLoading: priceLoading } = priceQuery;
 
   const chartData = useMemo(() => {
-    if (!histData?.by_date || !priceData?.prices) return [];
-    const priceMap = new Map(priceData.prices.map((p) => [p.date, p.close]));
+    if (!histData?.by_date || !priceData) return [];
+    const priceMap = new Map(priceData.map((p) => [p.date, p.close]));
 
     const dates = new Set([
       ...Object.keys(histData.by_date),
-      ...priceData.prices.map((p) => p.date),
+      ...priceData.map((p) => p.date),
     ]);
 
     return [...dates].sort().map((date) => {
@@ -648,6 +703,9 @@ function FlowVsPrice({ ticker }: { ticker: string }) {
   }, [histData, priceData]);
 
   if (histLoading || priceLoading) return <div className="h-48 bg-bg-card-hover rounded-lg animate-pulse" />;
+  if (historyQuery.isError || priceQuery.isError) {
+    return <QueryErrorState message={`Failed to load price/flow data for ${ticker}`} onRetry={() => void Promise.all([historyQuery.refetch(), priceQuery.refetch()])} />;
+  }
   if (chartData.length === 0) return <div className="text-xs text-text-muted py-4 text-center">No data for {ticker}</div>;
 
   return (
@@ -678,11 +736,11 @@ function FlowVsPrice({ ticker }: { ticker: string }) {
   );
 }
 
-function FlowVsPriceView({ tickers, pinned, onPin, onUnpin }: {
+function FlowVsPriceView({ tickers, pinned, selected, onSelect, onPin, onUnpin }: {
   tickers: string[]; pinned: string[];
+  selected: string; onSelect: (ticker: string) => void;
   onPin: (t: string) => void; onUnpin: (t: string) => void;
 }) {
-  const [selected, setSelected] = useState("");
   const all = useMemo(() => {
     const set = new Set([...pinned, ...tickers]);
     return [...set];
@@ -690,7 +748,7 @@ function FlowVsPriceView({ tickers, pinned, onPin, onUnpin }: {
 
   return (
     <div className="space-y-3">
-      <TickerSelector tickers={tickers} selected={selected} onSelect={setSelected}
+      <TickerSelector tickers={tickers} selected={selected} onSelect={onSelect}
         pinned={pinned} onPin={onPin} onUnpin={onUnpin} />
       {selected ? (
         <div className="card"><FlowVsPrice ticker={selected} /></div>
@@ -708,9 +766,11 @@ function FlowVsPriceView({ tickers, pinned, onPin, onUnpin }: {
 /* ── Expiry Heatmap ───────────────────────────────────────── */
 
 function ExpiryHeatmap() {
-  const { data: datesData } = useRecentEntries();
+  const datesQuery = useRecentEntries();
+  const { data: datesData } = datesQuery;
   const recentDates = useMemo(() => (datesData?.dates ?? []).slice(0, 7).map((d) => d.date), [datesData]);
-  const { data: entries, isLoading } = useAllEntriesForDates(recentDates);
+  const entriesQuery = useAllEntriesForDates(recentDates);
+  const { data: entries, isLoading } = entriesQuery;
 
   const expiryData = useMemo(() => {
     if (!entries) return [];
@@ -744,7 +804,10 @@ function ExpiryHeatmap() {
       .slice(0, 20);
   }, [entries]);
 
-  if (isLoading) return <div className="h-48 bg-bg-card-hover rounded-lg animate-pulse" />;
+  if (datesQuery.isLoading || isLoading) return <div className="h-48 bg-bg-card-hover rounded-lg animate-pulse" />;
+  if (datesQuery.isError || entriesQuery.isError) {
+    return <QueryErrorState message="Failed to load expiry data" onRetry={() => void Promise.all([datesQuery.refetch(), entriesQuery.refetch()])} />;
+  }
   if (expiryData.length === 0) return <div className="text-xs text-text-muted py-8 text-center">No expiry data</div>;
 
   const maxPremium = Math.max(...expiryData.map((d) => d.totalPremium));
@@ -889,9 +952,20 @@ function TickerSelector({ tickers, selected, onSelect, pinned, onPin, onUnpin }:
 export function FlowIntel() {
   const [view, setView] = useState<IntelView>("accumulation");
   const [selectedTicker, setSelectedTicker] = useState("");
+  const activeTicker = useAppStore((s) => s.activeTicker);
+  const setActiveTicker = useAppStore((s) => s.setActiveTicker);
   const [pinned, setPinned] = useState<string[]>(loadPinned);
   const { data: allTickers } = useTrackedTickers(7, 2);
   const topTickers = useMemo(() => (allTickers ?? []).slice(0, 8).map((t) => t.ticker), [allTickers]);
+
+  useEffect(() => {
+    setSelectedTicker(activeTicker);
+  }, [activeTicker]);
+
+  const handleSelectTicker = (ticker: string) => {
+    setSelectedTicker(ticker);
+    setActiveTicker(ticker);
+  };
 
   const handlePin = (t: string) => {
     const next = [...pinned, t];
@@ -956,7 +1030,7 @@ export function FlowIntel() {
             {view === "accumulation" ? "Ticker Accumulation Charts" : "Strike Escalation / De-escalation"}
           </h4>
           <TickerSelector
-            tickers={topTickers} selected={selectedTicker} onSelect={setSelectedTicker}
+            tickers={topTickers} selected={selectedTicker} onSelect={handleSelectTicker}
             pinned={pinned} onPin={handlePin} onUnpin={handleUnpin}
           />
           {selectedTicker ? (
@@ -1013,7 +1087,14 @@ export function FlowIntel() {
           <p className="text-xs text-text-muted mb-3">
             Price action overlaid with daily bull/bear flow. Did the stock move after institutional flow?
           </p>
-          <FlowVsPriceView tickers={topTickers} pinned={pinned} onPin={handlePin} onUnpin={handleUnpin} />
+          <FlowVsPriceView
+            tickers={topTickers}
+            pinned={pinned}
+            selected={selectedTicker}
+            onSelect={handleSelectTicker}
+            onPin={handlePin}
+            onUnpin={handleUnpin}
+          />
         </div>
       )}
 

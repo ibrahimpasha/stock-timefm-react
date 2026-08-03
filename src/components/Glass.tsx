@@ -129,16 +129,19 @@ export function Segmented<T extends string>({
   value,
   onChange,
   className = "",
+  ariaLabel = "Choose an option",
 }: {
   options: { value: T; label: ReactNode; badge?: ReactNode }[];
   value: T;
   onChange: (v: T) => void;
   className?: string;
+  ariaLabel?: string;
 }) {
   return (
     <div
-      className={`inline-flex items-center gap-0.5 p-0.5 rounded-full border border-border ${className}`}
-      style={{ background: "var(--glass-bg)" }}
+      role="group"
+      aria-label={ariaLabel}
+      className={`segmented-control inline-flex items-center gap-0.5 p-0.5 rounded-full border ${className}`}
     >
       {options.map((o) => {
         const active = o.value === value;
@@ -146,20 +149,13 @@ export function Segmented<T extends string>({
           <button
             key={o.value}
             type="button"
+            aria-pressed={active}
             onClick={() => onChange(o.value)}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            className={`min-h-6 shrink-0 whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 ${
               active
-                ? "text-text-primary"
+                ? "segmented-option-active"
                 : "text-text-secondary hover:text-text-primary"
             }`}
-            style={
-              active
-                ? {
-                    background: "var(--bg-card-hover)",
-                    boxShadow: "var(--shadow-1)",
-                  }
-                : undefined
-            }
           >
             {o.label}
             {o.badge}

@@ -18,7 +18,7 @@
  *   - {ticker:"NVDA"}  → useVoicesByTicker
  *   - {theme:"AI"}     → useVoicesByTheme
  */
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState, type MouseEvent } from "react";
 import {
   Heart,
   Repeat2,
@@ -130,7 +130,7 @@ function TickerChip({
 }: {
   ticker: string;
   sentiment?: VoiceSentiment;
-  onClick?: () => void;
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   active?: boolean;
 }) {
   const color = sentiment ? sentimentColor(sentiment) : "var(--accent-blue)";
@@ -138,6 +138,8 @@ function TickerChip({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
+      aria-label={`Filter by ${ticker}`}
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold transition-colors hover:brightness-110"
       style={{
         background: active ? color : `color-mix(in srgb, ${color} 14%, transparent)`,
@@ -159,13 +161,15 @@ function ThemeChip({
 }: {
   label: string;
   kind?: "sector" | "theme";
-  onClick?: () => void;
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   active?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
+      aria-label={`Filter by ${kind ?? "theme"} ${label}`}
       className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-colors hover:brightness-110"
       style={{
         background: active ? "var(--accent-purple)" : "var(--glass-bg)",
@@ -203,16 +207,20 @@ function HeaderBar({
   onClearFilter: () => void;
   stats: { total: number; analyzed: number; latest: string | null };
 }) {
+  const voiceSelectId = useId();
   return (
     <div className="flex items-center gap-3 flex-wrap pb-2">
       {/* Voice selector */}
       <div className="flex items-center gap-1.5">
-        <span className="text-xs uppercase tracking-[0.08em] text-text-secondary font-semibold">Voice</span>
+        <label htmlFor={voiceSelectId} className="text-xs uppercase tracking-[0.08em] text-text-secondary font-semibold">
+          Voice
+        </label>
         <select
+          id={voiceSelectId}
           value={voiceUsername ?? ""}
           onChange={(e) => onVoiceChange(e.target.value || null)}
-          className="border border-border px-2 py-1 text-xs text-text-primary font-mono"
-          style={{ borderRadius: "var(--radius-control)", background: "var(--glass-bg)" }}
+          className="control-surface min-h-7 border px-2 py-1 text-xs text-text-primary font-mono"
+          style={{ borderRadius: "var(--radius-control)" }}
         >
           <option value="">All voices</option>
           {voices.map((v) => (
@@ -227,6 +235,7 @@ function HeaderBar({
       <div className="flex items-center gap-1.5">
         <span className="text-xs uppercase tracking-[0.08em] text-text-secondary font-semibold">Window</span>
         <Segmented
+          ariaLabel="Voices time window"
           value={String(windowDays)}
           onChange={(v) => onWindowChange(Number(v))}
           options={WINDOW_OPTIONS.map((w) => ({ value: String(w.days), label: w.label }))}
@@ -388,7 +397,12 @@ function TweetRow({
               <span className="text-[9px] uppercase text-text-muted">analyzing…</span>
             )}
             {!pending && (
-              <SentimentDot s={tweet.overall_sentiment} />
+              <>
+                <SentimentDot s={tweet.overall_sentiment} />
+                <span className="sr-only">
+                  {sentimentLabel(tweet.overall_sentiment)} sentiment
+                </span>
+              </>
             )}
             <a
               href={xUrl}
@@ -403,9 +417,18 @@ function TweetRow({
           </div>
 
           {/* Tweet text */}
-          <div
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect();
+            }}
+            aria-pressed={selected}
+            aria-controls="voice-tweet-detail"
             className="text-sm text-text-primary leading-snug whitespace-pre-wrap"
             style={{
+              width: "100%",
+              textAlign: "left",
               display: "-webkit-box",
               WebkitLineClamp: 3,
               WebkitBoxOrient: "vertical" as const,
@@ -413,7 +436,7 @@ function TweetRow({
             }}
           >
             {visibleText}
-          </div>
+          </button>
 
           {/* Ticker chips */}
           {tweet.tickers.length > 0 && (
@@ -586,9 +609,10 @@ function TweetDetail({
           </div>
           <div className="space-y-1">
             {tweet.tickers.map((t) => (
-              <div
+              <button
+                type="button"
                 key={t.ticker}
-                className="flex items-center gap-2 p-1.5 rounded hover:bg-bg-card-hover cursor-pointer"
+                className="flex min-h-7 w-full items-center gap-2 p-1.5 rounded text-left hover:bg-bg-card-hover cursor-pointer"
                 onClick={() => {
                   setActiveTicker(t.ticker);
                   onPickTicker(t.ticker);
@@ -616,7 +640,7 @@ function TweetDetail({
                 <span className="text-xs num text-text-muted w-8 text-right">
                   {Math.round(t.confidence * 100)}%
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -738,6 +762,7 @@ export function VoicesTab() {
 
       {/* Mode switcher — Feed / Patterns / Synthesis */}
       <Segmented<VoicesMode>
+        ariaLabel="Voices view"
         value={mode}
         onChange={setMode}
         options={MODE_TABS.map((m) => {
@@ -813,7 +838,7 @@ export function VoicesTab() {
             </div>
 
             {/* Detail */}
-            <div className="card col-span-12 lg:col-span-5 h-full overflow-y-auto">
+            <div id="voice-tweet-detail" className="card col-span-12 lg:col-span-5 h-full overflow-y-auto">
               <TweetDetail
                 tweet={selectedTweet}
                 onPickTicker={(t) => {

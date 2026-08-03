@@ -2,13 +2,14 @@
 
 export interface Prediction {
   timestamp: string;
+  date?: string;
   price: number;
-  change: number;
-  pct_change: number;
-  q10: number;
-  q25: number;
-  q75: number;
-  q90: number;
+  change?: number;
+  pct_change?: number;
+  q10: number | null;
+  q25: number | null;
+  q75: number | null;
+  q90: number | null;
 }
 
 export interface ModelForecast {

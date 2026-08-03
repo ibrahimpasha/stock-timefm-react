@@ -12,7 +12,7 @@
  *
  * Built from a `TraderMatch` carried in `entry.trader_matches`.
  */
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { useAlertsPositions } from "../../../api/alerts";
 import {
@@ -108,6 +108,8 @@ export function TraderEventRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
+  const detailsId = useId();
+  const messagesId = useId();
   // Fetch positions eagerly. React Query dedupes by queryKey, so multiple
   // TRADER rows for the same author across the date list share ONE network
   // call. The collapsed header needs position-status to show "CLOSED +50%"
@@ -195,9 +197,12 @@ export function TraderEventRow({
       }}
     >
       {/* Header row — clickable */}
-      <div
-        className="flex items-center gap-2 text-xs py-1.5 px-2 hover:bg-bg-card-hover transition-colors cursor-pointer"
+      <button
+        type="button"
+        className="flex min-h-7 w-full items-center gap-2 text-left text-xs py-1.5 px-2 hover:bg-bg-card-hover transition-colors cursor-pointer"
         onClick={() => setExpanded((s) => !s)}
+        aria-expanded={expanded}
+        aria-controls={detailsId}
         title={`${match.author} — alert ${match.alert_id} — ${match.ts}`}
       >
         <span
@@ -329,11 +334,12 @@ export function TraderEventRow({
         >
           {expanded ? "▾" : "▸"}
         </span>
-      </div>
+      </button>
 
       {/* Expanded detail — fetched lazily on first click */}
       {expanded && (
         <div
+          id={detailsId}
           className="text-xs"
           style={{
             padding: "8px 12px 12px 56px",
@@ -486,6 +492,8 @@ export function TraderEventRow({
                 <button
                   type="button"
                   onClick={() => setShowMessages((s) => !s)}
+                  aria-expanded={showMessages}
+                  aria-controls={messagesId}
                   className="font-mono"
                   style={{
                     background: "transparent",
@@ -507,7 +515,7 @@ export function TraderEventRow({
               )}
 
               {showMessages && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div id={messagesId} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {position.events
                     .filter((e) => e.content)
                     .map((e) => (

@@ -480,6 +480,7 @@ export function FlowHeatmap() {
 
   const viewToggle = (
     <Segmented
+      ariaLabel="Heat map view"
       value={view}
       onChange={setView}
       options={[
@@ -521,12 +522,14 @@ export function FlowHeatmap() {
         {/* Date strip — a mini entry-volume histogram: each day's bar height is
             its flow entry count, so heavy days stand out at a glance. */}
         <div
-          className="flex items-stretch border border-border overflow-hidden"
-          style={{ borderRadius: "var(--radius-control)", background: "var(--glass-bg)" }}
+          className="control-surface flex items-stretch border overflow-hidden"
+          style={{ borderRadius: "var(--radius-control)" }}
         >
           <button
+            type="button"
             onClick={() => patchHeatmap({ selectedDates: new Set(dates.map((d) => d.date)) })}
-            className="px-3 text-xs font-semibold transition-colors flex items-center"
+            aria-pressed={isAll}
+            className="min-h-8 px-3 text-xs font-semibold transition-colors flex items-center"
             style={{
               background: isAll ? "color-mix(in srgb, var(--accent-blue) 15%, transparent)" : "transparent",
               color: isAll ? "var(--accent-blue)" : "var(--text-muted)",
@@ -544,9 +547,11 @@ export function FlowHeatmap() {
               const barH = Math.max(3, Math.round(((d.entries || 0) / maxE) * 20));
               return (
                 <button
+                  type="button"
                   key={d.date}
                   onClick={(e) => pickDate(d.date, e.shiftKey || e.metaKey || e.ctrlKey)}
-                  className="flex flex-col items-center justify-end gap-1 px-1.5 py-1.5 border-l border-border transition-colors"
+                  aria-pressed={on}
+                  className="flex min-h-8 min-w-8 flex-col items-center justify-end gap-1 px-1.5 py-1.5 border-l border-border transition-colors"
                   style={{ background: on ? "color-mix(in srgb, var(--accent-blue) 14%, transparent)" : "transparent" }}
                   title={`${d.entries} entries · ${d.date}${isToday ? " (today)" : ""} · click to view · shift-click to add days`}
                 >
@@ -579,8 +584,8 @@ export function FlowHeatmap() {
             Earnings pulses gate on the ≤10/20/30d window instead. */}
         {(pulse === "ml" || pulse === "play" || pulse === "technical" || pulse === "pattern") && (
           <label
-            className="flex items-center gap-1.5 border border-border px-2 py-1.5"
-            style={{ borderRadius: "var(--radius-control)", background: "var(--glass-bg)" }}
+            className="control-surface flex items-center gap-1.5 border px-2 py-1.5"
+            style={{ borderRadius: "var(--radius-control)" }}
             title="Minimum 0–100 strength a ticker needs to pulse (e.g. ML ≥ 80)"
           >
             <span className="text-[10px] uppercase tracking-wide text-text-muted">≥</span>
@@ -590,6 +595,7 @@ export function FlowHeatmap() {
               max={100}
               step={5}
               value={pulseThreshold}
+              aria-label="Minimum pulse strength"
               onChange={(e) => patchHeatmap({ pulseThreshold: clamp(Number(e.target.value) || 0, 0, 100) })}
               className="w-12 bg-transparent text-xs text-text-primary outline-none num"
             />
@@ -599,12 +605,12 @@ export function FlowHeatmap() {
         {/* Pulse the whole sector/theme frame instead of individual tiles. */}
         {pulse !== "off" && (
           <label
-            className={`flex items-center gap-1.5 border px-2 py-1.5 text-xs select-none ${
+            className={`control-surface flex items-center gap-1.5 border px-2 py-1.5 text-xs select-none ${
               groupBy === "none"
                 ? "border-border text-text-muted opacity-50 cursor-not-allowed"
                 : "border-border text-text-secondary cursor-pointer"
             }`}
-            style={{ borderRadius: "var(--radius-control)", background: "var(--glass-bg)" }}
+            style={{ borderRadius: "var(--radius-control)" }}
             title={
               groupBy === "none"
                 ? "Pick a Group (Sector / Theme / Sub-category) to enable group pulsing"
@@ -871,6 +877,8 @@ function Tile({
       type="button"
       onClick={onClick}
       title={tip}
+      aria-pressed={active}
+      aria-label={`${cell.ticker}${name ? `, ${name}` : ""}: ${formatPremium(cell.premium)} premium, ${cell.count} entries, ${label}`}
       className="absolute flex flex-col items-center justify-center overflow-hidden text-center transition-[outline] hover:outline hover:outline-2 hover:outline-white/40"
       style={{
         left: x,
@@ -885,6 +893,7 @@ function Tile({
     >
       {showArrow && (
         <span
+          aria-hidden="true"
           className="absolute top-0.5 right-0.5 leading-none font-bold"
           style={{
             fontSize: 11,
@@ -942,11 +951,11 @@ function FilterSlider({
   return (
     <label
       title={title}
-      className="flex items-center gap-2 border px-2.5 py-1.5 cursor-pointer select-none transition-colors"
+      className="control-surface flex items-center gap-2 border px-2.5 py-1.5 cursor-pointer select-none transition-colors"
       style={{
         borderRadius: "var(--radius-control)",
-        borderColor: on ? `color-mix(in srgb, ${accent} 50%, var(--border))` : "var(--border)",
-        background: on ? `color-mix(in srgb, ${accent} 10%, var(--glass-bg))` : "var(--glass-bg)",
+        borderColor: on ? accent : "var(--control-boundary)",
+        background: on ? `color-mix(in srgb, ${accent} 10%, var(--control-bg))` : "var(--control-bg)",
       }}
     >
       <input
@@ -963,6 +972,7 @@ function FilterSlider({
       </span>
       <input
         type="range"
+        aria-label={`${label} threshold`}
         min={min}
         max={max}
         step={step}
@@ -1005,11 +1015,11 @@ function MetricSelect({
   const active = options.find((o) => o.id === value);
   return (
     <label
-      className="relative flex items-center gap-1.5 border px-2.5 py-1.5 cursor-pointer transition-colors hover:brightness-110"
+      className="control-surface relative flex items-center gap-1.5 border px-2.5 py-1.5 cursor-pointer transition-colors hover:brightness-110"
       style={{
         borderRadius: "var(--radius-control)",
-        borderColor: `color-mix(in srgb, ${accent} 35%, var(--border))`,
-        background: `color-mix(in srgb, ${accent} 8%, var(--glass-bg))`,
+        borderColor: "var(--control-boundary)",
+        background: "var(--control-bg)",
       }}
       title={active?.hint}
     >

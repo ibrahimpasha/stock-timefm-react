@@ -8,8 +8,9 @@ import {
   CrosshairMode,
 } from "lightweight-charts";
 import { BarChart3 } from "lucide-react";
-import type { OHLCV, ModelForecast } from "../../lib/types";
+import type { OHLCV, ModelForecast, Prediction } from "../../lib/types";
 import { MODEL_COLORS, MODEL_LABELS } from "../../lib/constants";
+import { parseLocalDate, toLocalDateOnly } from "../../lib/dateOnly";
 
 interface ChartOverlays {
   showMA: string[];       // e.g. ["MA20", "MA50"]
@@ -56,15 +57,32 @@ function computeMA(data: OHLCV[], period: number) {
 /** Generate future business dates starting from a date string */
 function futureDates(startDate: string, count: number): string[] {
   const dates: string[] = [];
-  const d = new Date(startDate);
+  const d = parseLocalDate(startDate);
   while (dates.length < count) {
     d.setDate(d.getDate() + 1);
     const day = d.getDay();
     if (day !== 0 && day !== 6) {
-      dates.push(d.toISOString().split("T")[0]);
+      dates.push(toLocalDateOnly(d));
     }
   }
   return dates;
+}
+
+type PredictionWithBands = Prediction & {
+  q10: number;
+  q25: number;
+  q75: number;
+  q90: number;
+};
+
+function hasQuantileBands(
+  predictions: Prediction[],
+): predictions is PredictionWithBands[] {
+  return predictions.length > 0 && predictions.every((prediction) =>
+    [prediction.q10, prediction.q25, prediction.q75, prediction.q90].every(
+      (value) => typeof value === "number" && Number.isFinite(value),
+    ),
+  );
 }
 
 export function ForecastChart({
@@ -269,10 +287,16 @@ export function ForecastChart({
 
     for (const forecast of visibleForecasts) {
       const color = MODEL_COLORS[forecast.model] || "#8b949e";
-      const dates = futureDates(lastDate, forecast.prices.length);
+      const responseDates = forecast.predictions.map((prediction) =>
+        (prediction.timestamp || prediction.date || "").slice(0, 10),
+      );
+      const dates =
+        responseDates.length === forecast.prices.length && responseDates.every(Boolean)
+          ? responseDates
+          : futureDates(lastDate, forecast.prices.length);
 
       // Quantile bands (q10-q90 shading) if predictions have quantiles
-      if (forecast.predictions && forecast.predictions.length > 0) {
+      if (hasQuantileBands(forecast.predictions)) {
         // Outer band (q10-q90)
         const q90Series = chart.addLineSeries({
           color: "transparent",

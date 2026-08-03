@@ -19,7 +19,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Download, X, Star, Grid, List } from "lucide-react";
+import { Search, Download, X, Star, Grid, List, AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
 import apiClient from "../../api/client";
 import { Chip, Segmented } from "../../components/Glass";
 import type { ChipTone } from "../../components/Glass";
@@ -139,7 +139,8 @@ export function IFlowTracker() {
   }, [activeTicker]);
   const { data: taxonomy } = useTaxonomy();
 
-  const { data: datesData } = useIFlowDates();
+  const datesQuery = useIFlowDates();
+  const { data: datesData } = datesQuery;
   const dates = useMemo(() => datesData?.dates ?? [], [datesData?.dates]);
   const isAllDates = selectedDates.size === 0;
   const isSingleDate = selectedDates.size === 1;
@@ -188,15 +189,28 @@ export function IFlowTracker() {
     ? dates.map((d) => d.date)
     : [...selectedDates].sort().reverse();
 
-  const { data: summary, isLoading: summaryLoading } = useIFlowSummary(
+  const summaryQuery = useIFlowSummary(
     useSingleDateView ? singleDate : "",
     dte,
   );
+  const { data: summary, isLoading: summaryLoading } = summaryQuery;
   const multiSummaryQueries = useMultiDateSummaries(aggregateDateKeys, dte);
   const aggregateLoading =
     aggregateDateKeys.length > 0 && multiSummaryQueries.some((q) => q.isLoading);
 
-  const loading = useSingleDateView ? summaryLoading : aggregateLoading;
+  const loading = datesQuery.isLoading || (useSingleDateView ? summaryLoading : aggregateLoading);
+  const loadError = datesQuery.isError || (useSingleDateView
+    ? summaryQuery.isError
+    : multiSummaryQueries.some((query) => query.isError));
+
+  const retryFlowData = () => {
+    void datesQuery.refetch();
+    if (useSingleDateView) {
+      void summaryQuery.refetch();
+    } else {
+      for (const query of multiSummaryQueries) void query.refetch();
+    }
+  };
 
   // Source of truth for the ticker grid. Single-date view uses the raw
   // summary; everything else merges per-date summaries together. The
@@ -335,7 +349,7 @@ export function IFlowTracker() {
   // Per-ticker trader coverage — same source the right panel uses
   // (`trader_matches` annotated on flow entries). Guarantees grid and
   // panel never disagree about which tickers have trader activity.
-  const { data: coverageData } = useQuery<{
+  const coverageQuery = useQuery<{
     ok: boolean;
     coverage: Record<string, string[]>;
   }>({
@@ -345,6 +359,8 @@ export function IFlowTracker() {
     staleTime: 60_000,
     enabled: tradersOnly,
   });
+  const { data: coverageData } = coverageQuery;
+  const coverageReady = !tradersOnly || (!coverageQuery.isLoading && !coverageQuery.isError);
   const authorTickerSet = useMemo(() => {
     const s = new Set<string>();
     const cov = coverageData?.coverage;
@@ -365,7 +381,7 @@ export function IFlowTracker() {
     if (bias === "bullish") list = list.filter((t) => t.bullish > t.bearish);
     else if (bias === "bearish") list = list.filter((t) => t.bearish > t.bullish);
     if (search) list = list.filter((t) => t.ticker.toUpperCase().includes(search));
-    if (tradersOnly && authorTickerSet.size > 0) {
+    if (tradersOnly) {
       list = list.filter((t) => authorTickerSet.has(t.ticker.toUpperCase()));
     }
 
@@ -867,11 +883,25 @@ export function IFlowTracker() {
         </div>
       )}
 
+      {!loading && loadError && (
+        <div className="card flex items-center justify-center gap-2 py-8 text-sm text-accent-red">
+          <AlertTriangle size={14} />
+          <span>Unable to load flow data.</span>
+          <button
+            type="button"
+            onClick={retryFlowData}
+            className="inline-flex items-center gap-1 rounded border border-border px-2.5 py-1 text-xs text-text-secondary hover:text-text-primary"
+          >
+            <RefreshCw size={11} /> Retry
+          </button>
+        </div>
+      )}
+
       {/* ── Grid + Detail (two independent scrollers) ───────────────── */}
       {/* Each column has its own overflow-y-auto so a long ticker grid
           doesn't push the flow detail below the fold. If the page chrome
           height changes, adjust the 260px offset. */}
-      {!loading && (
+      {!loading && !loadError && (
         <div
           className="grid grid-cols-12 gap-4 max-md:gap-2 max-md:!h-auto max-md:!min-h-0"
           style={{ height: "calc(100vh - 260px)", minHeight: 420 }}
@@ -879,6 +909,24 @@ export function IFlowTracker() {
           <div
             className={`${selectedTicker ? "col-span-7" : "col-span-12"} overflow-y-auto pr-1 max-md:col-span-12 max-md:overflow-visible max-md:pr-0`}
           >
+            {tradersOnly && coverageQuery.isLoading && (
+              <div className="card mb-3 flex items-center justify-center gap-2 py-6 text-xs text-text-muted">
+                <Loader2 size={13} className="animate-spin" /> Loading trader coverage...
+              </div>
+            )}
+            {tradersOnly && coverageQuery.isError && (
+              <div className="card mb-3 flex items-center justify-center gap-2 py-6 text-xs text-accent-red">
+                <AlertTriangle size={13} />
+                <span>Unable to load trader coverage.</span>
+                <button
+                  type="button"
+                  onClick={() => void coverageQuery.refetch()}
+                  className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-secondary hover:text-text-primary"
+                >
+                  <RefreshCw size={11} /> Retry
+                </button>
+              </div>
+            )}
             {/* Watched-contracts surface: shown in "contracts" + "both" modes. */}
             {(watchView === "contracts" || watchView === "both") && (
               <div className={watchView === "both" ? "mb-4" : ""}>
@@ -894,7 +942,7 @@ export function IFlowTracker() {
                 whichever dates are selected. Single-date, multi-date,
                 and All Dates (defaults to today) all work — the merge
                 happens inside EntryTape via useMultiDateEntries. */}
-            {watchView !== "contracts" && viewMode === "tape" && tapeDates.length > 0 && (
+            {coverageReady && watchView !== "contracts" && viewMode === "tape" && tapeDates.length > 0 && (
               <EntryTape
                 dates={tapeDates}
                 bias={bias}
@@ -910,12 +958,14 @@ export function IFlowTracker() {
               />
             )}
             {/* Ticker grid: hidden entirely in "contracts" mode. */}
-            {watchView !== "contracts" && viewMode === "grid" && (() => {
+            {coverageReady && watchView !== "contracts" && viewMode === "grid" && (() => {
               // Pull watched tickers from the FULL list (not `filtered`) so filter
               // changes don't hide pinned tickers. Watched tickers are subtracted
               // from the main grid to avoid showing the same card twice.
               const watchSet = new Set(watchlist);
-              const watchedShown = tickers.filter((t) => watchSet.has(t.ticker));
+              const watchedShown = tickers.filter(
+                (t) => watchSet.has(t.ticker) && (!tradersOnly || authorTickerSet.has(t.ticker.toUpperCase())),
+              );
               const othersShown = filtered.filter((t) => !watchSet.has(t.ticker));
               const renderCard = (t: TrackedTicker) => {
                 // Merge the rich top-20 intel with the universal 14d escalation

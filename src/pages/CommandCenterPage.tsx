@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { useAppStore } from "../store/useAppStore";
-import { useMarketHistory, useMarketPrice } from "../api/forecast";
+import { runForecastModels, useMarketHistory, useMarketPrice } from "../api/forecast";
 import { useFlowAlerts } from "../api/flow";
 
 // Command Center feature components
@@ -11,7 +11,6 @@ import { ThemePulseCard } from "../features/command-center/ThemePulseCard";
 import { ForecastChart } from "../features/forecast/ForecastChart";
 import { ForecastConfig, DEFAULT_SETTINGS, type ForecastSettings } from "../features/forecast/ForecastConfig";
 import { ModelBreakdown } from "../features/command-center/ModelBreakdown";
-import apiClient from "../api/client";
 import type { OHLCV, ModelForecast } from "../lib/types";
 import { TickerSearch } from "../components/TickerSearch";
 import { Segmented } from "../components/Glass";
@@ -49,6 +48,9 @@ const VoicesTab = lazy(() =>
 const NewsTab = lazy(() =>
   import("../features/flow-analyzer/NewsTab").then((m) => ({ default: m.NewsTab })),
 );
+const BounceBoard = lazy(() =>
+  import("../features/flow-analyzer/BounceBoard").then((m) => ({ default: m.BounceBoard })),
+);
 
 import {
   Command,
@@ -64,6 +66,7 @@ import {
   Grid3x3,
   GitBranch,
   Network,
+  Activity,
 } from "lucide-react";
 
 /* ── Tab definitions ─────────────────────────────────────── */
@@ -72,6 +75,7 @@ type FlowTab =
   | "picks"
   | "iflow"
   | "heatmap"
+  | "bounce"
   | "flow-trader"
   | "smart-trader"
   | "flow-intel"
@@ -81,6 +85,7 @@ type FlowTab =
 const FLOW_TABS: { id: FlowTab; label: string; icon: React.ElementType }[] = [
   { id: "iflow", label: "iFlow Tracker", icon: Eye },
   { id: "heatmap", label: "Heat Map", icon: Grid3x3 },
+  { id: "bounce", label: "Bounce", icon: Activity },
   { id: "flow-trader", label: "Flow Trader", icon: Zap },
   { id: "smart-trader", label: "Smart Trader", icon: Brain },
   { id: "flow-intel", label: "Flow Intel", icon: BarChart3 },
@@ -91,7 +96,7 @@ const FLOW_TABS: { id: FlowTab; label: string; icon: React.ElementType }[] = [
 /* Visual grouping only — same 7 tabs/keys, clustered by what they answer:
  * FLOW = live options tape, BOOKS = the paper books, INTEL = synthesis. */
 const FLOW_TAB_GROUPS: { label: string; tabs: FlowTab[] }[] = [
-  { label: "Flow", tabs: ["iflow", "heatmap"] },
+  { label: "Flow", tabs: ["iflow", "heatmap", "bounce"] },
   { label: "Books", tabs: ["smart-trader", "flow-trader"] },
   { label: "Intel", tabs: ["flow-intel", "voices", "news"] },
 ];
@@ -122,6 +127,7 @@ function FlowTabBar({
             {group.label}
           </span>
           <Segmented<FlowTab>
+            ariaLabel={`${group.label} flow views`}
             options={group.tabs.map((id) => {
               const tab = byId.get(id)!;
               const Icon = tab.icon;
@@ -151,11 +157,15 @@ function AlertBellInner({ onClick, isOpen }: { onClick: () => void; isOpen: bool
   const count = alerts?.length ?? 0;
   return (
     <button
+      type="button"
       onClick={onClick}
+      aria-expanded={isOpen}
+      aria-controls="flow-alerts-panel"
+      aria-label={`${isOpen ? "Hide" : "Show"} flow alerts${count > 0 ? `, ${count} available` : ""}`}
       className="relative p-1.5 rounded-full transition-colors hover:bg-bg-card-hover"
       style={{ color: count > 0 ? "var(--accent-orange)" : "var(--text-muted)" }}
     >
-      <Bell size={16} fill={isOpen ? "currentColor" : "none"} />
+      <Bell size={16} fill={isOpen ? "currentColor" : "none"} aria-hidden="true" />
       {count > 0 && (
         <span className="num absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-accent-orange text-bg-primary text-[10px] font-bold flex items-center justify-center">
           {count}
@@ -172,6 +182,8 @@ function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
         return <IFlowTracker />;
       case "heatmap":
         return <FlowHeatmap />;
+      case "bounce":
+        return <BounceBoard />;
       case "flow-intel":
         return <FlowIntel />;
       case "flow-trader":
@@ -204,6 +216,7 @@ export function CommandCenterPage() {
   const [activeFlowTab, setActiveFlowTab] = useState<FlowTab>("iflow");
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>("overview");
   const [showAlerts, setShowAlerts] = useState(false);
+  const [settings, setSettings] = useState<ForecastSettings>(DEFAULT_SETTINGS);
 
   // Detail panel slides in when the user picks a ticker (from a flow card,
   // alert, anywhere). Closed by default so flow gets full width on first load.
@@ -218,11 +231,12 @@ export function CommandCenterPage() {
     return () => window.clearTimeout(id);
   }, [ticker]);
 
-  // Data query — historical OHLCV powers the candlestick price chart. The
-  // deprecated 8-model forecast/signal stack (predicted-price overlays,
-  // DecisionHero verdict, ForecastConfig) was removed 2026-06-24; this is now a
-  // pure price chart fed by live market history. See task #38.
-  const { data: history, isLoading: historyLoading } = useMarketHistory(ticker, 180);
+  // Keep enough candles to show the selected training window and historical
+  // forecast origin on the same chart.
+  const { data: history, isLoading: historyLoading } = useMarketHistory(
+    ticker,
+    Math.max(180, settings.historyDays),
+  );
 
   // Normalize history rows to OHLCV shape the chart expects.
   const historicalData: OHLCV[] = (history ?? []).map(
@@ -244,57 +258,28 @@ export function CommandCenterPage() {
   //    stack lost to a random-walk baseline on CRPS (2026-05-30) — the numbers
   //    are advisory, not a tradable price target.
   const { data: marketPrice } = useMarketPrice(ticker);
-  const [settings, setSettings] = useState<ForecastSettings>(DEFAULT_SETTINGS);
   const [customForecasts, setCustomForecasts] = useState<ModelForecast[]>([]);
   const [isRunningForecast, setIsRunningForecast] = useState(false);
+  const [forecastError, setForecastError] = useState<string | null>(null);
 
   const runForecast = useCallback(async () => {
     if (!ticker || settings.selectedModels.length === 0) return;
     setIsRunningForecast(true);
+    setForecastError(null);
     try {
-      const isDaily = settings.forecastType === "daily";
-      const endpoint = isDaily ? "/forecast/daily" : "/forecast/intraday";
-      const body = isDaily
-        ? {
-            ticker,
-            days: settings.forecastDays,
-            history_days: settings.historyDays,
-            use_covariates: settings.useCovariates,
-            use_pretrained: settings.usePretrained,
-          }
-        : {
-            ticker,
-            minutes: settings.forecastMinutes,
-            interval: settings.interval,
-            history_period: settings.historyPeriod,
-            use_covariates: settings.useCovariates,
-            use_pretrained: settings.usePretrained,
-          };
-      const results = await Promise.allSettled(
-        settings.selectedModels.map((model) =>
-          apiClient.post(endpoint, { ...body, model }).then((r) => {
-            const d = r.data;
-            const prices: number[] =
-              d.prices ?? (d.predictions?.map((p: { price: number }) => p.price) ?? []);
-            return {
-              model,
-              prices,
-              end_price:
-                d.end_price ??
-                d.summary?.final_price ??
-                (prices.length ? prices[prices.length - 1] : 0),
-              predictions: d.predictions ?? [],
-              current_price: d.current_price ?? 0,
-              latency_ms: d.latency_ms ?? 0,
-            } as ModelForecast;
-          }),
-        ),
-      );
-      const successful: ModelForecast[] = [];
-      for (const r of results) if (r.status === "fulfilled") successful.push(r.value);
-      setCustomForecasts(successful);
+      const { forecasts, failedModels } = await runForecastModels(ticker, settings);
+      setCustomForecasts(forecasts);
+      if (failedModels.length > 0) {
+        setForecastError(
+          forecasts.length > 0
+            ? `Unavailable models: ${failedModels.join(", ")}`
+            : "Forecast models are currently unavailable.",
+        );
+      }
     } catch (err) {
       console.error("Forecast run failed:", err);
+      setCustomForecasts([]);
+      setForecastError("Forecast request failed. Try again shortly.");
     } finally {
       setIsRunningForecast(false);
     }
@@ -307,14 +292,15 @@ export function CommandCenterPage() {
     if (!ticker || autoRanFor.current === ticker) return;
     autoRanFor.current = ticker;
     setCustomForecasts([]);
+    setForecastError(null);
     void runForecast();
   }, [ticker, runForecast]);
 
   return (
     <div className="space-y-5">
       {/* Page header + analyze bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
+      <div className="flex items-center justify-between gap-3 max-sm:flex-col max-sm:items-stretch">
+        <div className="flex items-baseline gap-3 max-sm:flex-wrap">
           <Command size={20} className="text-accent-purple self-center" />
           <h1 className="text-lg font-semibold text-text-primary">
             Command Center
@@ -322,7 +308,7 @@ export function CommandCenterPage() {
           <span className="num text-lg font-semibold text-accent-blue">{ticker}</span>
         </div>
         {/* Ticker / company-name search */}
-        <TickerSearch inputWidth="w-44" />
+        <TickerSearch className="max-sm:w-full" inputWidth="w-44 max-sm:w-full" />
       </div>
 
       {/* Daily Brief — JARVIS-style situational read at the very top: regime,
@@ -348,6 +334,8 @@ export function CommandCenterPage() {
                   <button
                     type="button"
                     onClick={() => setDetailOpen(true)}
+                    aria-expanded={detailOpen}
+                    aria-controls="command-center-analysis-panel"
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors"
                     title="Open analysis panel for the current ticker"
                   >
@@ -360,7 +348,7 @@ export function CommandCenterPage() {
             </div>
 
             {showAlerts && (
-              <div className="mt-3 mb-3">
+              <div id="flow-alerts-panel" className="mt-3 mb-3">
                 <FlowAlerts />
               </div>
             )}
@@ -372,7 +360,7 @@ export function CommandCenterPage() {
         </div>
 
         {detailOpen && (
-          <div className="col-span-12 lg:col-span-5 space-y-4">
+          <div id="command-center-analysis-panel" className="col-span-12 lg:col-span-5 space-y-4">
             {/* Detail header: ticker label + close button */}
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2">
@@ -394,6 +382,7 @@ export function CommandCenterPage() {
             </div>
 
             <Segmented<DetailTab>
+              ariaLabel="Analysis view"
               className="w-full justify-between max-md:justify-start"
               options={DETAIL_TABS.map((tab) => {
                 const Icon = tab.icon;
@@ -445,6 +434,11 @@ export function CommandCenterPage() {
                   isLoading={isRunningForecast}
                   ticker={ticker}
                 />
+                {forecastError && (
+                  <p role="alert" className="text-xs text-accent-red px-1">
+                    {forecastError}
+                  </p>
+                )}
                 <ForecastChart
                   historicalData={historicalData}
                   forecasts={customForecasts}

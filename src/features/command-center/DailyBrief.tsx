@@ -57,6 +57,10 @@ const PLAY_COLOR: Record<string, string> = {
 
 const tint = (c: string, pct: number) => `color-mix(in srgb, ${c} ${pct}%, transparent)`;
 
+function mutationError(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 const POSTURE_COLOR: Record<string, string> = {
   "risk-on": "var(--accent-green)",
   neutral: "var(--accent-orange)",
@@ -538,14 +542,15 @@ function AskDesk() {
   const ask = useAskDesk();
 
   const submit = () => {
-    const question = q.trim();
+    const submittedDraft = q;
+    const question = submittedDraft.trim();
     if (!question || ask.isPending) return;
     ask.mutate(
       { question, history: thread },
       {
         onSuccess: (data) => {
           setThread((t) => [...t, { q: question, a: data.answer || "(no answer)" }]);
-          setQ("");
+          setQ((draft) => (draft === submittedDraft ? "" : draft));
         },
       }
     );
@@ -584,6 +589,11 @@ function AskDesk() {
         </button>
       </div>
       {ask.isPending && <div className="text-xs text-text-muted mt-1">desk is thinking…</div>}
+      {ask.isError && (
+        <div className="text-xs text-accent-red mt-1" role="alert">
+          {mutationError(ask.error, "The desk could not answer. Try again.")}
+        </div>
+      )}
     </div>
   );
 }
@@ -595,7 +605,8 @@ export function DailyBrief() {
   const live = currentSession();
   const [activeSession, setActiveSession] = useState<BriefSession>(live);
   const { data, isLoading, refetch } = useCommandBrief(histDate || undefined, activeSession);
-  const { data: datesData } = useBriefDates();
+  const datesQuery = useBriefDates();
+  const { data: datesData } = datesQuery;
   const refresh = useRefreshBrief(activeSession);
   const [expanded, setExpanded] = useState(true);
   const setTicker = useSetTicker();
@@ -772,6 +783,23 @@ export function DailyBrief() {
           </span>
         )}
       </div>
+      {refresh.isError && (
+        <div className="mt-2 text-xs text-accent-red" role="alert">
+          {mutationError(refresh.error, "The brief could not be refreshed. Try again.")}
+        </div>
+      )}
+      {datesQuery.isError && !datesData && (
+        <div className="mt-2 flex items-center gap-2 text-xs text-accent-red" role="alert">
+          <span>Brief history could not be loaded.</span>
+          <button
+            type="button"
+            onClick={() => void datesQuery.refetch()}
+            className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-secondary hover:text-text-primary"
+          >
+            <RefreshCw size={11} /> Retry
+          </button>
+        </div>
+      )}
 
       {/* Headline — always visible */}
       {read.headline ? (

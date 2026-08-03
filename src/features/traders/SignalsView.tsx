@@ -12,7 +12,7 @@
  * tables follow the spec treatment (muted sticky header, hover rows, `num`
  * on all metrics). Behavior and data flow are unchanged.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { TrendingUp, Flame, Award, BarChart3, X } from "lucide-react";
 
 import {
@@ -607,18 +607,10 @@ function LeadersTab() {
 /* ── Sentiment tab ───────────────────────────────────────── */
 
 function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
-  const [ticker, setTicker] = useState<string>(defaultTicker);
-  const [draft, setDraft] = useState<string>(defaultTicker);
-
-  // Keep the input in sync when caller's default changes (e.g., new trending
-  // top ticker arrived) — but ONLY while the user hasn't typed anything yet,
-  // otherwise a trending refetch wipes their ticker mid-read.
-  const dirty = useRef(false);
-  useEffect(() => {
-    if (dirty.current) return;
-    setTicker(defaultTicker);
-    setDraft(defaultTicker);
-  }, [defaultTicker]);
+  const [tickerOverride, setTickerOverride] = useState<string | null>(null);
+  const [draftOverride, setDraftOverride] = useState<string | null>(null);
+  const ticker = tickerOverride ?? defaultTicker;
+  const draft = draftOverride ?? defaultTicker;
 
   const { data, isLoading, isFetching, isError } = useSentimentTrajectory(
     ticker,
@@ -646,8 +638,8 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
   function applyTicker() {
     const t = draft.trim().toUpperCase();
     if (t) {
-      dirty.current = true;
-      setTicker(t);
+      setTickerOverride(t);
+      setDraftOverride(t);
     }
   }
 
@@ -661,10 +653,7 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
         <input
           type="text"
           value={draft}
-          onChange={(e) => {
-            dirty.current = true;
-            setDraft(e.target.value);
-          }}
+          onChange={(e) => setDraftOverride(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") applyTicker();
           }}

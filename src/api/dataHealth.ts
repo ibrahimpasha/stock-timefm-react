@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "./client";
 
-export type HealthStatus = "green" | "amber" | "red" | "unknown";
+export type HealthStatus = "green" | "amber" | "red" | "unknown" | "paused";
 
 export interface HealthSource {
   key: string;
