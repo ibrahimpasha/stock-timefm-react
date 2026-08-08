@@ -20,6 +20,7 @@ import { dteTag } from "./utils";
 import { formatPremium } from "../../../lib/utils";
 import { useTickerMeta, type TickerMeta } from "../../../api/tickerMeta";
 import { useTickerTechnicals, type TickerTechnical } from "../../../api/tickerTechnicals";
+import { useTickerGex, type TickerGex } from "../../../api/tickerGex";
 import { useDashboardFilters } from "../../../store/useDashboardFilters";
 import { ChevronUp, ChevronDown, Activity, Sparkles } from "lucide-react";
 
@@ -271,34 +272,47 @@ const _clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, 
  *  Weights: technical .40, chart pattern .35, analyst target .25 (target is
  *  lighter — it lags and has partial coverage). Heuristic CONTEXT, not an
  *  empirically-calibrated predictor like ML — read it as a convergence flag. */
-function setupScore(
+export function setupScore(
   side: "Bull" | "Bear" | undefined,
   m: TickerMeta | undefined,
   t: TickerTechnical | undefined,
-): { score: number | null; tech: number | null; pat: number | null; tgt: number | null; bull: number } {
+  g?: TickerGex | undefined,
+): { score: number | null; tech: number | null; pat: number | null; tgt: number | null; gex: number | null; bull: number } {
   const comps: { v: number; w: number }[] = [];
   let tech: number | null = null;
   let pat: number | null = null;
   let tgt: number | null = null;
+  let gex: number | null = null;
   if (t && typeof t.tech_score === "number") {
     tech = _clamp(t.tech_score / 100, -1, 1);
-    comps.push({ v: tech, w: 0.4 });
+    comps.push({ v: tech, w: 0.35 });
   }
   if (t && t.pattern && t.pattern_strength) {
     pat = t.pattern_dir === "bull" ? t.pattern_strength / 100
       : t.pattern_dir === "bear" ? -t.pattern_strength / 100 : 0;
-    comps.push({ v: pat, w: 0.35 });
+    comps.push({ v: pat, w: 0.3 });
   }
   if (m && typeof m.target_pct === "number") {
     tgt = _clamp(m.target_pct / 25, -1, 1); // ±25% upside saturates
-    comps.push({ v: tgt, w: 0.25 });
+    comps.push({ v: tgt, w: 0.15 });
   }
-  if (!comps.length) return { score: null, tech, pat, tgt, bull: 0 };
+  // Dealer structure (2026-08-07, from the PRISM audit): where does spot sit
+  // between the put wall (dealer support below) and the call wall (resistance
+  // above)? Near the put wall with room above = bullish structure (+1);
+  // pressed into the call wall = bearish (-1). Neutral when walls are
+  // missing/degenerate or spot is outside them.
+  if (g && g.put_wall != null && g.call_wall != null && g.price != null &&
+      g.call_wall > g.put_wall && g.price > 0) {
+    const p = _clamp((g.price - g.put_wall) / (g.call_wall - g.put_wall), 0, 1);
+    gex = 1 - 2 * p;
+    comps.push({ v: gex, w: 0.2 });
+  }
+  if (!comps.length) return { score: null, tech, pat, tgt, gex, bull: 0 };
   const wsum = comps.reduce((s, c) => s + c.w, 0);
   const bull = comps.reduce((s, c) => s + c.v * c.w, 0) / wsum; // -1..+1 net bullishness
   const dir = side === "Bear" ? -1 : 1;
   const score = Math.round(50 + 50 * _clamp(bull * dir, -1, 1)); // 0..100 alignment with the trade
-  return { score, tech, pat, tgt, bull };
+  return { score, tech, pat, tgt, gex, bull };
 }
 
 /** SETUP color — green = strong tailwind, red = fighting the tape. */
@@ -310,14 +324,23 @@ function setupTextColor(score: number | null): string {
   return "var(--accent-red)"; // underlying setup contradicts the trade
 }
 
-/** Average-score helper. Returns (nscore + ml) / 2 when both present,
- *  whichever single one is present otherwise, null when neither is. */
-function avgScore(nscore: number | null | undefined,
+/** Average-score helper. Returns (setup + ml) / 2 when both present,
+ *  whichever single one is present otherwise, null when neither is.
+ *
+ *  Switched from (nscore + ml) 2026-08-07: on the 2-week efficacy audit,
+ *  averaging nscore into ML measurably DILUTED it (AUC 0.640 vs ML alone
+ *  0.666), while setup+ML beat everything (AUC 0.695, pick-sim profit
+ *  factor 5.2 vs 3.5) — setup is the only directional input, and it
+ *  caught the 7/29-window monsters ML alone missed (COHR +893%,
+ *  TQQQ +636%, SPY +524%). Caveat: setup used TODAY's technicals in
+ *  that audit (no history existed) — treat the margin as an upper
+ *  bound until ticker_technicals_history accumulates ~4wks. */
+export function avgScore(setup: number | null | undefined,
                   ml: number | null | undefined): number | null {
-  const ns = typeof nscore === "number" ? nscore : null;
+  const su = typeof setup === "number" ? setup : null;
   const mlNum = typeof ml === "number" ? ml : null;
-  if (ns != null && mlNum != null) return Math.round((ns + mlNum) / 2);
-  if (ns != null) return ns;
+  if (su != null && mlNum != null) return Math.round((su + mlNum) / 2);
+  if (su != null) return su;
   if (mlNum != null) return mlNum;
   return null;
 }
@@ -383,6 +406,11 @@ interface Props {
   authorTickerSet?: Set<string>;
   selectedTicker: string | null;
   onSelectTicker: (ticker: string) => void;
+  /** Earnings-window filter (1w/2w/1m/2m) — mirrors the Grid behavior.
+   *  null/undefined earningsMap or window "all" = no filtering. */
+  earningsWindow?: string;
+  earningsMap?: Record<string, string | null> | null;
+  earningsMaxDays?: number | null;
 }
 
 /** Map (CALL/PUT) × (ask% inferred direction) to a 2-word action label.
@@ -470,10 +498,11 @@ interface NotableScore {
     voices_sentiment?: string;
     component_scores?: Record<string, number>;
   };
-  /** ML probability (0-100) that the option's peak P/L during its
-   *  lifetime exceeds +100%. From notable_ml_v4 — gradient-boosting
-   *  classifier trained on lifetime-graded historical entries. NULL
-   *  when the model bundle isn't loadable. Rendered in the "ML"
+  /** ML probability (0-100) that the option's peak P/L exceeds +100%
+   *  WITHIN 10 TRADING DAYS of the print (retargeted 2026-08-07 — the
+   *  old lifetime target rewarded long DTE, not moves). From the
+   *  notable_ml_v4 bundle (v5-10d) — gradient-boosting classifier.
+   *  NULL when the model bundle isn't loadable. Rendered in the "ML"
    *  column, sortable, separately colored from NScore. */
   ml_score?: number | null;
   /** Model's predicted peak P/L %. From the same v4 bundle's regressor
@@ -533,6 +562,9 @@ export function EntryTape({
   authorTickerSet,
   selectedTicker,
   onSelectTicker,
+  earningsWindow,
+  earningsMap,
+  earningsMaxDays,
 }: Props) {
   // Fan out N parallel per-date queries (one per selected date). React
   // Query dedupes by (date, includeNotable), so re-renders don't re-fetch.
@@ -541,6 +573,7 @@ export function EntryTape({
   // Per-ticker reference data for the SETUP column (analyst target + TA + pattern).
   const { data: tickerMeta } = useTickerMeta();
   const { data: tickerTech } = useTickerTechnicals();
+  const { data: tickerGex } = useTickerGex();
   // Merge all entries across the selected dates into a single flat list.
   // Per-entry msg_id stays unique across dates because Discord snowflakes
   // are globally unique.
@@ -639,6 +672,12 @@ export function EntryTape({
       return true;
     };
     const out: EntryRow[] = [];
+    // Row keys MUST be unique: most entries carry `_msg_id: null` (79/80 on
+    // a typical day), so the ticker-strike-expiry-ts fallback collides when
+    // the same contract prints twice — duplicate React keys made sorting
+    // visually DUPLICATE rows at the top (reconciliation reuses keyed DOM).
+    // Suffix repeats with #n; stable across sorts since it's assigned here.
+    const seenIds = new Map<string, number>();
     // In Kian mode, iterate over the contract-aggregated set so each row
     // represents the whole bet (sum of prints) — matching how he posts
     // on Twitter. In all other modes, iterate raw per-print entries.
@@ -648,6 +687,17 @@ export function EntryTape({
       if (!ticker) continue;
       if (search && !ticker.toUpperCase().includes(search.toUpperCase())) continue;
       if (tradersOnly && authorTickerSet && !authorTickerSet.has(ticker)) continue;
+      // Earnings-window filter — same rule as the Grid: ticker must report
+      // within the window. No earnings date = excluded while a window is on.
+      if (earningsWindow && earningsWindow !== "all" && earningsMap
+          && earningsMaxDays != null) {
+        const ed = earningsMap[ticker.toUpperCase()];
+        if (!ed) continue;
+        const days = Math.ceil(
+          (new Date(ed).getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000,
+        );
+        if (!(days >= 0 && days <= earningsMaxDays)) continue;
+      }
       const dteNum = Number(e.dte ?? 0);
       if (!dteMatch(dteNum)) continue;
 
@@ -740,8 +790,11 @@ export function EntryTape({
         };
       }
 
+      const baseId = String(e._msg_id ?? `${ticker}-${strike}-${type}-${expiry}-${tsRaw}`);
+      const nSeen = seenIds.get(baseId) ?? 0;
+      seenIds.set(baseId, nSeen + 1);
       out.push({
-        msgId: String(e._msg_id ?? `${ticker}-${strike}-${type}-${expiry}-${tsRaw}`),
+        msgId: nSeen === 0 ? baseId : `${baseId}#${nSeen}`,
         ts: tsRaw,
         timeLabel: fmtTime(tsRaw),
         ticker,
@@ -764,7 +817,7 @@ export function EntryTape({
       });
     }
     return out;
-  }, [entries, aggregatedEntries, bias, dte, search, tradersOnly, authorTickerSet, filterMode, outlierMin, dates]);
+  }, [entries, aggregatedEntries, bias, dte, search, tradersOnly, authorTickerSet, filterMode, outlierMin, dates, earningsWindow, earningsMap, earningsMaxDays]);
 
   // Batch-fetch current prices for every unique ticker in the visible
   // rows. Refetches every 60s via the hook's refetchInterval — so the
@@ -842,12 +895,12 @@ export function EntryTape({
         case "score":    return numCmp(a.notable?.score ?? null, b.notable?.score ?? null, sortDir);
         case "ml":       return numCmp(a.notable?.ml_score ?? null, b.notable?.ml_score ?? null, sortDir);
         case "setup":    return numCmp(
-                           setupScore(a.side, tickerMeta?.[a.ticker], tickerTech?.[a.ticker]).score,
-                           setupScore(b.side, tickerMeta?.[b.ticker], tickerTech?.[b.ticker]).score,
+                           setupScore(a.side, tickerMeta?.[a.ticker], tickerTech?.[a.ticker], tickerGex?.[a.ticker]).score,
+                           setupScore(b.side, tickerMeta?.[b.ticker], tickerTech?.[b.ticker], tickerGex?.[b.ticker]).score,
                            sortDir);
         case "avg":      return numCmp(
-                           avgScore(a.notable?.score, a.notable?.ml_score),
-                           avgScore(b.notable?.score, b.notable?.ml_score),
+                           avgScore(setupScore(a.side, tickerMeta?.[a.ticker], tickerTech?.[a.ticker], tickerGex?.[a.ticker]).score, a.notable?.ml_score),
+                           avgScore(setupScore(b.side, tickerMeta?.[b.ticker], tickerTech?.[b.ticker], tickerGex?.[b.ticker]).score, b.notable?.ml_score),
                            sortDir);
         case "pred_peak": return numCmp(
                             a.notable?.predicted_peak_pnl ?? null,
@@ -856,7 +909,7 @@ export function EntryTape({
       }
     });
     return copy;
-  }, [rows, sortKey, sortDir, pnlByMsg, tickerMeta, tickerTech]);
+  }, [rows, sortKey, sortDir, pnlByMsg, tickerMeta, tickerTech, tickerGex]);
 
   const toggleSort = (k: SortKey) => {
     if (k === sortKey) {
@@ -1182,20 +1235,24 @@ export function EntryTape({
               ...borderStyle,
             }}
           >
-            {/* AVG — promoted to first position. Mean of NScore + ML;
-                empirical correlation analysis (2026-05-28) showed AVG
-                beats both individual scorers (r=+0.246 vs ML r=+0.229
-                vs NScore r=+0.157). Bigger / bolder than the individual
+            {/* AVG — promoted to first position. Mean of SETUP + ML
+                (switched from NScore+ML 2026-08-07 — see avgScore()):
+                ML grades the contract, SETUP grades whether the
+                underlying backs the direction; the 2wk audit showed
+                this pair beats ML alone (AUC 0.695 vs 0.666) while
+                nscore dilutes. Bigger / bolder than the individual
                 columns since it's the headline number. */}
             {(() => {
-              const avg = avgScore(r.notable?.score, r.notable?.ml_score);
-              const ns = r.notable?.score;
+              const su = setupScore(r.side, tickerMeta?.[r.ticker], tickerTech?.[r.ticker], tickerGex?.[r.ticker]).score;
               const ml = r.notable?.ml_score;
+              const avg = avgScore(su, ml);
               const title = avg == null
-                ? "Average score unavailable (no NScore + ML data)"
-                : `AVG = ${avg}/100  (NScore ${ns ?? "—"} + ML ${ml ?? "—"} / 2)\n` +
-                  `Headline score — mean of the heuristic + ML.\n` +
-                  `Empirically the strongest single signal (Pearson +0.246 vs realized peak P/L).`;
+                ? "Average score unavailable (no SETUP + ML data)"
+                : `AVG = ${avg}/100  (SETUP ${su ?? "—"} + ML ${ml ?? "—"} / 2)\n` +
+                  `Headline score — contract quality (ML) × directional agreement (SETUP).\n` +
+                  `2wk audit: beats ML alone (AUC 0.695 vs 0.666; pick profit factor 5.2 vs 3.5).\n` +
+                  `Caveat: SETUP edge measured on current technicals (lookahead) — ` +
+                  `honest validation lands once technicals history accumulates.`;
               return (
                 <span
                   className="w-12 text-center font-bold text-sm num"
@@ -1238,7 +1295,7 @@ export function EntryTape({
                 technical trend AGREE with this trade's direction? Per-ticker,
                 direction-aware (vs NScore/ML which grade the contract). */}
             {(() => {
-              const s = setupScore(r.side, tickerMeta?.[r.ticker], tickerTech?.[r.ticker]);
+              const s = setupScore(r.side, tickerMeta?.[r.ticker], tickerTech?.[r.ticker], tickerGex?.[r.ticker]);
               const t = tickerTech?.[r.ticker];
               const pct = (x: number | null) =>
                 x == null ? "—" : `${x >= 0 ? "+" : ""}${Math.round(x * 100)}`;
@@ -1247,8 +1304,9 @@ export function EntryTape({
                 : `SETUP ${s.score}/100 — does the underlying back this ${r.side} trade?\n` +
                   `net underlying lean ${s.bull >= 0 ? "+" : ""}${Math.round(s.bull * 100)} ` +
                   `(>50 tailwind, <50 fights the trade)\n` +
-                  `technical ${pct(s.tech)} · pattern ${pct(s.pat)}${t?.pattern ? ` (${t.pattern})` : ""} · target ${pct(s.tgt)}\n` +
-                  `weights 0.40 / 0.35 / 0.25. Heuristic context — not a calibrated predictor like ML.`;
+                  `technical ${pct(s.tech)} · pattern ${pct(s.pat)}${t?.pattern ? ` (${t.pattern})` : ""} · target ${pct(s.tgt)} · dealer ${pct(s.gex)}\n` +
+                  `weights .35/.30/.15/.20 (dealer = spot between put/call GEX walls).\n` +
+                  `Heuristic context — not a calibrated predictor like ML.`;
               return (
                 <span
                   className="w-10 text-center font-semibold num max-md:hidden"

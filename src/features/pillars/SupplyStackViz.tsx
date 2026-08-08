@@ -265,7 +265,20 @@ function PosterView({ data, onClose }: { data: SupplyStack; onClose: () => void 
   );
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: "color-mix(in srgb, var(--bg-base, #0b0e14) 88%, transparent)", backdropFilter: "blur(6px)" }}>
+    // --bg-primary (NOT the nonexistent --bg-base, whose #0b0e14 fallback
+    // painted a dark scrim under light-theme text) keeps the poster legible
+    // in both themes.
+    <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: "color-mix(in srgb, var(--bg-primary) 92%, transparent)", backdropFilter: "blur(6px)" }}>
+      {/* Fixed exit button — survives scrolling anywhere in the poster. */}
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="close poster"
+        className="fixed top-4 right-5 z-10 inline-flex items-center gap-1 rounded border border-border px-2.5 py-1.5 text-xs text-text-secondary hover:text-text-primary cursor-pointer"
+        style={{ background: "var(--bg-card-hover)" }}
+      >
+        <X size={13} /> close
+      </button>
       <div className="max-w-[110rem] mx-auto px-4 py-6">
         <div className="flex items-center gap-2 mb-4">
           <Layers size={16} className="text-accent-cyan" />
@@ -277,14 +290,6 @@ function PosterView({ data, onClose }: { data: SupplyStack; onClose: () => void 
               from application layer to critical minerals · live desk data · click any name
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="close poster"
-            className="ml-auto inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-text-secondary hover:text-text-primary cursor-pointer"
-          >
-            <X size={13} /> close
-          </button>
         </div>
 
         <div className="grid gap-4 items-start" style={{ gridTemplateColumns: "minmax(200px, 240px) minmax(0, 1fr) minmax(200px, 240px)" }}>

@@ -203,7 +203,8 @@ export function TraderPositionRow({
   const dte = useMemo(() => computeDte(pk.expiry), [pk.expiry]);
   const dl = dteTag(dte);
 
-  const realized = position.cumulative_exit_pct;
+  // Max stated exit = the play's real run; sum double-counts trims.
+  const realized = position.max_exit_pct ?? position.cumulative_exit_pct;
   const unrealized = position.current_pl_pct;
   const isClosed =
     position.status === "closed" || position.status === "stopped";

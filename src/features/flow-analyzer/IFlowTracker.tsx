@@ -48,6 +48,7 @@ import {
 import type { EscRollup } from "./iflow/hooks";
 import { TickerCard } from "./iflow/TickerCard";
 import { TopPicks } from "./iflow/TopPicks";
+import { TopSignals } from "./iflow/TopSignals";
 import { TickerDetail } from "./iflow/TickerDetail";
 import { ContractsView } from "./iflow/ContractsView";
 import { ThemeSection } from "./iflow/ThemeSection";
@@ -170,11 +171,12 @@ export function IFlowTracker() {
     setSelectedTicker(null);
   };
 
-  // Earnings-window mode is a "show me tickers with earnings soon" view; it
-  // intentionally overrides the date selection. Otherwise a ticker like TSEM
-  // (earnings in 2 days but no flow on the selected dates) would be invisible.
+  // Earnings window is a FILTER on the current date selection's tickers
+  // (fixed 2026-08-07 — it used to override the date selection and silently
+  // aggregate every date, so "1W + today" showed the whole earnings universe
+  // instead of today's flow with earnings within a week).
   const earningsFilterOn = earningsWindow !== "all";
-  const useSingleDateView = isSingleDate && !earningsFilterOn;
+  const useSingleDateView = isSingleDate;
 
   // Date keys to aggregate when we're NOT in single-date view.
   //   - All Dates / earnings-override → every available date
@@ -185,7 +187,7 @@ export function IFlowTracker() {
   // which can also be corrupted), causing "All Dates" to silently empty out.
   const aggregateDateKeys: string[] = useSingleDateView
     ? []
-    : isAllDates || earningsFilterOn
+    : isAllDates
     ? dates.map((d) => d.date)
     : [...selectedDates].sort().reverse();
 
@@ -297,9 +299,9 @@ export function IFlowTracker() {
   const mlDates: string[] = useMemo(() => {
     if (highlightMode !== "ml") return [];
     if (useSingleDateView) return singleDate ? [singleDate] : [];
-    if (isAllDates || earningsFilterOn) return dates.slice(0, 10).map((d) => d.date);
+    if (isAllDates) return dates.slice(0, 10).map((d) => d.date);
     return [...selectedDates].sort().reverse();
-  }, [highlightMode, useSingleDateView, singleDate, isAllDates, earningsFilterOn, dates, selectedDates]);
+  }, [highlightMode, useSingleDateView, singleDate, isAllDates, dates, selectedDates]);
   const mlEntryQueries = useMultiDateEntries(mlDates, true);
   const mlByTicker = useMemo(() => {
     const m = new Map<string, number>();
@@ -551,7 +553,7 @@ export function IFlowTracker() {
         <span className="text-xs text-text-muted">
           {filtered.length} tickers
           {earningsFilterOn ? (
-            <> — earnings universe (all dates, ignoring date selection)</>
+            <> — with earnings ≤{earningsWindow.toUpperCase()} out</>
           ) : (
             <>
               {isSingleDate && summary && (
@@ -869,8 +871,13 @@ export function IFlowTracker() {
         )}
       </div>
 
-      {/* ── Top Picks (single date only) ────────────────────────────── */}
-      {isSingleDate && singleDate && <TopPicks date={singleDate} dteFilter={dte} />}
+      {/* ── Top Picks + Top Signals (single date only) ───────────────── */}
+      {isSingleDate && singleDate && (
+        <div className="grid xl:grid-cols-2 gap-x-4">
+          <TopPicks date={singleDate} dteFilter={dte} />
+          <TopSignals date={singleDate} dteFilter={dte} />
+        </div>
+      )}
 
       {/* ── Loading skeleton ────────────────────────────────────────── */}
       {loading && (
@@ -950,6 +957,9 @@ export function IFlowTracker() {
                 search={search}
                 tradersOnly={tradersOnly}
                 authorTickerSet={authorTickerSet}
+                earningsWindow={earningsWindow}
+                earningsMap={earningsMap ?? null}
+                earningsMaxDays={earningsWindow !== "all" ? EARNINGS_WINDOW_DAYS[earningsWindow] : null}
                 selectedTicker={selectedTicker}
                 onSelectTicker={(t) => {
                   setSelectedTicker(t);

@@ -726,18 +726,22 @@ export function PillarsPage() {
           <div className="text-[10px] font-mono uppercase tracking-wider text-text-muted mb-2">
             Chokepoints that span pillars
           </div>
-          <div className="flex flex-col gap-1.5">
+          {/* Aligned 3-column grid — name | pillar chips | why. The old
+              per-row flex made every row's columns start at different x
+              positions, which read as a broken table. */}
+          <div className="grid gap-x-3 gap-y-2 text-xs items-start"
+               style={{ gridTemplateColumns: "minmax(120px, 190px) minmax(110px, 200px) 1fr" }}>
             {overview.cross_pillar_chokepoints.map((c) => (
-              <div key={c.name} className="flex items-start gap-2 text-xs">
-                <span className="font-semibold text-text-primary shrink-0">{c.name}</span>
-                <span className="flex gap-1 shrink-0">
+              <div key={c.name} className="contents">
+                <span className="font-semibold text-text-primary">{c.name}</span>
+                <span className="flex gap-1 flex-wrap">
                   {c.pillars.map((p) => (
-                    <span key={p} className="text-[9px] font-mono px-1 rounded bg-bg-card-hover text-text-muted">
+                    <span key={p} className="text-[9px] font-mono px-1 rounded bg-bg-card-hover text-text-muted whitespace-nowrap">
                       {p.replace(/_/g, " ")}
                     </span>
                   ))}
                 </span>
-                <span className="text-text-secondary min-w-0">{c.why}</span>
+                <span className="text-text-secondary leading-relaxed">{c.why}</span>
               </div>
             ))}
           </div>

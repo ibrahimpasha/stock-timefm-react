@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 
 import { useAppStore } from "../../store/useAppStore";
+import { useTickerEarningsBatch } from "../flow-analyzer/iflow/hooks";
 import {
   useCalendar,
 } from "../../api/intelV3";
@@ -154,6 +155,13 @@ function ForwardCalendar({
   // of the same macro pulled from multiple intel rows.
   const top = dedupCalendarEvents(events).slice(0, 12);
 
+  // Next-earnings fallback: even when nothing lands inside the 14d window,
+  // the scoped ticker's next earnings date is always worth showing.
+  const earningsQ = useTickerEarningsBatch(scopedTicker ? [scopedTicker] : []);
+  const nextEarnings = scopedTicker
+    ? earningsQ.data?.[scopedTicker.toUpperCase()] ?? null
+    : null;
+
   // Lightweight color hint per category — macro = blue, ticker = purple,
   // geopolitical = red. Helps glanceability when several categories mix.
   const categoryColor = (cat?: string): string => {
@@ -185,9 +193,24 @@ function ForwardCalendar({
           <div className="h-3 w-5/6 rounded bg-text-muted/15" />
         </div>
       ) : top.length === 0 ? (
-        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          No catalysts in window.
-        </p>
+        nextEarnings ? (
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            No catalysts in window. Next earnings:{" "}
+            <span className="num" style={{ color: "var(--accent-orange)" }}>
+              {nextEarnings.slice(0, 10)}
+            </span>
+            {(() => {
+              const d = Math.ceil(
+                (new Date(nextEarnings).getTime() - Date.now()) / 86_400_000,
+              );
+              return Number.isFinite(d) && d > 0 ? ` (in ${d}d)` : "";
+            })()}
+          </p>
+        ) : (
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            No catalysts in window.
+          </p>
+        )
       ) : (
         <div className="space-y-1.5">
           {top.map((ev, i) => {

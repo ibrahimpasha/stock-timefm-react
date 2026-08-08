@@ -572,6 +572,7 @@ export interface AlertPosition {
   events: AlertPositionEvent[];
   opened_at: string | null;
   cumulative_exit_pct: number | null;
+  max_exit_pct?: number | null;
   current_pl_pct: number | null;
   status: "open" | "partial" | "closed" | "stopped" | "runner" | string;
   n_events: number;

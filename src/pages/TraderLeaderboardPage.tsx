@@ -53,14 +53,13 @@ const SORT_OPTIONS: { value: SortMode; label: string }[] = [
  * unrealized mark. Mirrors the same logic inside `TraderPositionRow`.
  */
 function positionPct(p: AlertPosition): number | null {
+  // Per-play profit = MAX stated exit: trims at +50/+70/+120 on one play
+  // mean the play ran to +120%, never the sum of the trims.
   const s = (p.status || "").toLowerCase();
-  if (s === "closed" || s === "stopped") {
-    return p.cumulative_exit_pct ?? p.current_pl_pct ?? null;
+  if (s === "closed" || s === "stopped" || s === "partial") {
+    return p.max_exit_pct ?? p.cumulative_exit_pct ?? p.current_pl_pct ?? null;
   }
-  if (s === "partial") {
-    return p.cumulative_exit_pct ?? p.current_pl_pct ?? null;
-  }
-  return p.current_pl_pct ?? p.cumulative_exit_pct ?? null;
+  return p.current_pl_pct ?? p.max_exit_pct ?? p.cumulative_exit_pct ?? null;
 }
 
 /** Compare two ISO timestamps; nulls sort last. */
@@ -409,10 +408,12 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
 
   const winRate: number | null = (() => {
     const scored = realizedPositions.filter(
-      (p) => p.cumulative_exit_pct != null,
+      (p) => (p.max_exit_pct ?? p.cumulative_exit_pct) != null,
     );
     if (scored.length === 0) return null;
-    const wins = scored.filter((p) => (p.cumulative_exit_pct ?? 0) > 0).length;
+    const wins = scored.filter(
+      (p) => (p.max_exit_pct ?? p.cumulative_exit_pct ?? 0) > 0,
+    ).length;
     return wins / scored.length;
   })();
 

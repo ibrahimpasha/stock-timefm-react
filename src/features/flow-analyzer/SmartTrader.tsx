@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import type { ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Loader2,
@@ -28,7 +29,7 @@ import { useAppStore } from "../../store/useAppStore";
 import { GlassPanel, Chip, Stat, Segmented } from "../../components/Glass";
 import type { ChipTone } from "../../components/Glass";
 
-type PersonaName = "smart" | "aggressive" | "gemfinder" | "supercycle" | "conviction";
+type PersonaName = "smart" | "aggressive" | "builder" | "ruby" | "gemfinder" | "supercycle" | "conviction";
 
 interface PersonaRow {
   name: PersonaName;
@@ -226,6 +227,201 @@ function usePersonaList() {
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
+}
+
+// Persona watchlist — LIVING WL-A / WL-B: rows persist across days, marked
+// to market from their add-date premium; breakouts promote, dead drop.
+interface WatchlistRow {
+  ticker: string;
+  option_type: string;
+  strike: number | null;
+  expiry: string;
+  dte: number | null;
+  ml_score: number | null;
+  n_score: number | null;
+  note: string;
+  added: string;
+  pnl_pct: number | null;
+  peak_pnl_pct: number | null;
+  status: string;
+  drop_reason: string | null;
+  promoted_at: string | null;
+}
+
+function usePersonaWatchlist(persona: PersonaName, enabled: boolean) {
+  return useQuery<{
+    date: string | null;
+    wla: WatchlistRow[];
+    wlb: WatchlistRow[];
+    history: WatchlistRow[];
+  }>({
+    queryKey: ["smart-trader-watchlist", persona],
+    queryFn: () =>
+      apiClient.get(`/smart-trader/watchlist?persona=${persona}`).then((r) => r.data),
+    staleTime: 60_000,
+    refetchInterval: 300_000,
+    enabled,
+  });
+}
+
+function daysOn(added: string): number {
+  return Math.max(0, Math.round((Date.now() - new Date(added).getTime()) / 86_400_000));
+}
+
+function WatchlistPanel({ persona }: { persona: PersonaName }) {
+  const { data } = usePersonaWatchlist(persona, true);
+  if (!data || (!data.wla.length && !data.wlb.length && !(data.history ?? []).length))
+    return null;
+  const contract = (r: WatchlistRow) =>
+    `$${r.strike ?? "?"}${r.option_type === "CALL" ? "C" : "P"} ${r.expiry}${
+      r.dte != null ? ` · ${r.dte}d` : ""
+    }`;
+  const Row = ({ r }: { r: WatchlistRow }) => (
+    <div className="flex items-center gap-2 text-xs flex-wrap">
+      <span className="font-mono font-semibold w-14">{r.ticker}</span>
+      <span className="num text-text-muted">{contract(r)}</span>
+      {r.pnl_pct != null && (
+        <span className="num font-semibold" style={{ color: changeColor(r.pnl_pct) }}>
+          {r.pnl_pct >= 0 ? "+" : ""}{r.pnl_pct.toFixed(0)}%
+        </span>
+      )}
+      {r.peak_pnl_pct != null && r.peak_pnl_pct >= 30 && (
+        <span className="num text-text-muted">peak +{r.peak_pnl_pct.toFixed(0)}%</span>
+      )}
+      {r.promoted_at && <Chip tone="green">BREAKOUT</Chip>}
+      {r.ml_score != null && <Chip tone="blue">ML {r.ml_score}</Chip>}
+      <span className="text-text-muted">{daysOn(r.added)}d on list</span>
+      <span className="text-text-muted">{r.note}</span>
+    </div>
+  );
+  return (
+    <GlassPanel title="Watchlist">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-1.5">
+          <div className="text-xs font-semibold text-text-muted">
+            WL-A — cleared rules / breakouts, next in line ({data.wla.length})
+          </div>
+          {data.wla.slice(0, 12).map((r, i) => <Row key={`a${i}`} r={r} />)}
+          {!data.wla.length && <div className="text-xs text-text-muted">empty</div>}
+        </div>
+        <div className="space-y-1.5">
+          <div className="text-xs font-semibold text-text-muted">
+            WL-B — near-miss, monitoring ({data.wlb.length})
+          </div>
+          {data.wlb.slice(0, 12).map((r, i) => <Row key={`b${i}`} r={r} />)}
+          {!data.wlb.length && <div className="text-xs text-text-muted">empty</div>}
+        </div>
+      </div>
+      {(data.history ?? []).length > 0 && (
+        <div className="mt-3 space-y-1">
+          <div className="text-xs font-semibold text-text-muted">Recent moves</div>
+          {(data.history ?? []).slice(0, 8).map((r, i) => (
+            <div key={`h${i}`} className="flex items-center gap-2 text-xs text-text-muted">
+              <Chip tone={r.status === "entered" ? "green" : "neutral"}>
+                {r.status.toUpperCase()}
+              </Chip>
+              <span className="font-mono">{r.ticker}</span>
+              <span className="num">{contract(r)}</span>
+              {r.pnl_pct != null && (
+                <span className="num">{r.pnl_pct >= 0 ? "+" : ""}{r.pnl_pct.toFixed(0)}%</span>
+              )}
+              <span>{r.drop_reason ?? ""}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </GlassPanel>
+  );
+}
+
+// Ruby Desk Log — per-cycle desk notes from the intraday judge.
+interface RubyLogEvent {
+  ts: string;
+  regime?: string;
+  frozen?: boolean;
+  candidates?: number;
+  passed?: number;
+  read?: string;
+  vetoes?: { ticker: string; type: string; strike: number | null; reason: string }[];
+  opened?: { ticker: string; option_type: string; strike: number; expiry: string; contracts: number }[];
+  exits?: { ticker: string; reason: string; pnl_pct: number }[];
+  trims?: { ticker?: string; reason?: string; pnl_pct?: number }[];
+}
+
+function useRubyLog(enabled: boolean) {
+  return useQuery<{ events: RubyLogEvent[] }>({
+    queryKey: ["smart-trader-ruby-log"],
+    queryFn: () => apiClient.get("/smart-trader/ruby-log?limit=40").then((r) => r.data),
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+    enabled,
+  });
+}
+
+function RubyDeskLog() {
+  const { data } = useRubyLog(true);
+  const events = data?.events ?? [];
+  if (!events.length) {
+    return (
+      <GlassPanel title="Desk Log">
+        <div className="text-xs text-text-muted">
+          No cycles logged yet — the log fills as the 15-min intraday loop
+          enters, vetoes, trims, or freezes. Quiet cycles are not recorded.
+        </div>
+      </GlassPanel>
+    );
+  }
+  return (
+    <GlassPanel title="Desk Log">
+      <div className="space-y-3">
+        {events.map((e, i) => (
+          <div key={`${e.ts}-${i}`} className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              <span className="num text-text-muted">
+                {new Date(e.ts + (e.ts.endsWith("Z") ? "" : "Z")).toLocaleString([], {
+                  month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+                })}
+              </span>
+              {e.regime && <Chip tone="neutral">{e.regime}</Chip>}
+              {e.frozen && <Chip tone="red">FROZEN — daily loss cap</Chip>}
+              {(e.opened ?? []).map((o, j) => (
+                <Chip key={`o${j}`} tone="green">
+                  ENTER {o.ticker} ${o.strike}
+                  {o.option_type === "CALL" ? "C" : "P"} x{o.contracts}
+                </Chip>
+              ))}
+              {(e.vetoes ?? []).map((v, j) => (
+                <Chip key={`v${j}`} tone="yellow">VETO {v.ticker}</Chip>
+              ))}
+              {(e.trims ?? []).map((t, j) => (
+                <Chip key={`t${j}`} tone="neutral">TRIM {t.ticker ?? ""}</Chip>
+              ))}
+              {(e.exits ?? []).map((x, j) => (
+                <Chip key={`x${j}`} tone={x.pnl_pct >= 0 ? "green" : "red"}>
+                  EXIT {x.ticker} {x.pnl_pct >= 0 ? "+" : ""}
+                  {x.pnl_pct?.toFixed(0)}%
+                </Chip>
+              ))}
+              <span className="text-text-muted">
+                {e.candidates ?? 0} flow → {e.passed ?? 0} passed gate
+              </span>
+            </div>
+            {e.read && <div className="text-sm">{e.read}</div>}
+            {(e.vetoes ?? []).length > 0 && (
+              <div className="text-xs text-text-muted space-y-0.5">
+                {(e.vetoes ?? []).map((v, j) => (
+                  <div key={j}>
+                    VETO {v.ticker} ${v.strike}
+                    {v.type === "CALL" ? "C" : "P"} — {v.reason}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </GlassPanel>
+  );
 }
 
 function useCategories(window: CategoryWindow) {
@@ -1427,6 +1623,155 @@ function TradeDecisionHistory({
   );
 }
 
+type PosSortKey = "entry_date" | "pnl" | "pnl_dollars" | "value" | "peak" | "ticker" | "entry_px";
+type AddedWindow = "all" | "7d" | "30d";
+
+/** Dense sortable table of open positions — the "when did I add what, at
+ *  what price" view the grouped cards bury. One row per position, sortable
+ *  by added-date / entry price / P/L / value, quick added-window filter. */
+function PositionsTable({
+  positions,
+  stopPct,
+  trimsByParent,
+}: {
+  positions: Position[];
+  stopPct: number;
+  trimsByParent: Map<number, Position[]>;
+}) {
+  const setActiveTicker = useAppStore((s) => s.setActiveTicker);
+  const [sortKey, setSortKey] = useState<PosSortKey>("entry_date");
+  const [asc, setAsc] = useState(false);
+  const [added, setAdded] = useState<AddedWindow>("all");
+
+  const cutoff = useMemo(() => {
+    if (added === "all") return "";
+    const d = new Date();
+    d.setDate(d.getDate() - (added === "7d" ? 7 : 30));
+    return d.toISOString().slice(0, 10);
+  }, [added]);
+
+  const rows = useMemo(() => {
+    const list = positions.filter((p) => !cutoff || p.entry_date >= cutoff);
+    const val = (p: Position): number | string => {
+      switch (sortKey) {
+        case "entry_date": return p.entry_date;
+        case "ticker":     return p.ticker;
+        case "entry_px":   return p.premium_at_entry;
+        case "pnl":        return p.pnl_pct ?? -Infinity;
+        case "pnl_dollars":return p.pnl_dollars ?? -Infinity;
+        case "value":      return p.current_value ?? p.cost_basis;
+        case "peak":       return p.peak_pnl_pct ?? -Infinity;
+      }
+    };
+    return [...list].sort((a, b) => {
+      const va = val(a), vb = val(b);
+      const cmp = typeof va === "string"
+        ? String(va).localeCompare(String(vb))
+        : (va as number) - (vb as number);
+      return asc ? cmp : -cmp;
+    });
+  }, [positions, cutoff, sortKey, asc]);
+
+  const toggle = (k: PosSortKey) => {
+    if (k === sortKey) setAsc((v) => !v);
+    else { setSortKey(k); setAsc(k === "ticker" || k === "entry_date" ? false : false); }
+  };
+
+  const Th = ({ k, children, right = true }: { k?: PosSortKey; children: ReactNode; right?: boolean }) => (
+    <th
+      className={`px-2 py-1.5 font-semibold text-text-muted whitespace-nowrap ${right ? "text-right" : "text-left"} ${k ? "cursor-pointer hover:text-text-primary select-none" : ""}`}
+      onClick={k ? () => toggle(k) : undefined}
+      title={k ? "Sort" : undefined}
+    >
+      {children}
+      {k && sortKey === k && <span className="ml-0.5">{asc ? "▲" : "▼"}</span>}
+    </th>
+  );
+
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 mb-2 text-xs">
+        <span className="text-text-muted">Added:</span>
+        {(["all", "7d", "30d"] as AddedWindow[]).map((w) => (
+          <button key={w} type="button" onClick={() => setAdded(w)} className="rounded-full">
+            <Chip tone={added === w ? "blue" : "neutral"}>{w === "all" ? "All" : `last ${w}`}</Chip>
+          </button>
+        ))}
+        <span className="ml-auto text-text-muted num">{rows.length} of {positions.length}</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs num border-collapse">
+          <thead>
+            <tr className="border-b border-border">
+              <Th k="ticker" right={false}>Ticker</Th>
+              <Th right={false}>Contract</Th>
+              <Th k="entry_date" right={false}>Added</Th>
+              <Th>Days</Th>
+              <Th>Qty</Th>
+              <Th k="entry_px">Entry</Th>
+              <Th>Now</Th>
+              <Th>Cost</Th>
+              <Th k="value">Value</Th>
+              <Th k="pnl">P/L%</Th>
+              <Th k="pnl_dollars">P/L$</Th>
+              <Th k="peak">Peak</Th>
+              <Th>Floor</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((p) => {
+              const isEquity = p.instrument === "equity";
+              const scaled = (p.scale_stage ?? 0) >= 1;
+              const held = daysHeld(p.entry_date);
+              const pnl = p.pnl_pct ?? 0;
+              const trimmed = (trimsByParent.get(p.id)?.length ?? 0) > 0;
+              return (
+                <tr key={p.id} className="border-b border-border/50 hover:bg-bg-card-hover">
+                  <td className="px-2 py-1.5">
+                    <button
+                      onClick={() => setActiveTicker(p.ticker)}
+                      className="font-mono font-bold text-text-primary hover:text-accent-blue"
+                    >
+                      {p.ticker}
+                    </button>
+                  </td>
+                  <td className="px-2 py-1.5 whitespace-nowrap text-text-secondary">
+                    {isEquity ? "shares" : `$${p.strike} ${p.option_type} ${p.expiry ?? ""}`}
+                    {trimmed && <span className="ml-1 text-accent-green" title="has booked trims">✂</span>}
+                  </td>
+                  <td className="px-2 py-1.5 whitespace-nowrap text-text-secondary">{p.entry_date}</td>
+                  <td className="px-2 py-1.5 text-right text-text-muted">{held ?? "—"}</td>
+                  <td className="px-2 py-1.5 text-right text-text-secondary">{p.contracts}</td>
+                  <td className="px-2 py-1.5 text-right text-text-secondary">${p.premium_at_entry.toFixed(2)}</td>
+                  <td className="px-2 py-1.5 text-right text-text-secondary">
+                    {p.current_premium != null ? `$${p.current_premium.toFixed(2)}` : "—"}
+                  </td>
+                  <td className="px-2 py-1.5 text-right text-text-secondary">{formatCurrency(p.cost_basis)}</td>
+                  <td className="px-2 py-1.5 text-right text-text-primary">{formatCurrency(p.current_value ?? p.cost_basis)}</td>
+                  <td className="px-2 py-1.5 text-right font-bold" style={{ color: changeColor(pnl) }}>
+                    {pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}%
+                  </td>
+                  <td className="px-2 py-1.5 text-right" style={{ color: changeColor(p.pnl_dollars ?? 0) }}>
+                    {(p.pnl_dollars ?? 0) >= 0 ? "+" : ""}${(p.pnl_dollars ?? 0).toFixed(0)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right text-text-muted">
+                    {p.peak_pnl_pct != null ? `+${p.peak_pnl_pct.toFixed(0)}%` : "—"}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    {scaled
+                      ? <span className="text-accent-green">BE</span>
+                      : <span className="text-text-muted">{stopPct}%</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function OpenPositionsGrouped({
   positions,
   stopPct,
@@ -1572,6 +1917,16 @@ const PERSONA_META: Record<
     tagline: "Loosened options. ML 50+, DTE 1-45 (lottos OK), 5% size, -60% stop.",
     stopPct: -60,
   },
+  builder: {
+    label: "Builder",
+    tagline: "AbTrades/momoedge playbook: monthlies DTE 25-70, with the market regime, ranked SETUP x ML, scale-in tranches, trims at +40/+100, BE floor, runners.",
+    stopPct: -50,
+  },
+  ruby: {
+    label: "Ruby",
+    tagline: "Intraday options (ruby-trader v7). Smart's gates but enters TODAY's flow on a 15-min cycle, Sonnet judgment veto, E1 ladder + BE floor, -7% daily loss cap.",
+    stopPct: -40,
+  },
   gemfinder: {
     label: "Gem Finder",
     tagline: "Equity-only from knowledge graph. BULLISH bias + 2 bullish competitors + hot theme.",
@@ -1593,6 +1948,9 @@ export function SmartTrader() {
   const queryClient = useQueryClient();
   const [persona, setPersona] = useState<PersonaName>("smart");
   const [showClosed, setShowClosed] = useState(false);
+  // Open-positions layout: grouped cards (rich) vs dense sortable table
+  // ("when was it added, at what price" — 2026-08-07 user ask).
+  const [posView, setPosView] = useState<"table" | "grouped">("table");
   const summaryQuery = useSummary(persona);
   const todayQuery = useToday(persona);
   const historyQuery = useHistory(persona);
@@ -1669,7 +2027,7 @@ export function SmartTrader() {
     (a, b) => b[1].length - a[1].length,
   );
 
-  const personas: PersonaName[] = ["smart", "aggressive", "gemfinder", "supercycle", "conviction"];
+  const personas: PersonaName[] = ["smart", "aggressive", "builder", "ruby", "gemfinder", "supercycle", "conviction"];
   const personaRows = personaList?.personas ?? [];
   return (
     <div className="space-y-4">
@@ -1846,14 +2204,53 @@ export function SmartTrader() {
       {/* Hot categories — Today / 7d / 30d windows, self-fetches */}
       <CategoryTrendPanel />
 
-      {/* Open Positions — grouped by category then theme */}
+      {/* Open Positions — dense table (default) or grouped cards */}
       {summary.positions.length > 0 && (
-        <OpenPositionsGrouped
-          positions={summary.positions}
-          stopPct={PERSONA_META[persona].stopPct}
-          trimsByParent={trimsByParent}
-        />
+        posView === "table" ? (
+          <GlassPanel
+            title={
+              <span className="inline-flex items-center justify-between gap-2 w-full">
+                <span className="inline-flex items-center gap-1 text-accent-blue">
+                  <CheckCircle2 size={11} />
+                  Open Positions ({summary.positions.length})
+                </span>
+                <Segmented
+                  options={[{ value: "table", label: "Table" }, { value: "grouped", label: "Cards" }]}
+                  value={posView}
+                  onChange={(v) => setPosView(v as "table" | "grouped")}
+                />
+              </span>
+            }
+          >
+            <PositionsTable
+              positions={summary.positions}
+              stopPct={PERSONA_META[persona].stopPct}
+              trimsByParent={trimsByParent}
+            />
+          </GlassPanel>
+        ) : (
+          <div>
+            <div className="flex justify-end mb-1">
+              <Segmented
+                options={[{ value: "table", label: "Table" }, { value: "grouped", label: "Cards" }]}
+                value={posView}
+                onChange={(v) => setPosView(v as "table" | "grouped")}
+              />
+            </div>
+            <OpenPositionsGrouped
+              positions={summary.positions}
+              stopPct={PERSONA_META[persona].stopPct}
+              trimsByParent={trimsByParent}
+            />
+          </div>
+        )
       )}
+
+      {/* Ruby — the intraday desk log (judge reads, entries, vetoes, freezes) */}
+      {persona === "ruby" && <RubyDeskLog />}
+
+      {/* iFlow-Trader-style WL-A / WL-B for every persona (options books) */}
+      <WatchlistPanel persona={persona} />
 
       {/* Today — what got rejected, grouped by rule */}
       {todayQuery.isError && !today && (
