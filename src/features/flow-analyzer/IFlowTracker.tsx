@@ -309,11 +309,9 @@ export function IFlowTracker() {
     for (const q of mlEntryQueries) {
       for (const e of q.data?.entries ?? []) {
         const tk = String(e.ticker || "").toUpperCase();
-        // ml lives inside `notable` — the old `e.ml_score` read hit nothing
-        // and fell through to NScore, so the "ML" highlight thresholded the
-        // wrong metric entirely. Use the 0-100 display rank so the 80 default
-        // threshold means "top 20% of recent prints".
-        const ml = Number(e.notable?.ml_rank ?? e.notable?.ml_score ?? 0);
+        // ml lives inside `notable` (v5: 0-100 percentile), so the 80
+        // default threshold means "top 20% of recent prints".
+        const ml = Number(e.notable?.ml_score ?? 0);
         if (tk && ml > (m.get(tk) ?? 0)) m.set(tk, ml);
       }
     }
@@ -493,7 +491,7 @@ export function IFlowTracker() {
         const v = mlByTicker.get(tk);
         if (v == null) return { on: false };
         return v >= highlightMin
-          ? { on: true, title: `Best ML rank ${v} ≥ ${highlightMin} (percentile vs last 60d of prints)` }
+          ? { on: true, title: `Best ML ${v} ≥ ${highlightMin} (percentile vs last 60d of prints)` }
           : { on: false, title: `Best ML score ${v}` };
       }
       case "accum": {

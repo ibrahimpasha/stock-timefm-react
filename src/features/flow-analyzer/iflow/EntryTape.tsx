@@ -512,9 +512,10 @@ interface NotableScore {
    *  notable_ml_v4 bundle (v5-10d) — gradient-boosting classifier.
    *  NULL when the model bundle isn't loadable. Rendered in the "ML"
    *  column, sortable, separately colored from NScore. */
+  /** MLScore v5 — 0-100 percentile vs the trailing 60d of prints. THE scale. */
   ml_score?: number | null;
-  /** 0-100 display percentile of ml_score vs the last 60d of prints. */
-  ml_rank?: number | null;
+  /** Calibrated P(peak > +100% within 10 trading days), %, for tooltips. */
+  ml_prob?: number | null;
   /** Model's predicted peak P/L %. From the same v4 bundle's regressor
    *  (`reg_peak`). NOT magnitude-calibrated (test R² was negative); use
    *  this for RANKING / order-of-magnitude only. A predicted +85% says
@@ -1287,22 +1288,21 @@ export function EntryTape({
             </span>
             {/* ML — gradient boosting P(peak P/L > +100%) — notable_ml_v4. */}
             {(() => {
-              const prob = r.notable?.ml_score ?? null;
-              const rank = r.notable?.ml_rank ?? prob;   // rank; prob fallback pre-map
-              const mlTitle = rank == null
+              const ml = r.notable?.ml_score ?? null;
+              const prob = r.notable?.ml_prob ?? null;
+              const mlTitle = ml == null
                 ? "ML score unavailable (model bundle not loaded server-side)"
-                : `ML ${rank} = percentile vs the last 60 days of prints (0-100)\n` +
-                  `${prob != null ? `Raw model probability: ${prob}% chance of doubling within 10 TRADING days\n` : ""}` +
-                  `94+ is the persona-gate zone (raw >= 45). Ranking order is identical to the\n` +
-                  `raw probability — this is a display scale, not a different model.\n` +
-                  `Source: notable_ml_v4 (gradient boosting, 10d peak-graded labels)`;
+                : `ML ${ml} = percentile vs the trailing 60 days of prints (0-100)\n` +
+                  `${prob != null ? `Calibrated probability: ~${prob}% chance of doubling within 10 TRADING days\n` : ""}` +
+                  `94+ = persona-gate zone (top ~6%). Source: MLScore v5 (src/mlscore.py,\n` +
+                  `10d peak-graded labels, isotonic-calibrated)`;
               return (
                 <span
                   className="w-10 text-center font-semibold num max-md:hidden"
-                  style={{ color: mlTextColor(rank) }}
+                  style={{ color: mlTextColor(ml) }}
                   title={mlTitle}
                 >
-                  {rank != null ? rank : "—"}
+                  {ml != null ? ml : "—"}
                 </span>
               );
             })()}
@@ -1435,18 +1435,19 @@ export function EntryTape({
                 </span>
               );
             })()}
-            {/* PRED PEAK — model's regressor forecast, weighted by
-                classifier confidence.
+            {/* PRED PEAK — model's regressor forecast, weighted by the
+                calibrated PROBABILITY (ml_prob), never the percentile —
+                weighting by a rank would inflate every top print equally.
                 The raw regressor (reg_peak) outputs E[peak P/L]; on this
                 heavy-tailed target with negative test R² the magnitudes
-                aren't calibrated. Multiplying by (ml_score/100) shrinks
+                aren't calibrated. Multiplying by (ml_prob/100) shrinks
                 low-confidence predictions toward zero — so an entry with
                 ML=11 / raw_pred=+427% displays as +47%, which is honest
                 ("low probability so probability-weighted expected
                 upside is modest"). Cyan accent matches the ML column. */}
             {(() => {
               const raw = r.notable?.predicted_peak_pnl;
-              const ml = r.notable?.ml_score;
+              const ml = r.notable?.ml_prob ?? r.notable?.ml_score;
               if (raw == null) {
                 return (
                   <span className="w-20 text-right num text-text-muted max-md:hidden" title="Predicted peak unavailable">
