@@ -21,6 +21,7 @@ import { formatPremium } from "../../../lib/utils";
 import { useTickerMeta, type TickerMeta } from "../../../api/tickerMeta";
 import { useTickerTechnicals, type TickerTechnical } from "../../../api/tickerTechnicals";
 import { useTickerGex, type TickerGex } from "../../../api/tickerGex";
+import { wallTilt } from "../../gex/GexWall";
 import { useDashboardFilters } from "../../../store/useDashboardFilters";
 import { ChevronUp, ChevronDown, Activity, Sparkles } from "lucide-react";
 
@@ -301,10 +302,9 @@ export function setupScore(
   // above)? Near the put wall with room above = bullish structure (+1);
   // pressed into the call wall = bearish (-1). Neutral when walls are
   // missing/degenerate or spot is outside them.
-  if (g && g.put_wall != null && g.call_wall != null && g.price != null &&
-      g.call_wall > g.put_wall && g.price > 0) {
-    const p = _clamp((g.price - g.put_wall) / (g.call_wall - g.put_wall), 0, 1);
-    gex = 1 - 2 * p;
+  const tilt = wallTilt(g);
+  if (tilt != null) {
+    gex = tilt;
     comps.push({ v: gex, w: 0.2 });
   }
   if (!comps.length) return { score: null, tech, pat, tgt, gex, bull: 0 };

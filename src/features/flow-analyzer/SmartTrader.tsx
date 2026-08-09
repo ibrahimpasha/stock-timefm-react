@@ -28,6 +28,7 @@ import { formatCurrency, changeColor } from "../../lib/utils";
 import { useAppStore } from "../../store/useAppStore";
 import { GlassPanel, Chip, Stat, Segmented } from "../../components/Glass";
 import type { ChipTone } from "../../components/Glass";
+import { GexWall } from "../gex/GexWall";
 
 type PersonaName = "smart" | "aggressive" | "builder" | "ruby" | "gemfinder" | "supercycle" | "conviction";
 
@@ -1736,8 +1737,13 @@ function PositionsTable({
                     </button>
                   </td>
                   <td className="px-2 py-1.5 whitespace-nowrap text-text-secondary">
-                    {isEquity ? "shares" : `$${p.strike} ${p.option_type} ${p.expiry ?? ""}`}
-                    {trimmed && <span className="ml-1 text-accent-green" title="has booked trims">✂</span>}
+                    <span className="inline-flex items-center gap-1.5">
+                      {isEquity ? "shares" : `$${p.strike} ${p.option_type} ${p.expiry ?? ""}`}
+                      {!isEquity && (
+                        <GexWall ticker={p.ticker} strike={Number(p.strike) || null} width={40} />
+                      )}
+                      {trimmed && <span className="text-accent-green" title="has booked trims">✂</span>}
+                    </span>
                   </td>
                   <td className="px-2 py-1.5 whitespace-nowrap text-text-secondary">{p.entry_date}</td>
                   <td className="px-2 py-1.5 text-right text-text-muted">{held ?? "—"}</td>

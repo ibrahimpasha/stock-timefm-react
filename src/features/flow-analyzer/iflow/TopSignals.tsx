@@ -7,6 +7,7 @@ import { avgScore, setupScore } from "./EntryTape";
 import { useTickerMeta } from "../../../api/tickerMeta";
 import { useTickerTechnicals } from "../../../api/tickerTechnicals";
 import { useTickerGex } from "../../../api/tickerGex";
+import { GexWall } from "../../gex/GexWall";
 import { useTaxonomy } from "../../../api/taxonomy";
 import { useThemePulseScores } from "../../../api/intelGraph";
 import type { DteFilter } from "./types";
@@ -168,6 +169,7 @@ export function TopSignals({ date, dteFilter }: { date: string; dteFilter: DteFi
                     pulse {s.pulse}
                   </span>
                 )}
+                <GexWall ticker={s.ticker} strike={Number(e.strike) || null} />
                 <span className="text-text-secondary ml-auto num">{e.premium}</span>
                 <PnlBadge pnl={entryPnl(e, priceMap, date)} />
               </div>

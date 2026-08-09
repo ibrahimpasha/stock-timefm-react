@@ -13,7 +13,8 @@
  *   VOL      today's contracts traded
  *   UNUSUAL  volume / open interest — new positioning vs legacy
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { GlassPanel, Chip, Segmented } from "../components/Glass";
 import {
   useGexMatrix,
@@ -77,7 +78,15 @@ function formatValue(v: number | null, metric: GexMetric): string {
 
 export function GexMatrixPage() {
   const { data: tickers } = useGexTickers();
-  const [ticker, setTicker] = useState("SPY");
+  const [params, setParams] = useSearchParams();
+  // ?ticker= lets the inline GexWall bars on flow/signal/persona rows deep-link
+  // straight into the grid for the name you were already looking at.
+  const [ticker, setTicker] = useState(params.get("ticker")?.toUpperCase() || "SPY");
+  useEffect(() => {
+    const q = params.get("ticker")?.toUpperCase();
+    if (q && q !== ticker) setTicker(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
   const [metric, setMetric] = useState<GexMetric>("gex");
   const [band, setBand] = useState("20");
   const [nExp, setNExp] = useState("8");
@@ -134,7 +143,7 @@ export function GexMatrixPage() {
               <button
                 key={t.ticker}
                 type="button"
-                onClick={() => setTicker(t.ticker)}
+                onClick={() => { setTicker(t.ticker); setParams({ ticker: t.ticker }); }}
                 aria-pressed={t.ticker === ticker}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                   t.ticker === ticker

@@ -5,6 +5,7 @@ import { classifySide, dteTag, matchesDte, parsePremium, scoreEntry } from "./ut
 import { useIFlowEntries, useTickerPricesBatch } from "./hooks";
 import { estimateOptionPnl } from "./estimator";
 import type { DteFilter } from "./types";
+import { GexWall } from "../../gex/GexWall";
 
 /** Est. P/L badge shared by the digest cards — same estimator as EntryRow. */
 export function entryPnl(
@@ -119,6 +120,7 @@ export function TopPicks({ date, dteFilter }: { date: string; dteFilter: DteFilt
               {e.ask_pct > 0 && (
                 <span className="text-accent-orange num">{e.ask_pct}%ask</span>
               )}
+              <GexWall ticker={e.ticker} strike={Number(e.strike) || null} />
               <span className="text-text-secondary ml-auto num">{e.premium}</span>
               <PnlBadge pnl={entryPnl(e, priceMap, date)} />
               {mega && <span className="text-xs font-bold text-accent-green">MEGA</span>}
