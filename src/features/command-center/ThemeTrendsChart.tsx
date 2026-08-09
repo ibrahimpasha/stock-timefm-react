@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { TrendingUp, ArrowUp, ArrowDown, Minus } from "lucide-react";
-import { useThemeHeatHistory, useThemePnlHistory } from "../../api/themeHeat";
+import { TrendingUp, ArrowUp, ArrowDown, Minus, ChevronRight, ChevronDown } from "lucide-react";
+import { useThemeHeatHistory, useThemePnlHistory, useThemePnlBreakdown } from "../../api/themeHeat";
 import { useThemeRotation, type RotationWindow } from "../../api/rotation";
 import { useDashboardFilters } from "../../store/useDashboardFilters";
 import { RotationMap, MomentumRanking, AlertFeed, RotationScrubber } from "../rotation/RotationViz";
@@ -151,14 +151,27 @@ function ThemeRotationView({
 function ThemePnlView({
   data,
   isFetching,
+  sub,
   onSelectTheme,
   categoryFilter,
 }: {
   data: import("../../api/themeHeat").ThemePnlHistory | undefined;
   isFetching: boolean;
+  sub: import("../../api/themeHeat").ThemePnlBreakdown | undefined;
   onSelectTheme: (cat: string) => void;
   categoryFilter: string;
 }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const byCat = useMemo(() => {
+    const m = new Map<string, import("../../api/themeHeat").SubthemePnl[]>();
+    for (const t of sub?.themes ?? []) {
+      if (t.p2x == null) continue;
+      const arr = m.get(t.category) ?? [];
+      arr.push(t);
+      m.set(t.category, arr);
+    }
+    return m;
+  }, [sub]);
   const rows = useMemo(() => {
     if (!data) return [];
     return data.categories
@@ -214,8 +227,8 @@ function ThemePnlView({
         {rows.map((r) => {
           const active = categoryFilter === r.cat;
           return (
+            <div key={r.cat}>
             <div
-              key={r.cat}
               onClick={() => onSelectTheme(r.cat)}
               role="button"
               tabIndex={0}
@@ -230,9 +243,18 @@ function ThemePnlView({
                 opacity: categoryFilter && !active ? 0.55 : 1,
               }}
             >
-              <span className="text-xs truncate"
+              <span className="text-xs truncate flex items-center gap-0.5"
                     style={{ color: active ? "var(--accent-cyan)" : "var(--text-secondary)" }}>
-                {r.cat.replace(/_/g, " ")}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setOpen(open === r.cat ? null : r.cat); }}
+                  aria-label={`${open === r.cat ? "Hide" : "Show"} sub-themes of ${r.cat}`}
+                  aria-expanded={open === r.cat}
+                  className="shrink-0 text-text-muted hover:text-text-primary"
+                >
+                  {open === r.cat ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                </button>
+                <span className="truncate">{r.cat.replace(/_/g, " ")}</span>
               </span>
 
               <div className="flex gap-px h-4">
@@ -268,6 +290,44 @@ function ThemePnlView({
                 </span>
               </div>
             </div>
+
+            {open === r.cat && (
+              /* Sub-themes are aggregated over the WHOLE window, not per day —
+                 a (day, sub-theme) cell averages ~2 graded entries. */
+              <div className="ml-4 mb-2 mt-0.5 pl-2 border-l border-border flex flex-col gap-0.5">
+                <span className="text-[10px] text-text-muted pb-0.5">
+                  sub-themes are read over the FULL corpus, not the window above —
+                  over a short window each holds 1-2 graded entries
+                </span>
+                {(byCat.get(r.cat) ?? []).length === 0 && (
+                  <span className="text-[10px] text-text-muted py-1">
+                    no graded sub-theme entries yet
+                  </span>
+                )}
+                {(byCat.get(r.cat) ?? []).map((t) => (
+                  <div key={t.theme} className="grid items-center gap-2 text-[10px]"
+                       style={{ gridTemplateColumns: "150px 1fr 74px" }}
+                       title={`${t.theme}: ${((t.p2x_raw ?? 0) * 100).toFixed(0)}% raw over `
+                         + `${t.n_complete} graded ${t.n_complete === 1 ? "entry" : "entries"}`
+                         + ` -> ${((t.p2x ?? 0) * 100).toFixed(0)}% after shrinkage`}>
+                    <span className="text-text-muted truncate">
+                      {t.theme.replace(/_/g, " ").toLowerCase()}
+                    </span>
+                    <div className="h-2 rounded-full bg-bg-card-hover overflow-hidden">
+                      <div className="h-full rounded-full"
+                           style={{ width: `${Math.min(100, ((t.p2x ?? 0) / (base * 2)) * 100)}%`,
+                                    background: color(t.p2x) }} />
+                    </div>
+                    <span className="num text-right"
+                          style={{ color: (t.p2x ?? 0) >= base
+                            ? "var(--accent-green)" : "var(--accent-red)" }}>
+                      {((t.p2x ?? 0) * 100).toFixed(0)}% <span className="text-text-muted">n={t.n_complete}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           );
         })}
       </div>
@@ -288,6 +348,10 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
   const { data, isFetching } = useThemeHeatHistory(days);
   const rot = useThemeRotation(ROT_WINDOW[days] ?? "1M", view === "rotation");
   const pnl = useThemePnlHistory(days, view === "pnl");
+  /* Sub-themes are ALWAYS read over the full corpus, never the matrix's window:
+   * at 7d a sub-theme has 1-2 graded entries and the ranking is meaningless.
+   * Over the whole corpus the median is ~48, which is enough to rank. */
+  const sub = useThemePnlBreakdown(365, view === "pnl");
   const patchIFlow = useDashboardFilters((st) => st.patchIFlow);
   const categoryFilter = useDashboardFilters((st) => st.iflow.categoryFilter);
 
@@ -382,7 +446,7 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       {view === "pnl" && (
-        <ThemePnlView data={pnl.data} isFetching={pnl.isFetching}
+        <ThemePnlView data={pnl.data} isFetching={pnl.isFetching} sub={sub.data}
                       onSelectTheme={selectTheme} categoryFilter={categoryFilter} />
       )}
 

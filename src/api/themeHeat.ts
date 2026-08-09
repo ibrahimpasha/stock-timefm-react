@@ -68,3 +68,42 @@ export function useThemePnlHistory(days: number, enabled = true) {
     enabled,
   });
 }
+
+/* Sub-theme P/L, aggregated over the window rather than per day: the 79
+ * clustered sub-themes are 6x finer than the 12 categories, so a daily cell
+ * averages ~2 graded entries — too thin to render. Over a window the median
+ * is ~48, which is enough to rank.
+ *
+ * Sub-theme differences are real (observed variance 2x the binomial null,
+ * chi2 p<0.0001) but the RANKING does not persist across halves of the corpus
+ * (Spearman +0.23, p=0.19). Present as a scoreboard, never as a pick list. */
+export interface SubthemePnl {
+  theme: string;
+  category: string;
+  n_entries: number;
+  n_complete: number;
+  /** Unshrunk — can be 0% or 100% on a handful of entries. */
+  p2x_raw: number | null;
+  /** Shrunk toward base_rate; this is what to rank and colour by. */
+  p2x: number | null;
+  med_peak: number | null;
+}
+
+export interface ThemePnlBreakdown {
+  themes: SubthemePnl[];
+  base_rate: number;
+  prior_weight: number;
+  days: number;
+}
+
+export function useThemePnlBreakdown(days: number, enabled = true) {
+  return useQuery<ThemePnlBreakdown>({
+    queryKey: ["theme-pnl-breakdown", days],
+    queryFn: () =>
+      apiClient
+        .get<ThemePnlBreakdown>(`/market/theme-pnl-breakdown?days=${days}`)
+        .then((r) => r.data),
+    staleTime: 30 * 60_000,
+    enabled,
+  });
+}
