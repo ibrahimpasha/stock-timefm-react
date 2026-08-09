@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { TrendingUp, ArrowUp, ArrowDown, Minus } from "lucide-react";
 import { useThemeHeatHistory } from "../../api/themeHeat";
+import { useThemeRotation, type RotationWindow } from "../../api/rotation";
+import { RotationMap, MomentumRanking, AlertFeed } from "../rotation/RotationViz";
 import { Sparkline } from "../../components/CCPrimitives";
 import { Segmented } from "../../components/Glass";
 
@@ -47,9 +49,64 @@ function TrendArrow({ delta }: { delta: number }) {
   return <Minus size={12} style={{ color: "var(--text-muted)" }} />;
 }
 
+/* Days-window -> the rotation endpoint's smoothing window. Rotation needs more
+ * history than the matrix does (it smooths twice), so 7d maps to the shortest
+ * available rather than 1:1. */
+const ROT_WINDOW: Record<number, RotationWindow> = {
+  7: "1W", 30: "1M", 60: "3M", 90: "3M",
+};
+
+/* Rotation view — same RRG components the /rotation page uses, fed by
+ * `/market/theme-rotation`. Relative strength is a theme's SHARE of the day's
+ * total option premium, so a theme rises here only when money moves INTO it
+ * relative to everything else, not merely because the whole tape was loud. */
+function ThemeRotationView({
+  data,
+  isFetching,
+}: {
+  data: import("../../api/rotation").RotationResponse | undefined;
+  isFetching: boolean;
+}) {
+  if (isFetching && !data) {
+    return (
+      <div className="h-[200px] flex items-center justify-center text-xs text-text-muted animate-pulse">
+        loading rotation…
+      </div>
+    );
+  }
+  if (!data?.ok) {
+    return (
+      <div className="py-4 text-xs text-text-muted">
+        {data?.reason ?? "rotation unavailable"} — needs more flow-days of theme history.
+      </div>
+    );
+  }
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-4 items-start">
+      <RotationMap sectors={data.sectors} />
+      <div className="flex flex-col gap-3 min-w-0">
+        <MomentumRanking sectors={data.sectors} />
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-text-muted mb-1.5">
+            Rotation alerts
+          </div>
+          <AlertFeed alerts={data.alerts} />
+        </div>
+        <p className="text-[10px] text-text-muted">
+          {data.sessions} flow-days · strength = share of total option premium vs {data.benchmark}.
+          LEADING = growing share and still accelerating; IMPROVING = small share but gaining;
+          WEAKENING = still large but losing ground; LAGGING = small and shrinking.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
   const [days, setDays] = useState<number>(7);
+  const [view, setView] = useState<"matrix" | "rotation">("matrix");
   const { data, isFetching } = useThemeHeatHistory(days);
+  const rot = useThemeRotation(ROT_WINDOW[days] ?? "1M", view === "rotation");
 
   // Smooth harder over longer windows (more points to lean on).
   const span = days <= 7 ? 3 : days <= 30 ? 4 : 6;
@@ -113,10 +170,25 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
             </h3>
           </div>
         )}
-        {windowToggle}
+        <div className="flex items-center gap-2">
+          <Segmented
+            options={[
+              { value: "matrix", label: "Heat" },
+              { value: "rotation", label: "Rotation" },
+            ]}
+            value={view}
+            onChange={(v) => setView(v as "matrix" | "rotation")}
+            ariaLabel="Theme view"
+          />
+          {windowToggle}
+        </div>
       </div>
 
-      {!hasData ? (
+      {view === "rotation" && (
+        <ThemeRotationView data={rot.data} isFetching={rot.isFetching} />
+      )}
+
+      {view === "matrix" && (!hasData ? (
         <div className="h-[120px] flex items-center justify-center text-xs text-text-muted">
           {isFetching ? "loading…" : "No theme-heat history yet."}
         </div>
@@ -170,7 +242,7 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
             {data!.updated_at ? ` · updated ${data!.updated_at.slice(0, 10)}` : ""}
           </div>
         </>
-      )}
+      ))}
     </div>
   );
 }

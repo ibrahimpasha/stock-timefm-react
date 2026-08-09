@@ -70,6 +70,23 @@ export function useSectorRotation(window: RotationWindow = "1M") {
   });
 }
 
+/**
+ * Same payload shape as sectors, but relative strength is each intel theme's
+ * share of the day's total option premium. Backed by theme_heat_history, so
+ * "sessions" are flow-days — the corpus skips days with no flow.
+ */
+export function useThemeRotation(window: RotationWindow = "1M", enabled = true) {
+  return useQuery<RotationResponse>({
+    queryKey: ["theme-rotation", window],
+    queryFn: () =>
+      apiClient
+        .get<RotationResponse>(`/market/theme-rotation?window=${window}`)
+        .then((r) => r.data),
+    staleTime: 60 * 60 * 1000,
+    enabled,
+  });
+}
+
 /* ── GEX matrix ─────────────────────────────────────────────────────────── */
 
 export type GexMetric = "gex" | "vex" | "oi" | "vol" | "unusual";

@@ -7,7 +7,7 @@ import { avgScore, setupScore } from "./EntryTape";
 import { useTickerMeta } from "../../../api/tickerMeta";
 import { useTickerTechnicals } from "../../../api/tickerTechnicals";
 import { useTickerGex } from "../../../api/tickerGex";
-import { GexWall } from "../../gex/GexWall";
+import { GexWall, GexWallLegend } from "../../gex/GexWall";
 import { useTaxonomy } from "../../../api/taxonomy";
 import { useThemePulseScores } from "../../../api/intelGraph";
 import type { DteFilter } from "./types";
@@ -132,6 +132,7 @@ export function TopSignals({ date, dteFilter }: { date: string; dteFilter: DteFi
         <Sparkles size={12} className="text-accent-cyan" />
         Top Signals — SETUP × ML ({signals.length})
       </h4>
+      <GexWallLegend />
       <div className="space-y-1">
         {signals.map((s) => {
           const e = s.entry;
@@ -169,7 +170,7 @@ export function TopSignals({ date, dteFilter }: { date: string; dteFilter: DteFi
                     pulse {s.pulse}
                   </span>
                 )}
-                <GexWall ticker={s.ticker} strike={Number(e.strike) || null} />
+                <GexWall ticker={s.ticker} strike={Number(e.strike) || null} showLabel />
                 <span className="text-text-secondary ml-auto num">{e.premium}</span>
                 <PnlBadge pnl={entryPnl(e, priceMap, date)} />
               </div>
