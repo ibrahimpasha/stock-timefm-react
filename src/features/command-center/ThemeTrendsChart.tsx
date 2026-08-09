@@ -174,17 +174,29 @@ function ThemePnlView({
   }, [sub]);
   const rows = useMemo(() => {
     if (!data) return [];
+    const prior = data.prior_weight || 10;
+    const base = data.base_rate || 0.31;
     return data.categories
       .map((cat) => {
         const vals = data.series[cat] ?? [];
+        const counts = data.counts?.[cat] ?? [];
+        const raw = data.raw?.[cat] ?? [];
         const nn = vals.filter((v): v is number => v != null);
-        return {
-          cat, vals,
-          counts: data.counts?.[cat] ?? [],
-          raw: data.raw?.[cat] ?? [],
-          current: data.latest[cat] ?? null,
-          spark: nn,
-        };
+        /* Row headline = WINDOW aggregate, not the latest daily cell. The
+         * latest cell holds 1-2 graded entries and shrinks to ~base rate, so
+         * ranking rows by it reads recency noise as theme quality — an
+         * external review did exactly that and ranked a below-average theme
+         * as the strongest confirmed one. */
+        let hits = 0;
+        let n = 0;
+        raw.forEach((v, i) => {
+          if (v != null && counts[i]) {
+            hits += v * counts[i];
+            n += counts[i];
+          }
+        });
+        const agg = n ? (hits + base * prior) / (n + prior) : null;
+        return { cat, vals, counts, raw, current: agg, n, spark: nn };
       })
       .sort((a, b) => (b.current ?? -1) - (a.current ?? -1));
   }, [data]);
@@ -283,10 +295,12 @@ function ThemePnlView({
               <div className="flex items-center justify-end gap-1">
                 <Sparkline points={r.spark} width={36} height={14}
                            color={color(r.current)} />
-                <span className="num text-xs w-9 text-right"
+                <span className="num text-xs text-right whitespace-nowrap"
+                      title={`window aggregate over ${r.n} graded entries (shrunk)`}
                       style={{ color: r.current != null && r.current >= base
                         ? "var(--accent-green)" : "var(--accent-red)" }}>
                   {r.current != null ? `${(r.current * 100).toFixed(0)}%` : "—"}
+                  <span className="text-text-muted ml-1">n={r.n}</span>
                 </span>
               </div>
             </div>
@@ -481,7 +495,7 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
                 title={`${r.cat} — click to filter the flow tracker`}
                 className="grid items-center gap-2 cursor-pointer rounded px-1 -mx-1 hover:bg-bg-card-hover"
                 style={{
-                  gridTemplateColumns: "108px 1fr 84px",
+                  gridTemplateColumns: "108px 1fr 118px",
                   background: active
                     ? "color-mix(in srgb, var(--accent-cyan) 12%, transparent)"
                     : undefined,
