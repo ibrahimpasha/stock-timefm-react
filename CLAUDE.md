@@ -36,6 +36,8 @@ Don't reach for Redux or Context. If a piece of state spans pages, put it in Zus
 | `/command-center` | `CommandCenterPage` | Alias for the main command center |
 | `/pillars` | `PillarsPage` | Cross-source intelligence pillars |
 | `/traders` | `TraderLeaderboardPage` | Master/detail trader leaderboard. Left: ranked traders. Right: selected trader's positions (one row per position, click to expand event timeline) + the `SignalsView` panel on top (Trending / Leaders / Sentiment). |
+| `/rotation` | `RotationPage` | Sector rotation: RRG quadrant map (custom SVG, trails clipped to the circle, greedy label declutter), timeline, momentum ranking, insights, quadrant-transition alerts. One endpoint (`/market/sector-rotation`) feeds the whole page. **The map scales each axis independently** — RS-Ratio moves in a much tighter band than RS-Momentum, so a shared span flattens it into a vertical line. |
+| `/gex` | `GexMatrixPage` | Dealer positioning matrix — strikes down, expiries across, 5 metric tabs (GEX/VEX/OI/VOL/UNUSUAL) off one fetch. Heat scales to the 95th percentile of on-screen cells, not the max, so one 0DTE monster doesn't flatten the rest. |
 | `/map` | `BayAreaMapPage` | Bay Area company and campus map |
 
 Nav order is in `src/lib/constants.ts::NAV_ITEMS`. Adding a route = add to `App.tsx` Routes + push to NAV_ITEMS.

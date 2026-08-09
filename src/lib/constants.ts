@@ -125,6 +125,8 @@ export const INTEL_VIEW_COLORS: Record<string, string> = {
 export const NAV_ITEMS = [
   { label: "Command Center", path: "/" },
   { label: "Pillars", path: "/pillars" },
+  { label: "Rotation", path: "/rotation" },
+  { label: "GEX", path: "/gex" },
   { label: "Traders", path: "/traders" },
   { label: "Map", path: "/map" },
 ] as const;

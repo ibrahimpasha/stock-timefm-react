@@ -21,6 +21,12 @@ const BayAreaMapPage = lazy(() =>
 const PillarsPage = lazy(() =>
   import("./pages/PillarsPage").then((m) => ({ default: m.PillarsPage })),
 );
+const RotationPage = lazy(() =>
+  import("./pages/RotationPage").then((m) => ({ default: m.RotationPage })),
+);
+const GexMatrixPage = lazy(() =>
+  import("./pages/GexMatrixPage").then((m) => ({ default: m.GexMatrixPage })),
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -113,6 +119,8 @@ function AppLayout() {
             {/* alias kept so old /command-center bookmarks still resolve */}
             <Route path="/command-center" element={<CommandCenterPage />} />
             <Route path="/pillars" element={<PillarsPage />} />
+            <Route path="/rotation" element={<RotationPage />} />
+            <Route path="/gex" element={<GexMatrixPage />} />
             <Route path="/traders" element={<TraderLeaderboardPage />} />
             <Route path="/map" element={<BayAreaMapPage />} />
           </Routes>
