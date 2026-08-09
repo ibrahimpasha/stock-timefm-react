@@ -29,7 +29,8 @@ export interface SectorRow {
   rank: number;
   tail: RotationPoint[];
   spark: number[];
-  history: { date: string; ratio: number }[];
+  /** Full scrubable path over the window — the time slider replays these. */
+  history: RotationPoint[];
 }
 
 export interface RotationAlert {

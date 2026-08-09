@@ -6,11 +6,12 @@
  * because the Command Center's theme-rotation view renders the exact same
  * components against `/market/theme-rotation`.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GlassPanel, Chip, Segmented } from "../components/Glass";
 import { useSectorRotation, type RotationWindow } from "../api/rotation";
 import {
   SectorStrip, RotationMap, RotationTimeline, MomentumRanking, InsightLine, AlertFeed,
+  RotationScrubber,
 } from "../features/rotation/RotationViz";
 
 const WINDOWS: { value: RotationWindow; label: string }[] = [
@@ -27,6 +28,9 @@ export function RotationPage() {
   const { data, isLoading } = useSectorRotation(window);
 
   const sectors = data?.sectors ?? [];
+  const dates = sectors[0]?.history.map((p) => p.date) ?? [];
+  const [idx, setIdx] = useState(0);
+  useEffect(() => setIdx(Math.max(0, dates.length - 1)), [dates.length]);
   const picker = (
     <Segmented options={WINDOWS} value={window} onChange={setWindow} ariaLabel="Rotation window" />
   );
@@ -58,9 +62,10 @@ export function RotationPage() {
         <SectorStrip sectors={sectors} />
       </GlassPanel>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,0.8fr)] gap-3">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(340px,520px)_minmax(0,1.15fr)_minmax(0,0.85fr)] gap-3">
         <GlassPanel title="Rotation Map">
-          <RotationMap sectors={sectors} />
+          <RotationMap sectors={sectors} atIndex={idx} />
+          <RotationScrubber dates={dates} index={idx} onChange={setIdx} />
         </GlassPanel>
 
         <div className="flex flex-col gap-3 min-w-0">

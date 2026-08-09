@@ -6,7 +6,8 @@
  * backend returns an identical payload for both, so they render through one
  * set of components rather than two that drift apart.
  */
-import { useMemo } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { Play, Pause } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Sparkline } from "../../components/CCPrimitives";
 import type { SectorRow, RotationInsight } from "../../api/rotation";
@@ -87,54 +88,116 @@ export function SectorStrip({ sectors }: { sectors: SectorRow[] }) {
 
 /* ── rotation map (RRG scatter) ─────────────────────────────────────────── */
 
-export function RotationMap({ sectors }: { sectors: SectorRow[] }) {
-  const SIZE = 460;
-  const R = SIZE / 2 - 10;
+/** Catmull-Rom through the points, emitted as cubic beziers.
+ *  A raw polyline of daily readings reads as jagged noise; the spline shows
+ *  the arc of rotation, which is the thing the chart is actually about. */
+function smoothPath(pts: { x: number; y: number }[]): string {
+  if (pts.length < 2) return "";
+  if (pts.length === 2) {
+    return `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)} L${pts[1].x.toFixed(1)},${pts[1].y.toFixed(1)}`;
+  }
+  let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] ?? p2;
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
 
-  /* Two things matter for readability here:
-   *  - Scale on CURRENT positions, not the whole trail. Trails wander far more
-   *    than heads do, so scaling to them squashes every sector into a blob at
-   *    the origin. Overshooting trails get clipped to the circle instead.
-   *  - Scale each axis independently. RS-Ratio moves in a much tighter band
-   *    than RS-Momentum, so a shared span flattens the map into a vertical
-   *    line. Real RRGs normalize both axes too. */
+const TRAIL = 6;   // how many prior readings the comet tail shows
+
+/**
+ * RRG scatter. `atIndex` scrubs the whole board back through history — every
+ * theme jumps to where it stood that day and the trail follows it, which is
+ * how you watch a rotation actually happen rather than inferring it from a
+ * static snapshot.
+ *
+ * Scaling is fixed across the WHOLE window (not per frame) so positions are
+ * comparable as you scrub — a per-frame rescale would make everything appear
+ * to jitter in place while the axes silently moved underneath.
+ */
+export function RotationMap({
+  sectors,
+  atIndex,
+  animate = true,
+}: {
+  sectors: SectorRow[];
+  atIndex?: number;
+  animate?: boolean;
+}) {
+  const SIZE = 460;
+  const R = SIZE / 2 - 14;
+
+  /* Scale each axis independently and over the full window: RS-Ratio moves in
+   * a much tighter band than RS-Momentum, so a shared span flattens the map
+   * into a vertical line, and a per-frame span would break scrub comparability. */
   const [spanX, spanY] = useMemo(() => {
-    const dx = sectors.map((s) => Math.abs(s.ratio - 100));
-    const dy = sectors.map((s) => Math.abs(s.mom - 100));
-    return [Math.max(0.4, ...dx) * 1.3, Math.max(0.4, ...dy) * 1.3];
+    const xs: number[] = [];
+    const ys: number[] = [];
+    for (const s of sectors) {
+      for (const p of s.history.length ? s.history : s.tail) {
+        xs.push(Math.abs(p.ratio - 100));
+        ys.push(Math.abs(p.mom - 100));
+      }
+    }
+    // p92, not max: one wild historical day would otherwise set the scale and
+    // squash every current position into a blob at the origin. Anything beyond
+    // is clipped to the circle, which is the honest way to show an outlier.
+    const p92 = (v: number[]) => {
+      if (!v.length) return 1;
+      const sorted = [...v].sort((a, b) => a - b);
+      return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.92))];
+    };
+    return [Math.max(0.4, p92(xs)) * 1.1, Math.max(0.4, p92(ys)) * 1.1];
   }, [sectors]);
 
-  /* Sectors bunch tightly near the origin, so raw labels overlap into mush.
-   * Greedy declutter: walk heads top-down and push each label below the last
-   * one it would collide with, then draw a leader line back to the bubble. */
   const placed = useMemo(() => {
     const toXY = (ratio: number, mom: number) => ({
       x: SIZE / 2 + ((ratio - 100) / spanX) * R,
       y: SIZE / 2 - ((mom - 100) / spanY) * R,
     });
     const rows = sectors.map((s) => {
-      const pts = s.tail.map((p) => toXY(p.ratio, p.mom));
-      return { s, pts, head: pts[pts.length - 1] };
+      const series = s.history.length ? s.history : s.tail;
+      const i = atIndex == null ? series.length - 1
+        : Math.max(0, Math.min(series.length - 1, atIndex));
+      const trail = series.slice(Math.max(0, i - TRAIL + 1), i + 1).map((p) => toXY(p.ratio, p.mom));
+      const cur = series[i];
+      return {
+        s,
+        pts: trail,
+        head: trail[trail.length - 1] ?? toXY(s.ratio, s.mom),
+        quadrant: cur ? quadrantOf(cur.ratio, cur.mom) : s.quadrant,
+        date: cur?.date ?? "",
+      };
     });
+    /* Labels bunch near the origin, so greedily push each below the last one it
+     * collides with and draw a leader line back to its bubble. */
     const byY = [...rows].sort((a, b) => a.head.y - b.head.y);
     const taken: { x: number; y: number }[] = [];
     const out = new Map<string, number>();
     for (const r of byY) {
       let y = r.head.y;
-      while (taken.some((t) => Math.abs(t.y - y) < 20 && Math.abs(t.x - r.head.x) < 48)) {
+      while (taken.some((t) => Math.abs(t.y - y) < 20 && Math.abs(t.x - r.head.x) < 52)) {
         y += 20;
       }
-      y = Math.max(18, Math.min(SIZE - 16, y));   // keep the label inside the frame
+      y = Math.max(20, Math.min(SIZE - 16, y));
       taken.push({ x: r.head.x, y });
       out.set(r.s.ticker, y);
     }
     return rows.map((r) => ({ ...r, labelY: out.get(r.s.ticker) ?? r.head.y }));
-  }, [sectors, spanX, spanY, R]);
+  }, [sectors, spanX, spanY, R, atIndex]);
 
   return (
-    <div className="flex flex-col items-center">
-      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="w-full max-w-[480px]" role="img"
-           aria-label="Relative rotation graph: sector momentum versus relative strength">
+    <div className="w-full">
+      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="w-full block" role="img"
+           aria-label="Relative rotation graph: momentum versus relative strength">
         <defs>
           <radialGradient id="rrg-fade">
             <stop offset="55%" stopColor="var(--accent-blue)" stopOpacity="0.05" />
@@ -145,55 +208,133 @@ export function RotationMap({ sectors }: { sectors: SectorRow[] }) {
           </clipPath>
         </defs>
         <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="url(#rrg-fade)" stroke="var(--border)" />
-        <line x1={SIZE / 2} y1="8" x2={SIZE / 2} y2={SIZE - 8} stroke="var(--border)" />
-        <line x1="8" y1={SIZE / 2} x2={SIZE - 8} y2={SIZE / 2} stroke="var(--border)" />
+        <line x1={SIZE / 2} y1={SIZE / 2 - R} x2={SIZE / 2} y2={SIZE / 2 + R} stroke="var(--border)" />
+        <line x1={SIZE / 2 - R} y1={SIZE / 2} x2={SIZE / 2 + R} y2={SIZE / 2} stroke="var(--border)" />
 
         {/* quadrant captions */}
-        <text x="26" y="34" className="text-[11px]" fill="var(--accent-cyan)" fontWeight="600">IMPROVING</text>
-        <text x="26" y="48" className="text-[10px]" fill="var(--text-muted)">Momentum Accelerating</text>
-        <text x={SIZE - 26} y="34" textAnchor="end" className="text-[11px]" fill="var(--accent-green)" fontWeight="600">LEADING</text>
-        <text x={SIZE - 26} y="48" textAnchor="end" className="text-[10px]" fill="var(--text-muted)">Strong Momentum</text>
-        <text x="26" y={SIZE - 32} className="text-[11px]" fill="var(--accent-red)" fontWeight="600">LAGGING</text>
-        <text x="26" y={SIZE - 18} className="text-[10px]" fill="var(--text-muted)">Weak Momentum</text>
-        <text x={SIZE - 26} y={SIZE - 32} textAnchor="end" className="text-[11px]" fill="var(--accent-orange)" fontWeight="600">WEAKENING</text>
-        <text x={SIZE - 26} y={SIZE - 18} textAnchor="end" className="text-[10px]" fill="var(--text-muted)">Momentum Fading</text>
+        <text x="22" y="30" className="text-[11px]" fill="var(--accent-cyan)" fontWeight="600">IMPROVING</text>
+        <text x="22" y="43" className="text-[9px]" fill="var(--text-muted)">momentum accelerating</text>
+        <text x={SIZE - 22} y="30" textAnchor="end" className="text-[11px]" fill="var(--accent-green)" fontWeight="600">LEADING</text>
+        <text x={SIZE - 22} y="43" textAnchor="end" className="text-[9px]" fill="var(--text-muted)">strong momentum</text>
+        <text x="22" y={SIZE - 26} className="text-[11px]" fill="var(--accent-red)" fontWeight="600">LAGGING</text>
+        <text x="22" y={SIZE - 13} className="text-[9px]" fill="var(--text-muted)">weak momentum</text>
+        <text x={SIZE - 22} y={SIZE - 26} textAnchor="end" className="text-[11px]" fill="var(--accent-orange)" fontWeight="600">WEAKENING</text>
+        <text x={SIZE - 22} y={SIZE - 13} textAnchor="end" className="text-[9px]" fill="var(--text-muted)">momentum fading</text>
 
-        {placed.map(({ s, head, pts, labelY }) => {
-          const path = pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-          return (
-            <g key={s.ticker}>
-              {/* rotation trail — where the sector came from */}
-              <path d={path} fill="none" stroke={scoreColor(s.score)} strokeWidth="1.2"
-                    opacity="0.22" clipPath="url(#rrg-clip)" />
-              <circle cx={head.x} cy={head.y} r="9" fill={scoreColor(s.score)} opacity="0.85" />
-              {/* leader line when the label had to be nudged off its bubble */}
-              {Math.abs(labelY - head.y) > 4 && (
-                <line x1={head.x + 8} y1={head.y} x2={head.x + 13} y2={labelY - 4}
-                      stroke={seriesColor(s.ticker)} strokeWidth="1" opacity="0.45" />
-              )}
-              <text x={head.x + 15} y={labelY} className="text-[11px]" fontWeight="700"
-                    fill={seriesColor(s.ticker)}>
-                {s.ticker}
+        {/* trails first, so bubbles always sit on top of every line */}
+        <g clipPath="url(#rrg-clip)">
+          {placed.map(({ s, pts }) => (
+            <path key={s.ticker} d={smoothPath(pts)} fill="none"
+                  stroke={seriesColor(s.ticker)} strokeWidth="1.4" strokeLinecap="round"
+                  opacity="0.28" />
+          ))}
+        </g>
+
+        {placed.map(({ s, head, labelY }) => (
+          <g key={s.ticker}>
+            {Math.abs(labelY - head.y) > 4 && (
+              <line x1={head.x + 8} y1={head.y} x2={head.x + 13} y2={labelY - 4}
+                    stroke={seriesColor(s.ticker)} strokeWidth="1" opacity="0.4"
+                    style={animate ? { transition: "all 260ms ease-out" } : undefined} />
+            )}
+            {/* CSS transform on the group is what makes scrubbing animate —
+                transitioning cx/cy directly is not reliable across browsers. */}
+            <g style={{
+                 transform: `translate(${head.x}px, ${head.y}px)`,
+                 transition: animate ? "transform 260ms ease-out" : "none",
+               }}>
+              <circle r="9" fill={scoreColor(s.score)} opacity="0.9" />
+              <circle r="9" fill="none" stroke={seriesColor(s.ticker)} strokeWidth="1.5" opacity="0.7" />
+            </g>
+            <g style={{
+                 transform: `translate(${head.x}px, ${labelY}px)`,
+                 transition: animate ? "transform 260ms ease-out" : "none",
+               }}>
+              <text x="15" y="0" className="text-[11px]" fontWeight="700" fill={seriesColor(s.ticker)}>
+                {s.ticker.length > 12 ? s.ticker.slice(0, 12) : s.ticker}
               </text>
-              <text x={head.x + 15} y={labelY + 10} className="text-[10px]" fill="var(--text-muted)">
+              <text x="15" y="10" className="text-[9px]" fill="var(--text-muted)">
                 {pct(s.change_pct)}
               </text>
             </g>
-          );
-        })}
+          </g>
+        ))}
       </svg>
 
-      <div className="mt-3 flex flex-col items-center gap-1">
-        <span className="text-[10px] uppercase tracking-wider text-text-muted">Momentum score (color)</span>
-        <div className="h-2 w-48 rounded-full"
+      <div className="mt-2 flex items-center justify-center gap-2">
+        <span className="text-[10px] uppercase tracking-wider text-text-muted">weak</span>
+        <div className="h-1.5 w-32 rounded-full"
              style={{ background: "linear-gradient(90deg, var(--accent-red), var(--accent-orange), var(--accent-green))" }} />
-        <div className="flex justify-between w-48 text-[10px] text-text-muted num">
-          <span>-10</span><span>0</span><span>+10</span>
-        </div>
-        <p className="text-[10px] text-text-muted italic mt-1 text-center">
-          Position = relative strength × momentum. Color = momentum score.
-        </p>
+        <span className="text-[10px] uppercase tracking-wider text-text-muted">strong</span>
+        <span className="text-[10px] text-text-muted">· fill = momentum score, ring = identity</span>
       </div>
+    </div>
+  );
+}
+
+/** Local copy of the server's quadrant rule, for scrubbed frames. */
+function quadrantOf(ratio: number, mom: number): SectorRow["quadrant"] {
+  if (ratio >= 100) return mom >= 100 ? "LEADING" : "WEAKENING";
+  return mom >= 100 ? "IMPROVING" : "LAGGING";
+}
+
+/**
+ * Time slider under the map. Scrubbing replays the rotation; play walks it
+ * forward and stops at the end rather than looping, so the board is left
+ * showing today.
+ */
+export function RotationScrubber({
+  dates,
+  index,
+  onChange,
+}: {
+  dates: string[];
+  index: number;
+  /** setState-style so play can advance from the latest value, not a stale one. */
+  onChange: Dispatch<SetStateAction<number>>;
+}) {
+  const [playing, setPlaying] = useState(false);
+  const last = dates.length - 1;
+
+  useEffect(() => {
+    if (!playing) return;
+    const id = setInterval(() => {
+      onChange((prev: number) => {
+        // guard lives here so play always halts on the final frame
+        if (prev >= last) {
+          setPlaying(false);
+          return last;
+        }
+        return prev + 1;
+      });
+    }, 320);
+    return () => clearInterval(id);
+  }, [playing, last, onChange]);
+
+  if (dates.length < 2) return null;
+  return (
+    <div className="flex items-center gap-2 mt-1">
+      <button
+        type="button"
+        onClick={() => setPlaying((p) => (index >= last ? (onChange(0), true) : !p))}
+        aria-label={playing ? "Pause rotation replay" : "Play rotation replay"}
+        className="shrink-0 size-6 rounded-full flex items-center justify-center transition-colors
+                   bg-accent-cyan/15 text-accent-cyan hover:bg-accent-cyan/25"
+      >
+        {playing ? <Pause size={11} /> : <Play size={11} />}
+      </button>
+      <input
+        type="range"
+        min={0}
+        max={last}
+        value={index}
+        onChange={(e) => { setPlaying(false); onChange(Number(e.target.value)); }}
+        aria-label="Scrub rotation history"
+        className="flex-1 accent-accent-cyan h-1 cursor-pointer"
+      />
+      <span className="num text-[10px] text-text-muted w-[74px] text-right">
+        {dates[index] ?? ""}
+      </span>
     </div>
   );
 }

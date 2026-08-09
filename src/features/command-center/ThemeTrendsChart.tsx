@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TrendingUp, ArrowUp, ArrowDown, Minus } from "lucide-react";
 import { useThemeHeatHistory } from "../../api/themeHeat";
 import { useThemeRotation, type RotationWindow } from "../../api/rotation";
-import { RotationMap, MomentumRanking, AlertFeed } from "../rotation/RotationViz";
+import { RotationMap, MomentumRanking, AlertFeed, RotationScrubber } from "../rotation/RotationViz";
 import { Sparkline } from "../../components/CCPrimitives";
 import { Segmented } from "../../components/Glass";
 
@@ -81,18 +81,43 @@ function ThemeRotationView({
       </div>
     );
   }
+  const dates = data.sectors[0]?.history.map((p) => p.date) ?? [];
+  const [idx, setIdx] = useState(Math.max(0, dates.length - 1));
+  // snap to today whenever the window changes underneath us
+  useEffect(() => setIdx(Math.max(0, dates.length - 1)), [dates.length]);
+
+  const scrubbed = idx < dates.length - 1;
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-4 items-start">
-      <RotationMap sectors={data.sectors} />
-      <div className="flex flex-col gap-3 min-w-0">
-        <MomentumRanking sectors={data.sectors} />
+    /* Size the map COLUMN to the map. A plain 2-col split leaves the capped
+       square stranded in the middle of a very wide column on large screens,
+       which is what made this look unbalanced. */
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(340px,520px)_minmax(0,1fr)] gap-6 items-start">
+      <div className="w-full">
+        <RotationMap sectors={data.sectors} atIndex={idx} />
+        <RotationScrubber dates={dates} index={idx} onChange={setIdx} />
+      </div>
+
+      <div className="flex flex-col gap-4 min-w-0">
+        <div>
+          <div className="flex items-baseline justify-between mb-1.5">
+            <span className="text-[10px] uppercase tracking-wider text-text-muted">
+              Theme momentum
+            </span>
+            {scrubbed && (
+              <span className="text-[10px] num" style={{ color: "var(--accent-cyan)" }}>
+                map showing {dates[idx]} · ranking is current
+              </span>
+            )}
+          </div>
+          <MomentumRanking sectors={data.sectors} />
+        </div>
         <div>
           <div className="text-[10px] uppercase tracking-wider text-text-muted mb-1.5">
             Rotation alerts
           </div>
           <AlertFeed alerts={data.alerts} />
         </div>
-        <p className="text-[10px] text-text-muted">
+        <p className="text-[10px] text-text-muted leading-relaxed">
           {data.sessions} flow-days · strength = share of total option premium vs {data.benchmark}.
           LEADING = growing share and still accelerating; IMPROVING = small share but gaining;
           WEAKENING = still large but losing ground; LAGGING = small and shrinking.
