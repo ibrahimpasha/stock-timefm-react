@@ -69,6 +69,9 @@ export interface IFlowFilters {
   selectedAuthors: Set<string>;
   search: string;
   selectedDates: Set<string>;
+  /** Taxonomy category (e.g. "AI_POWER"); "" = no theme filter. Set by
+   *  clicking a theme in the rotation map, applies to Grid AND Tape. */
+  categoryFilter: string;
   watchView: IfWatchView;
   groupMode: IfGroupMode;
   // Grid-card green-border highlight (grid view only).
@@ -133,6 +136,7 @@ const IFLOW_DEFAULTS: IFlowFilters = {
   selectedAuthors: new Set<string>(),
   search: "",
   selectedDates: new Set<string>(),
+  categoryFilter: "",
   watchView: "tickers",
   groupMode: "subcat",
   highlightMode: "escalating",

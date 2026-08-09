@@ -404,6 +404,9 @@ interface Props {
   search: string;
   tradersOnly: boolean;
   authorTickerSet?: Set<string>;
+  /** Tickers belonging to the active theme; null = no theme filter.
+   *  Resolved in IFlowTracker so the Tape doesn't need the taxonomy itself. */
+  categoryTickers?: Set<string> | null;
   selectedTicker: string | null;
   onSelectTicker: (ticker: string) => void;
   /** Earnings-window filter (1w/2w/1m/2m) — mirrors the Grid behavior.
@@ -560,6 +563,7 @@ export function EntryTape({
   search,
   tradersOnly,
   authorTickerSet,
+  categoryTickers,
   selectedTicker,
   onSelectTicker,
   earningsWindow,
@@ -687,6 +691,7 @@ export function EntryTape({
       if (!ticker) continue;
       if (search && !ticker.toUpperCase().includes(search.toUpperCase())) continue;
       if (tradersOnly && authorTickerSet && !authorTickerSet.has(ticker)) continue;
+      if (categoryTickers && !categoryTickers.has(ticker)) continue;
       // Earnings-window filter — same rule as the Grid: ticker must report
       // within the window. No earnings date = excluded while a window is on.
       if (earningsWindow && earningsWindow !== "all" && earningsMap
@@ -817,7 +822,7 @@ export function EntryTape({
       });
     }
     return out;
-  }, [entries, aggregatedEntries, bias, dte, search, tradersOnly, authorTickerSet, filterMode, outlierMin, dates, earningsWindow, earningsMap, earningsMaxDays]);
+  }, [entries, aggregatedEntries, bias, dte, search, tradersOnly, authorTickerSet, categoryTickers, filterMode, outlierMin, dates, earningsWindow, earningsMap, earningsMaxDays]);
 
   // Batch-fetch current prices for every unique ticker in the visible
   // rows. Refetches every 60s via the hook's refetchInterval — so the

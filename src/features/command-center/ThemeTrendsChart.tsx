@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { TrendingUp, ArrowUp, ArrowDown, Minus } from "lucide-react";
 import { useThemeHeatHistory } from "../../api/themeHeat";
 import { useThemeRotation, type RotationWindow } from "../../api/rotation";
+import { useDashboardFilters } from "../../store/useDashboardFilters";
 import { RotationMap, MomentumRanking, AlertFeed, RotationScrubber } from "../rotation/RotationViz";
 import { Sparkline } from "../../components/CCPrimitives";
 import { Segmented } from "../../components/Glass";
@@ -63,7 +64,11 @@ const ROT_WINDOW: Record<number, RotationWindow> = {
 function ThemeRotationView({
   data,
   isFetching,
+  patchIFlow,
+  categoryFilter,
 }: {
+  patchIFlow: (p: { categoryFilter: string }) => void;
+  categoryFilter: string;
   data: import("../../api/rotation").RotationResponse | undefined;
   isFetching: boolean;
 }) {
@@ -87,13 +92,25 @@ function ThemeRotationView({
   useEffect(() => setIdx(Math.max(0, dates.length - 1)), [dates.length]);
 
   const scrubbed = idx < dates.length - 1;
+
+  /* Clicking a theme filters the iFlow Tracker (both Grid and Tape) to that
+   * taxonomy category — the rotation map's whole point is deciding where to
+   * look next, so it should hand you the flow rather than make you re-find it.
+   * Clicking the active theme again clears it. */
+  const selectTheme = (cat: string) => {
+    patchIFlow({ categoryFilter: categoryFilter === cat ? "" : cat });
+    document
+      .querySelector("[data-iflow-anchor]")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   return (
     /* Size the map COLUMN to the map. A plain 2-col split leaves the capped
        square stranded in the middle of a very wide column on large screens,
        which is what made this look unbalanced. */
     <div className="grid grid-cols-1 xl:grid-cols-[minmax(340px,520px)_minmax(0,1fr)] gap-6 items-start">
       <div className="w-full">
-        <RotationMap sectors={data.sectors} atIndex={idx} />
+        <RotationMap sectors={data.sectors} atIndex={idx}
+                     onSelect={selectTheme} selected={categoryFilter} />
         <RotationScrubber dates={dates} index={idx} onChange={setIdx} />
       </div>
 
@@ -109,7 +126,8 @@ function ThemeRotationView({
               </span>
             )}
           </div>
-          <MomentumRanking sectors={data.sectors} />
+          <MomentumRanking sectors={data.sectors}
+                           onSelect={selectTheme} selected={categoryFilter} />
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-wider text-text-muted mb-1.5">
@@ -132,6 +150,8 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
   const [view, setView] = useState<"matrix" | "rotation">("matrix");
   const { data, isFetching } = useThemeHeatHistory(days);
   const rot = useThemeRotation(ROT_WINDOW[days] ?? "1M", view === "rotation");
+  const patchIFlow = useDashboardFilters((st) => st.patchIFlow);
+  const categoryFilter = useDashboardFilters((st) => st.iflow.categoryFilter);
 
   // Smooth harder over longer windows (more points to lean on).
   const span = days <= 7 ? 3 : days <= 30 ? 4 : 6;
@@ -210,7 +230,8 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       {view === "rotation" && (
-        <ThemeRotationView data={rot.data} isFetching={rot.isFetching} />
+        <ThemeRotationView data={rot.data} isFetching={rot.isFetching}
+                           patchIFlow={patchIFlow} categoryFilter={categoryFilter} />
       )}
 
       {view === "matrix" && (!hasData ? (

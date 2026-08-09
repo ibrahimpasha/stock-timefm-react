@@ -127,10 +127,16 @@ export function RotationMap({
   sectors,
   atIndex,
   animate = true,
+  onSelect,
+  selected,
 }: {
   sectors: SectorRow[];
   atIndex?: number;
   animate?: boolean;
+  /** Present only where a click means something (themes map onto the iFlow
+   *  taxonomy; sector ETFs don't), so the map stays inert on the sector page. */
+  onSelect?: (key: string) => void;
+  selected?: string;
 }) {
   const SIZE = 460;
   const R = SIZE / 2 - 14;
@@ -231,7 +237,15 @@ export function RotationMap({
         </g>
 
         {placed.map(({ s, head, labelY }) => (
-          <g key={s.ticker}>
+          <g key={s.ticker}
+             onClick={onSelect ? () => onSelect(s.ticker) : undefined}
+             style={onSelect ? { cursor: "pointer" } : undefined}
+             role={onSelect ? "button" : undefined}
+             tabIndex={onSelect ? 0 : undefined}
+             onKeyDown={onSelect ? (e) => {
+               if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(s.ticker); }
+             } : undefined}
+             aria-label={onSelect ? `Filter flow to ${s.ticker}` : undefined}>
             {Math.abs(labelY - head.y) > 4 && (
               <line x1={head.x + 8} y1={head.y} x2={head.x + 13} y2={labelY - 4}
                     stroke={seriesColor(s.ticker)} strokeWidth="1" opacity="0.4"
@@ -243,8 +257,15 @@ export function RotationMap({
                  transform: `translate(${head.x}px, ${head.y}px)`,
                  transition: animate ? "transform 260ms ease-out" : "none",
                }}>
-              <circle r="9" fill={scoreColor(s.score)} opacity="0.9" />
-              <circle r="9" fill="none" stroke={seriesColor(s.ticker)} strokeWidth="1.5" opacity="0.7" />
+              {/* wider invisible hit area — a 9px dot is a cruel click target */}
+              {onSelect && <circle r="16" fill="transparent" />}
+              {selected === s.ticker && (
+                <circle r="14" fill="none" stroke={seriesColor(s.ticker)} strokeWidth="1.5" opacity="0.55" />
+              )}
+              <circle r="9" fill={scoreColor(s.score)}
+                      opacity={selected && selected !== s.ticker ? 0.35 : 0.9} />
+              <circle r="9" fill="none" stroke={seriesColor(s.ticker)} strokeWidth="1.5"
+                      opacity={selected && selected !== s.ticker ? 0.3 : 0.7} />
             </g>
             <g style={{
                  transform: `translate(${head.x}px, ${labelY}px)`,
@@ -390,7 +411,15 @@ export function RotationTimeline({ sectors }: { sectors: SectorRow[] }) {
 
 /* ── ranking ────────────────────────────────────────────────────────────── */
 
-export function MomentumRanking({ sectors }: { sectors: SectorRow[] }) {
+export function MomentumRanking({
+  sectors,
+  onSelect,
+  selected,
+}: {
+  sectors: SectorRow[];
+  onSelect?: (key: string) => void;
+  selected?: string;
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
@@ -407,7 +436,12 @@ export function MomentumRanking({ sectors }: { sectors: SectorRow[] }) {
           {sectors.map((s) => {
             const width = ((s.score + 10) / 20) * 100;
             return (
-              <tr key={s.ticker} className="border-t border-border">
+              <tr key={s.ticker}
+                  onClick={onSelect ? () => onSelect(s.ticker) : undefined}
+                  className={`border-t border-border ${onSelect ? "cursor-pointer hover:bg-bg-card-hover" : ""}`}
+                  style={selected === s.ticker
+                    ? { background: "color-mix(in srgb, var(--accent-cyan) 10%, transparent)" }
+                    : undefined}>
                 <td className="py-1.5 pr-2 num text-text-muted">{s.rank}</td>
                 <td className="py-1.5 whitespace-nowrap">
                   <span className="font-bold" style={{ color: seriesColor(s.ticker) }}>{s.ticker}</span>

@@ -112,6 +112,7 @@ export function IFlowTracker() {
     selectedDates,
     watchView,
     groupMode,
+    categoryFilter,
     highlightMode,
     highlightMin,
   } = useDashboardFilters((s) => s.iflow);
@@ -378,6 +379,18 @@ export function IFlowTracker() {
     return s;
   }, [coverageData, selectedAuthors]);
 
+  /* Theme filter: resolve the taxonomy category to its ticker set ONCE here,
+   * so Grid and Tape filter on exactly the same membership and the Tape never
+   * needs the taxonomy itself. */
+  const categoryTickers = useMemo(() => {
+    if (!categoryFilter || !taxonomy) return null;
+    const out = new Set<string>();
+    for (const [tk, e] of Object.entries(taxonomy.ticker_lookup)) {
+      if (e.category === categoryFilter) out.add(tk.toUpperCase());
+    }
+    return out;
+  }, [categoryFilter, taxonomy]);
+
   const filtered = useMemo(() => {
     let list = [...tickers];
     if (bias === "bullish") list = list.filter((t) => t.bullish > t.bearish);
@@ -385,6 +398,9 @@ export function IFlowTracker() {
     if (search) list = list.filter((t) => t.ticker.toUpperCase().includes(search));
     if (tradersOnly) {
       list = list.filter((t) => authorTickerSet.has(t.ticker.toUpperCase()));
+    }
+    if (categoryTickers) {
+      list = list.filter((t) => categoryTickers.has(t.ticker.toUpperCase()));
     }
 
     const earningsActive = earningsWindow !== "all" && !!earningsMap;
@@ -452,7 +468,7 @@ export function IFlowTracker() {
       });
     }
     return list;
-  }, [tickers, bias, search, sort, intelMap, earningsWindow, earningsMap, flowReturnsMap, tradersOnly, authorTickerSet]);
+  }, [tickers, bias, search, sort, intelMap, earningsWindow, earningsMap, flowReturnsMap, tradersOnly, authorTickerSet, categoryTickers]);
 
   // Resolve the green-border highlight for one card under the active mode.
   // Returns {on} + a hover title explaining why (and the raw score even when
@@ -497,7 +513,8 @@ export function IFlowTracker() {
   const selectedData = tickers.find((t) => t.ticker === selectedTicker);
 
   return (
-    <div>
+    /* anchor: clicking a theme in the rotation map scrolls the page here */
+    <div data-iflow-anchor>
       {/* ── Control strip: dates + search + view/group/sort/filters ── */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <div className="flex items-center gap-1 flex-wrap">
@@ -618,6 +635,23 @@ export function IFlowTracker() {
           ]}
         />
 
+        {categoryFilter && (
+          <button
+            type="button"
+            onClick={() => patchIFlow({ categoryFilter: "" })}
+            title="Clear the theme filter"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
+                       transition-colors shrink-0"
+            style={{
+              color: "var(--accent-cyan)",
+              background: "color-mix(in srgb, var(--accent-cyan) 14%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--accent-cyan) 35%, transparent)",
+            }}
+          >
+            {categoryFilter.replace(/_/g, " ")}
+            <X size={11} />
+          </button>
+        )}
         <StripLabel>Group</StripLabel>
         <span
           title={
@@ -957,6 +991,7 @@ export function IFlowTracker() {
                 search={search}
                 tradersOnly={tradersOnly}
                 authorTickerSet={authorTickerSet}
+                categoryTickers={categoryTickers}
                 earningsWindow={earningsWindow}
                 earningsMap={earningsMap ?? null}
                 earningsMaxDays={earningsWindow !== "all" ? EARNINGS_WINDOW_DAYS[earningsWindow] : null}
