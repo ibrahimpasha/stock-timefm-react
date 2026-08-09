@@ -4,7 +4,7 @@
  * Both read persisted tables (sector_prices, gex_matrix) refreshed on the
  * daily technicals timer — no yfinance in the request path, so these are cheap.
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import apiClient from "./client";
 
 export type Quadrant = "LEADING" | "WEAKENING" | "LAGGING" | "IMPROVING";
@@ -142,6 +142,21 @@ export interface GexTicker {
   spot: number | null;
   updated_at: string;
   cells: number;
+}
+
+/**
+ * Build the grid for a ticker the nightly universe doesn't cover (~5-10s).
+ * Backend spawns a detached subprocess; poll useGexMatrix until ok flips true.
+ */
+export function useGexRefresh() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ticker: string) =>
+      apiClient
+        .post(`/market/gex-matrix/refresh?ticker=${encodeURIComponent(ticker)}`)
+        .then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["gex-matrix-tickers"] }),
+  });
 }
 
 export function useGexTickers() {

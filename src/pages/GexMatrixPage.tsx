@@ -15,10 +15,12 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { GlassPanel, Chip, Segmented } from "../components/Glass";
 import {
   useGexMatrix,
   useGexTickers,
+  useGexRefresh,
   type GexMetric,
   type GexCell,
 } from "../api/rotation";
@@ -87,11 +89,47 @@ export function GexMatrixPage() {
     if (q && q !== ticker) setTicker(q);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
+  const [query, setQuery] = useState("");
+  const refresh = useGexRefresh();
+  const qc = useQueryClient();
   const [metric, setMetric] = useState<GexMetric>("gex");
   const [band, setBand] = useState("20");
   const [nExp, setNExp] = useState("8");
 
-  const { data, isLoading } = useGexMatrix(ticker, Number(nExp), Number(band));
+  const { data, isLoading, refetch } = useGexMatrix(ticker, Number(nExp), Number(band));
+
+  /* The build runs as a detached subprocess, so there's nothing to await —
+   * poll until cells land, then stop. Capped so a ticker with no chain at all
+   * (bad symbol, no listed options) doesn't poll forever. */
+  const building = refresh.isPending || (refresh.isSuccess && !data?.ok);
+  // The mutation resolves the moment the subprocess is spawned, so the chip
+  // list invalidated then would still be missing the new ticker. Re-invalidate
+  // once the grid actually lands.
+  useEffect(() => {
+    if (refresh.isSuccess && data?.ok) {
+      qc.invalidateQueries({ queryKey: ["gex-matrix-tickers"] });
+      refresh.reset();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refresh.isSuccess, data?.ok]);
+  useEffect(() => {
+    if (!building) return;
+    let tries = 0;
+    const id = setInterval(() => {
+      if (++tries > 15) return clearInterval(id);
+      refetch();
+    }, 2000);
+    return () => clearInterval(id);
+  }, [building, refetch]);
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const tk = query.trim().toUpperCase();
+    if (!tk) return;
+    setTicker(tk);
+    setParams({ ticker: tk });
+    setQuery("");
+  };
 
   /* Heat is scaled to the strongest cell currently on screen, so the grid
    * stays readable whether you're looking at SPY or a $2B small cap. */
@@ -155,6 +193,17 @@ export function GexMatrixPage() {
               </button>
             ))}
           </div>
+          <form onSubmit={submit} className="flex items-center gap-1">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="any ticker…"
+              aria-label="Look up a ticker's dealer positioning"
+              className="w-28 px-2 py-1 rounded-full text-xs bg-bg-card border border-border
+                         text-text-primary placeholder:text-text-muted focus:outline-none
+                         focus:border-accent-cyan num"
+            />
+          </form>
           <div className="ml-auto">{header}</div>
         </div>
 
@@ -163,10 +212,27 @@ export function GexMatrixPage() {
         )}
 
         {data && !data.ok && (
-          <p className="text-xs text-text-muted">
-            {data.reason ?? "no grid"}. Run{" "}
-            <code className="num">scripts/backfill_gex_matrix.py --tickers {ticker}</code>.
-          </p>
+          <div className="py-4 flex flex-col items-start gap-2">
+            <p className="text-xs text-text-muted">
+              No grid for <span className="num font-bold text-text-primary">{ticker}</span> yet —
+              the nightly build covers the anchors, your book and the top flow names only.
+            </p>
+            <button
+              type="button"
+              disabled={building}
+              onClick={() => refresh.mutate(ticker)}
+              className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors
+                         bg-accent-cyan/15 text-accent-cyan hover:bg-accent-cyan/25
+                         disabled:opacity-60"
+            >
+              {building ? `building ${ticker}…` : `Build ${ticker} now`}
+            </button>
+            {building && (
+              <p className="text-[10px] text-text-muted">
+                Pulling 8 option chains — usually 5-10s. This page refreshes itself.
+              </p>
+            )}
+          </div>
         )}
 
         {data?.ok && (
