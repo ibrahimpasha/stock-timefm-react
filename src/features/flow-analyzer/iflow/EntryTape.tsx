@@ -386,12 +386,17 @@ function scoreTextColor(score: number | null): string {
 /** ML score color — distinct accent so the user can't confuse it with
  *  the heuristic NScore. Cyan/blue tone matches the Flowseidon filter
  *  chip semantic (different system). */
+/* Thresholds match the 2026-08-07 rescale: ML is now P(peak > +100% within 10
+ * TRADING days), which tops out in the mid-60s — 45+ is roughly the top 8% of
+ * prints and the persona gate. The old >=80/>=60 cutoffs were tuned to the
+ * lifetime-target scale and made every honest score render as mediocre gray,
+ * which reads as "the model hates everything". */
 function mlTextColor(score: number | null): string {
   if (score == null) return "var(--text-muted)";
-  if (score >= 80) return "var(--accent-cyan)";
-  if (score >= 60) return "var(--accent-blue)";
-  if (score >= 40) return "var(--text-secondary)";
-  return "var(--accent-red)";
+  if (score >= 55) return "var(--accent-cyan)";
+  if (score >= 45) return "var(--accent-blue)";
+  if (score >= 30) return "var(--text-secondary)";
+  return "var(--text-muted)";
 }
 
 interface Props {
@@ -578,6 +583,10 @@ export function EntryTape({
   const { data: tickerMeta } = useTickerMeta();
   const { data: tickerTech } = useTickerTechnicals();
   const { data: tickerGex } = useTickerGex();
+  // Sorted ML scores across everything loaded — lets the ML tooltip translate
+  // an absolute score into "top X% of prints", which is how the rebased scale
+  // has to be read (45 is top ~8%, not a failing grade).
+  // (declared just below `entries`)
   // Merge all entries across the selected dates into a single flat list.
   // Per-entry msg_id stays unique across dates because Discord snowflakes
   // are globally unique.
@@ -589,6 +598,15 @@ export function EntryTape({
     }
     return out;
   }, [dateQueries]);
+
+  const mlSorted = useMemo(() => {
+    const v: number[] = [];
+    for (const e of entries) {
+      const m = (e as { notable?: { ml_score?: number | null } }).notable?.ml_score;
+      if (m != null) v.push(m);
+    }
+    return v.sort((a, b) => a - b);
+  }, [entries]);
 
   // Three filter modes:
   //   none    — show everything
@@ -1281,11 +1299,18 @@ export function EntryTape({
             {/* ML — gradient boosting P(peak P/L > +100%) — notable_ml_v4. */}
             {(() => {
               const ml = r.notable?.ml_score ?? null;
+              let pctile = "";
+              if (ml != null && mlSorted.length > 4) {
+                const below = mlSorted.filter((v) => v < ml).length;
+                pctile = `top ${Math.max(1, Math.round(100 - (below / mlSorted.length) * 100))}% of ${mlSorted.length} loaded prints`;
+              }
               const mlTitle = ml == null
                 ? "ML score unavailable (model bundle not loaded server-side)"
-                : `ML probability: ${ml}/100\n` +
-                  `Trained classifier — P("option peak P/L will exceed +100%" at some point during its lifetime)\n` +
-                  `Source: notable_ml_v4 (gradient boosting, peak-graded labels)`;
+                : `ML ${ml} = model P(peak P/L exceeds +100% within 10 TRADING days)\n` +
+                  (pctile ? `${pctile}\n` : "") +
+                  `Scale rebased 2026-08-07 — tops out mid-60s; 45+ is ~top 8% of the corpus\n` +
+                  `and the persona gate. Old 90s came from mispriced lifetime labels.\n` +
+                  `Source: notable_ml_v4 (gradient boosting, 10d peak-graded labels)`;
               return (
                 <span
                   className="w-10 text-center font-semibold num max-md:hidden"
