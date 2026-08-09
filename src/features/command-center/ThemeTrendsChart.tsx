@@ -64,14 +64,21 @@ const ROT_WINDOW: Record<number, RotationWindow> = {
 function ThemeRotationView({
   data,
   isFetching,
-  patchIFlow,
+  onSelectTheme,
   categoryFilter,
 }: {
-  patchIFlow: (p: { categoryFilter: string }) => void;
+  onSelectTheme: (cat: string) => void;
   categoryFilter: string;
   data: import("../../api/rotation").RotationResponse | undefined;
   isFetching: boolean;
 }) {
+  /* Hooks BEFORE any early return — bailing out first would change the hook
+   * count between the loading and loaded renders, which React rejects. */
+  const dates = data?.ok ? data.sectors[0]?.history.map((p) => p.date) ?? [] : [];
+  const [idx, setIdx] = useState(0);
+  // snap to today whenever the window changes underneath us
+  useEffect(() => setIdx(Math.max(0, dates.length - 1)), [dates.length]);
+
   if (isFetching && !data) {
     return (
       <div className="h-[200px] flex items-center justify-center text-xs text-text-muted animate-pulse">
@@ -86,23 +93,9 @@ function ThemeRotationView({
       </div>
     );
   }
-  const dates = data.sectors[0]?.history.map((p) => p.date) ?? [];
-  const [idx, setIdx] = useState(Math.max(0, dates.length - 1));
-  // snap to today whenever the window changes underneath us
-  useEffect(() => setIdx(Math.max(0, dates.length - 1)), [dates.length]);
 
   const scrubbed = idx < dates.length - 1;
-
-  /* Clicking a theme filters the iFlow Tracker (both Grid and Tape) to that
-   * taxonomy category — the rotation map's whole point is deciding where to
-   * look next, so it should hand you the flow rather than make you re-find it.
-   * Clicking the active theme again clears it. */
-  const selectTheme = (cat: string) => {
-    patchIFlow({ categoryFilter: categoryFilter === cat ? "" : cat });
-    document
-      .querySelector("[data-iflow-anchor]")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  const selectTheme = onSelectTheme;
   return (
     /* Size the map COLUMN to the map. A plain 2-col split leaves the capped
        square stranded in the middle of a very wide column on large screens,
@@ -153,6 +146,17 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
   const patchIFlow = useDashboardFilters((st) => st.patchIFlow);
   const categoryFilter = useDashboardFilters((st) => st.iflow.categoryFilter);
 
+  /* Clicking a theme — in EITHER view — filters the iFlow Tracker (Grid and
+   * Tape) to that taxonomy category. Deciding where to look next is the point
+   * of both views, so both should hand you the flow rather than make you
+   * re-find it. Clicking the active theme again clears the filter. */
+  const selectTheme = (cat: string) => {
+    patchIFlow({ categoryFilter: categoryFilter === cat ? "" : cat });
+    document
+      .querySelector("[data-iflow-anchor]")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   // Smooth harder over longer windows (more points to lean on).
   const span = days <= 7 ? 3 : days <= 30 ? 4 : 6;
 
@@ -190,7 +194,7 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
           style={{ background: heatColor(v) }}
         />
       ))}
-      <span>hot · 1.0× = baseline · EMA-weighted</span>
+      <span>hot · 1.0× = baseline · EMA-weighted · click a theme to filter the flow tracker</span>
     </div>
   );
 
@@ -231,7 +235,7 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
 
       {view === "rotation" && (
         <ThemeRotationView data={rot.data} isFetching={rot.isFetching}
-                           patchIFlow={patchIFlow} categoryFilter={categoryFilter} />
+                           onSelectTheme={selectTheme} categoryFilter={categoryFilter} />
       )}
 
       {view === "matrix" && (!hasData ? (
@@ -245,15 +249,31 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
           {/* Heat matrix — one row per theme (hottest first), one cell per
               flow-day coloured by EMA-smoothed heat, then current × + trend. */}
           <div className="space-y-1">
-            {rows.map((r) => (
+            {rows.map((r) => {
+              const active = categoryFilter === r.cat;
+              return (
               <div
                 key={r.cat}
-                className="grid items-center gap-2"
-                style={{ gridTemplateColumns: "108px 1fr 84px" }}
+                onClick={() => selectTheme(r.cat)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectTheme(r.cat); }
+                }}
+                aria-label={`Filter flow to ${r.cat.replace(/_/g, " ")}`}
+                title={`${r.cat} — click to filter the flow tracker`}
+                className="grid items-center gap-2 cursor-pointer rounded px-1 -mx-1 hover:bg-bg-card-hover"
+                style={{
+                  gridTemplateColumns: "108px 1fr 84px",
+                  background: active
+                    ? "color-mix(in srgb, var(--accent-cyan) 12%, transparent)"
+                    : undefined,
+                  opacity: categoryFilter && !active ? 0.55 : 1,
+                }}
               >
                 <span
-                  className="text-xs text-text-secondary truncate"
-                  title={r.cat}
+                  className="text-xs truncate"
+                  style={{ color: active ? "var(--accent-cyan)" : "var(--text-secondary)" }}
                 >
                   {r.cat.replace(/_/g, " ")}
                 </span>
@@ -280,7 +300,8 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
                   <TrendArrow delta={r.delta} />
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="num text-xs text-text-muted mt-2">
