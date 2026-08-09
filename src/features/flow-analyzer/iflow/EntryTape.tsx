@@ -391,11 +391,11 @@ function scoreTextColor(score: number | null): string {
  * prints and the persona gate. The old >=80/>=60 cutoffs were tuned to the
  * lifetime-target scale and made every honest score render as mediocre gray,
  * which reads as "the model hates everything". */
-function mlTextColor(score: number | null): string {
-  if (score == null) return "var(--text-muted)";
-  if (score >= 55) return "var(--accent-cyan)";
-  if (score >= 45) return "var(--accent-blue)";
-  if (score >= 30) return "var(--text-secondary)";
+function mlTextColor(rank: number | null): string {
+  if (rank == null) return "var(--text-muted)";
+  if (rank >= 94) return "var(--accent-cyan)";     // ~the ML>=45 persona-gate zone
+  if (rank >= 80) return "var(--accent-blue)";
+  if (rank >= 50) return "var(--text-secondary)";
   return "var(--text-muted)";
 }
 
@@ -513,6 +513,8 @@ interface NotableScore {
    *  NULL when the model bundle isn't loadable. Rendered in the "ML"
    *  column, sortable, separately colored from NScore. */
   ml_score?: number | null;
+  /** 0-100 display percentile of ml_score vs the last 60d of prints. */
+  ml_rank?: number | null;
   /** Model's predicted peak P/L %. From the same v4 bundle's regressor
    *  (`reg_peak`). NOT magnitude-calibrated (test R² was negative); use
    *  this for RANKING / order-of-magnitude only. A predicted +85% says
@@ -583,10 +585,6 @@ export function EntryTape({
   const { data: tickerMeta } = useTickerMeta();
   const { data: tickerTech } = useTickerTechnicals();
   const { data: tickerGex } = useTickerGex();
-  // Sorted ML scores across everything loaded — lets the ML tooltip translate
-  // an absolute score into "top X% of prints", which is how the rebased scale
-  // has to be read (45 is top ~8%, not a failing grade).
-  // (declared just below `entries`)
   // Merge all entries across the selected dates into a single flat list.
   // Per-entry msg_id stays unique across dates because Discord snowflakes
   // are globally unique.
@@ -598,15 +596,6 @@ export function EntryTape({
     }
     return out;
   }, [dateQueries]);
-
-  const mlSorted = useMemo(() => {
-    const v: number[] = [];
-    for (const e of entries) {
-      const m = (e as { notable?: { ml_score?: number | null } }).notable?.ml_score;
-      if (m != null) v.push(m);
-    }
-    return v.sort((a, b) => a - b);
-  }, [entries]);
 
   // Three filter modes:
   //   none    — show everything
@@ -1298,26 +1287,22 @@ export function EntryTape({
             </span>
             {/* ML — gradient boosting P(peak P/L > +100%) — notable_ml_v4. */}
             {(() => {
-              const ml = r.notable?.ml_score ?? null;
-              let pctile = "";
-              if (ml != null && mlSorted.length > 4) {
-                const below = mlSorted.filter((v) => v < ml).length;
-                pctile = `top ${Math.max(1, Math.round(100 - (below / mlSorted.length) * 100))}% of ${mlSorted.length} loaded prints`;
-              }
-              const mlTitle = ml == null
+              const prob = r.notable?.ml_score ?? null;
+              const rank = r.notable?.ml_rank ?? prob;   // rank; prob fallback pre-map
+              const mlTitle = rank == null
                 ? "ML score unavailable (model bundle not loaded server-side)"
-                : `ML ${ml} = model P(peak P/L exceeds +100% within 10 TRADING days)\n` +
-                  (pctile ? `${pctile}\n` : "") +
-                  `Scale rebased 2026-08-07 — tops out mid-60s; 45+ is ~top 8% of the corpus\n` +
-                  `and the persona gate. Old 90s came from mispriced lifetime labels.\n` +
+                : `ML ${rank} = percentile vs the last 60 days of prints (0-100)\n` +
+                  `${prob != null ? `Raw model probability: ${prob}% chance of doubling within 10 TRADING days\n` : ""}` +
+                  `94+ is the persona-gate zone (raw >= 45). Ranking order is identical to the\n` +
+                  `raw probability — this is a display scale, not a different model.\n` +
                   `Source: notable_ml_v4 (gradient boosting, 10d peak-graded labels)`;
               return (
                 <span
                   className="w-10 text-center font-semibold num max-md:hidden"
-                  style={{ color: mlTextColor(ml) }}
+                  style={{ color: mlTextColor(rank) }}
                   title={mlTitle}
                 >
-                  {ml != null ? ml : "—"}
+                  {rank != null ? rank : "—"}
                 </span>
               );
             })()}

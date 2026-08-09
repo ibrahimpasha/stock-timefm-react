@@ -67,6 +67,9 @@ export function TopSignals({ date, dteFilter }: { date: string; dteFilter: DteFi
       const ticker = String(e.ticker || "").toUpperCase();
       if (!ticker || !matchesDte(e.dte, dteFilter)) continue;
       const ml = e.notable?.ml_score ?? null;
+      // 0-100 display percentile — what the user-facing text shows; the
+      // SETUP x ML average keeps the raw probability so its meaning is stable
+      const mlRank = e.notable?.ml_rank ?? ml;
       const { side } = classifySide(e.type || e.option_type, e.ask_pct, e.vol_oi_ratio, e.side);
       const su = setupScore(side as "Bull" | "Bear", tickerMeta?.[ticker], tickerTech?.[ticker], tickerGex?.[ticker]);
       const avg = avgScore(su.score, ml);
@@ -86,7 +89,10 @@ export function TopSignals({ date, dteFilter }: { date: string; dteFilter: DteFi
 
       const t = tickerTech?.[ticker];
       const reasons: string[] = [];
-      if (ml != null) reasons.push(`ML ${ml} — contract quality (P of doubling ≤10td)`);
+      if (mlRank != null) {
+        reasons.push(`ML ${mlRank} — contract quality percentile` +
+          (ml != null ? ` (raw ${ml}% chance of doubling ≤10td)` : ""));
+      }
       if (su.score != null) {
         const bits: string[] = [];
         if (su.tech != null) bits.push(`trend ${su.tech >= 0 ? "+" : ""}${Math.round(su.tech * 100)}`);
