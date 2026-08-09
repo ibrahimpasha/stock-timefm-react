@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { TrendingUp, ArrowUp, ArrowDown, Minus } from "lucide-react";
-import { useThemeHeatHistory } from "../../api/themeHeat";
+import { useThemeHeatHistory, useThemePnlHistory } from "../../api/themeHeat";
 import { useThemeRotation, type RotationWindow } from "../../api/rotation";
 import { useDashboardFilters } from "../../store/useDashboardFilters";
 import { RotationMap, MomentumRanking, AlertFeed, RotationScrubber } from "../rotation/RotationViz";
@@ -138,11 +138,156 @@ function ThemeRotationView({
   );
 }
 
+/* P/L view — the same grid as Heat, coloured by what each theme's flow actually
+ * DID instead of how loud it was.
+ *
+ * Deliberately BACKWARD-LOOKING and labelled as such: theme P/L persistence was
+ * measured at +1.3pp top-vs-bottom quartile over 5 independent periods, p=0.67
+ * — directionally positive but unproven. This is a scoreboard, not a forecast.
+ *
+ * Colour is centred on the corpus base rate, not on zero: P(2x) is bounded and
+ * its no-information point is ~31%, so green/red means "beat / missed the
+ * average theme", which is the only comparison that means anything here. */
+function ThemePnlView({
+  data,
+  isFetching,
+  onSelectTheme,
+  categoryFilter,
+}: {
+  data: import("../../api/themeHeat").ThemePnlHistory | undefined;
+  isFetching: boolean;
+  onSelectTheme: (cat: string) => void;
+  categoryFilter: string;
+}) {
+  const rows = useMemo(() => {
+    if (!data) return [];
+    return data.categories
+      .map((cat) => {
+        const vals = data.series[cat] ?? [];
+        const nn = vals.filter((v): v is number => v != null);
+        return {
+          cat, vals,
+          counts: data.counts?.[cat] ?? [],
+          raw: data.raw?.[cat] ?? [],
+          current: data.latest[cat] ?? null,
+          spark: nn,
+        };
+      })
+      .sort((a, b) => (b.current ?? -1) - (a.current ?? -1));
+  }, [data]);
+
+  if (isFetching && !data) {
+    return <div className="h-[120px] flex items-center justify-center text-xs text-text-muted animate-pulse">loading P/L…</div>;
+  }
+  if (!data || !data.dates.length) {
+    return (
+      <div className="py-4 text-xs text-text-muted">
+        No graded theme P/L yet — run <code className="num">scripts/backfill_theme_pnl.py</code>.
+      </div>
+    );
+  }
+
+  const base = data.base_rate || 0.31;
+  /** Diverging around the base rate; null = 10d window still open. */
+  const color = (v: number | null): string => {
+    if (v == null) return "transparent";
+    const d = (v - base) / (base * 0.6);          // ±60% of base saturates
+    const t = Math.max(-1, Math.min(1, d));
+    return t >= 0
+      ? `color-mix(in srgb, var(--accent-green) ${Math.round(18 + t * 82)}%, var(--bg-card-hover))`
+      : `color-mix(in srgb, var(--accent-red) ${Math.round(18 + -t * 82)}%, var(--bg-card-hover))`;
+  };
+
+  return (
+    <>
+      <div className="flex items-center flex-wrap gap-1 text-xs text-text-muted mb-2">
+        <span>worse</span>
+        {[-1, -0.5, 0, 0.5, 1].map((k) => (
+          <span key={k} className="inline-block w-3 h-3 rounded-sm"
+                style={{ background: color(base + k * base * 0.6) }} />
+        ))}
+        <span>better · neutral = {(base * 100).toFixed(0)}% (corpus average)</span>
+        <span className="ml-1">· cell = P(a print that day doubled within 10 trading days)</span>
+      </div>
+
+      <div className="space-y-1">
+        {rows.map((r) => {
+          const active = categoryFilter === r.cat;
+          return (
+            <div
+              key={r.cat}
+              onClick={() => onSelectTheme(r.cat)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelectTheme(r.cat); }
+              }}
+              aria-label={`Filter flow to ${r.cat.replace(/_/g, " ")}`}
+              className="grid items-center gap-2 cursor-pointer rounded px-1 -mx-1 hover:bg-bg-card-hover"
+              style={{
+                gridTemplateColumns: "108px 1fr 84px",
+                background: active ? "color-mix(in srgb, var(--accent-cyan) 12%, transparent)" : undefined,
+                opacity: categoryFilter && !active ? 0.55 : 1,
+              }}
+            >
+              <span className="text-xs truncate"
+                    style={{ color: active ? "var(--accent-cyan)" : "var(--text-secondary)" }}>
+                {r.cat.replace(/_/g, " ")}
+              </span>
+
+              <div className="flex gap-px h-4">
+                {r.vals.map((v, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 rounded-sm"
+                    style={{
+                      background: color(v),
+                      minWidth: 2,
+                      // pending cells read as a gap, never as a bad outcome
+                      border: v == null ? "1px dashed var(--border)" : undefined,
+                      opacity: v == null ? 0.35 : 1,
+                    }}
+                    title={
+                      v == null
+                        ? `${r.cat} ${data.dates[i]}: 10-day window still open`
+                        : `${r.cat} ${data.dates[i]}: ${((r.raw[i] ?? 0) * 100).toFixed(0)}% doubled ` +
+                          `(${r.counts[i] ?? 0} graded ${r.counts[i] === 1 ? "entry" : "entries"}` +
+                          `, shown ${(v * 100).toFixed(0)}% after shrinkage)`
+                    }
+                  />
+                ))}
+              </div>
+
+              <div className="flex items-center justify-end gap-1">
+                <Sparkline points={r.spark} width={36} height={14}
+                           color={color(r.current)} />
+                <span className="num text-xs w-9 text-right"
+                      style={{ color: r.current != null && r.current >= base
+                        ? "var(--accent-green)" : "var(--accent-red)" }}>
+                  {r.current != null ? `${(r.current * 100).toFixed(0)}%` : "—"}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="num text-xs text-text-muted mt-2">
+        {data.dates[0]} → {data.dates[data.dates.length - 1]} · {data.dates.length} flow-days
+        {data.pending ? ` · ${data.pending} cells pending (10d window open)` : ""}
+        {" · "}backward-looking scoreboard — persistence measured at +1.3pp, p=0.67, so
+        {" "}this is what DID pay, not what will
+      </div>
+    </>
+  );
+}
+
 export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
   const [days, setDays] = useState<number>(7);
-  const [view, setView] = useState<"matrix" | "rotation">("matrix");
+  const [view, setView] = useState<"matrix" | "pnl" | "rotation">("matrix");
   const { data, isFetching } = useThemeHeatHistory(days);
   const rot = useThemeRotation(ROT_WINDOW[days] ?? "1M", view === "rotation");
+  const pnl = useThemePnlHistory(days, view === "pnl");
   const patchIFlow = useDashboardFilters((st) => st.patchIFlow);
   const categoryFilter = useDashboardFilters((st) => st.iflow.categoryFilter);
 
@@ -208,7 +353,9 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
             <TrendingUp size={11} />
             Theme trends
             <span className="normal-case tracking-normal font-normal text-text-muted ml-1">
-              flow heat over time
+              {view === "pnl" ? "what each theme's flow actually did"
+                : view === "rotation" ? "where money is rotating"
+                : "flow heat over time"}
             </span>
           </div>
         ) : (
@@ -223,15 +370,21 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
           <Segmented
             options={[
               { value: "matrix", label: "Heat" },
+              { value: "pnl", label: "P/L" },
               { value: "rotation", label: "Rotation" },
             ]}
             value={view}
-            onChange={(v) => setView(v as "matrix" | "rotation")}
+            onChange={(v) => setView(v as "matrix" | "pnl" | "rotation")}
             ariaLabel="Theme view"
           />
           {windowToggle}
         </div>
       </div>
+
+      {view === "pnl" && (
+        <ThemePnlView data={pnl.data} isFetching={pnl.isFetching}
+                      onSelectTheme={selectTheme} categoryFilter={categoryFilter} />
+      )}
 
       {view === "rotation" && (
         <ThemeRotationView data={rot.data} isFetching={rot.isFetching}
