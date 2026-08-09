@@ -95,6 +95,11 @@ export type GexMetric = "gex" | "vex" | "oi" | "vol" | "unusual";
 export interface GexCell {
   gex: number | null;
   vex: number | null;
+  /** Chain-average IV behind the greeks (null on rows built pre-migration). */
+  iv?: number | null;
+  /** BS call delta at this strike/expiry — the probability-ish context that
+   *  stops "green cell = buy the call" misreads. */
+  delta?: number | null;
   oi: number;
   vol: number;
   call_oi: number;

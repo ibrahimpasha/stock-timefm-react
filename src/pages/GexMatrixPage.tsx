@@ -289,7 +289,10 @@ export function GexMatrixPage() {
                             className="px-2 py-1.5 text-center num rounded"
                             title={
                               c
-                                ? `${k} ${e.label} — OI ${c.oi} (C ${c.call_oi}/P ${c.put_oi}), vol ${c.vol}`
+                                ? `${k} ${e.label} — ${spot ? `${k >= spot ? "+" : ""}${(((k - spot) / spot) * 100).toFixed(1)}% to strike` : ""}`
+                                  + `${c.delta != null ? ` · call Δ ${c.delta.toFixed(2)}` : ""}`
+                                  + ` · OI ${c.oi} (C ${c.call_oi}/P ${c.put_oi}), vol ${c.vol}`
+                                  + ` — gamma is positioning, not P(profit)`
                                 : undefined
                             }
                             style={{
@@ -340,7 +343,10 @@ export function GexMatrixPage() {
 
       <p className="text-[10px] text-text-muted px-1">
         Sign convention: dealers long calls, short puts. Positive (green) gamma dampens moves
-        through that strike; negative (red) amplifies them. Greeks are Black-Scholes from each
+        through that strike; negative (red) amplifies them. <strong>Green is dealer positioning,
+        not a buy signal</strong> — a big green cell often acts as a magnet/pin, and a call there
+        still needs spot to travel to it. Hover any cell for the % move required and the
+        call&apos;s delta. Greeks are Black-Scholes from each
         chain's own implied vol — yfinance does not publish them. Refreshed by
         <code className="num"> scripts/backfill_gex_matrix.py</code> on the daily timer, so the
         grid is end-of-day positioning, not a live tape.
