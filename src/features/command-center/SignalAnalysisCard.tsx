@@ -67,7 +67,13 @@ function ScoreBar({ value, color }: { value: number; color: string }) {
     <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
       <div
         className="h-full rounded-full"
-        style={{ width: `${pct}%`, background: color, transition: "width .35s ease" }}
+        style={{
+          width: "100%",
+          background: color,
+          transform: `scaleX(${pct / 100})`,
+          transformOrigin: "left",
+          transition: "transform .35s ease",
+        }}
       />
     </div>
   );
@@ -341,10 +347,17 @@ export function SignalAnalysisCard({ ticker }: Props) {
               <>
                 <ScoreBar value={ml.peak_score} color="var(--accent-purple)" />
                 <div className="text-xs text-text-muted leading-snug mt-1.5">
-                  P(option peak &gt; +100%) · best of <span className="num">{ml.n_entries}</span> flow{" "}
+                  ML percentile within similar DTE · best of <span className="num">{ml.n_entries}</span> flow{" "}
                   {ml.n_entries === 1 ? "entry" : "entries"}
                   {ml.as_of ? ` · ${ml.as_of}` : ""}
-                  <div className="opacity-70">ranking signal for spike potential — not a P/L forecast</div>
+                  {ml.peak_probability != null && (
+                    <div className="opacity-70">
+                      Estimated P(2x in 10 sessions): <span className="num">{ml.peak_probability}%</span>
+                    </div>
+                  )}
+                  <div className="opacity-70">
+                    {ml.gate_approved ? "validated trading gate" : "research ranking only"}
+                  </div>
                 </div>
               </>
             ) : (

@@ -209,6 +209,8 @@ export interface SignalConvergence {
 
 export interface SignalML {
   peak_score: number;
+  peak_probability?: number | null;
+  gate_approved?: boolean;
   n_entries: number;
   as_of: string | null;
   best: {

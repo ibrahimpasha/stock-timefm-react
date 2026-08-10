@@ -74,8 +74,7 @@ function passesKianFilter(entry: {
  *   "notable_nscore"  → NScore ≥ threshold (heuristic)
  *   "notable_ml"      → ML ≥ threshold (model)
  *   "notable_both"    → BOTH NScore AND ML ≥ threshold (intersection)
- *   "avg_sweet"       → AVG ∈ [75, 85)  (empirical sweet spot per 14d bucket
- *                       study — best median current P/L, lowest drawdown rate)
+ *   "avg_sweet"       → AVG ∈ [75, 85) composite-rank band
  * The Flowseidon "kian" filter remains mutually exclusive with all
  * Notable variants — clicking Flowseidon clears whichever Notable was on
  * and vice versa.
@@ -83,6 +82,8 @@ function passesKianFilter(entry: {
 type FilterMode = "none" | "notable_nscore" | "notable_ml" | "notable_both" | "avg_sweet" | "kian" | "outliers";
 
 const NOTABLE_CYCLE: FilterMode[] = ["none", "notable_nscore", "notable_ml", "notable_both", "avg_sweet"];
+const NSCORE_THRESHOLD = 65;
+const ML_RANK_THRESHOLD = 90;
 
 /** Visual + label per Notable filter state. Picked so the operator
  *  always knows which lens is active without reading the tooltip. */
@@ -325,17 +326,8 @@ function setupTextColor(score: number | null): string {
   return "var(--accent-red)"; // underlying setup contradicts the trade
 }
 
-/** Average-score helper. Returns (setup + ml) / 2 when both present,
- *  whichever single one is present otherwise, null when neither is.
- *
- *  Switched from (nscore + ml) 2026-08-07: on the 2-week efficacy audit,
- *  averaging nscore into ML measurably DILUTED it (AUC 0.640 vs ML alone
- *  0.666), while setup+ML beat everything (AUC 0.695, pick-sim profit
- *  factor 5.2 vs 3.5) — setup is the only directional input, and it
- *  caught the 7/29-window monsters ML alone missed (COHR +893%,
- *  TQQQ +636%, SPY +524%). Caveat: setup used TODAY's technicals in
- *  that audit (no history existed) — treat the margin as an upper
- *  bound until ticker_technicals_history accumulates ~4wks. */
+/** Ranking blend only, not a calibrated probability or validated outcome
+ * estimate. Returns whichever component exists when the other is absent. */
 export function avgScore(setup: number | null | undefined,
                   ml: number | null | undefined): number | null {
   const su = typeof setup === "number" ? setup : null;
@@ -384,17 +376,10 @@ function scoreTextColor(score: number | null): string {
   return "var(--text-secondary)";
 }
 
-/** ML score color — distinct accent so the user can't confuse it with
- *  the heuristic NScore. Cyan/blue tone matches the Flowseidon filter
- *  chip semantic (different system). */
-/* Thresholds match the 2026-08-07 rescale: ML is now P(peak > +100% within 10
- * TRADING days), which tops out in the mid-60s — 45+ is roughly the top 8% of
- * prints and the persona gate. The old >=80/>=60 cutoffs were tuned to the
- * lifetime-target scale and made every honest score render as mediocre gray,
- * which reads as "the model hates everything". */
+/** ML rank color. The value is a within-DTE percentile, not probability. */
 function mlTextColor(rank: number | null): string {
   if (rank == null) return "var(--text-muted)";
-  if (rank >= 94) return "var(--accent-cyan)";     // ~the ML>=45 persona-gate zone
+  if (rank >= 94) return "var(--accent-cyan)";
   if (rank >= 80) return "var(--accent-blue)";
   if (rank >= 50) return "var(--text-secondary)";
   return "var(--text-muted)";
@@ -507,21 +492,13 @@ interface NotableScore {
     voices_sentiment?: string;
     component_scores?: Record<string, number>;
   };
-  /** ML probability (0-100) that the option's peak P/L exceeds +100%
-   *  WITHIN 10 TRADING DAYS of the print (retargeted 2026-08-07 — the
-   *  old lifetime target rewarded long DTE, not moves). From the
-   *  notable_ml_v4 bundle (v5-10d) — gradient-boosting classifier.
-   *  NULL when the model bundle isn't loadable. Rendered in the "ML"
-   *  column, sortable, separately colored from NScore. */
-  /** MLScore v5 — 0-100 percentile vs the trailing 60d of prints. THE scale. */
+  /** MLScore 0-100 percentile among similar-DTE recent prints. */
   ml_score?: number | null;
-  /** Calibrated P(peak > +100% within 10 trading days), %, for tooltips. */
+  /** Estimated P(peak > +100% in the next 10 sessions), %, for tooltips. */
   ml_prob?: number | null;
-  /** Model's predicted peak P/L %. From the same v4 bundle's regressor
-   *  (`reg_peak`). NOT magnitude-calibrated (test R² was negative); use
-   *  this for RANKING / order-of-magnitude only. A predicted +85% says
-   *  "model thinks this is upper-band of outcomes", not exactly +85%.
-   *  Rendered in the "PRED PEAK" column, sortable, distinct accent. */
+  /** True only when the artifact passed causal, persona-specific validation. */
+  ml_gate_approved?: boolean;
+  /** Predicted peak P/L, absent when the regressor fails holdout validation. */
   predicted_peak_pnl?: number | null;
 }
 
@@ -613,8 +590,6 @@ export function EntryTape({
   // whole tab unmounts on tab switch; local useState would reset on remount).
   const { filterMode, sortKey, sortDir, outlierMin } = useDashboardFilters((s) => s.tape);
   const patchTape = useDashboardFilters((s) => s.patchTape);
-  const NOTABLE_THRESHOLD = 65;
-
   // Kian-mode contract aggregation. Groups entries by
   // (ticker, normalized type, strike, expiry) — collapses C/CALL and
   // P/PUT label inconsistency — sums premium, keeps the strongest ask%
@@ -752,21 +727,18 @@ export function EntryTape({
       // scans are smaller. Filters are skipped when their required data
       // is missing (e.g. backend score absent) so we don't accidentally
       // hide every row on a partial response.
-      if (filterMode === "notable_nscore" && notable && notable.score < NOTABLE_THRESHOLD) continue;
+      if (filterMode === "notable_nscore" && notable && notable.score < NSCORE_THRESHOLD) continue;
       if (filterMode === "notable_ml") {
         const ml = notable?.ml_score;
-        if (ml != null && ml < NOTABLE_THRESHOLD) continue;
+        if (ml != null && ml < ML_RANK_THRESHOLD) continue;
       }
       if (filterMode === "notable_both") {
-        if (notable && notable.score < NOTABLE_THRESHOLD) continue;
+        if (notable && notable.score < NSCORE_THRESHOLD) continue;
         const ml = notable?.ml_score;
-        if (ml != null && ml < NOTABLE_THRESHOLD) continue;
+        if (ml != null && ml < ML_RANK_THRESHOLD) continue;
       }
       if (filterMode === "avg_sweet") {
-        // Empirical sweet spot from 14d bucket study:
-        // AVG ∈ [75, 85) had highest median current P/L (+23.8%) and
-        // lowest drawdown rate (18.9%). 85+ bucket has higher mean but
-        // higher variance; 65-75 has positive but lower hit-rate.
+        // Composite-rank exploration band; not an outcome probability.
         const ns = notable?.score;
         const ml = notable?.ml_score;
         if (ns == null || ml == null) continue;
@@ -951,8 +923,8 @@ export function EntryTape({
     for (const e of entries as any[]) {
       const ns = e?.notable?.score;
       const ml = e?.notable?.ml_score;
-      const nsHit = ns != null && ns >= NOTABLE_THRESHOLD;
-      const mlHit = ml != null && ml >= NOTABLE_THRESHOLD;
+      const nsHit = ns != null && ns >= NSCORE_THRESHOLD;
+      const mlHit = ml != null && ml >= ML_RANK_THRESHOLD;
       if (nsHit) n += 1;
       if (mlHit) m += 1;
       if (nsHit && mlHit) b += 1;
@@ -1074,10 +1046,10 @@ export function EntryTape({
             };
             const tooltipFor: Record<FilterMode, string> = {
               none: `Click to cycle: Top NScore (${notableCounts.nscore}) → Top ML (${notableCounts.ml}) → Top Both (${notableCounts.both}) → AVG 75-85 (${notableCounts.sweet}) → off`,
-              notable_nscore: `Heuristic NScore ≥ ${NOTABLE_THRESHOLD}. Click → Top ML.`,
-              notable_ml: `ML probability ≥ ${NOTABLE_THRESHOLD} (P[peak P/L > +100%]). Click → Top Both.`,
-              notable_both: `BOTH NScore AND ML ≥ ${NOTABLE_THRESHOLD} — the picks both systems agree on. Click → AVG 75-85.`,
-              avg_sweet: `AVG ∈ [75, 85) — empirical sweet spot from 14d bucket study (best median P/L, lowest drawdown rate). Click → off.`,
+              notable_nscore: `Heuristic NScore ≥ ${NSCORE_THRESHOLD}. Click → Top ML.`,
+              notable_ml: `Within-DTE ML percentile ≥ ${ML_RANK_THRESHOLD}. Click → Top Both.`,
+              notable_both: `NScore ≥ ${NSCORE_THRESHOLD} and ML rank ≥ ${ML_RANK_THRESHOLD}. Click → AVG 75-85.`,
+              avg_sweet: `AVG ∈ [75, 85) composite-rank band. Click → off.`,
               kian: "",
               outliers: "",
             };
@@ -1259,13 +1231,8 @@ export function EntryTape({
               ...borderStyle,
             }}
           >
-            {/* AVG — promoted to first position. Mean of SETUP + ML
-                (switched from NScore+ML 2026-08-07 — see avgScore()):
-                ML grades the contract, SETUP grades whether the
-                underlying backs the direction; the 2wk audit showed
-                this pair beats ML alone (AUC 0.695 vs 0.666) while
-                nscore dilutes. Bigger / bolder than the individual
-                columns since it's the headline number. */}
+            {/* AVG is a compact ranking blend of directional setup and the
+                within-DTE ML percentile. It is not an outcome probability. */}
             {(() => {
               const su = setupScore(r.side, tickerMeta?.[r.ticker], tickerTech?.[r.ticker], tickerGex?.[r.ticker]).score;
               const ml = r.notable?.ml_score;
@@ -1273,10 +1240,8 @@ export function EntryTape({
               const title = avg == null
                 ? "Average score unavailable (no SETUP + ML data)"
                 : `AVG = ${avg}/100  (SETUP ${su ?? "—"} + ML ${ml ?? "—"} / 2)\n` +
-                  `Headline score — contract quality (ML) × directional agreement (SETUP).\n` +
-                  `2wk audit: beats ML alone (AUC 0.695 vs 0.666; pick profit factor 5.2 vs 3.5).\n` +
-                  `Caveat: SETUP edge measured on current technicals (lookahead) — ` +
-                  `honest validation lands once technicals history accumulates.`;
+                  `Composite rank: within-DTE ML percentile plus directional setup.\n` +
+                  `Use for ordering only; it is not a calibrated probability.`;
               return (
                 <span
                   className="w-12 text-center font-bold text-sm num"
@@ -1297,16 +1262,15 @@ export function EntryTape({
             >
               {scoreNum != null ? scoreNum : "—"}
             </span>
-            {/* ML — gradient boosting P(peak P/L > +100%) — notable_ml_v4. */}
+            {/* ML percentile and its separate estimated probability. */}
             {(() => {
               const ml = r.notable?.ml_score ?? null;
               const prob = r.notable?.ml_prob ?? null;
               const mlTitle = ml == null
                 ? "ML score unavailable (model bundle not loaded server-side)"
-                : `ML ${ml} = percentile vs the trailing 60 days of prints (0-100)\n` +
-                  `${prob != null ? `Calibrated probability: ~${prob}% chance of doubling within 10 TRADING days\n` : ""}` +
-                  `94+ = persona-gate zone (top ~6%). Source: MLScore v5 (src/mlscore.py,\n` +
-                  `10d peak-graded labels, isotonic-calibrated)`;
+                : `ML ${ml} = percentile among similar-DTE recent prints (0-100)\n` +
+                  `${prob != null ? `Estimated probability: ~${prob}% chance of doubling in the next 10 sessions\n` : ""}` +
+                  `${r.notable?.ml_gate_approved ? "Artifact passed the trading-gate validation." : "Research ranking only; artifact is not approved to gate trades."}`;
               return (
                 <span
                   className="w-10 text-center font-semibold num max-md:hidden"
@@ -1477,7 +1441,7 @@ export function EntryTape({
                 upside is modest"). Cyan accent matches the ML column. */}
             {(() => {
               const raw = r.notable?.predicted_peak_pnl;
-              const ml = r.notable?.ml_prob ?? r.notable?.ml_score;
+              const ml = r.notable?.ml_prob;
               if (raw == null) {
                 return (
                   <span className="w-20 text-right num text-text-muted max-md:hidden" title="Predicted peak unavailable">

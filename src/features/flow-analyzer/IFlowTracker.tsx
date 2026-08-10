@@ -798,7 +798,7 @@ export function IFlowTracker() {
                   ["Esc", "escalating", "Strikes escalating (original default)"],
                   ["Accum", "accum", "Bullish accumulation (accumulation label / escalating bull side)"],
                   ["Play", "play", "Theme-Pulse play score ≥ threshold — capital-preservation tuned (accumulation + catalyst + technicals, penalizes stretched names)"],
-                  ["ML", "ml", "Best ML score ≥ threshold — P[option doubles] on recent flow"],
+                  ["ML", "ml", "Best within-DTE ML percentile ≥ threshold on recent flow"],
                 ] as const
               ).map(([l, v, tip]) => (
                 <ChipButton

@@ -66,7 +66,7 @@ const GROUP_OPTIONS: { id: GroupBy; label: string }[] = [
 const PULSE_OPTIONS: { id: Pulse; label: string; hint: string }[] = [
   { id: "off", label: "Off", hint: "no animation" },
   { id: "earnings", label: "Earnings", hint: "tiles breathe as an earnings date approaches within the window set by the Earnings filter slider (faster = sooner)" },
-  { id: "ml", label: "ML score", hint: "tiles breathe when the day's best ML score (P[option doubles]) is high" },
+  { id: "ml", label: "ML rank", hint: "tiles breathe when the day's best within-DTE ML percentile is high" },
   { id: "play", label: "Play score", hint: "tiles breathe when the Theme-Pulse play score is high" },
   { id: "technical", label: "TA setup", hint: "tiles breathe on a technical inflection (fib level / band edge / RSI extreme); ▲▼ = direction" },
   { id: "pattern", label: "Chart pattern", hint: "tiles breathe when a candlestick/chart pattern is detected; ▲▼ = pattern direction" },
@@ -247,7 +247,7 @@ export function FlowHeatmap() {
     for (const q of mlEntryQueries) {
       for (const e of q.data?.entries ?? []) {
         const tk = String(e.ticker || "").toUpperCase();
-        const ml = Number(e.ml_score ?? e.notable?.score ?? 0);
+        const ml = Number(e.notable?.ml_score ?? 0);
         if (tk && ml > (m.get(tk) ?? 0)) m.set(tk, ml);
       }
     }
@@ -633,7 +633,7 @@ export function FlowHeatmap() {
         <FilterSlider
           label="ML ≥" on={mlOn} value={mlMin} min={0} max={100} step={5}
           onToggle={(v) => patchHeatmap({ mlOn: v })} onValue={(v) => patchHeatmap({ mlMin: v })}
-          title="Hide tiles whose best ML score (P[option doubles]) is below this"
+          title="Hide tiles whose best within-DTE ML percentile is below this"
         />
         <FilterSlider
           label="Play ≥" on={playOn} value={playMin} min={0} max={100} step={5}
