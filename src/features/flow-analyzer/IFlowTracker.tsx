@@ -839,6 +839,7 @@ export function IFlowTracker() {
           {(
             [
               ["Any", "all"],
+              ["Today", "today"],
               ["1W", "1w"],
               ["2W", "2w"],
               ["1M", "1m"],

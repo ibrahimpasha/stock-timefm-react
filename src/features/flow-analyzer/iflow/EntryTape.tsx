@@ -18,6 +18,7 @@ import { estimateOptionPnl } from "./estimator";
 import type { BiasFilter, DteFilter } from "./types";
 import { dteTag } from "./utils";
 import { formatPremium } from "../../../lib/utils";
+import { daysFromToday } from "../../../lib/dateOnly";
 import { useTickerMeta, type TickerMeta } from "../../../api/tickerMeta";
 import { useTickerTechnicals, type TickerTechnical } from "../../../api/tickerTechnicals";
 import { useTickerGex, type TickerGex } from "../../../api/tickerGex";
@@ -215,7 +216,7 @@ function recomputeAggregateScore(
  *  switches to it with that column's default direction. */
 type SortKey =
   | "time" | "ticker" | "side" | "action" | "contract"
-  | "dte" | "voi" | "ask" | "atm" | "premium" | "pnl"
+  | "dte" | "ern" | "voi" | "ask" | "atm" | "premium" | "pnl"
   | "score" | "ml" | "setup" | "avg" | "pred_peak";
 type SortDir = "asc" | "desc";
 
@@ -223,7 +224,7 @@ type SortDir = "asc" | "desc";
  *  default to DESC ("biggest first"); text columns default to ASC. */
 const DEFAULT_DIR: Record<SortKey, SortDir> = {
   time: "desc", ticker: "asc", side: "asc", action: "asc", contract: "asc",
-  dte: "desc", voi: "desc", ask: "desc", atm: "desc", premium: "desc",
+  dte: "desc", ern: "asc", voi: "desc", ask: "desc", atm: "desc", premium: "desc",
   pnl: "desc", score: "desc", ml: "desc", setup: "desc", avg: "desc", pred_peak: "desc",
 };
 
@@ -900,6 +901,15 @@ export function EntryTape({
         case "action":   return strCmp(a.action, b.action, sortDir);
         case "contract": return numCmp(a.strike, b.strike, sortDir);
         case "dte":      return numCmp(a.dte, b.dte, sortDir);
+        case "ern": {
+          const ed = (t: string) => {
+            const d = earningsMap?.[t.toUpperCase()];
+            if (!d) return null;
+            const n = daysFromToday(d);
+            return n >= 0 ? n : null;
+          };
+          return numCmp(ed(a.ticker), ed(b.ticker), sortDir);
+        }
         case "voi":      return numCmp(a.voiRatio, b.voiRatio, sortDir);
         case "ask":      return numCmp(a.askPct, b.askPct, sortDir);
         case "atm":      return numCmp(a.moneyness, b.moneyness, sortDir);
@@ -922,7 +932,7 @@ export function EntryTape({
       }
     });
     return copy;
-  }, [rows, sortKey, sortDir, pnlByMsg, tickerMeta, tickerTech, tickerGex]);
+  }, [rows, sortKey, sortDir, pnlByMsg, tickerMeta, tickerTech, tickerGex, earningsMap]);
 
   const toggleSort = (k: SortKey) => {
     if (k === sortKey) {
@@ -1184,6 +1194,7 @@ export function EntryTape({
         {renderHeader("action", "action", "w-24 justify-start max-md:hidden")}
         {renderHeader("contract", "contract", "flex-1 min-w-[160px] justify-start max-md:min-w-[80px]")}
         {renderHeader("dte", "dte", "w-14 justify-start max-md:hidden")}
+        {renderHeader("ern", "ern", "w-10 justify-start max-md:hidden")}
         {renderHeader("vol/oi", "voi", "w-14 justify-end max-md:hidden")}
         {renderHeader("ask%", "ask", "w-14 justify-end max-md:hidden")}
         {renderHeader("ATM%", "atm", "w-16 justify-end max-md:hidden")}
@@ -1375,6 +1386,25 @@ export function EntryTape({
                 </span>
               ) : null}
             </span>
+            {(() => {
+              const d = earningsMap?.[r.ticker.toUpperCase()];
+              const n = d ? daysFromToday(d) : null;
+              const show = n != null && n >= 0;
+              return (
+                <span
+                  className={`w-10 num max-md:hidden ${show && n === 0 ? "font-bold" : ""}`}
+                  style={{
+                    color: !show ? "var(--text-muted)"
+                      : n === 0 ? "var(--accent-orange)"
+                      : n <= 7 ? "color-mix(in srgb, var(--accent-orange) 70%, var(--text-secondary))"
+                      : "var(--text-muted)",
+                  }}
+                  title={show ? `Earnings ${d} (${n === 0 ? "today" : `in ${n}d`})` : "No upcoming earnings date"}
+                >
+                  {show ? (n === 0 ? "TDY" : `${n}d`) : "—"}
+                </span>
+              );
+            })()}
             <span
               className="w-14 text-right num max-md:hidden"
               style={{

@@ -51,7 +51,7 @@ export type IfBias = "all" | "bullish" | "bearish";
 export type IfDte = "all" | "lotto" | "swing" | "leap";
 export type IfSort = "entries" | "premium" | "score" | "escalating" | "returns" | "recent";
 export type IfViewMode = "grid" | "tape";
-export type IfEarnings = "all" | "1w" | "2w" | "1m" | "2m";
+export type IfEarnings = "all" | "today" | "1w" | "2w" | "1m" | "2m";
 export type IfWatchView = "tickers" | "contracts" | "both";
 export type IfGroupMode = "subcat" | "macro" | "flat";
 // Which signal lights a grid card's green border. "escalating" preserves the
@@ -86,7 +86,7 @@ export type TapeFilterMode =
   | "none" | "notable_nscore" | "notable_ml" | "notable_both" | "avg_sweet" | "kian"
   | "outliers";
 export type TapeSortKey =
-  | "time" | "ticker" | "side" | "action" | "contract" | "dte" | "voi" | "ask"
+  | "time" | "ticker" | "side" | "action" | "contract" | "dte" | "ern" | "voi" | "ask"
   | "atm" | "premium" | "pnl" | "score" | "ml" | "setup" | "avg" | "pred_peak";
 export type TapeSortDir = "asc" | "desc";
 

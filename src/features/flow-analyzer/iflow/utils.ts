@@ -13,6 +13,7 @@ import type { DteFilter, EarningsWindow } from "./types";
  */
 export const EARNINGS_WINDOW_DAYS: Record<EarningsWindow, number> = {
   all: Infinity,
+  today: 0,
   "1w": 7,
   "2w": 14,
   "1m": 30,

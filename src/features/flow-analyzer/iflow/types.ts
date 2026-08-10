@@ -8,7 +8,7 @@
 export type BiasFilter = "all" | "bullish" | "bearish";
 export type DteFilter = "all" | "lotto" | "swing" | "leap";
 export type SortMode = "entries" | "premium" | "score" | "escalating" | "returns" | "recent";
-export type EarningsWindow = "all" | "1w" | "2w" | "1m" | "2m";
+export type EarningsWindow = "all" | "today" | "1w" | "2w" | "1m" | "2m";
 
 /** Per-ticker accumulation/escalation intel returned by /flow/iflow/history. */
 export interface TickerIntel {
