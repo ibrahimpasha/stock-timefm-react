@@ -1,3 +1,4 @@
+import { WeekdayBehavior } from "./WeekdayBehavior";
 import { useMemo, useState } from "react";
 import { Eye } from "lucide-react";
 import { useFlowPicks } from "../../../api/flow";
@@ -179,7 +180,7 @@ export function TickerDetail({
           <span className="text-xs text-text-muted num">{trackedData.total_entries} total</span>
         </div>
         <BullBearBar bull={trackedData.bullish} total={total} />
-        <div className="flex items-center justify-between mt-2 text-xs">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
           <span className="text-text-muted">
             Net Premium:{" "}
             <span className="text-text-secondary num">{trackedData.net_premium}</span>
@@ -190,6 +191,8 @@ export function TickerDetail({
           />
         </div>
       </div>
+
+      <WeekdayBehavior ticker={ticker} />
 
       {tickerPicks.length > 0 && (
         <div>
@@ -240,7 +243,7 @@ export function TickerDetail({
                     {formatDate(date)}
                   </div>
                 )}
-                <div className="space-y-0.5 pl-2 border-l-2 border-border">
+                <div className="min-w-0 space-y-0.5 border-l-2 border-border pl-2">
                   {(traderByDate[date] || []).map((g) => (
                     <TraderEventRow
                       key={`t-${g.key}`}

@@ -166,11 +166,11 @@ export function ThemeSection({
   }, [bySubGroup, subGroupBy]);
 
   return (
-    <div className="mb-4">
+    <div className="mb-4 min-w-0">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center gap-2 py-1.5 px-2 -mx-2 rounded hover:bg-bg-card-hover transition-colors text-left"
+        className="flex min-h-11 w-full min-w-0 items-center gap-1 rounded px-1 py-1.5 text-left transition-colors hover:bg-bg-card-hover md:-mx-2 md:min-h-0 md:gap-2 md:px-2"
         title={categoryDescription || ""}
       >
         {expanded ? (
@@ -178,7 +178,7 @@ export function ThemeSection({
         ) : (
           <ChevronRight size={14} className="text-text-muted shrink-0" />
         )}
-        <span className="text-xs font-semibold uppercase tracking-wider text-text-primary">
+        <span className="min-w-0 flex-1 truncate text-xs font-semibold uppercase tracking-wider text-text-primary md:flex-none">
           {category.replace(/_/g, " ")}
         </span>
         <span className="text-xs font-mono text-text-muted">{tickerCount} tkr</span>
@@ -208,7 +208,7 @@ export function ThemeSection({
           </span>
         )}
         {bnDef && (
-          <span className="ml-auto flex items-center gap-2 text-[10px] font-mono text-text-muted truncate min-w-0">
+          <span className="ml-auto hidden min-w-0 items-center gap-2 truncate font-mono text-[10px] text-text-muted sm:flex">
             <span
               className="px-1.5 py-0.5 rounded truncate"
               style={{
@@ -225,7 +225,7 @@ export function ThemeSection({
       </button>
 
       {expanded && (
-        <div className="mt-2 space-y-3 pl-4 border-l border-border ml-1">
+        <div className="ml-1 mt-2 min-w-0 space-y-3 border-l border-border pl-2 md:pl-4">
           {subGroupOrder.map((key) => {
             const items = bySubGroup[key];
             if (!items.length) return null;
@@ -244,7 +244,7 @@ export function ThemeSection({
             return (
               <div key={key}>
                 <div
-                  className="text-[10px] uppercase tracking-wider mb-1.5 font-semibold flex items-center gap-1.5"
+                  className="mb-1.5 flex min-w-0 items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider"
                   title={
                     isThemeMode
                       ? themeDesc || (isSentinel ? "Tickers with no theme tag" : "")
@@ -253,7 +253,7 @@ export function ThemeSection({
                   }
                 >
                   <span
-                    className="px-1.5 py-0.5 rounded font-mono"
+                    className="max-w-full shrink-0 truncate rounded px-1.5 py-0.5 font-mono"
                     style={{
                       background: isSentinel
                         ? "transparent"
@@ -274,7 +274,7 @@ export function ThemeSection({
                   >
                     {chipLabel}
                   </span>
-                  <span className="text-text-secondary normal-case tracking-normal">
+                  <span className="min-w-0 flex-1 truncate normal-case tracking-normal text-text-secondary max-sm:hidden">
                     {secondary}
                   </span>
                   <span className="opacity-60 font-mono normal-case tracking-normal">
@@ -298,7 +298,7 @@ export function ThemeSection({
                     ) : null;
                   })()}
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   {items.map((t) => (
                     <div key={t.ticker}>{renderCard(t)}</div>
                   ))}

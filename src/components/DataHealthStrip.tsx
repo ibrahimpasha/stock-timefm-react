@@ -52,14 +52,14 @@ export function DataHealthStrip() {
         onClick={() => setOpen((v) => !v)}
         title="Backend feed health"
         aria-label="Backend feed health"
-        className="flex items-center gap-1.5 p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors max-md:p-1.5"
+        className="flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-md text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary lg:min-h-0 lg:min-w-0 lg:p-2"
       >
         <Activity size={16} />
         <Dot status={overall} pulse />
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-72 rounded-lg border border-border bg-bg-card shadow-xl p-2">
+        <div className="absolute right-0 top-full z-50 mt-1 w-[min(18rem,calc(100vw-1rem))] rounded-lg border border-border bg-bg-card p-2 shadow-xl">
           <div className="flex items-center justify-between px-2 py-1">
             <span className="text-xs font-semibold text-text-primary">
               Data feeds

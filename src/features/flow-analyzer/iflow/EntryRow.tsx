@@ -80,7 +80,7 @@ export function EntryRow({
   return (
     <div>
       <div
-        className="flex items-center gap-2 text-xs py-1.5 px-2 rounded hover:bg-bg-card-hover transition-colors cursor-pointer"
+        className="flex min-w-0 cursor-pointer items-start gap-1 rounded px-0 py-1.5 text-xs transition-colors hover:bg-bg-card-hover lg:items-center lg:gap-2 lg:px-2"
       >
         <button
           type="button"
@@ -88,7 +88,7 @@ export function EntryRow({
             e.stopPropagation();
             toggleWatchedContract(contractKey);
           }}
-          className="p-0.5 -ml-0.5 rounded hover:bg-bg-card-hover transition-colors shrink-0"
+          className="-ml-0.5 flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded p-0.5 transition-colors hover:bg-bg-card-hover lg:min-h-0 lg:min-w-0"
           title={watched ? "Unwatch contract" : "Watch contract"}
           aria-label={watched ? `Unwatch ${ticker} contract` : `Watch ${ticker} contract`}
           aria-pressed={watched}
@@ -108,12 +108,12 @@ export function EntryRow({
           onClick={() => onToggle(entryKey)}
           aria-expanded={expanded}
           aria-controls={entry.analysis ? detailsId : undefined}
-          className="flex min-h-6 min-w-0 flex-1 items-center gap-2 rounded text-left"
+          className="flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 rounded text-left lg:min-h-6 lg:flex-nowrap"
         >
-          <span className="font-mono font-semibold w-10 shrink-0" style={{ color }}>
+          <span className="shrink-0 font-mono font-semibold lg:w-10" style={{ color }}>
             {side}
           </span>
-          <span className="text-text-muted italic w-16 shrink-0">{action}</span>
+          <span className="shrink-0 italic text-text-muted lg:w-16">{action}</span>
           <span className="num font-bold text-text-primary">
             ${entry.strike} {optType}
           </span>

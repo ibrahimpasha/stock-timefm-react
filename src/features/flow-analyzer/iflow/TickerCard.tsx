@@ -57,7 +57,7 @@ export function TickerCard({
   return (
     <div
       title={highlightTitle}
-      className="card card-interactive text-left py-2 px-3 relative"
+      className="card card-interactive relative min-w-0 overflow-hidden px-3 py-2 text-left"
       style={{
         borderColor: selected ? "var(--accent-blue)" : lit ? "color-mix(in srgb, var(--accent-green) 55%, transparent)" : undefined,
         background: selected ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : lit ? "color-mix(in srgb, var(--accent-green) 6%, transparent)" : undefined,
@@ -66,7 +66,7 @@ export function TickerCard({
       <button
         type="button"
         onClick={() => toggleWatchlist(t.ticker)}
-        className="absolute left-2.5 top-2 z-10 min-h-6 min-w-6 rounded hover:bg-bg-card-hover transition-colors"
+        className="absolute left-1 top-0.5 z-10 min-h-11 min-w-11 rounded transition-colors hover:bg-bg-card-hover lg:left-2.5 lg:top-2 lg:min-h-6 lg:min-w-6"
         title={watched ? "Remove from watchlist" : "Add to watchlist"}
         aria-label={watched ? `Remove ${t.ticker} from watchlist` : `Add ${t.ticker} to watchlist`}
         aria-pressed={watched}
@@ -94,7 +94,7 @@ export function TickerCard({
         }}
         aria-pressed={selected}
         aria-label={`Select ${t.ticker}, ${net ? "bullish" : "bearish"}, ${t.total_entries} entries`}
-        className="block min-h-6 w-full text-left"
+        className="block min-h-11 w-full min-w-0 text-left lg:min-h-6"
       >
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-1.5 pl-5">

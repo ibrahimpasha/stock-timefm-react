@@ -659,17 +659,17 @@ export function TraderLeaderboardPage() {
       : `Last ${lookback} days · ${nTraders} trader${nTraders === 1 ? "" : "s"}`;
 
   return (
-    <div className="flex flex-col space-y-4">
+    <div className="flex min-w-0 flex-col space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-2 max-sm:flex-col">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <Users size={20} className="text-accent-purple" />
-          <h1 className="text-lg font-semibold text-text-primary m-0">
+          <h1 className="m-0 text-lg font-semibold text-text-primary">
             Trader Leaderboard
           </h1>
-          <span className="num text-xs text-text-muted">{headerSub}</span>
+          <span className="num basis-full pl-8 text-xs text-text-muted sm:basis-auto sm:pl-0">{headerSub}</span>
         </div>
-        <div className="flex items-center gap-2 text-xs text-text-muted">
+        <div className="flex shrink-0 items-center gap-2 pl-8 text-xs text-text-muted sm:pl-0">
           <TrendingUp size={13} />
           <span>Auto-refresh 60s</span>
         </div>

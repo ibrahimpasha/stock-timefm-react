@@ -286,3 +286,22 @@ export function useTickerPricesBatch(tickers: string[]) {
     enabled: sorted.length > 0,
   });
 }
+
+/* ── Per-ticker lifetime-graded flow rows (weekday-behavior overlay) ── */
+export interface LifetimeRow {
+  flow_date: string;
+  type: string;
+  premium: number | null;
+  peak_pnl_pct_10d: number | null;
+  terminal_pnl_pct: number | null;
+  label_10d_complete: boolean;
+}
+export function useEntryLifetime(ticker: string) {
+  return useQuery<{ ticker: string; rows: LifetimeRow[] }>({
+    queryKey: ["iflow", "lifetime", ticker],
+    queryFn: () =>
+      apiClient.get(`/flow/iflow/lifetime?ticker=${ticker}`).then((r) => r.data),
+    staleTime: 12 * 60 * 60 * 1000, // regraded nightly
+    enabled: !!ticker,
+  });
+}

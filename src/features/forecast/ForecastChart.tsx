@@ -68,6 +68,25 @@ function futureDates(startDate: string, count: number): string[] {
   return dates;
 }
 
+/** Lightweight Charts requires strictly ascending, unique times. Forecast
+ * APIs may include the origin candle as prediction[0], so keep our observed
+ * close as the sole origin point and deduplicate every future date. */
+function pointsFromOrigin(
+  originDate: string,
+  originValue: number,
+  dates: string[],
+  values: number[],
+) {
+  const byDate = new Map<string, number>([[originDate, originValue]]);
+  dates.forEach((date, index) => {
+    const value = values[index];
+    if (date > originDate && Number.isFinite(value)) byDate.set(date, value);
+  });
+  return [...byDate.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, value]) => ({ time: toTime(date), value }));
+}
+
 type PredictionWithBands = Prediction & {
   q10: number;
   q25: number;
@@ -313,18 +332,18 @@ export function ForecastChart({
           crosshairMarkerVisible: false,
         });
 
-        const q90Data = forecast.predictions.map((p, i) => ({
-          time: toTime(dates[i] || lastDate),
-          value: p.q90,
-        }));
-        const q10Data = forecast.predictions.map((p, i) => ({
-          time: toTime(dates[i] || lastDate),
-          value: p.q10,
-        }));
-
-        // Prepend the last historical close for continuity
-        q90Data.unshift({ time: toTime(lastDate), value: lastClose });
-        q10Data.unshift({ time: toTime(lastDate), value: lastClose });
+        const q90Data = pointsFromOrigin(
+          lastDate,
+          lastClose,
+          dates,
+          forecast.predictions.map((prediction) => prediction.q90),
+        );
+        const q10Data = pointsFromOrigin(
+          lastDate,
+          lastClose,
+          dates,
+          forecast.predictions.map((prediction) => prediction.q10),
+        );
 
         q90Series.setData(q90Data);
         q10Series.setData(q10Data);
@@ -341,11 +360,12 @@ export function ForecastChart({
           crosshairMarkerVisible: false,
         });
 
-        const areaData = forecast.predictions.map((p, i) => ({
-          time: toTime(dates[i] || lastDate),
-          value: (p.q25 + p.q75) / 2,
-        }));
-        areaData.unshift({ time: toTime(lastDate), value: lastClose });
+        const areaData = pointsFromOrigin(
+          lastDate,
+          lastClose,
+          dates,
+          forecast.predictions.map((prediction) => (prediction.q25 + prediction.q75) / 2),
+        );
         areaSeries.setData(areaData);
         seriesRefs.current.push(areaSeries);
       }
@@ -361,12 +381,7 @@ export function ForecastChart({
         title: MODEL_LABELS[forecast.model] || forecast.model,
       });
 
-      const lineData = forecast.prices.map((price, i) => ({
-        time: toTime(dates[i] || lastDate),
-        value: price,
-      }));
-      // Start from last close for continuity
-      lineData.unshift({ time: toTime(lastDate), value: lastClose });
+      const lineData = pointsFromOrigin(lastDate, lastClose, dates, forecast.prices);
       forecastLine.setData(lineData);
       seriesRefs.current.push(forecastLine);
     }

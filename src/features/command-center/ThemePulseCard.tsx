@@ -132,18 +132,18 @@ export function ThemePulseCard({ ticker }: Props) {
     <div className="card flex flex-col gap-2">
       {/* Header: the title toggles expand/collapse; the download icon pulls
           every generated theme pulse as a CSV for manual analysis. */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:opacity-90 transition-opacity text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary"
+          className="flex min-h-11 min-w-0 basis-full cursor-pointer items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary transition-opacity hover:opacity-90 sm:min-h-0 sm:basis-auto sm:flex-1"
         >
           {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
           <Activity size={14} className="text-accent-cyan" />
           Theme Pulse
         </button>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs text-text-muted">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+          <span className="min-w-0 flex-1 truncate text-xs text-text-muted">
             {theme} · <span className="num">{data.n}</span> names
           </span>
           <a
@@ -151,7 +151,7 @@ export function ThemePulseCard({ ticker }: Props) {
             download
             title="Download all theme pulses (CSV) for manual analysis"
             aria-label="download all theme pulses"
-            className="text-text-muted hover:text-accent-cyan transition-colors"
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-text-muted transition-colors hover:text-accent-cyan sm:min-h-0 sm:min-w-0"
           >
             <Download size={13} />
           </a>

@@ -120,32 +120,53 @@ function FlowTabBar({
 }) {
   const byId = new Map(FLOW_TABS.map((t) => [t.id, t]));
   return (
-    <div className="flex items-end gap-3 flex-wrap max-md:gap-2">
-      {FLOW_TAB_GROUPS.map((group) => (
-        <div key={group.label} className="flex flex-col gap-1">
-          <span className="pl-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-muted leading-none">
-            {group.label}
-          </span>
-          <Segmented<FlowTab>
-            ariaLabel={`${group.label} flow views`}
-            options={group.tabs.map((id) => {
-              const tab = byId.get(id)!;
-              const Icon = tab.icon;
-              return {
-                value: id,
-                label: (
-                  <>
-                    <Icon size={13} />
-                    {tab.label}
-                  </>
-                ),
-              };
-            })}
-            value={activeTab}
-            onChange={onTabChange}
-          />
-        </div>
-      ))}
+    <div className="min-w-0 flex-1">
+      <Segmented<FlowTab>
+        ariaLabel="Flow workspace"
+        className="w-full lg:hidden"
+        options={FLOW_TABS.map((tab) => {
+          const Icon = tab.icon;
+          return {
+            value: tab.id,
+            label: (
+              <>
+                <Icon size={13} />
+                {tab.label}
+              </>
+            ),
+          };
+        })}
+        value={activeTab}
+        onChange={onTabChange}
+      />
+
+      <div className="hidden flex-wrap items-end gap-3 lg:flex">
+        {FLOW_TAB_GROUPS.map((group) => (
+          <div key={group.label} className="flex flex-col gap-1">
+            <span className="pl-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-muted leading-none">
+              {group.label}
+            </span>
+            <Segmented<FlowTab>
+              ariaLabel={`${group.label} flow views`}
+              options={group.tabs.map((id) => {
+                const tab = byId.get(id)!;
+                const Icon = tab.icon;
+                return {
+                  value: id,
+                  label: (
+                    <>
+                      <Icon size={13} />
+                      {tab.label}
+                    </>
+                  ),
+                };
+              })}
+              value={activeTab}
+              onChange={onTabChange}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -162,7 +183,7 @@ function AlertBellInner({ onClick, isOpen }: { onClick: () => void; isOpen: bool
       aria-expanded={isOpen}
       aria-controls="flow-alerts-panel"
       aria-label={`${isOpen ? "Hide" : "Show"} flow alerts${count > 0 ? `, ${count} available` : ""}`}
-      className="relative p-1.5 rounded-full transition-colors hover:bg-bg-card-hover"
+      className="relative flex min-h-11 min-w-11 items-center justify-center rounded-full transition-colors hover:bg-bg-card-hover lg:min-h-0 lg:min-w-0 lg:p-1.5"
       style={{ color: count > 0 ? "var(--accent-orange)" : "var(--text-muted)" }}
     >
       <Bell size={16} fill={isOpen ? "currentColor" : "none"} aria-hidden="true" />
@@ -227,6 +248,9 @@ export function CommandCenterPage() {
       firstRender.current = false;
       return;
     }
+    // Phone flow uses its own list -> ticker detail transition. Automatically
+    // opening this second analysis layer would replace the detail just chosen.
+    if (window.matchMedia("(max-width: 1023px)").matches) return;
     const id = window.setTimeout(() => setDetailOpen(true), 0);
     return () => window.clearTimeout(id);
   }, [ticker]);
@@ -296,6 +320,17 @@ export function CommandCenterPage() {
     void runForecast();
   }, [ticker, runForecast]);
 
+  const openDetail = () => {
+    setDetailOpen(true);
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      window.setTimeout(() => {
+        document
+          .getElementById("command-center-analysis-panel")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Page header + analyze bar */}
@@ -324,19 +359,21 @@ export function CommandCenterPage() {
             - The detail panel can be dismissed via [X] to reclaim flow width.
             - When closed and a ticker is set, a tiny "Show analysis" button
               brings it back without forcing another ticker click. */}
-      <div className="grid grid-cols-12 gap-4 items-start">
-        <div className={detailOpen ? "col-span-12 lg:col-span-7" : "col-span-12"}>
-          <div className="card">
-            <div className="flex items-start justify-between gap-2">
+      <div className="grid min-w-0 grid-cols-12 items-start gap-4">
+        <div
+          className={`${detailOpen ? "col-span-12 max-lg:hidden lg:col-span-7" : "col-span-12"} min-w-0`}
+        >
+          <div className="card min-w-0 overflow-hidden">
+            <div className="flex min-w-0 items-start justify-between gap-2">
               <FlowTabBar activeTab={activeFlowTab} onTabChange={setActiveFlowTab} />
-              <div className="flex items-center gap-2 self-end pb-0.5">
+              <div className="flex shrink-0 items-center gap-1 self-end pb-0.5 md:gap-2">
                 {!detailOpen && ticker && (
                   <button
                     type="button"
-                    onClick={() => setDetailOpen(true)}
+                    onClick={openDetail}
                     aria-expanded={detailOpen}
                     aria-controls="command-center-analysis-panel"
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary lg:min-h-0"
                     title="Open analysis panel for the current ticker"
                   >
                     <SidebarOpen size={14} />
@@ -360,7 +397,7 @@ export function CommandCenterPage() {
         </div>
 
         {detailOpen && (
-          <div id="command-center-analysis-panel" className="col-span-12 lg:col-span-5 space-y-4">
+          <div id="command-center-analysis-panel" className="col-span-12 min-w-0 scroll-mt-16 space-y-4 lg:col-span-5 lg:scroll-mt-0">
             {/* Detail header: ticker label + close button */}
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2">
@@ -373,7 +410,7 @@ export function CommandCenterPage() {
               <button
                 type="button"
                 onClick={() => setDetailOpen(false)}
-                className="p-1 rounded-full text-text-muted hover:text-text-primary hover:bg-bg-card-hover transition-colors"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-bg-card-hover hover:text-text-primary lg:min-h-0 lg:min-w-0 lg:p-1"
                 title="Hide analysis panel"
                 aria-label="Close analysis panel"
               >

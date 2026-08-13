@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   MapContainer, TileLayer, CircleMarker, Polygon, Tooltip, Popup, useMap,
 } from "react-leaflet";
+import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
@@ -111,6 +112,7 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
   const [query, setQuery] = useState("");
   const [colorBy, setColorBy] = useState<ColorBy>("signal");
   const [focusTicker, setFocusTicker] = useState<string | null>(null);
+  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const { data, isLoading } = useTickerMap(minCap);
   const { data: taxonomy } = useTickerTaxonomy();
   const activeTicker = useAppStore((s) => s.activeTicker);
@@ -234,9 +236,33 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)] gap-3 max-lg:grid-cols-1">
-      <div className="overflow-hidden border border-border relative" style={{ height: `calc(100vh - ${heightOffset}px)`, minHeight: 460, borderRadius: "var(--radius-panel)" }}>
+      <div className="overflow-hidden border border-border relative" style={{ height: `calc(100dvh - ${heightOffset}px)`, minHeight: 460, borderRadius: "var(--radius-panel)" }}>
         {/* Floating control bar — chrome only; the map surface below is untouched */}
         <div className="absolute top-3 left-3 right-3 z-[1000] glass-strong px-3 py-2 flex items-center gap-2 flex-wrap text-xs">
+          <div className="flex min-h-11 w-full items-center justify-between gap-2 lg:hidden">
+            <span className="min-w-0 truncate text-text-secondary">
+              {MODES.find((item) => item.id === mode)?.label} · <span className="num">{stats.shown}</span> shown
+            </span>
+            <button
+              type="button"
+              onClick={() => setMobileControlsOpen((open) => !open)}
+              aria-expanded={mobileControlsOpen}
+              aria-controls="map-mobile-controls"
+              title="Map filters"
+              className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary"
+            >
+              <SlidersHorizontal size={17} aria-hidden="true" />
+              <ChevronDown
+                size={14}
+                aria-hidden="true"
+                className={`transition-transform ${mobileControlsOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+          </div>
+          <div
+            id="map-mobile-controls"
+            className={`${mobileControlsOpen ? "flex" : "hidden"} w-full min-w-0 flex-wrap items-center gap-2 lg:contents`}
+          >
           <Segmented<Mode>
             ariaLabel="Map display mode"
             options={MODES.map((m) => ({ value: m.id, label: m.label }))}
@@ -282,7 +308,7 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
                   setFocusTicker(null);
                 }}
                 aria-pressed={minCap === f.min}
-                className="inline-flex min-h-6 shrink-0 cursor-pointer rounded-full"
+                className="inline-flex min-h-11 shrink-0 cursor-pointer items-center rounded-full lg:min-h-6"
               >
                 <Chip tone={minCap === f.min ? "blue" : "neutral"}>{f.label}</Chip>
               </button>
@@ -299,6 +325,7 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
               ⌖ real building footprints — zoom in to see the shapes
             </span>
           )}
+          </div>
         </div>
 
         {/* Group legend — glass panel floating over the map */}

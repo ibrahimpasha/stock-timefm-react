@@ -19,7 +19,20 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Download, X, Star, Grid, List, AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ChevronDown,
+  Download,
+  Grid,
+  List,
+  Loader2,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  Star,
+  X,
+} from "lucide-react";
 import apiClient from "../../api/client";
 import { Chip, Segmented } from "../../components/Glass";
 import type { ChipTone } from "../../components/Glass";
@@ -75,7 +88,12 @@ function ChipButton({
   children: ReactNode;
 }) {
   return (
-    <button type="button" onClick={onClick} title={title} className="rounded-full">
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className="inline-flex min-h-11 items-center rounded-full lg:min-h-0"
+    >
       <Chip
         tone={active ? tone : "neutral"}
         className={active ? "" : "hover:text-text-primary transition-colors cursor-pointer"}
@@ -118,6 +136,7 @@ export function IFlowTracker() {
   } = useDashboardFilters((s) => s.iflow);
   const patchIFlow = useDashboardFilters((s) => s.patchIFlow);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const activeTicker = useAppStore((s) => s.activeTicker);
   const setActiveTicker = useAppStore((s) => s.setActiveTicker);
@@ -170,6 +189,19 @@ export function IFlowTracker() {
     else next.add(d);
     patchIFlow({ selectedDates: next });
     setSelectedTicker(null);
+  };
+
+  const openTicker = (ticker: string) => {
+    setSelectedTicker(ticker);
+    setActiveTicker(ticker);
+    setMobileFiltersOpen(false);
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      window.setTimeout(() => {
+        document
+          .querySelector("[data-iflow-anchor]")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+    }
   };
 
   // Earnings window is a FILTER on the current date selection's tickers
@@ -516,10 +548,10 @@ export function IFlowTracker() {
 
   return (
     /* anchor: clicking a theme in the rotation map scrolls the page here */
-    <div data-iflow-anchor>
+    <div className="min-w-0" data-iflow-anchor>
       {/* ── Control strip: dates + search + view/group/sort/filters ── */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <div className="flex items-center gap-1 flex-wrap">
+      <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2">
+        <div className="mobile-horizontal-strip flex w-full min-w-0 items-center gap-1 overflow-x-auto lg:w-auto lg:flex-wrap lg:overflow-visible">
           <ChipButton
             active={isAllDates}
             tone="blue"
@@ -543,7 +575,7 @@ export function IFlowTracker() {
           ))}
         </div>
         <div
-          className="relative flex items-center gap-2 rounded-full border border-border px-3 py-1.5 flex-1 max-w-xs focus-within:border-accent-blue transition-colors"
+          className="relative flex min-h-11 w-full min-w-0 items-center gap-2 rounded-full border border-border px-3 py-1.5 transition-colors focus-within:border-accent-blue lg:min-h-0 lg:max-w-xs lg:flex-1"
           style={{ background: "var(--glass-bg)" }}
         >
           <Search size={14} className="text-text-muted" />
@@ -605,6 +637,27 @@ export function IFlowTracker() {
           dte={dte}
         />
 
+        <button
+          type="button"
+          onClick={() => setMobileFiltersOpen((open) => !open)}
+          aria-expanded={mobileFiltersOpen}
+          aria-controls="iflow-mobile-filters"
+          className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-3 text-xs font-semibold text-text-secondary lg:hidden"
+        >
+          <SlidersHorizontal size={15} aria-hidden="true" />
+          Filters
+          <ChevronDown
+            size={14}
+            aria-hidden="true"
+            className={`transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+
+        <div
+          id="iflow-mobile-filters"
+          className={`${mobileFiltersOpen ? "flex" : "hidden"} w-full min-w-0 flex-wrap items-center gap-2 lg:contents`}
+        >
+
         {/* Watchlist surface(s) to show */}
         <StripLabel>View</StripLabel>
         <Segmented<WatchView>
@@ -656,6 +709,7 @@ export function IFlowTracker() {
         )}
         <StripLabel>Group</StripLabel>
         <span
+          className="max-w-full"
           title={
             "Subcat: by sector → broad clustered subcategory (84 buckets, e.g. EUV Litho WFE).\n" +
             "Macro: by sector → primary macro driver (M1-M10).\n" +
@@ -720,7 +774,10 @@ export function IFlowTracker() {
         </div>
 
         <StripLabel>Layout</StripLabel>
-        <span title="Grid: per-ticker cards. Tape: chronological feed of every entry — single, multi-date, or defaults to today if you haven't picked dates.">
+        <span
+          className="max-w-full"
+          title="Grid: per-ticker cards. Tape: chronological feed of every entry — single, multi-date, or defaults to today if you haven't picked dates."
+        >
           <Segmented<"grid" | "tape">
             value={viewMode}
             onChange={(v) => {
@@ -759,6 +816,7 @@ export function IFlowTracker() {
           Sort
         </span>
         <span
+          className="max-w-full min-w-0"
           style={{
             opacity: viewMode === "tape" ? 0.4 : 1,
             pointerEvents: viewMode === "tape" ? "none" : "auto",
@@ -906,6 +964,7 @@ export function IFlowTracker() {
             )}
           </div>
         )}
+        </div>
       </div>
 
       {/* ── Top Picks + Top Signals (single date only) ───────────────── */}
@@ -919,7 +978,7 @@ export function IFlowTracker() {
       {/* ── Loading skeleton ────────────────────────────────────────── */}
       {loading && (
         <div className="animate-pulse">
-          <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+          <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 md:grid-cols-5">
             {[...Array(10)].map((_, i) => (
               <div key={i} className="card h-20" />
             ))}
@@ -947,11 +1006,11 @@ export function IFlowTracker() {
           height changes, adjust the 260px offset. */}
       {!loading && !loadError && (
         <div
-          className="grid grid-cols-12 gap-4 max-md:gap-2 max-md:!h-auto max-md:!min-h-0"
+          className="grid grid-cols-12 gap-4 max-lg:gap-2 max-lg:!h-auto max-lg:!min-h-0"
           style={{ height: "calc(100vh - 260px)", minHeight: 420 }}
         >
           <div
-            className={`${selectedTicker ? "col-span-7" : "col-span-12"} overflow-y-auto pr-1 max-md:col-span-12 max-md:overflow-visible max-md:pr-0`}
+            className={`${selectedTicker ? "col-span-7 max-lg:hidden" : "col-span-12"} overflow-y-auto pr-1 max-lg:col-span-12 max-lg:overflow-visible max-lg:pr-0`}
           >
             {tradersOnly && coverageQuery.isLoading && (
               <div className="card mb-3 flex items-center justify-center gap-2 py-6 text-xs text-text-muted">
@@ -975,10 +1034,7 @@ export function IFlowTracker() {
             {(watchView === "contracts" || watchView === "both") && (
               <div className={watchView === "both" ? "mb-4" : ""}>
                 <ContractsView
-                  onSelectTicker={(t) => {
-                    setSelectedTicker(t);
-                    setActiveTicker(t);
-                  }}
+                  onSelectTicker={openTicker}
                 />
               </div>
             )}
@@ -999,10 +1055,7 @@ export function IFlowTracker() {
                 earningsMap={earningsMap ?? null}
                 earningsMaxDays={earningsWindow !== "all" ? EARNINGS_WINDOW_DAYS[earningsWindow] : null}
                 selectedTicker={selectedTicker}
-                onSelectTicker={(t) => {
-                  setSelectedTicker(t);
-                  setActiveTicker(t);
-                }}
+                onSelectTicker={openTicker}
               />
             )}
             {/* Ticker grid: hidden entirely in "contracts" mode. */}
@@ -1042,8 +1095,7 @@ export function IFlowTracker() {
                     if (selectedTicker === t.ticker) {
                       setSelectedTicker(null);
                     } else {
-                      setSelectedTicker(t.ticker);
-                      setActiveTicker(t.ticker);
+                      openTicker(t.ticker);
                     }
                   }}
                   intel={mergedIntel}
@@ -1087,7 +1139,7 @@ export function IFlowTracker() {
                           None of your watched tickers have flow on the selected dates.
                         </div>
                       ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                           {watchedShown.map(renderCard)}
                         </div>
                       )}
@@ -1109,7 +1161,7 @@ export function IFlowTracker() {
                           escMap={escMap}
                         />
                       ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                           {othersShown.map(renderCard)}
                         </div>
                       )}
@@ -1120,7 +1172,15 @@ export function IFlowTracker() {
             })()}
           </div>
           {selectedTicker && selectedData && (
-            <div className="col-span-5 overflow-y-auto pr-1 max-md:col-span-12 max-md:overflow-visible max-md:pr-0">
+            <div className="col-span-5 overflow-y-auto pr-1 max-lg:col-span-12 max-lg:overflow-visible max-lg:pr-0">
+              <button
+                type="button"
+                onClick={() => setSelectedTicker(null)}
+                className="mb-2 inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-xs font-semibold text-text-secondary lg:hidden"
+              >
+                <ArrowLeft size={16} aria-hidden="true" />
+                Back to tickers
+              </button>
               <TickerDetail
                 ticker={selectedTicker}
                 trackedData={selectedData}

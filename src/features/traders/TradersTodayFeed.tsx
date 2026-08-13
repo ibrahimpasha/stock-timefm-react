@@ -67,7 +67,7 @@ function EventRow({ ev }: { ev: TraderTodayEvent }) {
   return (
     <div>
       <div
-        className="flex items-center gap-2 text-xs py-1 px-2 rounded hover:bg-bg-card-hover transition-colors cursor-pointer"
+        className="flex min-h-11 min-w-0 cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs transition-colors hover:bg-bg-card-hover"
         onClick={() => setOpen((v) => !v)}
       >
         {open ? (
@@ -135,12 +135,12 @@ export function TradersTodayFeed() {
   const authors = data.authors;
   return (
     <div className="card p-3">
-      <div className="flex items-center gap-2 mb-3">
+      <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
         <Clock size={14} className="text-accent-purple" />
         <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
           Today's Activity
         </h3>
-        <span className="num text-xs text-text-muted">
+        <span className="num basis-full pl-6 text-xs text-text-muted sm:basis-auto sm:pl-0">
           {data.date} · {data.total_events} event{data.total_events === 1 ? "" : "s"} ·{" "}
           {authors.length} trader{authors.length === 1 ? "" : "s"}
         </span>
@@ -164,7 +164,7 @@ export function TradersTodayFeed() {
                   onClick={() =>
                     setCollapsed((m) => ({ ...m, [a.author]: !m[a.author] }))
                   }
-                  className="flex items-center gap-2 mb-1 hover:opacity-80 transition-opacity"
+                  className="mb-1 flex min-h-11 items-center gap-2 transition-opacity hover:opacity-80 md:min-h-0"
                 >
                   {isCollapsed ? (
                     <ChevronRight size={12} className="text-text-muted" />

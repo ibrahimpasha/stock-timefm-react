@@ -1,7 +1,17 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BarChart3, Sun, Moon } from "lucide-react";
+import {
+  BarChart3,
+  Blocks,
+  Gauge,
+  Grid3X3,
+  MapPinned,
+  Moon,
+  Orbit,
+  Sun,
+  Users,
+} from "lucide-react";
 import { NAV_ITEMS } from "./lib/constants";
 import { useTheme } from "./store/useTheme";
 import { DataHealthStrip } from "./components/DataHealthStrip";
@@ -37,43 +47,89 @@ const queryClient = new QueryClient({
   },
 });
 
+const MOBILE_NAV = [
+  { path: "/", label: "Desk", icon: Gauge },
+  { path: "/pillars", label: "Pillars", icon: Blocks },
+  { path: "/rotation", label: "Rotate", icon: Orbit },
+  { path: "/gex", label: "GEX", icon: Grid3X3 },
+  { path: "/traders", label: "Traders", icon: Users },
+  { path: "/map", label: "Map", icon: MapPinned },
+] as const;
+
 function Navbar() {
   return (
-    /* Floating glass bar — sticky with margin so the ambient field shows
-     * around it; content scrolls underneath the blur. */
-    <div className="sticky top-0 z-40 px-4 pt-3 max-md:px-2 max-md:pt-2">
-      <nav className="glass-strong flex items-center gap-1 px-4 py-2 max-md:px-2 max-md:py-1.5 max-md:overflow-x-auto max-md:whitespace-nowrap">
-        {/* Logo — hide the wordmark on mobile to save horizontal space */}
-        <div className="flex items-center gap-2 mr-5 max-md:mr-2 shrink-0">
-          <BarChart3 size={20} className="text-accent-blue max-md:size-[18px]" />
-          <span className="font-bold text-sm tracking-wide gradient-text max-md:hidden">
+    <>
+      <header className="mobile-app-bar lg:hidden">
+        <div className="flex min-w-0 items-center gap-2">
+          <BarChart3 size={19} className="shrink-0 text-accent-blue" aria-hidden="true" />
+          <span className="truncate text-sm font-bold gradient-text">
             Stock-TimeFM
           </span>
         </div>
 
-        {/* Nav links — horizontally scrollable strip on mobile */}
-        <div className="flex items-center gap-0.5">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                `px-3 py-1.5 rounded-full text-sm font-medium transition-colors max-md:px-2 max-md:py-1 max-md:text-xs shrink-0 ${
-                  isActive
-                    ? "bg-accent-blue/15 text-accent-blue"
-                    : "text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
+        <div className="flex items-center">
+          <DataHealthStrip />
+          <ThemeToggle />
         </div>
+      </header>
 
-        <DataHealthStrip />
-        <ThemeToggle />
-      </nav>
-    </div>
+      {/* Desktop keeps the full route rail and persistent system controls. */}
+      <div className="sticky top-0 z-40 hidden px-4 pt-3 lg:block">
+        <nav className="glass-strong flex items-center gap-1 px-4 py-2">
+          <div className="mr-5 flex shrink-0 items-center gap-2">
+            <BarChart3 size={20} className="text-accent-blue" aria-hidden="true" />
+            <span className="text-sm font-bold gradient-text">
+              Stock-TimeFM
+            </span>
+          </div>
+
+          <div className="flex items-center gap-0.5">
+            {NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.path === "/"}
+                className={({ isActive }) =>
+                  `shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-accent-blue/15 text-accent-blue"
+                      : "text-text-secondary hover:bg-bg-card-hover hover:text-text-primary"
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+
+          <DataHealthStrip />
+          <ThemeToggle />
+        </nav>
+      </div>
+    </>
+  );
+}
+
+function MobileNavigation() {
+  return (
+    <nav className="mobile-bottom-nav lg:hidden" aria-label="Primary navigation">
+      {MOBILE_NAV.map((item) => {
+        const Icon = item.icon;
+        return (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            end={item.path === "/"}
+            className={({ isActive }) =>
+              `mobile-bottom-nav__item ${isActive ? "mobile-bottom-nav__item--active" : ""}`
+            }
+          >
+            <Icon size={18} aria-hidden="true" />
+            <span>{item.label}</span>
+          </NavLink>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -90,7 +146,7 @@ function ThemeToggle() {
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       aria-pressed={!isDark}
-      className="ml-auto shrink-0 p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors max-md:p-1.5"
+      className="ml-auto flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary lg:min-h-0 lg:min-w-0 lg:p-2"
     >
       {isDark ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
     </button>
@@ -99,7 +155,7 @@ function ThemeToggle() {
 
 function AppLayout() {
   return (
-    <div className="min-h-screen flex flex-col bg-bg-primary">
+    <div className="min-h-screen min-w-0 flex flex-col bg-bg-primary">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
@@ -107,7 +163,7 @@ function AppLayout() {
       <main
         id="main-content"
         tabIndex={-1}
-        className="flex-1 px-4 py-4 max-md:px-2 max-md:py-2"
+        className="mobile-content flex-1 min-w-0 px-4 py-4 max-md:px-2 max-md:py-3"
       >
         <Suspense
           fallback={
@@ -126,6 +182,7 @@ function AppLayout() {
           </Routes>
         </Suspense>
       </main>
+      <MobileNavigation />
     </div>
   );
 }

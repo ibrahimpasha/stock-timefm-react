@@ -408,7 +408,7 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
   );
 
   const legend = (
-    <div className="flex items-center gap-1 text-xs text-text-muted">
+    <div className="flex flex-wrap items-center gap-1 text-xs text-text-muted">
       <span>cooling</span>
       {[0.3, 0.6, 1, 1.5, 2.5, 3.5].map((v) => (
         <span
@@ -427,7 +427,7 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
         className={`flex items-center justify-between flex-wrap gap-2 ${embedded ? "mb-1.5" : "mb-3"}`}
       >
         {embedded ? (
-          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary flex items-center gap-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
             <TrendingUp size={11} />
             Theme trends
             <span className="normal-case tracking-normal font-normal text-text-muted ml-1">
@@ -444,7 +444,7 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
             </h3>
           </div>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex w-full max-w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap">
           <Segmented
             options={[
               { value: "matrix", label: "Heat" },

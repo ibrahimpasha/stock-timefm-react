@@ -153,7 +153,7 @@ export function GexMatrixPage() {
   }, [data, spot]);
 
   const header = (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex w-full min-w-0 flex-wrap items-center gap-2 lg:w-auto">
       <Segmented options={METRICS} value={metric} onChange={setMetric} ariaLabel="Metric" />
       <Segmented options={BANDS} value={band} onChange={setBand} ariaLabel="Strike band" />
       <Segmented options={EXPIRY_COUNTS} value={nExp} onChange={setNExp} ariaLabel="Expiries" />
@@ -176,14 +176,14 @@ export function GexMatrixPage() {
         }
       >
         <div className="flex flex-wrap items-center gap-2 mb-3">
-          <div className="flex flex-wrap gap-1">
+          <div className="mobile-horizontal-strip flex w-full min-w-0 gap-1 overflow-x-auto lg:w-auto lg:flex-wrap lg:overflow-visible">
             {(tickers ?? []).map((t) => (
               <button
                 key={t.ticker}
                 type="button"
                 onClick={() => { setTicker(t.ticker); setParams({ ticker: t.ticker }); }}
                 aria-pressed={t.ticker === ticker}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                className={`min-h-11 shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors lg:min-h-0 ${
                   t.ticker === ticker
                     ? "bg-accent-cyan/15 text-accent-cyan"
                     : "text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
@@ -199,12 +199,12 @@ export function GexMatrixPage() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="any ticker…"
               aria-label="Look up a ticker's dealer positioning"
-              className="w-28 px-2 py-1 rounded-full text-xs bg-bg-card border border-border
+              className="min-h-11 w-28 px-2 py-1 rounded-full text-xs bg-bg-card border border-border lg:min-h-0
                          text-text-primary placeholder:text-text-muted focus:outline-none
                          focus:border-accent-cyan num"
             />
           </form>
-          <div className="ml-auto">{header}</div>
+          <div className="w-full min-w-0 lg:ml-auto lg:w-auto">{header}</div>
         </div>
 
         {isLoading && !data && (

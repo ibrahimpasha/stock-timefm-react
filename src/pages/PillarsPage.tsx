@@ -257,68 +257,85 @@ function CompanyTable({
   const rows = showAll ? companies : companies.slice(0, 24);
   return (
     <div className="flex flex-col">
-      <div className="grid grid-cols-[64px_1fr_44px_52px_44px_52px_56px_56px] gap-2 px-2 py-1.5 text-xs text-text-muted uppercase tracking-[0.08em]">
-        <span>ticker</span>
-        <span>why / role</span>
-        <span className="text-right">play</span>
-        <span className="text-right">purity</span>
-        <span className="text-right">peg</span>
-        <span className="text-right">30d</span>
-        <span className="text-right">target</span>
-        <span className="text-right">cap</span>
-      </div>
-      {rows.map((c) => (
-        <button
-          key={c.ticker}
-          type="button"
-          onClick={() => onTicker(c.ticker)}
-          className="grid grid-cols-[64px_1fr_44px_52px_44px_52px_56px_56px] gap-2 px-2 py-1.5 text-xs items-center text-left rounded-[var(--radius-control)] hover:bg-bg-card-hover transition-colors"
-          style={{ background: c.ticker === active ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : undefined }}
-        >
-          <span className="font-mono font-semibold text-text-primary flex items-center gap-1">
-            {c.ticker}
-            {c.featured && <span className="w-1.5 h-1.5 rounded-full bg-accent-cyan" title="researched name" />}
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate text-text-secondary">{c.one_liner || c.name || ""}</span>
-            <span className="text-xs" style={{ color: accumColor(c.accum_label) }}>
+      <div className="space-y-1 md:hidden">
+        {rows.map((c) => (
+          <button
+            key={c.ticker}
+            type="button"
+            onClick={() => onTicker(c.ticker)}
+            className="min-h-11 w-full rounded-[var(--radius-control)] px-2 py-2.5 text-left transition-colors hover:bg-bg-card-hover"
+            style={{ background: c.ticker === active ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : undefined }}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="flex items-center gap-1 font-mono text-sm font-semibold text-text-primary">
+                {c.ticker}
+                {c.featured && <span className="h-1.5 w-1.5 rounded-full bg-accent-cyan" title="researched name" />}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-xs text-text-secondary">
+                {c.one_liner || c.name || ""}
+              </span>
+              <span className="num text-xs font-semibold" style={{ color: c.play_score != null && c.play_score >= 60 ? "var(--accent-green)" : "var(--text-secondary)" }}>
+                Play {c.play_score ?? "—"}
+              </span>
+            </span>
+            <span className="mt-1 block truncate text-xs" style={{ color: accumColor(c.accum_label) }}>
               {c.role || ""}
               {c.accum_label ? ` · ${c.accum_label.replace(/_/g, " ").toLowerCase()}` : ""}
             </span>
-          </span>
-          <span className="text-right num" style={{ color: c.play_score != null && c.play_score >= 60 ? "var(--accent-green)" : "var(--text-secondary)" }}>
-            {c.play_score ?? "—"}
-          </span>
-          <span className="text-right num text-text-secondary">
-            {typeof c.purity === "number" ? `${Math.round(c.purity * 100)}%` : "—"}
-          </span>
-          <span
-            className="text-right num"
-            style={{ color: typeof c.peg !== "number" ? "var(--text-muted)" : c.peg <= 1 ? "var(--accent-green)" : c.peg <= 1.5 ? "var(--text-secondary)" : "var(--accent-orange)" }}
-            title="PEG (lower = cheaper vs growth)"
+            <span className="mt-2 grid grid-cols-5 gap-1 text-center text-xs">
+              <span><span className="block text-text-muted">Purity</span><span className="num text-text-secondary">{typeof c.purity === "number" ? `${Math.round(c.purity * 100)}%` : "—"}</span></span>
+              <span><span className="block text-text-muted">PEG</span><span className="num text-text-secondary">{typeof c.peg === "number" ? c.peg.toFixed(1) : "—"}</span></span>
+              <span><span className="block text-text-muted">30D</span><span className="num" style={{ color: c.return_30d == null ? "var(--text-muted)" : c.return_30d >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>{c.return_30d == null ? "—" : `${c.return_30d >= 0 ? "+" : ""}${c.return_30d.toFixed(0)}%`}</span></span>
+              <span><span className="block text-text-muted">Target</span><span className="num" style={{ color: c.target_pct == null ? "var(--text-muted)" : c.target_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>{c.target_pct == null ? "—" : `${c.target_pct >= 0 ? "+" : ""}${c.target_pct.toFixed(0)}%`}</span></span>
+              <span><span className="block text-text-muted">Cap</span><span className="num text-text-secondary">{fmtCap(c.market_cap)}</span></span>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="hidden md:flex md:flex-col">
+        <div className="grid grid-cols-[64px_1fr_44px_52px_44px_52px_56px_56px] gap-2 px-2 py-1.5 text-xs text-text-muted uppercase tracking-[0.08em]">
+          <span>ticker</span>
+          <span>why / role</span>
+          <span className="text-right">play</span>
+          <span className="text-right">purity</span>
+          <span className="text-right">peg</span>
+          <span className="text-right">30d</span>
+          <span className="text-right">target</span>
+          <span className="text-right">cap</span>
+        </div>
+        {rows.map((c) => (
+          <button
+            key={c.ticker}
+            type="button"
+            onClick={() => onTicker(c.ticker)}
+            className="grid grid-cols-[64px_1fr_44px_52px_44px_52px_56px_56px] items-center gap-2 rounded-[var(--radius-control)] px-2 py-1.5 text-left text-xs transition-colors hover:bg-bg-card-hover"
+            style={{ background: c.ticker === active ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : undefined }}
           >
-            {typeof c.peg === "number" ? c.peg.toFixed(1) : "—"}
-          </span>
-          <span
-            className="text-right num"
-            style={{ color: c.return_30d == null ? "var(--text-muted)" : c.return_30d >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}
-          >
-            {c.return_30d == null ? "—" : `${c.return_30d >= 0 ? "+" : ""}${c.return_30d.toFixed(0)}%`}
-          </span>
-          <span
-            className="text-right num"
-            style={{ color: c.target_pct == null ? "var(--text-muted)" : c.target_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}
-          >
-            {c.target_pct == null ? "—" : `${c.target_pct >= 0 ? "+" : ""}${c.target_pct.toFixed(0)}%`}
-          </span>
-          <span className="text-right num text-text-muted">{fmtCap(c.market_cap)}</span>
-        </button>
-      ))}
+            <span className="flex items-center gap-1 font-mono font-semibold text-text-primary">
+              {c.ticker}
+              {c.featured && <span className="h-1.5 w-1.5 rounded-full bg-accent-cyan" title="researched name" />}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-text-secondary">{c.one_liner || c.name || ""}</span>
+              <span className="text-xs" style={{ color: accumColor(c.accum_label) }}>
+                {c.role || ""}{c.accum_label ? ` · ${c.accum_label.replace(/_/g, " ").toLowerCase()}` : ""}
+              </span>
+            </span>
+            <span className="num text-right" style={{ color: c.play_score != null && c.play_score >= 60 ? "var(--accent-green)" : "var(--text-secondary)" }}>{c.play_score ?? "—"}</span>
+            <span className="num text-right text-text-secondary">{typeof c.purity === "number" ? `${Math.round(c.purity * 100)}%` : "—"}</span>
+            <span className="num text-right" style={{ color: typeof c.peg !== "number" ? "var(--text-muted)" : c.peg <= 1 ? "var(--accent-green)" : c.peg <= 1.5 ? "var(--text-secondary)" : "var(--accent-orange)" }}>{typeof c.peg === "number" ? c.peg.toFixed(1) : "—"}</span>
+            <span className="num text-right" style={{ color: c.return_30d == null ? "var(--text-muted)" : c.return_30d >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>{c.return_30d == null ? "—" : `${c.return_30d >= 0 ? "+" : ""}${c.return_30d.toFixed(0)}%`}</span>
+            <span className="num text-right" style={{ color: c.target_pct == null ? "var(--text-muted)" : c.target_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>{c.target_pct == null ? "—" : `${c.target_pct >= 0 ? "+" : ""}${c.target_pct.toFixed(0)}%`}</span>
+            <span className="num text-right text-text-muted">{fmtCap(c.market_cap)}</span>
+          </button>
+        ))}
+      </div>
       {companies.length > 24 && (
         <button
           type="button"
           onClick={() => setShowAll((v) => !v)}
-          className="text-xs text-text-muted hover:text-text-secondary transition-colors py-1.5 text-left"
+          className="min-h-11 py-1.5 text-left text-xs text-text-muted transition-colors hover:text-text-secondary md:min-h-0"
         >
           {showAll ? "show fewer" : `show all ${companies.length} names →`}
         </button>
@@ -636,11 +653,11 @@ function WeeklyReportSection() {
   if (!data?.available || !data.markdown) return null;
   return (
     <div className="card border-l-2" style={{ borderLeftColor: "var(--accent-purple)" }}>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+          className="flex min-h-11 min-w-0 basis-full items-center gap-2 text-left sm:basis-auto sm:flex-1"
         >
           <BookOpen size={16} className="text-accent-purple shrink-0" />
           <span className="text-sm font-semibold text-text-primary truncate">
@@ -657,7 +674,7 @@ function WeeklyReportSection() {
             value={data.file ?? ""}
             onChange={(e) => setPick(e.target.value || null)}
             title="Pick a past weekly report"
-            className="num text-xs bg-bg-card border border-border rounded px-1.5 py-0.5 text-text-secondary shrink-0"
+            className="num min-h-11 shrink-0 rounded border border-border bg-bg-card px-1.5 py-0.5 text-xs text-text-secondary sm:min-h-0"
           >
             {archive.map((r, i) => (
               <option key={r.file} value={r.file}>
@@ -669,10 +686,10 @@ function WeeklyReportSection() {
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-1 shrink-0"
+          className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-md sm:min-h-0 sm:min-w-0"
           aria-label={open ? "hide report" : "show report"}
         >
-          <span className="text-[10px] font-mono text-text-muted">{open ? "hide" : "show"}</span>
+          <span className="hidden text-[10px] font-mono text-text-muted sm:inline">{open ? "hide" : "show"}</span>
           <ChevronRight
             size={15}
             className="text-text-muted"
@@ -702,7 +719,7 @@ export function PillarsPage() {
   const sel = useMemo(() => tabs.find((t) => t.key === selected), [tabs, selected]);
 
   return (
-    <div className="max-w-[110rem] mx-auto px-4 py-4 xl:flex xl:items-start xl:gap-4">
+    <div className="mx-auto max-w-[110rem] px-4 py-4 max-md:px-0 max-md:py-1 xl:flex xl:items-start xl:gap-4">
       <div className="flex-1 min-w-0 space-y-4">
       {/* header */}
       <div>
@@ -726,13 +743,10 @@ export function PillarsPage() {
           <div className="text-[10px] font-mono uppercase tracking-wider text-text-muted mb-2">
             Chokepoints that span pillars
           </div>
-          {/* Aligned 3-column grid — name | pillar chips | why. The old
-              per-row flex made every row's columns start at different x
-              positions, which read as a broken table. */}
-          <div className="grid gap-x-3 gap-y-2 text-xs items-start"
-               style={{ gridTemplateColumns: "minmax(120px, 190px) minmax(110px, 200px) 1fr" }}>
+          {/* Each evidence row owns the same responsive column template. */}
+          <div className="space-y-3 text-xs md:space-y-2">
             {overview.cross_pillar_chokepoints.map((c) => (
-              <div key={c.name} className="contents">
+              <div key={c.name} className="pillar-chokepoint-row grid items-start gap-x-3 gap-y-1 border-b border-border pb-3 last:border-0 last:pb-0 md:gap-y-2 md:border-0 md:pb-0">
                 <span className="font-semibold text-text-primary">{c.name}</span>
                 <span className="flex gap-1 flex-wrap">
                   {c.pillars.map((p) => (
@@ -769,7 +783,7 @@ export function PillarsPage() {
             <button
               key={t.key}
               onClick={() => setSelected(t.key)}
-              className="flex-1 min-w-[220px] text-left rounded-lg border px-3 py-2 transition-colors"
+              className="min-h-11 min-w-[220px] flex-1 rounded-lg border px-3 py-2 text-left transition-colors"
               style={{
                 borderColor: on ? t.accent : "var(--border)",
                 background: on ? `${t.accent}14` : "var(--bg-card)",

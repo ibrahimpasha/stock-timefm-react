@@ -19,13 +19,17 @@ export function GlassPanel({
   return (
     <section className={`card ${interactive ? "card-interactive" : ""} ${className}`}>
       {(title || actions) && (
-        <header className="flex items-center justify-between gap-2 mb-3">
+        <header className="mb-3 flex min-w-0 items-center justify-between gap-2 max-lg:flex-wrap">
           {title && (
             <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
               {title}
             </h3>
           )}
-          {actions && <div className="flex items-center gap-1.5">{actions}</div>}
+          {actions && (
+            <div className="flex min-w-0 max-w-full items-center gap-1.5 overflow-x-auto">
+              {actions}
+            </div>
+          )}
         </header>
       )}
       {children}
@@ -151,7 +155,7 @@ export function Segmented<T extends string>({
             type="button"
             aria-pressed={active}
             onClick={() => onChange(o.value)}
-            className={`min-h-6 shrink-0 whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            className={`flex min-h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors max-lg:min-h-11 ${
               active
                 ? "segmented-option-active"
                 : "text-text-secondary hover:text-text-primary"

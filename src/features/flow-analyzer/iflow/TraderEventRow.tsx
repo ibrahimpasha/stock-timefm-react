@@ -199,19 +199,18 @@ export function TraderEventRow({
       {/* Header row — clickable */}
       <button
         type="button"
-        className="flex min-h-7 w-full items-center gap-2 text-left text-xs py-1.5 px-2 hover:bg-bg-card-hover transition-colors cursor-pointer"
+        className="flex min-h-11 w-full min-w-0 cursor-pointer flex-wrap items-center gap-2 px-2 py-1.5 text-left text-xs transition-colors hover:bg-bg-card-hover lg:min-h-7 lg:flex-nowrap"
         onClick={() => setExpanded((s) => !s)}
         aria-expanded={expanded}
         aria-controls={detailsId}
         title={`${match.author} — alert ${match.alert_id} — ${match.ts}`}
       >
         <span
-          className="font-bold uppercase shrink-0"
+          className="shrink-0 font-bold uppercase lg:min-w-[50px]"
           style={{
             color: "var(--accent-purple)",
             fontSize: 10,
             letterSpacing: 0.6,
-            minWidth: 50,
           }}
         >
           TRADER
@@ -232,8 +231,8 @@ export function TraderEventRow({
         </span>
 
         <span
-          className="text-text-secondary shrink-0"
-          style={{ fontSize: 12, minWidth: 80 }}
+          className="min-w-0 max-w-full truncate text-text-secondary lg:min-w-20"
+          style={{ fontSize: 12 }}
         >
           {match.author}
         </span>
