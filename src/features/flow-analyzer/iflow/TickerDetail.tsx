@@ -1,6 +1,7 @@
 import { WeekdayBehavior } from "./WeekdayBehavior";
 import { useMemo, useState } from "react";
-import { Eye } from "lucide-react";
+import { Eye, ShieldCheck } from "lucide-react";
+import { useAdminAnalysis, type AdminCall } from "../../../api/alerts";
 import { useFlowPicks } from "../../../api/flow";
 import { BullBearBar } from "../../../components/BullBearBar";
 import { PickCard } from "../../../components/PickCard";
@@ -12,6 +13,50 @@ import { EntryRow } from "./EntryRow";
 import { EarningsBadge } from "./TickerCard";
 import type { DteFilter, TraderMatch } from "./types";
 import { TraderEventRow } from "./TraderEventRow";
+
+/** What the server-admin desk said about this ticker (14d #admin-analysis
+ *  digest) — levels and dealer-positioning context right next to the flow.
+ *  Renders nothing when no admin mentioned the ticker. */
+function AdminDeskBlock({ ticker }: { ticker: string }) {
+  const { data } = useAdminAnalysis();
+  const calls = useMemo(() => {
+    const out: (AdminCall & { author: string })[] = [];
+    for (const a of data?.authors ?? [])
+      for (const c of a.calls)
+        if (c.tickers.includes(ticker.toUpperCase())) out.push({ ...c, author: a.author });
+    return out.sort((x, y) => (y.ts || "").localeCompare(x.ts || "")).slice(0, 6);
+  }, [data, ticker]);
+  if (!calls.length) return null;
+  const dirColor = (d: string) =>
+    d === "bull" ? "var(--accent-green)" : d === "bear" ? "var(--accent-red)"
+    : d === "macro" ? "var(--accent-blue)" : "var(--text-muted)";
+  return (
+    <div className="card">
+      <div className="flex items-center gap-1.5 mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
+        <ShieldCheck size={12} className="text-accent-purple" />
+        Admin desk
+        <span className="text-text-muted normal-case tracking-normal font-normal">
+          {calls.length} mention{calls.length > 1 ? "s" : ""} · 14d
+        </span>
+      </div>
+      <div className="space-y-1.5">
+        {calls.map((c) => (
+          <div key={c.msg_id} className="text-xs leading-snug">
+            <span className="num text-text-muted">{c.ts.slice(5, 10)}</span>
+            <span className="mx-1.5 font-semibold" style={{ color: dirColor(c.direction) }}>
+              {c.direction.toUpperCase()}
+            </span>
+            <span className="text-text-muted">{c.author}</span>
+            <span className="text-text-secondary"> — {c.thesis}</span>
+            {c.levels && (
+              <span className="num" style={{ color: "var(--accent-cyan)" }}> · {c.levels}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Right-hand detail panel of IFlowTracker. Two modes:
@@ -191,6 +236,8 @@ export function TickerDetail({
           />
         </div>
       </div>
+
+      <AdminDeskBlock ticker={ticker} />
 
       <WeekdayBehavior ticker={ticker} />
 
