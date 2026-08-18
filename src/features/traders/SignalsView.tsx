@@ -13,13 +13,15 @@
  * on all metrics). Behavior and data flow are unchanged.
  */
 import { useMemo, useState } from "react";
-import { TrendingUp, Flame, Award, BarChart3, X } from "lucide-react";
+import { TrendingUp, Flame, Award, BarChart3, X, ShieldCheck } from "lucide-react";
 
 import {
   useTrending,
   useFirstMentionLeaderboard,
   useSentimentTrajectory,
   useAlertsByTicker,
+  useAdminAnalysis,
+  type AdminCall,
 } from "../../api/alerts";
 import { useAppStore } from "../../store/useAppStore";
 import { Sparkline, RangeBar } from "../../components/CCPrimitives";
@@ -41,7 +43,7 @@ import type {
 
 /* ── Local helpers ───────────────────────────────────────── */
 
-type SignalsTab = "trending" | "leaders" | "sentiment";
+type SignalsTab = "trending" | "leaders" | "sentiment" | "admin";
 
 const WINDOW_OPTIONS: { hours: number; label: string }[] = [
   { hours: 6, label: "6h" },
@@ -825,6 +827,86 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
   );
 }
 
+/* ── Admin analysis tab ──────────────────────────────────── */
+
+const DIR_TONE: Record<AdminCall["direction"], ChipTone> = {
+  bull: "green", bear: "red", neutral: "neutral", macro: "blue",
+};
+
+function AdminTab({ onTickerClick }: { onTickerClick: (t: string) => void }) {
+  const { data, isLoading } = useAdminAnalysis();
+  if (isLoading && !data)
+    return <div className="p-3 text-sm text-text-muted animate-pulse">loading admin analysis…</div>;
+  if (!data?.authors?.length)
+    return (
+      <div className="p-3 text-sm text-text-muted">
+        No admin-analysis digest generated yet.
+      </div>
+    );
+  return (
+    <div className="p-2 space-y-3">
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        <span className="text-text-muted uppercase tracking-[0.08em] font-semibold">
+          Most discussed
+        </span>
+        {(data.top_tickers ?? []).slice(0, 10).map((t) => (
+          <button key={t.ticker} onClick={() => onTickerClick(t.ticker)}>
+            <Chip tone={t.bull > t.bear ? "green" : t.bear > t.bull ? "red" : "neutral"}>
+              <span className="num">{t.ticker}</span>
+              <span className="text-text-muted ml-1">{t.n}</span>
+            </Chip>
+          </button>
+        ))}
+        <span className="ml-auto text-text-muted">
+          #admin-analysis · last {data.window_days ?? 14}d
+          {data.generated_at ? ` · ${relativeAge(data.generated_at)}` : ""}
+        </span>
+      </div>
+      {data.authors.map((a) => (
+        <div key={a.author}>
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-sm font-semibold text-text-primary">{a.author}</span>
+            <span className="text-xs text-text-muted">{a.n_calls} posts</span>
+          </div>
+          <div className="text-xs text-text-muted mb-1.5">{a.style}</div>
+          <div className="space-y-1">
+            {a.calls.map((c) => (
+              <div
+                key={c.msg_id}
+                className="flex items-start gap-2 text-xs rounded-md px-2 py-1.5"
+                style={{ background: "color-mix(in srgb, var(--bg-card) 60%, transparent)" }}
+              >
+                <span className="num text-text-muted w-14 shrink-0">{c.ts.slice(5, 10)}</span>
+                <Chip tone={DIR_TONE[c.direction] ?? "neutral"}>{c.direction.toUpperCase()}</Chip>
+                <span className="flex flex-wrap gap-1 shrink-0">
+                  {c.tickers.slice(0, 4).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => onTickerClick(t)}
+                      className="num font-semibold text-accent-blue hover:underline"
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </span>
+                <span className="text-text-secondary min-w-0">
+                  {c.thesis}
+                  {c.levels && (
+                    <span className="text-text-muted"> · {c.levels}</span>
+                  )}
+                  {c.from_image && (
+                    <span className="text-text-muted"> · chart</span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ── SignalsView shell ───────────────────────────────────── */
 
 export function SignalsView() {
@@ -884,6 +966,15 @@ export function SignalsView() {
                   </span>
                 ),
               },
+              {
+                value: "admin",
+                label: (
+                  <span className="inline-flex items-center gap-1">
+                    <ShieldCheck size={12} />
+                    Admin
+                  </span>
+                ),
+              },
             ]}
             value={tab}
             onChange={setTab}
@@ -912,6 +1003,7 @@ export function SignalsView() {
         {tab === "sentiment" && (
           <SentimentTab defaultTicker={topTrending || "NVDA"} />
         )}
+        {tab === "admin" && <AdminTab onTickerClick={handleTickerClick} />}
       </div>
     </GlassPanel>
   );

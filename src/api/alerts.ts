@@ -330,3 +330,37 @@ export function useGenerateTraderBrief() {
     },
   });
 }
+
+/* ── Admin-analysis channel digest (subagent sweep, 14d) ───────────── */
+export interface AdminCall {
+  msg_id: string;
+  ts: string;
+  tickers: string[];
+  direction: "bull" | "bear" | "neutral" | "macro";
+  instrument: string;
+  thesis: string;
+  levels: string | null;
+  timeframe: string | null;
+  from_image: boolean;
+}
+export interface AdminAuthor {
+  author: string;
+  style: string;
+  n_calls: number;
+  calls: AdminCall[];
+}
+export interface AdminAnalysisResponse {
+  ok?: boolean;
+  generated_at?: string;
+  window_days?: number;
+  channel?: string;
+  authors?: AdminAuthor[];
+  top_tickers?: { ticker: string; n: number; bull: number; bear: number }[];
+}
+export function useAdminAnalysis() {
+  return useQuery<AdminAnalysisResponse>({
+    queryKey: ["alerts", "admin-analysis"],
+    queryFn: () => apiClient.get("/alerts/admin-analysis").then((r) => r.data),
+    staleTime: 60 * 60 * 1000,
+  });
+}
