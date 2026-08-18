@@ -453,6 +453,14 @@ function fmtTime(raw: string | undefined): string {
 /** Use the same side-correction logic the backend summary applies, so a
  *  put-selling entry doesn't render as "Bear" just because the LLM tagged
  *  it that way before ask% was factored in. */
+/** Index/broad-market ETFs — excluded from the dissent screen (a SPY put on
+ *  a euphoric day is a routine hedge, not informed single-name dissent). */
+const INDEX_ETFS = new Set([
+  "SPY", "QQQ", "IWM", "DIA", "SPX", "SPXW", "NDX", "VIX", "TLT", "HYG",
+]);
+/** Inverse/vol ETFs — a CALL here is a market-BEAR bet; inverted in the lean. */
+const BEAR_ETFS = new Set(["SQQQ", "SPXS", "SPXU", "QID", "PSQ", "SH", "UVXY"]);
+
 function correctedSide(entry: Record<string, unknown>): "Bull" | "Bear" {
   const type = String(entry.type || entry.option_type || "").toUpperCase();
   const askPct = Number(entry.ask_pct ?? 50);
@@ -593,6 +601,35 @@ export function EntryTape({
   // Kian-mode contract aggregation. Groups entries by
   // (ticker, normalized type, strike, expiry) — collapses C/CALL and
   // P/PUT label inconsistency — sums premium, keeps the strongest ask%
+  // Day lean + dissent detection — from the FULL loaded tape (pre-filter),
+  // so toggling Bias/DTE chips can't move the denominator. Backtested on
+  // 7/16-8/18: on the 6 days where a >=70% bull tape preceded a red day,
+  // the opposite-side prints with ask>=85, DTE 5-45, single-name, >=$500K
+  // graded median +67% 10d peak vs +39% for the consensus. Selection
+  // signal only — it does NOT predict the market day (corr ~0).
+  const dayLean = useMemo(() => {
+    let bull = 0, bear = 0;
+    for (const e of entries) {
+      const prem = parseFloat(String(e.premium ?? "0").replace(/[$,]/g, "")) || 0;
+      if (prem <= 0) continue;
+      let s = correctedSide(e);
+      if (BEAR_ETFS.has(String(e.ticker || "").toUpperCase()))
+        s = s === "Bull" ? "Bear" : "Bull";
+      if (s === "Bull") bull += prem; else bear += prem;
+    }
+    const tot = bull + bear;
+    return tot > 0 ? bull / tot : null;
+  }, [entries]);
+  const leanSide: "Bull" | "Bear" | null =
+    dayLean == null ? null : dayLean >= 0.7 ? "Bull" : dayLean <= 0.3 ? "Bear" : null;
+  const isDissent = (r: EntryRow): boolean => {
+    if (!leanSide || r.side === leanSide) return false;
+    const tk = r.ticker.toUpperCase();
+    if (INDEX_ETFS.has(tk) || BEAR_ETFS.has(tk)) return false;
+    return (r.askPct ?? 0) >= 85 && r.dte != null && r.dte >= 5 && r.dte <= 45
+      && r.premium >= 500_000;
+  };
+
   // (closest to the directional extreme) and the earliest timestamp.
   // Returns one row per CONTRACT, not per print. Only built in kian
   // mode; default and notable modes use the raw per-print entries.
@@ -1147,7 +1184,28 @@ export function EntryTape({
             </label>
           )}
         </div>
-        <span className="text-xs text-text-muted num">
+        <span className="flex items-center gap-2 text-xs text-text-muted num">
+          {dayLean != null && (
+            <span
+              className="px-2 py-0.5 rounded-full font-medium whitespace-nowrap"
+              style={{
+                color: leanSide === "Bull" ? "var(--accent-green)"
+                  : leanSide === "Bear" ? "var(--accent-red)" : "var(--text-muted)",
+                border: "1px solid var(--border)",
+              }}
+              title={
+                `Premium-weighted lean of the full loaded tape (inverse ETFs counted as market bets). ` +
+                (leanSide
+                  ? `One-sided (>=70%) — opposite-side conviction prints get a DISSENT tag: ` +
+                    `single-name, ask% >= 85, DTE 5-45, >= $500K. On the six 70%+ bull days that preceded ` +
+                    `a red day (7/16-8/4), those prints graded median +67% 10d peak vs +39% for the consensus. ` +
+                    `Selection signal only — it does NOT predict whether tomorrow is red.`
+                  : `Mixed tape — no dissent tags at <70% one-sidedness.`)
+              }
+            >
+              tape {Math.round(dayLean * 100)}% bull
+            </span>
+          )}
           {sortedRows.length} of {entries.length} entries
           {dates.length > 1 ? ` · ${dates.length} dates` : ""}
         </span>
@@ -1319,7 +1377,28 @@ export function EntryTape({
             >
               {r.side}
             </span>
-            <span className="w-24 text-text-secondary max-md:hidden">{r.action}</span>
+            <span className="w-24 text-text-secondary max-md:hidden flex items-center gap-1">
+              <span className="truncate">{r.action}</span>
+              {isDissent(r) && (
+                <span
+                  className="px-1 rounded text-[9px] font-bold shrink-0"
+                  style={{
+                    color: "var(--accent-purple)",
+                    background: "color-mix(in srgb, var(--accent-purple) 14%, transparent)",
+                    border: "1px solid color-mix(in srgb, var(--accent-purple) 35%, transparent)",
+                  }}
+                  title={
+                    `DISSENT — conviction print against a ${Math.round((dayLean ?? 0) * 100)}% ` +
+                    `${leanSide?.toLowerCase()} tape: single-name, ask% ${r.askPct}, DTE ${r.dte}, ` +
+                    `${formatPremium(r.premium)}. Historically (7/16-8/18) these graded ` +
+                    `median +67% 10d peak vs +39% for the day's consensus prints. ` +
+                    `A print-selection screen, NOT a market-crash forecast.`
+                  }
+                >
+                  DISSENT
+                </span>
+              )}
+            </span>
             <span className="flex-1 min-w-[160px] num text-text-primary truncate flex items-center gap-1.5 max-md:min-w-[80px]" title={r.contractLabel}>
               <span className="truncate">{r.contractLabel}</span>
               {r.printCount > 1 && (
