@@ -6,7 +6,7 @@
  * because the Command Center's theme-rotation view renders the exact same
  * components against `/market/theme-rotation`.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { GlassPanel, Chip, Segmented } from "../components/Glass";
 import { useSectorRotation, type RotationWindow } from "../api/rotation";
 import {
@@ -29,8 +29,9 @@ export function RotationPage() {
 
   const sectors = data?.sectors ?? [];
   const dates = sectors[0]?.history.map((p) => p.date) ?? [];
-  const [idx, setIdx] = useState(0);
-  useEffect(() => setIdx(Math.max(0, dates.length - 1)), [dates.length]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const selectedIndex = selectedDate ? dates.indexOf(selectedDate) : -1;
+  const idx = selectedIndex >= 0 ? selectedIndex : Math.max(0, dates.length - 1);
   const picker = (
     <Segmented options={WINDOWS} value={window} onChange={setWindow} ariaLabel="Rotation window" />
   );
@@ -65,7 +66,14 @@ export function RotationPage() {
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(340px,520px)_minmax(0,1.15fr)_minmax(0,0.85fr)] gap-3">
         <GlassPanel title="Rotation Map">
           <RotationMap sectors={sectors} atIndex={idx} />
-          <RotationScrubber dates={dates} index={idx} onChange={setIdx} />
+          <RotationScrubber
+            dates={dates}
+            index={idx}
+            onChange={(next) => {
+              const nextIndex = typeof next === "function" ? next(idx) : next;
+              setSelectedDate(dates[nextIndex] ?? null);
+            }}
+          />
         </GlassPanel>
 
         <div className="flex flex-col gap-3 min-w-0">

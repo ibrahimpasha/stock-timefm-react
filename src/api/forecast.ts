@@ -194,6 +194,7 @@ export interface SignalTechnical {
   pattern_dir?: string;
   pattern_strength?: number;
   patterns?: string[];
+  updated_at?: string | null;
 }
 
 export interface SignalConvergence {
@@ -213,6 +214,27 @@ export interface SignalML {
   gate_approved?: boolean;
   n_entries: number;
   as_of: string | null;
+  metric_id?: string | null;
+  metric_label?: string | null;
+  aggregation?: string | null;
+  model_status?: string | null;
+  model_version?: string | null;
+  trained_at?: string | null;
+  serving_mode?: "disabled" | "rank_only" | "gate_and_rank" | string | null;
+  ranking_allowed?: boolean | null;
+  gating_allowed?: boolean | null;
+  calibration_status?: "calibrated" | "uncalibrated" | string | null;
+  cohort?: string | null;
+  horizon_sessions?: number | null;
+  validation_sample_size?: number | null;
+  base_rate?: number | null;
+  oos_brier?: number | null;
+  score_distribution?: {
+    scored_contracts?: number | null;
+    median?: number | null;
+    p75?: number | null;
+    maximum?: number | null;
+  } | null;
   best: {
     type: string;
     strike: number | string | null;
@@ -234,6 +256,8 @@ export interface SignalProfile {
    *  "About" text that feeds the wiki / graphify. Shown as a dropdown by the
    *  company name in SignalAnalysisCard. */
   about: string | null;
+  updated_at?: string | null;
+  profile_updated_at?: string | null;
 }
 
 export interface SignalAnalysisResult {
@@ -242,6 +266,12 @@ export interface SignalAnalysisResult {
   technical: SignalTechnical | null;
   convergence: SignalConvergence | null;
   ml: SignalML | null;
+  source_freshness?: {
+    technical?: string | null;
+    profile?: string | null;
+    convergence?: string | null;
+    ml?: string | null;
+  };
 }
 
 /** Reliable per-ticker signal panel: deterministic TA + cross-source

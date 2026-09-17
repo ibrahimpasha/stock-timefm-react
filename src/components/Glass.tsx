@@ -17,16 +17,16 @@ export function GlassPanel({
   interactive?: boolean;
 }) {
   return (
-    <section className={`card ${interactive ? "card-interactive" : ""} ${className}`}>
+    <section className={`card glass-panel ${interactive ? "card-interactive" : ""} ${className}`}>
       {(title || actions) && (
-        <header className="mb-3 flex min-w-0 items-center justify-between gap-2 max-lg:flex-wrap">
+        <header className="glass-panel__header">
           {title && (
-            <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
+            <h3 className="min-w-0 text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
               {title}
             </h3>
           )}
           {actions && (
-            <div className="flex min-w-0 max-w-full items-center gap-1.5 overflow-x-auto">
+            <div className="mobile-horizontal-strip flex min-w-0 max-w-full items-center gap-1.5 overflow-x-auto">
               {actions}
             </div>
           )}
@@ -74,7 +74,7 @@ export function Chip({
     return (
       <span
         title={title}
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border border-border text-text-secondary ${className}`}
+        className={`chip inline-flex max-w-full items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs font-medium text-text-secondary ${className}`}
       >
         {children}
       </span>
@@ -84,7 +84,7 @@ export function Chip({
   return (
     <span
       title={title}
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${className}`}
+      className={`chip inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${className}`}
       style={{
         color: v,
         backgroundColor: `color-mix(in srgb, ${v} 14%, transparent)`,
@@ -109,7 +109,7 @@ export function Stat({
   sub?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-0.5 min-w-0">
+    <div className="stat flex min-w-0 flex-col gap-0.5">
       <span className="text-xs text-text-muted truncate">{label}</span>
       <span
         className="text-sm font-semibold num truncate"
@@ -145,7 +145,7 @@ export function Segmented<T extends string>({
     <div
       role="group"
       aria-label={ariaLabel}
-      className={`segmented-control inline-flex items-center gap-0.5 p-0.5 rounded-full border ${className}`}
+      className={`segmented-control mobile-horizontal-strip inline-flex items-center gap-0.5 rounded-full border p-0.5 ${className}`}
     >
       {options.map((o) => {
         const active = o.value === value;
@@ -155,7 +155,7 @@ export function Segmented<T extends string>({
             type="button"
             aria-pressed={active}
             onClick={() => onChange(o.value)}
-            className={`flex min-h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors max-lg:min-h-11 ${
+            className={`segmented-option flex min-h-7 shrink-0 touch-manipulation items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors max-lg:min-h-11 ${
               active
                 ? "segmented-option-active"
                 : "text-text-secondary hover:text-text-primary"

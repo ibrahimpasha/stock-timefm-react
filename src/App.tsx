@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
+import { lazy, Suspense, type ElementType } from "react";
+import { BrowserRouter, Routes, Route, NavLink, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   BarChart3,
@@ -15,6 +15,7 @@ import {
 import { NAV_ITEMS } from "./lib/constants";
 import { useTheme } from "./store/useTheme";
 import { DataHealthStrip } from "./components/DataHealthStrip";
+import { DataConnectionBanner } from "./components/DataConnectionBanner";
 
 // Route-level code splitting — each page (and its heavy deps: leaflet on the
 // map, the flow-analyzer suite on command center) loads on first visit
@@ -56,61 +57,90 @@ const MOBILE_NAV = [
   { path: "/map", label: "Map", icon: MapPinned },
 ] as const;
 
+const NAV_ICONS: Record<string, ElementType> = {
+  "/": Gauge,
+  "/command-center": Gauge,
+  "/pillars": Blocks,
+  "/rotation": Orbit,
+  "/gex": Grid3X3,
+  "/traders": Users,
+  "/map": MapPinned,
+};
+
 function Navbar() {
+  const location = useLocation();
+  const currentSection =
+    MOBILE_NAV.find((item) =>
+      item.path === "/"
+        ? location.pathname === "/" || location.pathname === "/command-center"
+        : location.pathname.startsWith(item.path),
+    )?.label ?? "Desk";
+
   return (
     <>
       <header className="mobile-app-bar lg:hidden">
-        <div className="flex min-w-0 items-center gap-2">
+        <NavLink
+          to="/"
+          className="mobile-brand"
+          aria-label="Stock-TimeFM command center"
+        >
           <BarChart3 size={19} className="shrink-0 text-accent-blue" aria-hidden="true" />
-          <span className="truncate text-sm font-bold gradient-text">
-            Stock-TimeFM
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-bold text-text-primary">
+              Stock-TimeFM
+            </span>
+            <span className="block truncate text-xs text-text-muted">{currentSection}</span>
           </span>
-        </div>
+        </NavLink>
 
-        <div className="flex items-center">
+        <div className="flex shrink-0 items-center">
           <DataHealthStrip />
           <ThemeToggle />
         </div>
       </header>
 
-      {/* Desktop keeps the full route rail and persistent system controls. */}
-      <div className="sticky top-0 z-40 hidden px-4 pt-3 lg:block">
-        <nav className="glass-strong flex items-center gap-1 px-4 py-2">
-          <div className="mr-5 flex shrink-0 items-center gap-2">
+      <header className="desktop-app-header hidden lg:block">
+        <nav className="desktop-app-nav" aria-label="Primary navigation">
+          <NavLink to="/" className="desktop-brand" aria-label="Stock-TimeFM command center">
             <BarChart3 size={20} className="text-accent-blue" aria-hidden="true" />
-            <span className="text-sm font-bold gradient-text">
+            <span className="text-sm font-bold text-text-primary">
               Stock-TimeFM
             </span>
-          </div>
+          </NavLink>
 
-          <div className="flex items-center gap-0.5">
+          <div className="desktop-route-list">
             {NAV_ITEMS.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === "/"}
-                className={({ isActive }) =>
-                  `shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-accent-blue/15 text-accent-blue"
-                      : "text-text-secondary hover:bg-bg-card-hover hover:text-text-primary"
-                  }`
-                }
-              >
-                {item.label}
-              </NavLink>
+              (() => {
+                const Icon = NAV_ICONS[item.path] ?? Gauge;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    end={item.path === "/"}
+                    className={({ isActive }) =>
+                      `desktop-nav-item ${isActive ? "desktop-nav-item--active" : ""}`
+                    }
+                  >
+                    <Icon size={15} aria-hidden="true" />
+                    <span>{item.label}</span>
+                  </NavLink>
+                );
+              })()
             ))}
           </div>
 
-          <DataHealthStrip />
-          <ThemeToggle />
+          <div className="ml-auto flex shrink-0 items-center">
+            <DataHealthStrip />
+            <ThemeToggle />
+          </div>
         </nav>
-      </div>
+      </header>
     </>
   );
 }
 
 function MobileNavigation() {
+  const location = useLocation();
   return (
     <nav className="mobile-bottom-nav lg:hidden" aria-label="Primary navigation">
       {MOBILE_NAV.map((item) => {
@@ -120,9 +150,13 @@ function MobileNavigation() {
             key={item.path}
             to={item.path}
             end={item.path === "/"}
-            className={({ isActive }) =>
-              `mobile-bottom-nav__item ${isActive ? "mobile-bottom-nav__item--active" : ""}`
-            }
+            className={({ isActive }) => {
+              const active = isActive || (
+                item.path === "/" && location.pathname === "/command-center"
+              );
+              return `mobile-bottom-nav__item ${active ? "mobile-bottom-nav__item--active" : ""}`;
+            }}
+            title={item.label}
           >
             <Icon size={18} aria-hidden="true" />
             <span>{item.label}</span>
@@ -155,7 +189,7 @@ function ThemeToggle() {
 
 function AppLayout() {
   return (
-    <div className="min-h-screen min-w-0 flex flex-col bg-bg-primary">
+    <div className="app-shell min-h-screen min-w-0 flex flex-col bg-bg-primary">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
@@ -163,11 +197,16 @@ function AppLayout() {
       <main
         id="main-content"
         tabIndex={-1}
-        className="mobile-content flex-1 min-w-0 px-4 py-4 max-md:px-2 max-md:py-3"
+        className="app-main mobile-content flex-1 min-w-0"
       >
+        <DataConnectionBanner />
         <Suspense
           fallback={
-            <div className="p-8 text-sm text-text-muted animate-pulse">loading…</div>
+            <div className="page-loading" role="status" aria-live="polite">
+              <span className="page-loading__bar" />
+              <span className="page-loading__bar page-loading__bar--short" />
+              <span className="sr-only">Loading workspace</span>
+            </div>
           }
         >
           <Routes>

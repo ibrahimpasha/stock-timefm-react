@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useSignalAnalysis, useMarketPrice, useMarketHistory } from "../../api/forecast";
 import { Sparkline, RangeBar, Tag } from "../../components/CCPrimitives";
+import { Chip } from "../../components/Glass";
 import {
   Activity,
   TrendingUp,
@@ -38,10 +39,10 @@ function tint(c: string, pct: number): string {
   return `color-mix(in srgb, ${c} ${pct}%, transparent)`;
 }
 
-function scoreColor(v: number): string {
-  if (v >= 65) return "var(--accent-green)";
-  if (v >= 40) return "var(--accent-yellow, #eab308)";
-  return "var(--accent-red)";
+function technicalColor(v: number): string {
+  if (v > 15) return "var(--accent-green)";
+  if (v < -15) return "var(--accent-red)";
+  return "var(--text-secondary)";
 }
 
 function dirColor(dir?: string): string {
@@ -53,8 +54,8 @@ function dirColor(dir?: string): string {
 
 const CONV_COLOR: Record<string, string> = {
   STRONG: "var(--accent-green)",
-  WATCH: "var(--accent-yellow, #eab308)",
-  MIXED: "var(--accent-orange, #f59e0b)",
+  WATCH: "var(--accent-yellow)",
+  MIXED: "var(--accent-orange)",
   QUIET: "var(--text-muted)",
 };
 
@@ -77,6 +78,58 @@ function ScoreBar({ value, color }: { value: number; color: string }) {
       />
     </div>
   );
+}
+
+/** Signed technical gauge centered at zero. Positive and negative readings
+ * extend from the midpoint, so -25 can no longer look like an empty 0-100 bar. */
+function BipolarGauge({ value }: { value: number }) {
+  const clamped = Math.max(-100, Math.min(100, value));
+  const scale = Math.abs(clamped) / 100;
+  return (
+    <div
+      className="relative h-2 overflow-hidden rounded-full"
+      style={{ background: "var(--border)" }}
+      role="img"
+      aria-label={`Technical direction ${Math.round(clamped)} on a minus 100 to plus 100 scale`}
+    >
+      <div
+        className="absolute inset-y-0"
+        style={{
+          left: clamped < 0 ? 0 : "50%",
+          width: "50%",
+          background: technicalColor(clamped),
+          transform: `scaleX(${scale})`,
+          transformOrigin: clamped < 0 ? "right" : "left",
+        }}
+      />
+      <div
+        className="absolute inset-y-0 w-px"
+        style={{ left: "50%", background: "var(--text-secondary)" }}
+      />
+    </div>
+  );
+}
+
+function humanize(value: string | null | undefined): string {
+  return String(value || "").replaceAll("_", " ");
+}
+
+function formatRate(value: number | null | undefined): string | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  const pct = Math.abs(value) <= 1 ? value * 100 : value;
+  return `${pct.toFixed(1)}%`;
+}
+
+function sourceStamp(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const parsed = new Date(value.includes("T") ? value : value.replace(" ", "T") + "Z");
+  if (Number.isNaN(parsed.getTime())) return value;
+  return `updated ${parsed.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })}`;
 }
 
 /** Convergence source indicator — filled dot when the source is active. */
@@ -107,7 +160,7 @@ function SrcDot({ label, n, tint: t }: { label: string; n: number; tint: string 
 /**
  * Signal Analysis — reliable per-ticker read replacing the deprecated price
  * forecast. Price hero (live sparkline) + analyst-target range bar + three
- * auditable signal gauges: Technical, cross-source Convergence, ML peak-potential.
+ * auditable signal gauges: Technical, cross-source Convergence, ML contract research.
  */
 export function SignalAnalysisCard({ ticker }: Props) {
   const { data, isLoading } = useSignalAnalysis(ticker);
@@ -146,6 +199,28 @@ export function SignalAnalysisCard({ ticker }: Props) {
   const convLabel = conv?.convergence?.label ?? "";
   const convCol = CONV_COLOR[convLabel] ?? "var(--text-muted)";
   const sig = conv?.signals ?? {};
+  const mlProbabilityVisible = !!ml
+    && ml.gate_approved === true
+    && ml.calibration_status === "calibrated"
+    && ml.peak_probability != null;
+  const hasMlProvenance = !!ml && [
+    ml.model_status,
+    ml.model_version,
+    ml.serving_mode,
+    ml.calibration_status,
+    ml.cohort,
+    ml.horizon_sessions,
+    ml.validation_sample_size,
+  ].some((value) => value != null && value !== "");
+  const bestContract = ml
+    ? [
+        ml.best?.type || null,
+        ml.best?.strike != null ? `$${ml.best.strike}` : null,
+        ml.best?.expiry || null,
+      ].filter(Boolean).join(" ")
+    : "";
+  const baseRate = formatRate(ml?.base_rate);
+  const freshness = data?.source_freshness;
 
   return (
     <div className="card">
@@ -256,7 +331,7 @@ export function SignalAnalysisCard({ ticker }: Props) {
 
       {!isLoading && !hasAny && (profile || mp) && (
         <div className="text-xs text-text-muted pt-2 border-t border-border text-center">
-          No technical / convergence / ML signal yet for {ticker}.
+          No technical, convergence, or ML research signal yet for {ticker}.
         </div>
       )}
 
@@ -271,19 +346,29 @@ export function SignalAnalysisCard({ ticker }: Props) {
               </span>
               {tech && (
                 <span className="ml-auto inline-flex items-center gap-1">
+                  {sourceStamp(freshness?.technical) && (
+                    <span className="num text-xs font-normal text-text-muted">
+                      {sourceStamp(freshness?.technical)}
+                    </span>
+                  )}
                   <TrendIcon size={13} style={{ color: trendCol }} />
                   <span
                     className="num text-sm font-bold"
-                    style={{ color: scoreColor(tech.tech_score) }}
+                    style={{ color: technicalColor(tech.tech_score) }}
                   >
-                    {Math.round(tech.tech_score)}
+                    {tech.tech_score > 0 ? "+" : ""}{Math.round(tech.tech_score)}
                   </span>
                 </span>
               )}
             </div>
             {tech ? (
               <>
-                <ScoreBar value={tech.tech_score} color={scoreColor(tech.tech_score)} />
+                <BipolarGauge value={tech.tech_score} />
+                <div className="num mt-1 flex justify-between text-xs text-text-muted" aria-hidden="true">
+                  <span>-100</span>
+                  <span>neutral</span>
+                  <span>+100</span>
+                </div>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs mt-1.5">
                   {tech.pattern && (
                     <span style={{ color: dirColor(tech.pattern_dir) }}>
@@ -292,10 +377,17 @@ export function SignalAnalysisCard({ ticker }: Props) {
                     </span>
                   )}
                   <span className="num text-text-muted">
-                    setup {Math.round(tech.setup_strength)} · RSI {Math.round(tech.rsi14)} · MACD{" "}
+                    RSI {Math.round(tech.rsi14)} · MACD{" "}
                     {tech.macd_hist >= 0 ? "+" : ""}
                     {tech.macd_hist.toFixed(2)}
                   </span>
+                </div>
+                <div className="mt-2">
+                  <div className="mb-1 flex items-center justify-between text-xs text-text-muted">
+                    <span>Setup strength</span>
+                    <span className="num text-text-secondary">{Math.round(tech.setup_strength)}/100</span>
+                  </div>
+                  <ScoreBar value={tech.setup_strength} color="var(--accent-blue)" />
                 </div>
               </>
             ) : (
@@ -311,7 +403,12 @@ export function SignalAnalysisCard({ ticker }: Props) {
                 Convergence
               </span>
               {conv && (
-                <span className="ml-auto">
+                <span className="ml-auto inline-flex items-center gap-2">
+                  {sourceStamp(freshness?.convergence) && (
+                    <span className="num text-xs text-text-muted">
+                      {sourceStamp(freshness?.convergence)}
+                    </span>
+                  )}
                   <Tag color={convCol} bg={tint(convCol, 16)} border={tint(convCol, 50)}>
                     {convLabel || "—"}
                   </Tag>
@@ -323,42 +420,91 @@ export function SignalAnalysisCard({ ticker }: Props) {
                 <SrcDot label="news" n={sig.news?.count ?? 0} tint="var(--accent-blue)" />
                 <SrcDot label="iflow" n={sig.iflow?.count ?? 0} tint="var(--accent-purple)" />
                 <SrcDot label="voices" n={sig.voices?.count ?? 0} tint="var(--accent-green)" />
-                <SrcDot label="traders" n={sig.traders?.count ?? 0} tint="var(--accent-orange, #f59e0b)" />
+                <SrcDot label="traders" n={sig.traders?.count ?? 0} tint="var(--accent-orange)" />
               </div>
             ) : (
               <div className="text-xs text-text-muted">no cross-source activity</div>
             )}
           </div>
 
-          {/* ML peak-potential */}
+          {/* Contract-level ML research */}
           <div className="pt-2.5 mt-2.5 border-t border-border">
             <div className="flex items-center gap-1.5 mb-1.5">
               <Brain size={12} className="text-text-muted" />
               <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-                ML Peak-Potential
+                ML Contract Research
               </span>
               {ml && (
-                <span className="num ml-auto text-sm font-bold text-accent-purple">
-                  {ml.peak_score}
+                <span className="num ml-auto text-sm font-bold text-accent-purple" title="Best within-DTE contract percentile, not ticker confidence">
+                  pctl {ml.peak_score}
                 </span>
               )}
             </div>
             {ml ? (
               <>
                 <ScoreBar value={ml.peak_score} color="var(--accent-purple)" />
-                <div className="text-xs text-text-muted leading-snug mt-1.5">
-                  ML percentile within similar DTE · best of <span className="num">{ml.n_entries}</span> flow{" "}
-                  {ml.n_entries === 1 ? "entry" : "entries"}
-                  {ml.as_of ? ` · ${ml.as_of}` : ""}
-                  {ml.peak_probability != null && (
-                    <div className="opacity-70">
-                      Estimated P(2x in 10 sessions): <span className="num">{ml.peak_probability}%</span>
-                    </div>
-                  )}
-                  <div className="opacity-70">
-                    {ml.gate_approved ? "validated trading gate" : "research ranking only"}
-                  </div>
+                <div className="mt-1.5 text-xs leading-snug text-text-secondary">
+                  Highest within-DTE percentile across <span className="num">{ml.n_entries}</span> recent {ticker} flow{" "}
+                  {ml.n_entries === 1 ? "entry" : "entries"}; this is not ticker confidence.
+                  {ml.as_of ? <span className="num text-text-muted"> As of {ml.as_of}.</span> : null}
                 </div>
+                {bestContract && (
+                  <div className="mt-1 text-xs text-text-muted">
+                    Highest-ranked contract <span className="num text-text-primary">{bestContract}</span>
+                    {ml.best?.flow_date ? <span className="num"> · {ml.best.flow_date}</span> : null}
+                  </div>
+                )}
+                {ml.score_distribution && (
+                  <div className="num mt-1 text-xs text-text-muted">
+                    Distribution median {ml.score_distribution.median ?? "—"} · p75 {ml.score_distribution.p75 ?? "—"} · max {ml.score_distribution.maximum ?? ml.peak_score}
+                  </div>
+                )}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <Chip tone={ml.gating_allowed ? "green" : ml.ranking_allowed ? "blue" : "neutral"}>
+                    {ml.serving_mode === "gate_and_rank"
+                      ? "Gate + rank"
+                      : ml.serving_mode === "rank_only"
+                        ? "Rank only"
+                        : ml.serving_mode === "disabled"
+                          ? "Disabled"
+                          : ml.gate_approved
+                            ? "Approved artifact"
+                            : "Research only"}
+                  </Chip>
+                  {ml.model_status && (
+                    <Chip tone={ml.model_status === "approved" ? "green" : "neutral"}>
+                      status {humanize(ml.model_status)}
+                    </Chip>
+                  )}
+                  {ml.model_version && <Chip tone="purple">model <span className="num">{ml.model_version}</span></Chip>}
+                  {ml.calibration_status && (
+                    <Chip tone={ml.calibration_status === "calibrated" ? "cyan" : "neutral"}>
+                      {humanize(ml.calibration_status)}
+                    </Chip>
+                  )}
+                  {ml.cohort && <Chip>cohort {humanize(ml.cohort)}</Chip>}
+                  {ml.horizon_sessions != null && <Chip><span className="num">{ml.horizon_sessions}</span> sessions</Chip>}
+                  {ml.validation_sample_size != null && <Chip>validation <span className="num">n={ml.validation_sample_size}</span></Chip>}
+                </div>
+                {mlProbabilityVisible ? (
+                  <div className="mt-2 text-xs text-text-secondary">
+                    Calibrated P(2x within {ml.horizon_sessions ?? 10} sessions):{" "}
+                    <span className="num font-semibold text-text-primary">{ml.peak_probability}%</span>
+                    {baseRate ? <span className="text-text-muted"> · validation base rate {baseRate}</span> : null}
+                  </div>
+                ) : ml.peak_probability != null ? (
+                  <div className="mt-2 text-xs text-text-muted">
+                    Probability withheld because approved calibration metadata is not confirmed.
+                  </div>
+                ) : null}
+                {!hasMlProvenance && (
+                  <div className="mt-2 text-xs text-text-muted">
+                    Model provenance is unavailable in this legacy response; percentile remains research-only context.
+                  </div>
+                )}
+                {ml.trained_at && (
+                  <div className="num mt-1 text-xs text-text-muted">trained {ml.trained_at}</div>
+                )}
               </>
             ) : (
               <div className="text-xs text-text-muted">no recent options flow to score</div>

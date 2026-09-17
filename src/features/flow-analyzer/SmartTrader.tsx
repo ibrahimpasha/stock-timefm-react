@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import apiClient from "../../api/client";
 import { formatCurrency, changeColor } from "../../lib/utils";
+import { daysFromToday } from "../../lib/dateOnly";
 import { useAppStore } from "../../store/useAppStore";
 import { GlassPanel, Chip, Stat, Segmented } from "../../components/Glass";
 import type { ChipTone } from "../../components/Glass";
@@ -39,7 +40,53 @@ interface PersonaRow {
   return_pct: number;
   open_positions: number;
   total_value: number;
+  ml_threshold?: number | null;
+  ml_serving_mode?: "disabled" | "rank_only" | "gate_and_rank";
   error?: string;
+}
+
+interface RankBreakdown {
+  validated?: boolean;
+  policy_version?: string;
+  base_name: string;
+  base_score: number;
+  components?: Array<{
+    name: string;
+    score: number;
+    weight: number;
+    contribution: number;
+  }>;
+  ml_score: number | null;
+  ml_serving_mode: string;
+  setup_score: number | null;
+  evidence_score?: number | null;
+  evidence_adjustment?: number;
+  model_adjustment?: number;
+  category_adjustment: number;
+  pulse_adjustment: number;
+  total: number;
+}
+
+interface DecisionReceipt {
+  source?: {
+    date?: string;
+    age_days?: number | null;
+    status?: string;
+    fallback_used?: boolean;
+  };
+  intent?: { option_type?: string; action?: string; direction?: string };
+  ml?: {
+    serving_mode?: string;
+    model_version?: string | null;
+    score?: number | null;
+    gate_applied?: boolean;
+  };
+  rank?: RankBreakdown;
+  research_gate?: { approved: boolean; families: string[]; reasons: string[] };
+  execution?: {
+    fill_kind?: string;
+    quote?: { source?: string; observed_at?: string; bid?: number; ask?: number; data_delay_seconds?: number };
+  };
 }
 
 interface Position {
@@ -82,6 +129,10 @@ interface Position {
   parent_id: number | null;
   peak_pnl_pct: number | null;
   reason: string | null;
+  rank_score?: number | null;
+  rank_breakdown?: RankBreakdown | null;
+  ml_serving_mode?: string | null;
+  decision_receipt?: DecisionReceipt | null;
 }
 
 interface CategoryTrendItem {
@@ -233,6 +284,7 @@ function usePersonaList() {
 // Persona watchlist — LIVING WL-A / WL-B: rows persist across days, marked
 // to market from their add-date premium; breakouts promote, dead drop.
 interface WatchlistRow {
+  id?: number;
   ticker: string;
   option_type: string;
   strike: number | null;
@@ -247,6 +299,25 @@ interface WatchlistRow {
   status: string;
   drop_reason: string | null;
   promoted_at: string | null;
+  current_dte?: number | null;
+  decision_state?: "watching" | "triggered" | "eligible" | "blocked" | "entered" | "invalidated";
+  block_reason?: string | null;
+  last_evaluated_at?: string | null;
+  triggered_at?: string | null;
+  added_at?: string | null;
+  source_date?: string | null;
+  last_marked_at?: string | null;
+}
+
+interface WatchlistActivity {
+  daily: { date: string; added: number; scans: number }[];
+  last_scan_at: string | null;
+  last_added_date: string | null;
+  last_added_at: string | null;
+  last_evaluated_at: string | null;
+  last_marked_at: string | null;
+  latest_source_date: string | null;
+  last_reset_at: string | null;
 }
 
 function usePersonaWatchlist(persona: PersonaName, enabled: boolean) {
@@ -255,6 +326,7 @@ function usePersonaWatchlist(persona: PersonaName, enabled: boolean) {
     wla: WatchlistRow[];
     wlb: WatchlistRow[];
     history: WatchlistRow[];
+    activity?: WatchlistActivity;
   }>({
     queryKey: ["smart-trader-watchlist", persona],
     queryFn: () =>
@@ -266,58 +338,221 @@ function usePersonaWatchlist(persona: PersonaName, enabled: boolean) {
 }
 
 function daysOn(added: string): number {
-  return Math.max(0, Math.round((Date.now() - new Date(added).getTime()) / 86_400_000));
+  return Math.max(0, -daysFromToday(added));
+}
+
+function watchlistTime(value?: string | null): string {
+  if (!value) return "Not recorded";
+  if (value.length === 10) return value;
+  const parsed = new Date(/(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value}Z`);
+  return Number.isNaN(parsed.getTime()) ? "Not recorded" : parsed.toLocaleString();
 }
 
 function WatchlistPanel({ persona }: { persona: PersonaName }) {
-  const { data } = usePersonaWatchlist(persona, true);
-  if (!data || (!data.wla.length && !data.wlb.length && !(data.history ?? []).length))
-    return null;
+  const { data, isPending, isError, isFetching, refetch } = usePersonaWatchlist(persona, true);
+  const queryClient = useQueryClient();
+  const [mobileSection, setMobileSection] = useState<"wla" | "wlb" | "history" | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const [sort, setSort] = useState("newest");
+  const [addedFilter, setAddedFilter] = useState("all");
+  const reset = useMutation({
+    mutationFn: (target: PersonaName) => apiClient.post(
+      `/smart-trader/watchlist/reset?persona=${target}`, { confirm_persona: target },
+    ),
+    onSuccess: (_response, target) => queryClient.invalidateQueries({
+      queryKey: ["smart-trader-watchlist", target],
+    }),
+  });
+  const activity = data?.activity;
+  const activeCount = (data?.wla.length ?? 0) + (data?.wlb.length ?? 0);
+  const filterAndSort = (rows: WatchlistRow[]) => rows.filter((r) => {
+    if (addedFilter === "all") return true;
+    const days = activity?.daily.slice(addedFilter === "today" ? -1 : -7) ?? [];
+    return days.some((d) => d.date === r.added);
+  }).sort((a, b) => {
+    if (sort === "ticker") return a.ticker.localeCompare(b.ticker) || b.added.localeCompare(a.added);
+    if (sort === "pnl") return (b.pnl_pct ?? -Infinity) - (a.pnl_pct ?? -Infinity);
+    if (sort === "checked") return (b.last_evaluated_at ?? "").localeCompare(a.last_evaluated_at ?? "");
+    if (sort === "source") return (b.source_date ?? "").localeCompare(a.source_date ?? "");
+    const order = (b.added_at ?? b.added).localeCompare(a.added_at ?? a.added) || (b.id ?? 0) - (a.id ?? 0);
+    return sort === "oldest" ? -order : order;
+  });
+  const wla = filterAndSort(data?.wla ?? []);
+  const wlb = filterAndSort(data?.wlb ?? []);
+  const visibleSection = mobileSection ?? (wla.length || !wlb.length ? "wla" : "wlb");
   const contract = (r: WatchlistRow) =>
-    `$${r.strike ?? "?"}${r.option_type === "CALL" ? "C" : "P"} ${r.expiry}${
-      r.dte != null ? ` · ${r.dte}d` : ""
+    `$${r.strike ?? "?"}${["C", "CALL"].includes(r.option_type) ? "C" : "P"} ${r.expiry}${
+      (r.current_dte ?? r.dte) != null ? ` · ${r.current_dte ?? r.dte}d` : ""
     }`;
   const Row = ({ r }: { r: WatchlistRow }) => (
-    <div className="flex items-center gap-2 text-xs flex-wrap">
-      <span className="font-mono font-semibold w-14">{r.ticker}</span>
-      <span className="num text-text-muted">{contract(r)}</span>
-      {r.pnl_pct != null && (
-        <span className="num font-semibold" style={{ color: changeColor(r.pnl_pct) }}>
-          {r.pnl_pct >= 0 ? "+" : ""}{r.pnl_pct.toFixed(0)}%
+    <>
+      <details className="group rounded-[var(--radius-control)] border border-border md:hidden">
+        <summary className="flex min-h-11 list-none items-center gap-2 px-3 py-2 text-xs marker:content-none">
+          <ChevronRight
+            size={13}
+            className="shrink-0 text-text-muted transition-transform group-open:rotate-90"
+            aria-hidden="true"
+          />
+          <span className="w-12 shrink-0 font-mono font-semibold text-text-primary">
+            {r.ticker}
+          </span>
+          <span className="num min-w-0 flex-1 truncate text-text-muted">
+            {contract(r)}
+          </span>
+          {r.pnl_pct != null && (
+            <span
+              className="num shrink-0 font-semibold"
+              style={{ color: changeColor(r.pnl_pct) }}
+            >
+              {r.pnl_pct >= 0 ? "+" : ""}{r.pnl_pct.toFixed(0)}%
+            </span>
+          )}
+        </summary>
+        <div className="space-y-2 px-3 pb-3 pl-10 text-xs">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Chip tone={r.decision_state === "eligible" ? "green" : "neutral"}>
+              {r.decision_state ?? "watching"}
+            </Chip>
+            {r.triggered_at && <Chip tone="blue">Price trigger</Chip>}
+            {r.ml_score != null && <Chip tone="blue">ML {r.ml_score}</Chip>}
+            {r.peak_pnl_pct != null && r.peak_pnl_pct >= 30 && (
+              <Chip tone="neutral" className="num">
+                peak +{r.peak_pnl_pct.toFixed(0)}%
+              </Chip>
+            )}
+            <span className="text-text-muted">{daysOn(r.added)}d on list</span>
+          </div>
+          <p className="break-words leading-relaxed text-text-secondary">
+            {r.block_reason || (r.last_evaluated_at ? r.note : "Legacy observation; eligibility not evaluated.")}
+          </p>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-text-muted">
+            <dt>Added</dt><dd>{watchlistTime(r.added_at ?? r.added)}</dd>
+            <dt>Flow date</dt><dd>{r.source_date ?? "Not recorded"}</dd>
+            <dt>Evaluated</dt><dd>{watchlistTime(r.last_evaluated_at)}</dd>
+            <dt>Mark cycle</dt><dd>{watchlistTime(r.last_marked_at)}</dd>
+          </dl>
+        </div>
+      </details>
+      <div className="hidden items-center gap-2 text-xs md:flex md:flex-wrap">
+        <span className="w-14 font-mono font-semibold">{r.ticker}</span>
+        <span className="num text-text-muted">{contract(r)}</span>
+        {r.pnl_pct != null && (
+          <span className="num font-semibold" style={{ color: changeColor(r.pnl_pct) }}>
+            {r.pnl_pct >= 0 ? "+" : ""}{r.pnl_pct.toFixed(0)}%
+          </span>
+        )}
+        {r.peak_pnl_pct != null && r.peak_pnl_pct >= 30 && (
+          <span className="num text-text-muted">peak +{r.peak_pnl_pct.toFixed(0)}%</span>
+        )}
+        <Chip tone={r.decision_state === "eligible" ? "green" : "neutral"}>
+          {r.decision_state ?? "watching"}
+        </Chip>
+        {r.triggered_at && <Chip tone="blue">Price trigger</Chip>}
+        {r.ml_score != null && <Chip tone="blue">ML {r.ml_score}</Chip>}
+        <span className="text-text-muted">{daysOn(r.added)}d on list</span>
+        <span className="text-text-secondary">Added {watchlistTime(r.added_at ?? r.added)}</span>
+        <span className="text-text-muted">Flow {r.source_date ?? "unknown"}</span>
+        <span className="text-text-muted">Evaluated {watchlistTime(r.last_evaluated_at)}</span>
+        <span className="text-text-muted">
+          {r.block_reason || (r.last_evaluated_at ? r.note : "Legacy observation; eligibility not evaluated.")}
         </span>
-      )}
-      {r.peak_pnl_pct != null && r.peak_pnl_pct >= 30 && (
-        <span className="num text-text-muted">peak +{r.peak_pnl_pct.toFixed(0)}%</span>
-      )}
-      {r.promoted_at && <Chip tone="green">BREAKOUT</Chip>}
-      {r.ml_score != null && <Chip tone="blue">ML {r.ml_score}</Chip>}
-      <span className="text-text-muted">{daysOn(r.added)}d on list</span>
-      <span className="text-text-muted">{r.note}</span>
-    </div>
+      </div>
+    </>
   );
   return (
     <GlassPanel title="Watchlist">
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-1.5">
-          <div className="text-xs font-semibold text-text-muted">
-            WL-A — cleared rules / breakouts, next in line ({data.wla.length})
-          </div>
-          {data.wla.slice(0, 12).map((r, i) => <Row key={`a${i}`} r={r} />)}
-          {!data.wla.length && <div className="text-xs text-text-muted">empty</div>}
-        </div>
-        <div className="space-y-1.5">
-          <div className="text-xs font-semibold text-text-muted">
-            WL-B — near-miss, monitoring ({data.wlb.length})
-          </div>
-          {data.wlb.slice(0, 12).map((r, i) => <Row key={`b${i}`} r={r} />)}
-          {!data.wlb.length && <div className="text-xs text-text-muted">empty</div>}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <label className="flex min-h-11 items-center gap-2 text-xs text-text-muted">
+          Sort
+          <select aria-label="Sort watchlist" value={sort} onChange={(e) => setSort(e.target.value)}
+            className="min-h-11 min-w-0 rounded-[var(--radius-control)] border border-border bg-bg-card px-2 text-xs text-text-primary">
+            <option value="newest">Newest added</option><option value="oldest">Oldest added</option>
+            <option value="checked">Recently evaluated</option><option value="source">Latest flow date</option>
+            <option value="ticker">Ticker A-Z</option><option value="pnl">Modeled gain</option>
+          </select>
+        </label>
+        <select aria-label="Watchlist additions period" value={addedFilter} onChange={(e) => setAddedFilter(e.target.value)}
+          disabled={!activity} className="min-h-11 rounded-[var(--radius-control)] border border-border bg-bg-card px-2 text-xs text-text-primary">
+          <option value="all">All additions</option><option value="today">Added today (PT)</option><option value="week">Added last 7 days (PT)</option>
+        </select>
+        <div className="ml-auto flex items-center gap-1">
+          <button type="button" title="Reload watchlist" aria-label="Reload watchlist" disabled={isFetching}
+            onClick={() => void refetch()} className="flex size-11 items-center justify-center text-text-muted disabled:opacity-50">
+            <RefreshCw size={15} className={isFetching ? "animate-spin" : ""} />
+          </button>
+          <button type="button" disabled={!activeCount || reset.isPending || isError} onClick={() => {
+            if (window.confirm(`Reset the ${persona} watchlist?\n\nArchive ${activeCount} active observations. Positions, cash and history stay unchanged. These contracts can return when a newer flow date is observed. No scan or trade is started.`)) reset.mutate(persona);
+          }} className="flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-border px-3 text-xs text-text-secondary disabled:opacity-50">
+            <RotateCcw size={14} />{reset.isPending ? "Resetting..." : "Reset watchlist"}
+          </button>
         </div>
       </div>
-      {(data.history ?? []).length > 0 && (
-        <div className="mt-3 space-y-1">
+      {reset.isError && <p role="alert" className="mb-3 text-xs text-accent-red">Reset failed. Reload the list before trying again.</p>}
+      {reset.isSuccess && <p role="status" className="mb-3 text-xs text-text-secondary">{reset.data.data.archived_count} observations archived. Positions and cash unchanged.</p>}
+      {isError && <p role="alert" className="mb-3 text-xs text-accent-red">Watchlist could not be reloaded. Displayed data may be out of date.</p>}
+      {isPending && <p role="status" className="py-3 text-xs text-text-muted">Loading watchlist...</p>}
+      {activity && <div className="mb-4 space-y-3 border-b border-border pb-3 text-xs">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-text-muted lg:grid-cols-4">
+          <div>Added today (PT)<div className="num mt-1 font-semibold text-text-primary">{activity.daily.at(-1)?.added ?? 0}</div></div>
+          <div>Added in 7 days<div className="num mt-1 font-semibold text-text-primary">{activity.daily.slice(-7).reduce((sum, d) => sum + d.added, 0)}</div></div>
+          <div>Last addition<div className="mt-1 text-text-primary">{watchlistTime(activity.last_added_at ?? activity.last_added_date)}</div></div>
+          <div>Last recorded scan<div className="mt-1 text-text-primary">{watchlistTime(activity.last_scan_at)}</div></div>
+        </div>
+        <div className="flex flex-wrap gap-x-5 gap-y-1 text-text-muted">
+          <span>Latest observed flow: {activity.latest_source_date ?? "Not recorded"}</span>
+          <span>Last mark cycle: {watchlistTime(activity.last_marked_at)}</span>
+        </div>
+        <details>
+          <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-text-secondary"><Clock size={14} />Daily activity (14 days, PT)</summary>
+          <table className="w-full text-left text-xs">
+            <thead className="text-text-muted"><tr><th className="py-2 font-medium">Date</th><th className="font-medium">Added</th><th className="font-medium">Recorded scans</th></tr></thead>
+            <tbody>{[...activity.daily].reverse().map((day) => <tr key={day.date} className="border-t border-border">
+              <td className="py-2 num">{day.date}</td><td className="num text-accent-blue">+{day.added}</td><td className="num">{day.scans}</td>
+            </tr>)}</tbody>
+          </table>
+        </details>
+      </div>}
+      {data && !activeCount && <p className="mb-3 py-3 text-sm text-text-muted">No active observations for {persona}.</p>}
+      <Segmented<"wla" | "wlb" | "history">
+        className="mobile-horizontal-strip mb-3 w-full md:hidden"
+        ariaLabel="Choose watchlist section"
+        value={visibleSection}
+        onChange={setMobileSection}
+        options={[
+          { value: "wla", label: "Screened", badge: <span className="num">{wla.length}</span> },
+          { value: "wlb", label: "Monitoring", badge: <span className="num">{wlb.length}</span> },
+          { value: "history", label: "Moves", badge: <span className="num">{(data?.history ?? []).length}</span> },
+        ]}
+      />
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className={`${visibleSection === "wla" ? "space-y-1.5" : "hidden"} md:block md:space-y-1.5`}>
+          <div className="text-xs font-semibold text-text-muted">
+            Screened observations ({wla.length})
+          </div>
+          <div className="space-y-1.5">
+            {wla.slice(0, showAll ? undefined : 12).map((r, i) => <Row key={r.id ?? `a${i}`} r={r} />)}
+            {!wla.length && <div className="py-3 text-center text-sm text-text-muted">No screened observations in this period.</div>}
+          </div>
+        </div>
+        <div className={`${visibleSection === "wlb" ? "space-y-1.5" : "hidden"} md:block md:space-y-1.5`}>
+          <div className="text-xs font-semibold text-text-muted">
+            Monitoring / blocked ({wlb.length})
+          </div>
+          <div className="space-y-1.5">
+            {wlb.slice(0, showAll ? undefined : 12).map((r, i) => <Row key={r.id ?? `b${i}`} r={r} />)}
+            {!wlb.length && <div className="py-3 text-center text-sm text-text-muted">No monitored observations in this period.</div>}
+          </div>
+        </div>
+      </div>
+      {(wla.length > 12 || wlb.length > 12) && (
+        <button type="button" onClick={() => setShowAll(!showAll)} className="mt-2 min-h-11 text-xs text-accent">
+          {showAll ? "Show fewer" : "Show all observations"}
+        </button>
+      )}
+      <div className={`${visibleSection === "history" ? "mt-3 space-y-1.5" : "hidden"} md:mt-3 ${(data?.history ?? []).length > 0 ? "md:block" : "md:hidden"} md:space-y-1`}>
           <div className="text-xs font-semibold text-text-muted">Recent moves</div>
-          {(data.history ?? []).slice(0, 8).map((r, i) => (
-            <div key={`h${i}`} className="flex items-center gap-2 text-xs text-text-muted">
+          {(data?.history ?? []).slice(0, 8).map((r, i) => (
+            <div key={`h${i}`} className="flex min-h-11 flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-border px-3 py-2 text-xs text-text-muted md:min-h-0 md:rounded-none md:border-0 md:p-0">
               <Chip tone={r.status === "entered" ? "green" : "neutral"}>
                 {r.status.toUpperCase()}
               </Chip>
@@ -329,8 +564,10 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
               <span>{r.drop_reason ?? ""}</span>
             </div>
           ))}
-        </div>
-      )}
+          {(data?.history ?? []).length === 0 && (
+            <div className="py-3 text-center text-sm text-text-muted">No recent watchlist moves.</div>
+          )}
+      </div>
     </GlassPanel>
   );
 }
@@ -896,6 +1133,54 @@ function WhyPick({ reason, compact = false }: { reason: string | null; compact?:
   );
 }
 
+function DecisionAudit({ p }: { p: Position }) {
+  const rank = p.rank_breakdown ?? p.decision_receipt?.rank;
+  const source = p.decision_receipt?.source;
+  const mode = p.ml_serving_mode ?? p.decision_receipt?.ml?.serving_mode;
+  const quote = p.decision_receipt?.execution?.quote;
+  const quality = p.decision_receipt?.research_gate;
+  if (!rank && !source && !mode && !quote) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2 text-xs text-text-muted">
+      {rank?.validated === false && <Chip tone="neutral">Experimental policy</Chip>}
+      {quote && (
+        <span className="num">
+          {quote.data_delay_seconds ? `${quote.data_delay_seconds / 60}m delayed quote` : "Indicative quote"}
+          {" · simulated ask fill"}
+        </span>
+      )}
+      {quality && <Chip tone={quality.approved ? "green" : "neutral"}>
+        {quality.approved ? `Evidence checked: ${quality.families.join(", ")}` : "Evidence blocked"}
+      </Chip>}
+      {rank && (
+        <span className="num text-text-secondary">
+          Decision rank <strong className="text-text-primary">{rank.total.toFixed(1)}</strong>
+          {` = ${rank.base_name} ${rank.base_score.toFixed(1)}`}
+          {` ${(rank.model_adjustment ?? 0) >= 0 ? "+" : ""}${(rank.model_adjustment ?? 0).toFixed(1)} model`}
+          {` ${rank.category_adjustment >= 0 ? "+" : ""}${rank.category_adjustment.toFixed(1)} category`}
+          {` ${rank.pulse_adjustment >= 0 ? "+" : ""}${rank.pulse_adjustment.toFixed(1)} pulse`}
+        </span>
+      )}
+      {rank?.components?.map((component) => (
+        <Chip key={component.name} tone="neutral" className="num">
+          {component.name.toLowerCase()} {Math.round(component.weight * 100)}%
+        </Chip>
+      ))}
+      {mode && (
+        <Chip tone={mode === "gate_and_rank" ? "green" : "blue"}>
+          ML {mode === "gate_and_rank" ? "gate + rank" : mode.replaceAll("_", " ")}
+        </Chip>
+      )}
+      {source?.date && (
+        <span className="num">
+          source {source.date}
+          {source.fallback_used ? ` · fallback ${source.age_days ?? "?"}d old` : ""}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function PositionCard({
   p,
   stopPct,
@@ -933,8 +1218,8 @@ function PositionCard({
   const unitLabel = isEquity ? "share" : "contract";
   const unitWord = p.contracts === 1 ? unitLabel : `${unitLabel}s`;
   return (
-    <div className="card" style={{ borderLeft: `3px solid ${sideColor}` }}>
-      <div className="flex items-center justify-between gap-2">
+    <div className="card" style={{ borderColor: tint(sideColor, 35) }}>
+      <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-stretch">
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           {!isEquity && <SideIcon side={p.side} />}
           <button
@@ -962,6 +1247,7 @@ function PositionCard({
             x{p.contracts} {unitWord}
           </span>
           {p.ml_score != null && <ScoreChip score={p.ml_score} label="ML" />}
+          {p.rank_score != null && <Chip tone="blue" className="num">rank {p.rank_score.toFixed(1)}</Chip>}
           {p.n_score != null && <ScoreChip score={p.n_score} label="N" />}
           {p.graph_score != null && (
             <Chip tone="purple" className="num" title="graph composite score">
@@ -992,8 +1278,8 @@ function PositionCard({
             </Chip>
           )}
         </div>
-        <div className="flex items-center gap-3 text-xs shrink-0">
-          <div className="text-right">
+        <div className="grid shrink-0 grid-cols-3 gap-3 text-xs max-md:w-full md:flex md:items-center">
+          <div className="max-md:text-left md:text-right">
             <div className="text-text-muted">Cost</div>
             <div className="num text-text-primary">
               {formatCurrency(p.cost_basis)}
@@ -1022,6 +1308,7 @@ function PositionCard({
       </div>
       {/* Why this pick — the entry rationale. */}
       <WhyPick reason={p.reason} />
+      <DecisionAudit p={p} />
 
       {/* Per-trade context row — days held, underlying move, breakeven. */}
       <div className="mt-2 flex items-center gap-x-4 gap-y-1 flex-wrap text-xs">
@@ -1089,7 +1376,7 @@ function PositionCard({
       </div>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="mt-2 text-xs text-text-muted hover:text-accent-blue flex items-center gap-1 transition-colors"
+        className="mt-2 flex min-h-11 items-center gap-1 text-xs text-text-muted transition-colors hover:text-accent-blue md:min-h-0"
       >
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
         <Network size={10} />
@@ -1171,14 +1458,14 @@ function CategoryTrendPanel() {
               className="rounded-md text-xs"
               style={{
                 background: "color-mix(in srgb, var(--bg-card) 50%, transparent)",
-                borderLeft: `3px solid ${heat}`,
+                border: `1px solid ${tint(heat, 30)}`,
               }}
             >
               <button
                 onClick={() =>
                   setExpanded(isExpanded ? null : t.category)
                 }
-                className="w-full px-3 py-2 flex items-center justify-between"
+                className="flex min-h-11 w-full flex-col items-stretch justify-between gap-1 px-3 py-2 text-left sm:flex-row sm:items-center"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   {isExpanded ? (
@@ -1186,6 +1473,11 @@ function CategoryTrendPanel() {
                   ) : (
                     <ChevronRight size={11} />
                   )}
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: heat }}
+                    aria-hidden="true"
+                  />
                   <span className="font-mono font-bold text-text-primary">
                     {t.category}
                   </span>
@@ -1193,7 +1485,7 @@ function CategoryTrendPanel() {
                     {t.ticker_count} tickers
                   </span>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex w-full shrink-0 items-center justify-between gap-3 pl-5 sm:w-auto sm:justify-start sm:pl-0">
                   <div className="hidden sm:block w-20 h-1.5 rounded-full bg-border overflow-hidden">
                     <div
                       className="h-full rounded-full"
@@ -1206,7 +1498,7 @@ function CategoryTrendPanel() {
                   >
                     {t.hotness_ratio.toFixed(2)}x
                   </span>
-                  <span className="num text-text-secondary text-right w-24">
+                  <span className="num text-right text-text-secondary sm:w-24">
                     ${(t.premium_window / 1e6).toFixed(1)}M
                   </span>
                 </div>
@@ -1303,7 +1595,7 @@ function ClosedRow({ p, trims = [] }: { p: Position; trims?: Position[] }) {
       className="px-3 py-2 rounded-md text-xs space-y-1"
       style={{
         background: "color-mix(in srgb, var(--border) 10%, transparent)",
-        borderLeft: `2px solid ${color}`,
+        border: `1px solid ${tint(color, 28)}`,
       }}
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1409,16 +1701,17 @@ function RejectionBlock({
     >
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-3 py-2"
+        className="flex min-h-11 w-full items-center justify-between px-3 py-2 text-left"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           <XCircle size={12} className="text-accent-red" />
-          <span className="font-semibold text-text-primary">{meta.label}</span>
-          <span className="text-text-muted">
+          <span className="min-w-0 font-semibold text-text-primary max-md:line-clamp-2">{meta.label}</span>
+          <span className="shrink-0 text-text-muted max-md:hidden">
             blocked {entries.length} {entries.length === 1 ? "entry" : "entries"}
           </span>
         </div>
+        <Chip tone="red" className="num md:hidden">{entries.length}</Chip>
       </button>
       {open && (
         <div className="px-3 pb-2 space-y-1">
@@ -1428,10 +1721,10 @@ function RejectionBlock({
           {entries.slice(0, 30).map((e, i) => (
             <div
               key={i}
-              className="flex items-center justify-between num text-xs px-2 py-1 rounded"
+              className="num flex min-w-0 flex-col items-start gap-1 rounded px-2 py-2 text-xs md:flex-row md:items-center md:justify-between md:py-1"
               style={{ background: "color-mix(in srgb, var(--bg-card) 40%, transparent)" }}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <span className="font-bold text-text-primary">{e.ticker}</span>
                 {e.strike != null && (
                   <span className="text-text-primary">
@@ -1445,7 +1738,7 @@ function RejectionBlock({
                   <span className="text-text-muted">ml={e.ml_score}</span>
                 )}
               </div>
-              <span className="text-text-muted truncate ml-2">{e.reason}</span>
+              <span className="break-words text-text-muted md:ml-2 md:min-w-0 md:flex-1 md:truncate">{e.reason}</span>
             </div>
           ))}
           {entries.length > 30 && (
@@ -1540,9 +1833,9 @@ function TradeDecisionHistory({
     <section className="card">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between gap-2 text-xs uppercase tracking-[0.08em] font-semibold transition-colors hover:text-text-primary"
+        className="flex min-h-11 w-full flex-col items-stretch justify-between gap-2 text-xs font-semibold uppercase tracking-[0.08em] transition-colors hover:text-text-primary md:flex-row md:items-center"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2 text-left">
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           <span className="text-text-secondary">
             Trade Decision History ({logical.length})
@@ -1553,7 +1846,7 @@ function TradeDecisionHistory({
             </Chip>
           )}
         </div>
-        <div className="flex items-center gap-3 text-xs num normal-case tracking-normal">
+        <div className="num flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 text-left text-xs normal-case tracking-normal md:justify-end md:pl-0">
           {logical.length > 0 ? (
             <>
               <span className="text-text-muted">
@@ -1627,6 +1920,35 @@ function TradeDecisionHistory({
 type PosSortKey = "entry_date" | "pnl" | "pnl_dollars" | "value" | "peak" | "ticker" | "entry_px";
 type AddedWindow = "all" | "7d" | "30d";
 
+function PositionSortHeader({
+  column,
+  activeSort,
+  ascending,
+  onSort,
+  children,
+  right = true,
+}: {
+  column?: PosSortKey;
+  activeSort: PosSortKey;
+  ascending: boolean;
+  onSort: (key: PosSortKey) => void;
+  children: ReactNode;
+  right?: boolean;
+}) {
+  return (
+    <th
+      className={`whitespace-nowrap px-2 py-1.5 font-semibold text-text-muted ${right ? "text-right" : "text-left"} ${column ? "cursor-pointer select-none hover:text-text-primary" : ""}`}
+      onClick={column ? () => onSort(column) : undefined}
+      title={column ? "Sort" : undefined}
+    >
+      {children}
+      {column && activeSort === column && (
+        <span className="ml-0.5">{ascending ? "▲" : "▼"}</span>
+      )}
+    </th>
+  );
+}
+
 /** Dense sortable table of open positions — the "when did I add what, at
  *  what price" view the grouped cards bury. One row per position, sortable
  *  by added-date / entry price / P/L / value, quick added-window filter. */
@@ -1678,45 +2000,105 @@ function PositionsTable({
     else { setSortKey(k); setAsc(k === "ticker" || k === "entry_date" ? false : false); }
   };
 
-  const Th = ({ k, children, right = true }: { k?: PosSortKey; children: ReactNode; right?: boolean }) => (
-    <th
-      className={`px-2 py-1.5 font-semibold text-text-muted whitespace-nowrap ${right ? "text-right" : "text-left"} ${k ? "cursor-pointer hover:text-text-primary select-none" : ""}`}
-      onClick={k ? () => toggle(k) : undefined}
-      title={k ? "Sort" : undefined}
-    >
-      {children}
-      {k && sortKey === k && <span className="ml-0.5">{asc ? "▲" : "▼"}</span>}
-    </th>
-  );
-
   return (
     <div>
-      <div className="flex items-center gap-1.5 mb-2 text-xs">
+      <div className="mb-2 flex min-h-11 items-center gap-1.5 text-xs md:min-h-0">
         <span className="text-text-muted">Added:</span>
         {(["all", "7d", "30d"] as AddedWindow[]).map((w) => (
-          <button key={w} type="button" onClick={() => setAdded(w)} className="rounded-full">
+          <button key={w} type="button" onClick={() => setAdded(w)} className="inline-flex min-h-11 items-center rounded-full md:min-h-0">
             <Chip tone={added === w ? "blue" : "neutral"}>{w === "all" ? "All" : `last ${w}`}</Chip>
           </button>
         ))}
         <span className="ml-auto text-text-muted num">{rows.length} of {positions.length}</span>
       </div>
-      <div className="overflow-x-auto">
+      <Segmented<PosSortKey>
+        className="mobile-horizontal-strip mb-2 w-full md:hidden"
+        ariaLabel="Sort open positions"
+        value={sortKey}
+        onChange={toggle}
+        options={[
+          { value: "entry_date", label: "Added" },
+          { value: "ticker", label: "Ticker" },
+          { value: "entry_px", label: "Entry" },
+          { value: "pnl", label: "P/L %" },
+          { value: "pnl_dollars", label: "P/L $" },
+          { value: "value", label: "Value" },
+          { value: "peak", label: "Peak" },
+        ]}
+      />
+      <div className="space-y-1.5 md:hidden">
+        {rows.map((p) => {
+          const isEquity = p.instrument === "equity";
+          const scaled = (p.scale_stage ?? 0) >= 1;
+          const held = daysHeld(p.entry_date);
+          const pnl = p.pnl_pct ?? 0;
+          const trimmed = (trimsByParent.get(p.id)?.length ?? 0) > 0;
+          return (
+            <details key={p.id} className="group rounded-[var(--radius-control)] border border-border">
+              <summary className="flex min-h-11 list-none items-center gap-2 px-3 py-2 marker:content-none">
+                <ChevronRight
+                  size={13}
+                  className="shrink-0 text-text-muted transition-transform group-open:rotate-90"
+                  aria-hidden="true"
+                />
+                <span className="w-12 shrink-0 font-mono text-xs font-bold text-text-primary">
+                  {p.ticker}
+                </span>
+                <span className="num min-w-0 flex-1 truncate text-xs text-text-secondary">
+                  {isEquity ? "shares" : `$${p.strike} ${p.option_type} ${p.expiry ?? ""}`}
+                </span>
+                <span className="num shrink-0 text-sm font-bold" style={{ color: changeColor(pnl) }}>
+                  {pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}%
+                </span>
+              </summary>
+              <div className="space-y-3 px-3 pb-3 pl-10">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                  <Stat label="Added" value={p.entry_date} sub={held != null ? `${held}d held` : undefined} />
+                  <Stat label="Quantity" value={p.contracts} sub={isEquity ? "shares" : "contracts"} />
+                  <Stat label="Entry" value={`$${p.premium_at_entry.toFixed(2)}`} />
+                  <Stat label="Now" value={p.current_premium != null ? `$${p.current_premium.toFixed(2)}` : "—"} />
+                  <Stat label="Cost" value={formatCurrency(p.cost_basis)} />
+                  <Stat label="Value" value={formatCurrency(p.current_value ?? p.cost_basis)} />
+                  <Stat label="P/L" value={`${(p.pnl_dollars ?? 0) >= 0 ? "+" : ""}$${(p.pnl_dollars ?? 0).toFixed(0)}`} tone={(p.pnl_dollars ?? 0) >= 0 ? "green" : "red"} />
+                  <Stat label="Peak" value={p.peak_pnl_pct != null ? `+${p.peak_pnl_pct.toFixed(0)}%` : "—"} />
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Chip tone={scaled ? "green" : "neutral"} className="num">
+                    floor {scaled ? "BE" : `${stopPct}%`}
+                  </Chip>
+                  {trimmed && <Chip tone="green">booked trims</Chip>}
+                  {p.ml_score != null && <Chip tone="blue" className="num">ML {p.ml_score}</Chip>}
+                  {p.n_score != null && <Chip tone="neutral" className="num">N {p.n_score}</Chip>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTicker(p.ticker)}
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-control)] border border-border text-xs font-semibold text-accent-blue transition-colors hover:bg-bg-card-hover"
+                >
+                  Open {p.ticker} analysis
+                </button>
+              </div>
+            </details>
+          );
+        })}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full text-xs num border-collapse">
           <thead>
             <tr className="border-b border-border">
-              <Th k="ticker" right={false}>Ticker</Th>
-              <Th right={false}>Contract</Th>
-              <Th k="entry_date" right={false}>Added</Th>
-              <Th>Days</Th>
-              <Th>Qty</Th>
-              <Th k="entry_px">Entry</Th>
-              <Th>Now</Th>
-              <Th>Cost</Th>
-              <Th k="value">Value</Th>
-              <Th k="pnl">P/L%</Th>
-              <Th k="pnl_dollars">P/L$</Th>
-              <Th k="peak">Peak</Th>
-              <Th>Floor</Th>
+              <PositionSortHeader column="ticker" activeSort={sortKey} ascending={asc} onSort={toggle} right={false}>Ticker</PositionSortHeader>
+              <PositionSortHeader activeSort={sortKey} ascending={asc} onSort={toggle} right={false}>Contract</PositionSortHeader>
+              <PositionSortHeader column="entry_date" activeSort={sortKey} ascending={asc} onSort={toggle} right={false}>Added</PositionSortHeader>
+              <PositionSortHeader activeSort={sortKey} ascending={asc} onSort={toggle}>Days</PositionSortHeader>
+              <PositionSortHeader activeSort={sortKey} ascending={asc} onSort={toggle}>Qty</PositionSortHeader>
+              <PositionSortHeader column="entry_px" activeSort={sortKey} ascending={asc} onSort={toggle}>Entry</PositionSortHeader>
+              <PositionSortHeader activeSort={sortKey} ascending={asc} onSort={toggle}>Now</PositionSortHeader>
+              <PositionSortHeader activeSort={sortKey} ascending={asc} onSort={toggle}>Cost</PositionSortHeader>
+              <PositionSortHeader column="value" activeSort={sortKey} ascending={asc} onSort={toggle}>Value</PositionSortHeader>
+              <PositionSortHeader column="pnl" activeSort={sortKey} ascending={asc} onSort={toggle}>P/L%</PositionSortHeader>
+              <PositionSortHeader column="pnl_dollars" activeSort={sortKey} ascending={asc} onSort={toggle}>P/L$</PositionSortHeader>
+              <PositionSortHeader column="peak" activeSort={sortKey} ascending={asc} onSort={toggle}>Peak</PositionSortHeader>
+              <PositionSortHeader activeSort={sortKey} ascending={asc} onSort={toggle}>Floor</PositionSortHeader>
             </tr>
           </thead>
           <tbody>
@@ -1848,23 +2230,26 @@ function OpenPositionsGrouped({
               onClick={() =>
                 setCollapsed((c) => ({ ...c, [cat]: !c[cat] }))
               }
-              className="w-full flex items-center justify-between text-xs font-semibold px-2 py-1.5 rounded-[var(--radius-control)] hover:bg-bg-card-hover transition-colors"
+              className="flex min-h-11 w-full flex-col items-stretch justify-between gap-1 rounded-[var(--radius-control)] px-2 py-1.5 text-xs font-semibold transition-colors hover:bg-bg-card-hover md:flex-row md:items-center"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2 text-left">
                 {isCollapsed ? (
                   <ChevronRight size={12} />
                 ) : (
                   <ChevronDown size={12} />
                 )}
-                <span className="text-accent-cyan uppercase tracking-wider">
+                <span className="min-w-0 break-words text-accent-cyan uppercase tracking-wider">
                   {cat}
                 </span>
-                <span className="text-text-muted normal-case">
+                <span className="text-text-muted normal-case max-md:hidden">
                   · {catCount} {catCount === 1 ? "position" : "positions"} ·{" "}
                   {themeMap.size} {themeMap.size === 1 ? "theme" : "themes"}
                 </span>
               </div>
-              <div className="flex items-center gap-3 num text-xs">
+              <div className="num flex w-full items-center justify-between gap-3 pl-5 text-xs md:w-auto md:justify-start md:pl-0">
+                <span className="text-text-muted md:hidden">
+                  {catCount} {catCount === 1 ? "position" : "positions"} · {themeMap.size} {themeMap.size === 1 ? "theme" : "themes"}
+                </span>
                 <span className="text-text-muted">
                   {formatCurrency(catValue)}
                 </span>
@@ -1880,14 +2265,14 @@ function OpenPositionsGrouped({
                   .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
                   .map(([theme, posList]) => (
                     <div key={theme} className="space-y-1.5">
-                      <div className="text-xs font-mono text-text-muted pl-1 flex items-center gap-2">
-                        <span className="text-accent-cyan/70">{theme}</span>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2 pl-1 font-mono text-xs text-text-muted">
+                        <span className="min-w-0 break-words text-accent-cyan/70">{theme}</span>
                         <span>· {posList.length}</span>
-                        <span className="text-text-muted/60">
+                        <span className="min-w-0 break-words text-text-muted/60">
                           {posList.map((p) => p.ticker).join(" · ")}
                         </span>
                       </div>
-                      <div className="space-y-2 pl-2 border-l border-border/40">
+                      <div className="space-y-2 md:pl-2 md:border-l md:border-border/40">
                         {posList.map((p) => (
                           <PositionCard
                             key={p.id}
@@ -1914,18 +2299,18 @@ const PERSONA_META: Record<
   { label: string; tagline: string; stopPct: number }
 > = {
   smart: {
-    label: "Smart Trader",
-    tagline: "Rule-compliant options. ML 70+, DTE 8-30, 2% size, -40% stop.",
+    label: "Smart",
+    tagline: "Rule-compliant options. DTE 8-30, 5% size, -40% stop, multi-signal rank, 70% deployment.",
     stopPct: -40,
   },
   aggressive: {
-    label: "Aggressive Trader",
-    tagline: "Loosened options. ML 50+, DTE 1-45 (lottos OK), 5% size, -60% stop.",
+    label: "Aggressive",
+    tagline: "Volume book. DTE 1-45 (lottos allowed), 8% size, -60% stop, no regime gate.",
     stopPct: -60,
   },
   builder: {
     label: "Builder",
-    tagline: "AbTrades/momoedge playbook: monthlies DTE 25-70, with the market regime, ranked SETUP x ML, scale-in tranches, trims at +40/+100, BE floor, runners.",
+    tagline: "Monthlies DTE 25-70, with the market regime, ranked by SETUP + ML + bounded evidence, scale-in tranches, trims, breakeven floor, runners.",
     stopPct: -50,
   },
   ruby: {
@@ -2036,16 +2421,16 @@ export function SmartTrader() {
   const personas: PersonaName[] = ["smart", "aggressive", "builder", "ruby", "gemfinder", "supercycle", "conviction"];
   const personaRows = personaList?.personas ?? [];
   return (
-    <div className="space-y-4">
+    <div className="max-w-full space-y-4 overflow-x-clip pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       {/* Persona selector — five paper books at the same starting capital */}
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="mobile-workspace-controls glass-strong sticky z-20 space-y-1.5 p-2 md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <div className="flex items-center gap-1 text-xs text-text-muted shrink-0">
             <Users size={11} />
             Persona
           </div>
           <Segmented<PersonaName>
-            className="flex-wrap max-md:w-full"
+            className="mobile-horizontal-strip w-full flex-nowrap md:w-auto md:flex-wrap"
             options={personas.map((p) => {
               const row = personaRows.find((r) => r.name === p);
               const pRet = row?.return_pct ?? 0;
@@ -2065,7 +2450,7 @@ export function SmartTrader() {
           />
         </div>
         {/* Active book at a glance — tagline + size, replaces the old per-button sublines */}
-        <div className="text-xs text-text-muted">
+        <div className="line-clamp-2 text-xs leading-relaxed text-text-muted md:line-clamp-none">
           {PERSONA_META[persona].tagline}
           {(() => {
             const row = personaRows.find((r) => r.name === persona);
@@ -2073,6 +2458,11 @@ export function SmartTrader() {
               <span className="num">
                 {" "}
                 · {row.open_positions} open · ${(row.total_value / 1000).toFixed(1)}K
+                {row.ml_serving_mode === "gate_and_rank"
+                  ? ` · ML gate ${row.ml_threshold ?? "?"}+ active`
+                  : row.ml_serving_mode === "rank_only"
+                    ? " · ML research rank only; no ML rejection"
+                    : ""}
               </span>
             ) : null;
           })()}
@@ -2084,11 +2474,11 @@ export function SmartTrader() {
 
       {/* Action buttons — no manual "Run Picks": the cron is the only source
           of new positions (a manual re-pick would stack duplicates). */}
-      <div className="flex gap-2">
+      <div className="flex min-w-0 flex-wrap gap-2">
         <button
           onClick={() => markMutation.mutate()}
           disabled={markMutation.isPending}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-text-primary font-semibold text-sm transition-all hover:bg-bg-card-hover disabled:opacity-40"
+          className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-border px-4 py-2 text-sm font-semibold text-text-primary transition-colors hover:bg-bg-card-hover disabled:opacity-40 sm:flex-none"
         >
           {markMutation.isPending ? (
             <Loader2 size={14} className="animate-spin" />
@@ -2097,7 +2487,7 @@ export function SmartTrader() {
           )}
           Mark to Market
         </button>
-        <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:flex-none">
           <span className="text-text-muted text-sm">$</span>
           <input
             type="number"
@@ -2107,7 +2497,7 @@ export function SmartTrader() {
             value={resetCapital}
             onChange={(e) => setResetCapital(e.target.value)}
             aria-label="Reset starting capital"
-            className="num w-24 px-2 py-2 rounded-lg border border-border bg-bg-card text-text-primary text-sm focus:outline-none focus:border-accent-blue/50"
+            className="num min-h-11 min-w-0 flex-1 rounded-[var(--radius-control)] border border-border bg-bg-card px-2 py-2 text-sm text-text-primary focus:border-accent-blue/50 focus:outline-none sm:w-24 sm:flex-none"
           />
           <button
             onClick={() => {
@@ -2124,7 +2514,7 @@ export function SmartTrader() {
                 resetMutation.mutate(amt);
             }}
             disabled={resetMutation.isPending}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-text-secondary text-sm hover:text-accent-red hover:border-accent-red/40 transition-all disabled:opacity-40"
+            className="flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-border px-3 py-2 text-sm text-text-secondary transition-colors hover:border-accent-red/40 hover:text-accent-red disabled:opacity-40"
           >
             {resetMutation.isPending ? (
               <Loader2 size={12} className="animate-spin" />
@@ -2137,8 +2527,8 @@ export function SmartTrader() {
       </div>
 
       {/* Portfolio Summary */}
-      <GlassPanel title="Smart Trader Portfolio">
-        <div className="flex items-center justify-between mb-3 gap-3">
+      <GlassPanel title="TraderJoe Portfolio">
+        <div className="mb-3 flex items-end justify-between gap-3">
           <div className="num text-2xl font-extrabold text-text-primary">
             {formatCurrency(summary.total_value)}
           </div>
@@ -2155,7 +2545,7 @@ export function SmartTrader() {
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 gap-3 min-[400px]:grid-cols-3 md:grid-cols-6">
           <Stat label="Cash" value={formatCurrency(summary.cash)} />
           <Stat label="Positions" value={formatCurrency(summary.positions_value)} />
           <Stat
@@ -2194,7 +2584,7 @@ export function SmartTrader() {
       {/* Why this works — explainer adapts to active persona */}
       <div
         className="card text-xs text-text-secondary leading-relaxed"
-        style={{ borderLeft: "3px solid var(--accent-blue)" }}
+        style={{ borderColor: "color-mix(in srgb, var(--accent-blue) 30%, var(--glass-border))" }}
       >
         {summary.persona_description}
       </div>
@@ -2215,12 +2605,13 @@ export function SmartTrader() {
         posView === "table" ? (
           <GlassPanel
             title={
-              <span className="inline-flex items-center justify-between gap-2 w-full">
+              <span className="flex w-full min-w-0 flex-wrap items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-1 text-accent-blue">
                   <CheckCircle2 size={11} />
                   Open Positions ({summary.positions.length})
                 </span>
                 <Segmented
+                  className="mobile-horizontal-strip max-w-full"
                   options={[{ value: "table", label: "Table" }, { value: "grouped", label: "Cards" }]}
                   value={posView}
                   onChange={(v) => setPosView(v as "table" | "grouped")}
@@ -2236,8 +2627,9 @@ export function SmartTrader() {
           </GlassPanel>
         ) : (
           <div>
-            <div className="flex justify-end mb-1">
+            <div className="mb-1 flex justify-end">
               <Segmented
+                className="mobile-horizontal-strip max-w-full"
                 options={[{ value: "table", label: "Table" }, { value: "grouped", label: "Cards" }]}
                 value={posView}
                 onChange={(v) => setPosView(v as "table" | "grouped")}
@@ -2256,7 +2648,7 @@ export function SmartTrader() {
       {persona === "ruby" && <RubyDeskLog />}
 
       {/* iFlow-Trader-style WL-A / WL-B for every persona (options books) */}
-      <WatchlistPanel persona={persona} />
+      <WatchlistPanel key={persona} persona={persona} />
 
       {/* Today — what got rejected, grouped by rule */}
       {todayQuery.isError && !today && (

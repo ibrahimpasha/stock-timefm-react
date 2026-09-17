@@ -548,9 +548,12 @@ export function IFlowTracker() {
 
   return (
     /* anchor: clicking a theme in the rotation map scrolls the page here */
-    <div className="min-w-0" data-iflow-anchor>
+    <div
+      className="min-w-0 max-w-full overflow-x-clip pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      data-iflow-anchor
+    >
       {/* ── Control strip: dates + search + view/group/sort/filters ── */}
-      <div className="mb-4 flex min-w-0 flex-wrap items-center gap-2">
+      <div className="mobile-workspace-controls glass-strong sticky z-20 mb-4 flex min-w-0 flex-wrap items-center gap-2 overflow-y-auto p-2 md:static md:z-auto md:max-h-none md:overflow-visible md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
         <div className="mobile-horizontal-strip flex w-full min-w-0 items-center gap-1 overflow-x-auto lg:w-auto lg:flex-wrap lg:overflow-visible">
           <ChipButton
             active={isAllDates}
@@ -595,13 +598,13 @@ export function IFlowTracker() {
                 searchInputRef.current?.focus();
               }}
               aria-label="Clear search"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+              className="absolute right-0 top-1/2 inline-flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center text-text-muted transition-colors hover:text-text-primary lg:min-h-0 lg:min-w-0 lg:right-2"
             >
               <X size={14} />
             </button>
           )}
         </div>
-        <span className="text-xs text-text-muted">
+        <span className="min-w-0 flex-1 truncate text-xs text-text-muted md:flex-none md:overflow-visible">
           {filtered.length} tickers
           {earningsFilterOn ? (
             <> — with earnings ≤{earningsWindow.toUpperCase()} out</>
@@ -655,12 +658,13 @@ export function IFlowTracker() {
 
         <div
           id="iflow-mobile-filters"
-          className={`${mobileFiltersOpen ? "flex" : "hidden"} w-full min-w-0 flex-wrap items-center gap-2 lg:contents`}
+          className={`${mobileFiltersOpen ? "flex" : "hidden"} w-full min-w-0 flex-col items-stretch gap-2 md:flex-row md:flex-wrap md:items-center lg:contents`}
         >
 
         {/* Watchlist surface(s) to show */}
         <StripLabel>View</StripLabel>
         <Segmented<WatchView>
+          className="mobile-horizontal-strip w-full md:w-auto"
           value={watchView}
           onChange={(v) => patchIFlow({ watchView: v })}
           options={[
@@ -695,7 +699,7 @@ export function IFlowTracker() {
             type="button"
             onClick={() => patchIFlow({ categoryFilter: "" })}
             title="Clear the theme filter"
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
+            className="inline-flex min-h-11 items-center gap-1 px-2 rounded-full text-xs font-medium lg:min-h-0 lg:py-0.5
                        transition-colors shrink-0"
             style={{
               color: "var(--accent-cyan)",
@@ -709,7 +713,7 @@ export function IFlowTracker() {
         )}
         <StripLabel>Group</StripLabel>
         <span
-          className="max-w-full"
+          className="w-full min-w-0 md:w-auto"
           title={
             "Subcat: by sector → broad clustered subcategory (84 buckets, e.g. EUV Litho WFE).\n" +
             "Macro: by sector → primary macro driver (M1-M10).\n" +
@@ -717,6 +721,7 @@ export function IFlowTracker() {
           }
         >
           <Segmented<GroupMode>
+            className="mobile-horizontal-strip w-full md:w-auto"
             value={groupMode}
             onChange={(v) => patchIFlow({ groupMode: v })}
             options={[
@@ -729,7 +734,7 @@ export function IFlowTracker() {
 
         {/* Bias — green/red is the bull/bear encoding, kept via Chip tones */}
         <StripLabel>Bias</StripLabel>
-        <div className="flex items-center gap-1">
+        <div className="mobile-horizontal-strip flex w-full items-center gap-1 overflow-x-auto md:w-auto md:overflow-visible">
           {(
             [
               ["All", "all", "blue"],
@@ -750,7 +755,7 @@ export function IFlowTracker() {
 
         {/* DTE — orange/blue/cyan mirror the lotto/swing/leap tag colors */}
         <StripLabel>DTE</StripLabel>
-        <div className="flex items-center gap-1">
+        <div className="mobile-horizontal-strip flex w-full items-center gap-1 overflow-x-auto md:w-auto md:overflow-visible">
           {(
             [
               ["All DTE", "all", "blue"],
@@ -775,10 +780,11 @@ export function IFlowTracker() {
 
         <StripLabel>Layout</StripLabel>
         <span
-          className="max-w-full"
+          className="w-full min-w-0 md:w-auto"
           title="Grid: per-ticker cards. Tape: chronological feed of every entry — single, multi-date, or defaults to today if you haven't picked dates."
         >
           <Segmented<"grid" | "tape">
+            className="mobile-horizontal-strip w-full md:w-auto"
             value={viewMode}
             onChange={(v) => {
               patchIFlow({ viewMode: v });
@@ -816,13 +822,14 @@ export function IFlowTracker() {
           Sort
         </span>
         <span
-          className="max-w-full min-w-0"
+          className="w-full min-w-0 md:w-auto"
           style={{
             opacity: viewMode === "tape" ? 0.4 : 1,
             pointerEvents: viewMode === "tape" ? "none" : "auto",
           }}
         >
           <Segmented<SortMode>
+            className="mobile-horizontal-strip w-full md:w-auto"
             value={sort}
             onChange={(v) => patchIFlow({ sort: v })}
             options={[
@@ -849,7 +856,7 @@ export function IFlowTracker() {
         {viewMode !== "tape" && (
           <>
             <StripLabel>Highlight</StripLabel>
-            <div className="flex items-center gap-1">
+            <div className="mobile-horizontal-strip flex w-full items-center gap-1 overflow-x-auto md:w-auto md:overflow-visible">
               {(
                 [
                   ["Off", "off", "No green border"],
@@ -893,7 +900,7 @@ export function IFlowTracker() {
           </>
         )}
         <StripLabel>Earnings</StripLabel>
-        <div className="flex items-center gap-1">
+        <div className="mobile-horizontal-strip flex w-full items-center gap-1 overflow-x-auto md:w-auto md:overflow-visible">
           {(
             [
               ["Any", "all"],
@@ -934,7 +941,7 @@ export function IFlowTracker() {
           Traders
         </ChipButton>
         {tradersOnly && traderList.length > 0 && (
-          <div className="flex items-center gap-1 flex-wrap">
+          <div className="mobile-horizontal-strip flex w-full items-center gap-1 overflow-x-auto md:w-auto md:flex-wrap md:overflow-visible">
             {traderList.map((t) => (
               <ChipButton
                 key={t.author}
@@ -956,7 +963,8 @@ export function IFlowTracker() {
             {selectedAuthors.size > 0 && (
               <button
                 onClick={() => patchIFlow({ selectedAuthors: new Set() })}
-                className="px-2 py-1 rounded-full text-xs font-semibold text-text-muted hover:text-text-primary transition-colors"
+                aria-label="Clear trader selection"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-xs font-semibold text-text-muted transition-colors hover:text-text-primary lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1"
                 title="Clear trader selection"
               >
                 <X size={12} />
@@ -969,7 +977,7 @@ export function IFlowTracker() {
 
       {/* ── Top Picks + Top Signals (single date only) ───────────────── */}
       {isSingleDate && singleDate && (
-        <div className="grid xl:grid-cols-2 gap-x-4">
+        <div className="grid min-w-0 gap-x-4 xl:grid-cols-2 [&>*]:min-w-0">
           <TopPicks date={singleDate} dteFilter={dte} />
           <TopSignals date={singleDate} dteFilter={dte} />
         </div>
@@ -1006,11 +1014,11 @@ export function IFlowTracker() {
           height changes, adjust the 260px offset. */}
       {!loading && !loadError && (
         <div
-          className="grid grid-cols-12 gap-4 max-lg:gap-2 max-lg:!h-auto max-lg:!min-h-0"
+          className="grid min-w-0 grid-cols-12 gap-4 max-lg:gap-2 max-lg:!h-auto max-lg:!min-h-0"
           style={{ height: "calc(100vh - 260px)", minHeight: 420 }}
         >
           <div
-            className={`${selectedTicker ? "col-span-7 max-lg:hidden" : "col-span-12"} overflow-y-auto pr-1 max-lg:col-span-12 max-lg:overflow-visible max-lg:pr-0`}
+            className={`${selectedTicker ? "col-span-7 max-lg:hidden" : "col-span-12"} min-w-0 max-w-full overflow-y-auto pr-1 max-lg:col-span-12 max-lg:overflow-visible max-lg:pr-0`}
           >
             {tradersOnly && coverageQuery.isLoading && (
               <div className="card mb-3 flex items-center justify-center gap-2 py-6 text-xs text-text-muted">
@@ -1032,7 +1040,7 @@ export function IFlowTracker() {
             )}
             {/* Watched-contracts surface: shown in "contracts" + "both" modes. */}
             {(watchView === "contracts" || watchView === "both") && (
-              <div className={watchView === "both" ? "mb-4" : ""}>
+              <div className={`max-w-full overflow-x-auto overscroll-x-contain ${watchView === "both" ? "mb-4" : ""}`}>
                 <ContractsView
                   onSelectTicker={openTicker}
                 />
@@ -1043,20 +1051,22 @@ export function IFlowTracker() {
                 and All Dates (defaults to today) all work — the merge
                 happens inside EntryTape via useMultiDateEntries. */}
             {coverageReady && watchView !== "contracts" && viewMode === "tape" && tapeDates.length > 0 && (
-              <EntryTape
-                dates={tapeDates}
-                bias={bias}
-                dte={dte}
-                search={search}
-                tradersOnly={tradersOnly}
-                authorTickerSet={authorTickerSet}
-                categoryTickers={categoryTickers}
-                earningsWindow={earningsWindow}
-                earningsMap={earningsMap ?? null}
-                earningsMaxDays={earningsWindow !== "all" ? EARNINGS_WINDOW_DAYS[earningsWindow] : null}
-                selectedTicker={selectedTicker}
-                onSelectTicker={openTicker}
-              />
+              <div className="max-w-full overflow-x-auto overscroll-x-contain">
+                <EntryTape
+                  dates={tapeDates}
+                  bias={bias}
+                  dte={dte}
+                  search={search}
+                  tradersOnly={tradersOnly}
+                  authorTickerSet={authorTickerSet}
+                  categoryTickers={categoryTickers}
+                  earningsWindow={earningsWindow}
+                  earningsMap={earningsMap ?? null}
+                  earningsMaxDays={earningsWindow !== "all" ? EARNINGS_WINDOW_DAYS[earningsWindow] : null}
+                  selectedTicker={selectedTicker}
+                  onSelectTicker={openTicker}
+                />
+              </div>
             )}
             {/* Ticker grid: hidden entirely in "contracts" mode. */}
             {coverageReady && watchView !== "contracts" && viewMode === "grid" && (() => {
@@ -1172,11 +1182,11 @@ export function IFlowTracker() {
             })()}
           </div>
           {selectedTicker && selectedData && (
-            <div className="col-span-5 overflow-y-auto pr-1 max-lg:col-span-12 max-lg:overflow-visible max-lg:pr-0">
+            <div className="col-span-5 min-w-0 max-w-full overflow-y-auto pr-1 max-lg:col-span-12 max-lg:overflow-visible max-lg:pr-0">
               <button
                 type="button"
                 onClick={() => setSelectedTicker(null)}
-                className="mb-2 inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-xs font-semibold text-text-secondary lg:hidden"
+                className="glass-strong sticky top-[calc(3rem+env(safe-area-inset-top))] z-10 mb-2 inline-flex min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] px-3 text-xs font-semibold text-text-secondary lg:hidden"
               >
                 <ArrowLeft size={16} aria-hidden="true" />
                 Back to tickers

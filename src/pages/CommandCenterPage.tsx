@@ -53,6 +53,7 @@ const BounceBoard = lazy(() =>
 );
 
 import {
+  ArrowLeft,
   Command,
   Zap,
   Eye,
@@ -67,6 +68,7 @@ import {
   GitBranch,
   Network,
   Activity,
+  ChevronDown,
 } from "lucide-react";
 
 /* ── Tab definitions ─────────────────────────────────────── */
@@ -87,7 +89,7 @@ const FLOW_TABS: { id: FlowTab; label: string; icon: React.ElementType }[] = [
   { id: "heatmap", label: "Heat Map", icon: Grid3x3 },
   { id: "bounce", label: "Bounce", icon: Activity },
   { id: "flow-trader", label: "Flow Trader", icon: Zap },
-  { id: "smart-trader", label: "Smart Trader", icon: Brain },
+  { id: "smart-trader", label: "TraderJoe", icon: Brain },
   { id: "flow-intel", label: "Flow Intel", icon: BarChart3 },
   { id: "voices", label: "Voices", icon: Mic2 },
   { id: "news", label: "News", icon: Globe },
@@ -232,12 +234,29 @@ function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
 
 /* ── Main Command Center Page ────────────────────────────── */
 
+function useDesktopViewport() {
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches,
+  );
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  return isDesktop;
+}
+
 export function CommandCenterPage() {
   const ticker = useAppStore((s) => s.activeTicker);
   const [activeFlowTab, setActiveFlowTab] = useState<FlowTab>("iflow");
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>("overview");
   const [showAlerts, setShowAlerts] = useState(false);
+  const [mobileBriefOpen, setMobileBriefOpen] = useState(false);
+  const isDesktop = useDesktopViewport();
   const [settings, setSettings] = useState<ForecastSettings>(DEFAULT_SETTINGS);
+  const analysisTriggerRef = useRef<HTMLButtonElement>(null);
+  const detailPanelRef = useRef<HTMLDivElement>(null);
 
   // Detail panel slides in when the user picks a ticker (from a flow card,
   // alert, anywhere). Closed by default so flow gets full width on first load.
@@ -254,6 +273,45 @@ export function CommandCenterPage() {
     const id = window.setTimeout(() => setDetailOpen(true), 0);
     return () => window.clearTimeout(id);
   }, [ticker]);
+
+  const closeDetail = useCallback(() => {
+    setDetailOpen(false);
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      window.setTimeout(() => analysisTriggerRef.current?.focus(), 0);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!detailOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeDetail();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [closeDetail, detailOpen]);
+
+  useEffect(() => {
+    if (!detailOpen || isDesktop) return;
+    const panel = detailPanelRef.current;
+    if (!panel) return;
+    const selector = "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
+    const containFocus = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(panel.querySelectorAll<HTMLElement>(selector));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", containFocus);
+    return () => window.removeEventListener("keydown", containFocus);
+  }, [detailOpen, isDesktop]);
 
   // Keep enough candles to show the selected training window and historical
   // forecast origin on the same chart.
@@ -322,35 +380,54 @@ export function CommandCenterPage() {
 
   const openDetail = () => {
     setDetailOpen(true);
-    if (window.matchMedia("(max-width: 1023px)").matches) {
-      window.setTimeout(() => {
-        document
-          .getElementById("command-center-analysis-panel")
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 0);
-    }
+    window.setTimeout(() => detailPanelRef.current?.focus(), 0);
   };
 
   return (
-    <div className="space-y-5">
+    <div className="command-center-page">
       {/* Page header + analyze bar */}
-      <div className="flex items-center justify-between gap-3 max-sm:flex-col max-sm:items-stretch">
-        <div className="flex items-baseline gap-3 max-sm:flex-wrap">
-          <Command size={20} className="text-accent-purple self-center" />
-          <h1 className="text-lg font-semibold text-text-primary">
-            Command Center
-          </h1>
-          <span className="num text-lg font-semibold text-accent-blue">{ticker}</span>
+      <header className="command-context-bar">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="command-context-mark" aria-hidden="true">
+            <Command size={17} />
+          </span>
+          <div className="min-w-0">
+            <h1 className="truncate text-sm font-semibold text-text-primary lg:text-lg">
+              Command Center
+            </h1>
+            <p className="truncate text-xs text-text-muted lg:hidden">
+              <span className="num font-semibold text-accent-blue">{ticker}</span>
+              <span aria-hidden="true"> · </span>
+              decision workspace
+            </p>
+          </div>
+          <span className="num hidden text-sm font-semibold text-accent-blue lg:inline">{ticker}</span>
         </div>
-        {/* Ticker / company-name search */}
-        <TickerSearch className="max-sm:w-full" inputWidth="w-44 max-sm:w-full" />
-      </div>
+        <TickerSearch className="command-ticker-search" inputWidth="w-44 max-sm:w-full" />
+      </header>
 
       {/* Daily Brief — JARVIS-style situational read at the very top: regime,
           today's agenda, your paper books, cross-source convergence, theme heat,
           plus a cached Claude "Read" that prioritises the day with a
           capital-preservation stance. */}
-      <DailyBrief />
+      <details
+        className="command-mobile-brief"
+        open={isDesktop || mobileBriefOpen}
+        onToggle={(event) => {
+          if (!isDesktop) setMobileBriefOpen(event.currentTarget.open);
+        }}
+      >
+        <summary className="lg:hidden">
+          <span className="flex min-w-0 items-center gap-2">
+            <Activity size={15} className="shrink-0 text-accent-green" aria-hidden="true" />
+            <span className="truncate text-xs font-semibold text-text-primary">Daily brief</span>
+          </span>
+          <ChevronDown className="command-mobile-brief__chevron" size={16} aria-hidden="true" />
+        </summary>
+        <div className="command-mobile-brief__content command-daily-brief">
+          <DailyBrief />
+        </div>
+      </details>
 
       {/* Master/detail layout:
             - Default state: Flow workspace takes the full width (col 12).
@@ -359,25 +436,27 @@ export function CommandCenterPage() {
             - The detail panel can be dismissed via [X] to reclaim flow width.
             - When closed and a ticker is set, a tiny "Show analysis" button
               brings it back without forcing another ticker click. */}
-      <div className="grid min-w-0 grid-cols-12 items-start gap-4">
+      <div className="command-center-workspace grid min-w-0 grid-cols-12 items-start gap-4">
         <div
-          className={`${detailOpen ? "col-span-12 max-lg:hidden lg:col-span-7" : "col-span-12"} min-w-0`}
+          className={`${detailOpen ? "col-span-12 max-lg:hidden lg:col-span-7" : "col-span-12"} command-master-workspace min-w-0`}
         >
-          <div className="card min-w-0 overflow-hidden">
-            <div className="flex min-w-0 items-start justify-between gap-2">
+          <section className="command-workspace-surface min-w-0 overflow-hidden" aria-label="Flow workspace">
+            <div className="command-flow-toolbar flex min-w-0 items-start justify-between gap-2">
               <FlowTabBar activeTab={activeFlowTab} onTabChange={setActiveFlowTab} />
               <div className="flex shrink-0 items-center gap-1 self-end pb-0.5 md:gap-2">
                 {!detailOpen && ticker && (
                   <button
+                    ref={analysisTriggerRef}
                     type="button"
                     onClick={openDetail}
                     aria-expanded={detailOpen}
                     aria-controls="command-center-analysis-panel"
-                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary lg:min-h-0"
+                    className="analysis-trigger"
                     title="Open analysis panel for the current ticker"
                   >
                     <SidebarOpen size={14} />
-                    Analysis (<span className="num">{ticker}</span>)
+                    <span className="hidden sm:inline">Analysis</span>
+                    <span className="num">{ticker}</span>
                   </button>
                 )}
                 <AlertBellInner onClick={() => setShowAlerts(!showAlerts)} isOpen={showAlerts} />
@@ -390,54 +469,76 @@ export function CommandCenterPage() {
               </div>
             )}
 
-            <div className="mt-3">
+            <div className="command-flow-content mt-3">
               <FlowTabContent activeTab={activeFlowTab} />
             </div>
-          </div>
+          </section>
         </div>
 
         {detailOpen && (
-          <div id="command-center-analysis-panel" className="col-span-12 min-w-0 scroll-mt-16 space-y-4 lg:col-span-5 lg:scroll-mt-0">
-            {/* Detail header: ticker label + close button */}
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-2">
-                <BarChart3 size={16} className="text-accent-blue" />
-                <span className="num font-semibold text-text-primary">{ticker}</span>
-                <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-muted">
-                  analysis
-                </span>
+          <aside
+            ref={detailPanelRef}
+            id="command-center-analysis-panel"
+            tabIndex={-1}
+            role={isDesktop ? "complementary" : "dialog"}
+            aria-modal={isDesktop ? undefined : true}
+            aria-label={`${ticker} analysis workspace`}
+            className="command-detail-workspace col-span-12 min-w-0 lg:col-span-5"
+          >
+            <div className="command-detail-sticky">
+              <div className="command-detail-heading">
+                <button
+                  type="button"
+                  onClick={closeDetail}
+                  className="command-detail-back lg:hidden"
+                >
+                  <ArrowLeft size={17} aria-hidden="true" />
+                  <span>Back to desk</span>
+                </button>
+                <div className="hidden min-w-0 items-center gap-2 lg:flex">
+                  <BarChart3 size={16} className="shrink-0 text-accent-blue" aria-hidden="true" />
+                  <span className="num truncate font-semibold text-text-primary">{ticker}</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-muted">
+                    analysis
+                  </span>
+                </div>
+                <div className="flex min-w-0 items-center gap-2 lg:hidden">
+                  <span className="num truncate text-sm font-semibold text-text-primary">{ticker}</span>
+                  <span className="text-xs text-text-muted">Analysis</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeDetail}
+                  className="command-detail-close"
+                  title="Hide analysis panel"
+                  aria-label="Close analysis panel"
+                >
+                  <X size={17} aria-hidden="true" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setDetailOpen(false)}
-                className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-bg-card-hover hover:text-text-primary lg:min-h-0 lg:min-w-0 lg:p-1"
-                title="Hide analysis panel"
-                aria-label="Close analysis panel"
-              >
-                <X size={16} />
-              </button>
+
+              <Segmented<DetailTab>
+                ariaLabel="Analysis view"
+                className="w-full justify-between"
+                options={DETAIL_TABS.map((tab) => {
+                  const Icon = tab.icon;
+                  return {
+                    value: tab.id,
+                    label: (
+                      <>
+                        <Icon size={13} />
+                        {tab.label}
+                      </>
+                    ),
+                  };
+                })}
+                value={activeDetailTab}
+                onChange={setActiveDetailTab}
+              />
             </div>
 
-            <Segmented<DetailTab>
-              ariaLabel="Analysis view"
-              className="w-full justify-between max-md:justify-start"
-              options={DETAIL_TABS.map((tab) => {
-                const Icon = tab.icon;
-                return {
-                  value: tab.id,
-                  label: (
-                    <>
-                      <Icon size={13} />
-                      {tab.label}
-                    </>
-                  ),
-                };
-              })}
-              value={activeDetailTab}
-              onChange={setActiveDetailTab}
-            />
-
-            {activeDetailTab === "overview" ? (
+            <div className="command-detail-content">
+              {activeDetailTab === "overview" ? (
               <>
                 {/* Signal Analysis — reliable per-ticker read at the TOP, replacing
                     the deprecated 8-model price forecast. Three auditable sources:
@@ -498,12 +599,13 @@ export function CommandCenterPage() {
                     away. The original import is kept above as a fallback. */}
                 <IntelligencePanelV3 />
               </>
-            ) : activeDetailTab === "narrative" ? (
-              <NarrativeTimeline ticker={ticker} hours={72} />
-            ) : (
-              <ConvergenceGraph ticker={ticker} hours={72} limit={50} />
-            )}
-          </div>
+              ) : activeDetailTab === "narrative" ? (
+                <NarrativeTimeline ticker={ticker} hours={72} />
+              ) : (
+                <ConvergenceGraph ticker={ticker} hours={72} limit={50} />
+              )}
+            </div>
+          </aside>
         )}
       </div>
     </div>

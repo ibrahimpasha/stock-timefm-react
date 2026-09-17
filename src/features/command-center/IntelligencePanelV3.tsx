@@ -13,7 +13,7 @@
  * The legacy 8-category IntelligencePanel is mounted inside a collapsible
  * at the bottom for callers who still want the full prose view.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -33,6 +33,12 @@ import { IntelligencePanel } from "./IntelligencePanel";
 
 /* ── Constants / helpers ─────────────────────────────────── */
 
+let todayStartMs = (() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today.getTime();
+})();
+
 function fmtCalendarDate(iso: string | undefined): string {
   if (!iso) return "";
   const [y, m, day] = iso.split("-").map(Number);
@@ -51,10 +57,8 @@ function daysUntil(iso: string | undefined): number | null {
   const [y, m, day] = iso.split("-").map(Number);
   if (!y || !m || !day) return null;
   const target = new Date(y, m - 1, day);
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
   target.setHours(0, 0, 0, 0);
-  const diff = Math.round((target.getTime() - now.getTime()) / 86_400_000);
+  const diff = Math.round((target.getTime() - todayStartMs) / 86_400_000);
   return diff;
 }
 
@@ -151,6 +155,20 @@ function ForwardCalendar({
   scopedTicker: string | null;
   isLoading?: boolean;
 }) {
+  const [, setCalendarDay] = useState(0);
+  useEffect(() => {
+    const refreshDay = () => {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const next = now.getTime();
+      if (next !== todayStartMs) {
+        todayStartMs = next;
+        setCalendarDay((value) => value + 1);
+      }
+    };
+    const timer = window.setInterval(refreshDay, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   // Dedup before slicing so the user sees 8 distinct events, not 8 copies
   // of the same macro pulled from multiple intel rows.
   const top = dedupCalendarEvents(events).slice(0, 12);
@@ -200,10 +218,8 @@ function ForwardCalendar({
               {nextEarnings.slice(0, 10)}
             </span>
             {(() => {
-              const d = Math.ceil(
-                (new Date(nextEarnings).getTime() - Date.now()) / 86_400_000,
-              );
-              return Number.isFinite(d) && d > 0 ? ` (in ${d}d)` : "";
+              const d = daysUntil(nextEarnings.slice(0, 10));
+              return d != null && d > 0 ? ` (in ${d}d)` : "";
             })()}
           </p>
         ) : (

@@ -10,6 +10,55 @@ export type DteFilter = "all" | "lotto" | "swing" | "leap";
 export type SortMode = "entries" | "premium" | "score" | "escalating" | "returns" | "recent";
 export type EarningsWindow = "all" | "today" | "1w" | "2w" | "1m" | "2m";
 
+export type MlServingMode = "disabled" | "rank_only" | "gate_and_rank";
+export type MlCalibrationStatus = "calibrated" | "uncalibrated";
+
+/** Optional model provenance attached to scored flow entries as the backend
+ * rolls out the expanded contract. Every field stays optional so cached and
+ * legacy responses remain renderable. */
+export interface MlScoreProvenance {
+  ml_model_status?: string | null;
+  ml_model_version?: string | null;
+  ml_serving_mode?: MlServingMode | string | null;
+  ml_ranking_allowed?: boolean | null;
+  ml_gating_allowed?: boolean | null;
+  ml_calibration_status?: MlCalibrationStatus | string | null;
+  ml_cohort?: string | null;
+  ml_horizon_sessions?: number | null;
+  ml_validation_sample_size?: number | null;
+}
+
+/** Backend notable-flow envelope. NScore, ML percentile, and probability are
+ * deliberately separate because they have different definitions and gates. */
+export interface NotableScore extends MlScoreProvenance {
+  score: number;
+  side: "Bull" | "Bear";
+  parts: {
+    size: number;
+    convergence: number;
+    conviction: number;
+    catalyst: number;
+    structural: number;
+  };
+  signals: {
+    intel_bias?: string;
+    forecast_dir?: string;
+    accumulation_label?: string;
+    trader_calls_24h?: number;
+    trader_same_dir_24h?: number;
+    news_24h?: number;
+    voices_7d?: number;
+    voices_sentiment?: string;
+    component_scores?: Record<string, number>;
+  };
+  /** 0-100 percentile among recent prints in a similar-DTE cohort. */
+  ml_score?: number | null;
+  /** Calibrated P(peak > +100% within the configured horizon), in percent. */
+  ml_prob?: number | null;
+  ml_gate_approved?: boolean;
+  predicted_peak_pnl?: number | null;
+}
+
 /** Per-ticker accumulation/escalation intel returned by /flow/iflow/history. */
 export interface TickerIntel {
   escalating: boolean;

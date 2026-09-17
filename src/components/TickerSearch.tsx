@@ -186,7 +186,7 @@ export function TickerSearch({
           id={listboxId}
           role="listbox"
           aria-label="Ticker suggestions"
-          className="glass-strong absolute left-0 z-50 mt-1.5 w-72 max-h-80 overflow-y-auto py-1"
+          className="glass-strong absolute right-0 z-50 mt-1.5 w-[min(18rem,calc(100vw-1rem))] max-h-[min(20rem,60dvh)] overflow-y-auto py-1"
           style={{ boxShadow: "var(--shadow-3)" }}
         >
           {matches.map((m, i) => (

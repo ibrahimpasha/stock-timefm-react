@@ -31,8 +31,17 @@ export interface DataHealth {
 export function useDataHealth() {
   return useQuery<DataHealth>({
     queryKey: ["data-health"],
-    queryFn: () => apiClient.get("/system/data-health").then((r) => r.data),
+    queryFn: ({ signal }) => apiClient.get("/system/data-health", {
+      signal, timeout: 15_000,
+    }).then((r) => {
+      if (!r.data || !Array.isArray(r.data.sources) || typeof r.data.generated_at !== "string") {
+        throw new Error("Invalid data-health response");
+      }
+      return r.data;
+    }),
     staleTime: 60_000,
     refetchInterval: 120_000,
+    refetchOnWindowFocus: true,
+    retry: false,
   });
 }

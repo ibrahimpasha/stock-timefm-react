@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { TrendingUp, ArrowUp, ArrowDown, Minus, ChevronRight, ChevronDown } from "lucide-react";
 import { useThemeHeatHistory, useThemePnlHistory, useThemePnlBreakdown } from "../../api/themeHeat";
 import { useThemeRotation, type RotationWindow } from "../../api/rotation";
@@ -75,9 +75,9 @@ function ThemeRotationView({
   /* Hooks BEFORE any early return — bailing out first would change the hook
    * count between the loading and loaded renders, which React rejects. */
   const dates = data?.ok ? data.sectors[0]?.history.map((p) => p.date) ?? [] : [];
-  const [idx, setIdx] = useState(0);
-  // snap to today whenever the window changes underneath us
-  useEffect(() => setIdx(Math.max(0, dates.length - 1)), [dates.length]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const selectedIndex = selectedDate ? dates.indexOf(selectedDate) : -1;
+  const idx = selectedIndex >= 0 ? selectedIndex : Math.max(0, dates.length - 1);
 
   if (isFetching && !data) {
     return (
@@ -104,7 +104,14 @@ function ThemeRotationView({
       <div className="w-full">
         <RotationMap sectors={data.sectors} atIndex={idx}
                      onSelect={selectTheme} selected={categoryFilter} />
-        <RotationScrubber dates={dates} index={idx} onChange={setIdx} />
+        <RotationScrubber
+          dates={dates}
+          index={idx}
+          onChange={(next) => {
+            const nextIndex = typeof next === "function" ? next(idx) : next;
+            setSelectedDate(dates[nextIndex] ?? null);
+          }}
+        />
       </div>
 
       <div className="flex flex-col gap-4 min-w-0">

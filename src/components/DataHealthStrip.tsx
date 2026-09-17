@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Activity } from "lucide-react";
 import { useDataHealth, type HealthStatus } from "../api/dataHealth";
 import { relativeAge } from "../lib/utils";
+import { connectionIssue } from "../api/connectionIssue";
 
 const STATUS_VAR: Record<HealthStatus, string> = {
   green: "var(--accent-green)",
@@ -29,7 +30,7 @@ function Dot({ status, pulse }: { status: HealthStatus; pulse?: boolean }) {
  * this makes "technicals haven't updated in 9 days" visible at a glance.
  */
 export function DataHealthStrip() {
-  const { data, isError } = useDataHealth();
+  const { data, isError, error } = useDataHealth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -72,7 +73,7 @@ export function DataHealthStrip() {
           </div>
           {isError && (
             <div className="px-2 py-1.5 text-xs" style={{ color: "var(--accent-red)" }}>
-              Health endpoint unreachable — is the API server up?
+              {connectionIssue(error).message}
             </div>
           )}
           {data?.sources.map((s) => (

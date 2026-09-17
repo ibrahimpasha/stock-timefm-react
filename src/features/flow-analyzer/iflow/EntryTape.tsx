@@ -15,8 +15,13 @@
 import { useMemo } from "react";
 import { useMultiDateEntries, useTickerPricesBatch } from "./hooks";
 import { estimateOptionPnl } from "./estimator";
-import type { BiasFilter, DteFilter } from "./types";
-import { dteTag } from "./utils";
+import type { BiasFilter, DteFilter, NotableScore } from "./types";
+import {
+  canShowMlProbability,
+  dteTag,
+  parsePremium,
+  researchRank,
+} from "./utils";
 import { formatPremium } from "../../../lib/utils";
 import { daysFromToday } from "../../../lib/dateOnly";
 import { useTickerMeta, type TickerMeta } from "../../../api/tickerMeta";
@@ -74,7 +79,7 @@ function passesKianFilter(entry: {
  *   "notable_nscore"  → NScore ≥ threshold (heuristic)
  *   "notable_ml"      → ML ≥ threshold (model)
  *   "notable_both"    → BOTH NScore AND ML ≥ threshold (intersection)
- *   "avg_sweet"       → AVG ∈ [75, 85) composite-rank band
+ *   "avg_sweet"       → Research Rank in [75, 85)
  * The Flowseidon "kian" filter remains mutually exclusive with all
  * Notable variants — clicking Flowseidon clears whichever Notable was on
  * and vice versa.
@@ -84,6 +89,8 @@ type FilterMode = "none" | "notable_nscore" | "notable_ml" | "notable_both" | "a
 const NOTABLE_CYCLE: FilterMode[] = ["none", "notable_nscore", "notable_ml", "notable_both", "avg_sweet"];
 const NSCORE_THRESHOLD = 65;
 const ML_RANK_THRESHOLD = 90;
+const RESEARCH_RANK_MIN = 75;
+const RESEARCH_RANK_MAX_EXCLUSIVE = 85;
 
 /** Visual + label per Notable filter state. Picked so the operator
  *  always knows which lens is active without reading the tooltip. */
@@ -95,25 +102,25 @@ const NOTABLE_STYLE: Record<FilterMode, { label: string; fg: string; bg: string;
     bd: "var(--border)",
   },
   notable_nscore: {
-    label: "Top NScore",
+    label: `NScore ${NSCORE_THRESHOLD}+`,
     fg: "var(--accent-yellow)",
     bg: "color-mix(in srgb, var(--accent-yellow) 18%, transparent)",
     bd: "color-mix(in srgb, var(--accent-yellow) 50%, transparent)",
   },
   notable_ml: {
-    label: "Top ML",
+    label: `ML pctl ${ML_RANK_THRESHOLD}+`,
     fg: "var(--accent-cyan)",
     bg: "color-mix(in srgb, var(--accent-cyan) 18%, transparent)",
     bd: "color-mix(in srgb, var(--accent-cyan) 50%, transparent)",
   },
   notable_both: {
-    label: "Top Both",
+    label: "N + ML",
     fg: "var(--accent-purple)",
     bg: "color-mix(in srgb, var(--accent-purple) 18%, transparent)",
     bd: "color-mix(in srgb, var(--accent-purple) 50%, transparent)",
   },
   avg_sweet: {
-    label: "AVG 75-85",
+    label: `Rank ${RESEARCH_RANK_MIN}-${RESEARCH_RANK_MAX_EXCLUSIVE - 1}`,
     fg: "var(--accent-green)",
     bg: "color-mix(in srgb, var(--accent-green) 18%, transparent)",
     bd: "color-mix(in srgb, var(--accent-green) 50%, transparent)",
@@ -141,7 +148,7 @@ function entryMoneyness(e: Record<string, unknown>): number | null {
   const strike = Number(e.strike ?? 0);
   if (!(underlying > 0) || !(strike > 0)) return null;
   let m = ((strike - underlying) / underlying) * 100;
-  if (String(e.type ?? "").toUpperCase().includes("PUT")) m = -m;
+  if (normalizeOptType(e.type ?? e.option_type) === "PUT") m = -m;
   return m;
 }
 
@@ -326,23 +333,9 @@ function setupTextColor(score: number | null): string {
   return "var(--accent-red)"; // underlying setup contradicts the trade
 }
 
-/** Ranking blend only, not a calibrated probability or validated outcome
- * estimate. Returns whichever component exists when the other is absent. */
-export function avgScore(setup: number | null | undefined,
-                  ml: number | null | undefined): number | null {
-  const su = typeof setup === "number" ? setup : null;
-  const mlNum = typeof ml === "number" ? ml : null;
-  if (su != null && mlNum != null) return Math.round((su + mlNum) / 2);
-  if (su != null) return su;
-  if (mlNum != null) return mlNum;
-  return null;
-}
-
-/** AVG column color — intensity-keyed. Green when both systems converge
- *  on a high value; amber at mid; muted otherwise. This is the
- *  "consensus" reading — different semantic from NScore (heuristic) or
- *  ML alone, so it gets its own accent. */
-function avgTextColor(score: number | null): string {
+/** Research Rank color. The rank is a transparent ordering blend and carries
+ * no calibrated outcome meaning. */
+function researchRankTextColor(score: number | null): string {
   if (score == null) return "var(--text-muted)";
   if (score >= 80) return "var(--accent-green)";
   if (score >= 65) return "var(--accent-orange)";
@@ -350,22 +343,23 @@ function avgTextColor(score: number | null): string {
   return "var(--text-muted)";
 }
 
-/** Notable score → border style. Tiered: top picks visually pop. */
+/** Notable score -> full-row inset emphasis without a side-tab accent. */
 function scoreBorderStyle(score: number | null, fallbackColor: string) {
-  if (score == null) return { borderLeft: `2px solid ${fallbackColor}`, boxShadow: undefined };
+  if (score == null) {
+    return { boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${fallbackColor} 20%, transparent)` };
+  }
   if (score >= 85) {
     return {
-      borderLeft: "3px solid var(--accent-yellow)",
-      boxShadow: "0 0 6px color-mix(in srgb, var(--accent-yellow) 35%, transparent)",
+      boxShadow: "inset 0 0 0 1px var(--accent-yellow), 0 0 6px color-mix(in srgb, var(--accent-yellow) 35%, transparent)",
     };
   }
   if (score >= 70) {
-    return { borderLeft: "3px solid var(--accent-yellow)", boxShadow: undefined };
+    return { boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--accent-yellow) 70%, transparent)" };
   }
   if (score >= 55) {
-    return { borderLeft: `2px solid var(--accent-yellow)`, boxShadow: undefined };
+    return { boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--accent-yellow) 35%, transparent)" };
   }
-  return { borderLeft: `2px solid ${fallbackColor}`, boxShadow: undefined };
+  return { boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${fallbackColor} 20%, transparent)` };
 }
 
 function scoreTextColor(score: number | null): string {
@@ -462,7 +456,7 @@ const INDEX_ETFS = new Set([
 const BEAR_ETFS = new Set(["SQQQ", "SPXS", "SPXU", "QID", "PSQ", "SH", "UVXY"]);
 
 function correctedSide(entry: Record<string, unknown>): "Bull" | "Bear" {
-  const type = String(entry.type || entry.option_type || "").toUpperCase();
+  const type = normalizeOptType(entry.type || entry.option_type);
   const askPct = Number(entry.ask_pct ?? 50);
   let voi = entry.vol_oi_ratio as number | string | undefined;
   if (typeof voi === "string") voi = Number(String(voi).replace("x", "").trim()) || 0;
@@ -470,44 +464,9 @@ function correctedSide(entry: Record<string, unknown>): "Bull" | "Bear" {
   if (askPct >= 55) isBuying = true;
   else if (askPct < 40) isBuying = false;
   else isBuying = (Number(voi) || 0) >= 1.5;
-  if (type.includes("CALL")) return isBuying ? "Bull" : "Bear";
-  if (type.includes("PUT")) return isBuying ? "Bear" : "Bull";
+  if (type === "CALL") return isBuying ? "Bull" : "Bear";
+  if (type === "PUT") return isBuying ? "Bear" : "Bull";
   return (entry.side as "Bull" | "Bear") || "Bull";
-}
-
-/** Backend's per-entry Notable scoring envelope. Optional on the wire
- *  because we only pay for the prefetch when `include_notable=true`. */
-interface NotableScore {
-  /** Heuristic 5-component blend, 0-100. Auditable via `parts` and
-   *  `signals`. Rendered in the dashboard's "NScore" column. */
-  score: number;
-  side: "Bull" | "Bear";
-  parts: {
-    size: number;
-    convergence: number;
-    conviction: number;
-    catalyst: number;
-    structural: number;
-  };
-  signals: {
-    intel_bias?: string;
-    forecast_dir?: string;
-    accumulation_label?: string;
-    trader_calls_24h?: number;
-    trader_same_dir_24h?: number;
-    news_24h?: number;
-    voices_7d?: number;
-    voices_sentiment?: string;
-    component_scores?: Record<string, number>;
-  };
-  /** MLScore 0-100 percentile among similar-DTE recent prints. */
-  ml_score?: number | null;
-  /** Estimated P(peak > +100% in the next 10 sessions), %, for tooltips. */
-  ml_prob?: number | null;
-  /** True only when the artifact passed causal, persona-specific validation. */
-  ml_gate_approved?: boolean;
-  /** Predicted peak P/L, absent when the regressor fails holdout validation. */
-  predicted_peak_pnl?: number | null;
 }
 
 interface EntryRow {
@@ -610,7 +569,7 @@ export function EntryTape({
   const dayLean = useMemo(() => {
     let bull = 0, bear = 0;
     for (const e of entries) {
-      const prem = parseFloat(String(e.premium ?? "0").replace(/[$,]/g, "")) || 0;
+      const prem = parsePremium(e.premium_usd ?? e.premium);
       if (prem <= 0) continue;
       let s = correctedSide(e);
       if (BEAR_ETFS.has(String(e.ticker || "").toUpperCase()))
@@ -650,7 +609,7 @@ export function EntryTape({
       const strike = e.strike;
       const expiry = String(e.expiry || "").trim();
       const key = `${ticker}|${type}|${strike}|${expiry}`;
-      const prem = parseFloat(String(e.premium ?? "0").replace(/[$,]/g, "")) || 0;
+      const prem = parsePremium(e.premium_usd ?? e.premium);
       const askRaw = e.ask_pct;
       const ask = askRaw == null ? null : Number(askRaw);
       const ts = String(e.image_downloaded_at || "");
@@ -736,7 +695,7 @@ export function EntryTape({
       // _discord_time_utc / flow_time are intentionally NOT used here:
       // they're sparse + sometimes wrong + cause inconsistent ordering.
       const tsRaw = String(e.image_downloaded_at || "");
-      const type = String(e.type || "").toUpperCase();
+      const type = normalizeOptType(e.type || e.option_type);
       const strike = Number(e.strike ?? 0);
       const expiry = fmtExpiry(String(e.expiry ?? ""));
       const askPct = e.ask_pct != null ? Number(e.ask_pct) : null;
@@ -755,32 +714,39 @@ export function EntryTape({
       const contractType = type.includes("CALL") ? "CALL" : type.includes("PUT") ? "PUT" : type;
       const contractLabel = `$${strike} ${contractType}${expiry ? ` ${expiry}` : ""}`;
 
-      // Parse premium once — strip "$" and "," then to number. Used for
-      // sorting; the display still uses formatPremium() for readability.
-      const premiumNum = parseFloat(String(e.premium ?? "0").replace(/[$,]/g, "")) || 0;
+      // Canonical parser handles numeric dollars and compact K/M/B strings.
+      const premiumNum = parsePremium(e.premium_usd ?? e.premium);
 
       const notable = (e.notable as NotableScore | null | undefined) ?? null;
-      // Apply the active filter mode early so downstream sort/render
-      // scans are smaller. Filters are skipped when their required data
-      // is missing (e.g. backend score absent) so we don't accidentally
-      // hide every row on a partial response.
-      if (filterMode === "notable_nscore" && notable && notable.score < NSCORE_THRESHOLD) continue;
+      // A score filter means the metric must exist and pass its own threshold.
+      // Missing values never qualify as high scores.
+      if (filterMode === "notable_nscore"
+          && (notable?.score == null || notable.score < NSCORE_THRESHOLD)) continue;
       if (filterMode === "notable_ml") {
         const ml = notable?.ml_score;
-        if (ml != null && ml < ML_RANK_THRESHOLD) continue;
+        if (ml == null || ml < ML_RANK_THRESHOLD) continue;
       }
       if (filterMode === "notable_both") {
-        if (notable && notable.score < NSCORE_THRESHOLD) continue;
         const ml = notable?.ml_score;
-        if (ml != null && ml < ML_RANK_THRESHOLD) continue;
+        if (notable?.score == null || notable.score < NSCORE_THRESHOLD
+            || ml == null || ml < ML_RANK_THRESHOLD) continue;
       }
       if (filterMode === "avg_sweet") {
-        // Composite-rank exploration band; not an outcome probability.
-        const ns = notable?.score;
+        // Research Rank mirrors the evidence-first paper-book ordering policy.
         const ml = notable?.ml_score;
-        if (ns == null || ml == null) continue;
-        const avg = (ns + ml) / 2;
-        if (avg < 75 || avg >= 85) continue;
+        const setup = setupScore(
+          side,
+          tickerMeta?.[ticker.toUpperCase()],
+          tickerTech?.[ticker.toUpperCase()],
+          tickerGex?.[ticker.toUpperCase()],
+        ).score;
+        const rank = researchRank(
+          setup,
+          ml,
+          notable?.score,
+          notable?.ml_serving_mode,
+        );
+        if (rank == null || rank < RESEARCH_RANK_MIN || rank >= RESEARCH_RANK_MAX_EXCLUSIVE) continue;
       }
       if (filterMode === "outliers") {
         // Deep-OTM convexity bets — "someone knows something" prints.
@@ -840,7 +806,7 @@ export function EntryTape({
       });
     }
     return out;
-  }, [entries, aggregatedEntries, bias, dte, search, tradersOnly, authorTickerSet, categoryTickers, filterMode, outlierMin, dates, earningsWindow, earningsMap, earningsMaxDays]);
+  }, [entries, aggregatedEntries, bias, dte, search, tradersOnly, authorTickerSet, categoryTickers, filterMode, outlierMin, dates, earningsWindow, earningsMap, earningsMaxDays, tickerMeta, tickerTech, tickerGex]);
 
   // Batch-fetch current prices for every unique ticker in the visible
   // rows. Refetches every 60s via the hook's refetchInterval — so the
@@ -931,8 +897,8 @@ export function EntryTape({
                            setupScore(b.side, tickerMeta?.[b.ticker], tickerTech?.[b.ticker], tickerGex?.[b.ticker]).score,
                            sortDir);
         case "avg":      return numCmp(
-                           avgScore(setupScore(a.side, tickerMeta?.[a.ticker], tickerTech?.[a.ticker], tickerGex?.[a.ticker]).score, a.notable?.ml_score),
-                           avgScore(setupScore(b.side, tickerMeta?.[b.ticker], tickerTech?.[b.ticker], tickerGex?.[b.ticker]).score, b.notable?.ml_score),
+                           researchRank(setupScore(a.side, tickerMeta?.[a.ticker], tickerTech?.[a.ticker], tickerGex?.[a.ticker]).score, a.notable?.ml_score, a.notable?.score, a.notable?.ml_serving_mode),
+                           researchRank(setupScore(b.side, tickerMeta?.[b.ticker], tickerTech?.[b.ticker], tickerGex?.[b.ticker]).score, b.notable?.ml_score, b.notable?.score, b.notable?.ml_serving_mode),
                            sortDir);
         case "pred_peak": return numCmp(
                             a.notable?.predicted_peak_pnl ?? null,
@@ -956,7 +922,7 @@ export function EntryTape({
   // matter which mode is active. MUST be declared before any early
   // return (Rules of Hooks).
   const notableCounts = useMemo(() => {
-    let n = 0, m = 0, b = 0, sweet = 0;
+    let n = 0, m = 0, b = 0, rankBand = 0;
     for (const e of entries as any[]) {
       const ns = e?.notable?.score;
       const ml = e?.notable?.ml_score;
@@ -965,13 +931,18 @@ export function EntryTape({
       if (nsHit) n += 1;
       if (mlHit) m += 1;
       if (nsHit && mlHit) b += 1;
-      if (ns != null && ml != null) {
-        const avg = (ns + ml) / 2;
-        if (avg >= 75 && avg < 85) sweet += 1;
-      }
+      const ticker = String(e?.ticker || "").toUpperCase();
+      const setup = setupScore(
+        correctedSide(e),
+        tickerMeta?.[ticker],
+        tickerTech?.[ticker],
+        tickerGex?.[ticker],
+      ).score;
+      const rank = researchRank(setup, ml, e?.notable?.score, e?.notable?.ml_serving_mode);
+      if (rank != null && rank >= RESEARCH_RANK_MIN && rank < RESEARCH_RANK_MAX_EXCLUSIVE) rankBand += 1;
     }
-    return { nscore: n, ml: m, both: b, sweet };
-  }, [entries]);
+    return { nscore: n, ml: m, both: b, rankBand };
+  }, [entries, tickerMeta, tickerTech, tickerGex]);
   // Kian-mode count must match the aggregated-contract semantics — same
   // grouping logic as `aggregatedEntries` so the badge number lines up
   // with the rows you'd see after toggling the filter on. Doesn't depend
@@ -986,7 +957,7 @@ export function EntryTape({
       const strike = e?.strike;
       const expiry = String(e?.expiry || "").trim();
       const key = `${ticker}|${type}|${strike}|${expiry}`;
-      const prem = parseFloat(String(e?.premium ?? "0").replace(/[$,]/g, "")) || 0;
+      const prem = parsePremium(e?.premium_usd ?? e?.premium);
       const ask = e?.ask_pct != null ? Number(e.ask_pct) : null;
       const dteN = e?.dte != null ? Number(e.dte) : null;
       const cur = seen.get(key);
@@ -1065,7 +1036,7 @@ export function EntryTape({
               currentNotable === "notable_nscore" ? notableCounts.nscore
               : currentNotable === "notable_ml"   ? notableCounts.ml
               : currentNotable === "notable_both" ? notableCounts.both
-              : currentNotable === "avg_sweet"    ? notableCounts.sweet
+              : currentNotable === "avg_sweet"    ? notableCounts.rankBand
               : notableCounts.both;
             const onClick = () => {
               const idx = NOTABLE_CYCLE.indexOf(currentNotable);
@@ -1082,11 +1053,11 @@ export function EntryTape({
               }
             };
             const tooltipFor: Record<FilterMode, string> = {
-              none: `Click to cycle: Top NScore (${notableCounts.nscore}) → Top ML (${notableCounts.ml}) → Top Both (${notableCounts.both}) → AVG 75-85 (${notableCounts.sweet}) → off`,
-              notable_nscore: `Heuristic NScore ≥ ${NSCORE_THRESHOLD}. Click → Top ML.`,
-              notable_ml: `Within-DTE ML percentile ≥ ${ML_RANK_THRESHOLD}. Click → Top Both.`,
-              notable_both: `NScore ≥ ${NSCORE_THRESHOLD} and ML rank ≥ ${ML_RANK_THRESHOLD}. Click → AVG 75-85.`,
-              avg_sweet: `AVG ∈ [75, 85) composite-rank band. Click → off.`,
+              none: `Click to cycle: NScore ${NSCORE_THRESHOLD}+ (${notableCounts.nscore}) → ML percentile ${ML_RANK_THRESHOLD}+ (${notableCounts.ml}) → both (${notableCounts.both}) → Research Rank ${RESEARCH_RANK_MIN}-${RESEARCH_RANK_MAX_EXCLUSIVE - 1} (${notableCounts.rankBand}) → off`,
+              notable_nscore: `Heuristic NScore ≥ ${NSCORE_THRESHOLD}; missing NScore is excluded. Click → ML percentile.`,
+              notable_ml: `Within-DTE ML percentile ≥ ${ML_RANK_THRESHOLD}; missing ML is excluded. Click → intersection.`,
+              notable_both: `NScore ≥ ${NSCORE_THRESHOLD} and ML percentile ≥ ${ML_RANK_THRESHOLD}; both must exist. Click → Research Rank.`,
+              avg_sweet: `Research Rank ${RESEARCH_RANK_MIN}-${RESEARCH_RANK_MAX_EXCLUSIVE - 1}: evidence + directional Setup, with quarantined ML capped at ±3. Click → off.`,
               kian: "",
               outliers: "",
             };
@@ -1211,12 +1182,12 @@ export function EntryTape({
         </span>
       </div>
       <div
-        className="flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-text-muted px-2 py-1 max-md:gap-1 sticky top-0 z-10 glass-strong"
+        className="iflow-tape-header flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-text-muted px-2 py-1 max-md:gap-1 sticky top-0 z-10 glass-strong"
         style={{ borderRadius: "var(--radius-control)" }}
       >
-        {renderHeader("avg", "avg", "w-12 justify-center")}
+        {renderHeader("rank", "avg", "w-12 justify-center")}
         {renderHeader("nscore", "score", "w-10 justify-center max-md:hidden")}
-        {renderHeader("ml", "ml", "w-10 justify-center max-md:hidden")}
+        {renderHeader("ml pctl", "ml", "w-10 justify-center max-md:hidden")}
         {renderHeader("setup", "setup", "w-10 justify-center max-md:hidden")}
         {renderHeader("time", "time", "w-12 justify-start max-md:hidden")}
         {renderHeader("ticker", "ticker", "w-14 justify-start")}
@@ -1230,7 +1201,7 @@ export function EntryTape({
         {renderHeader("ATM%", "atm", "w-16 justify-end max-md:hidden")}
         {renderHeader("premium", "premium", "w-20 justify-end max-md:hidden")}
         {renderHeader("P/L", "pnl", "w-16 justify-end")}
-        {renderHeader("pred peak", "pred_peak", "w-20 justify-end max-md:hidden")}
+        {renderHeader("weighted peak", "pred_peak", "w-20 justify-end max-md:hidden")}
       </div>
       {sortedRows.map((r) => {
         const sideColor =
@@ -1283,30 +1254,35 @@ export function EntryTape({
             key={r.msgId}
             type="button"
             onClick={() => onSelectTicker(r.ticker)}
-            className="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-bg-card-hover transition-colors text-left max-md:gap-1"
+            className="iflow-tape-row w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-bg-card-hover transition-colors text-left max-md:gap-1"
             style={{
               background: isSelected ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : "transparent",
               ...borderStyle,
             }}
           >
-            {/* AVG is a compact ranking blend of directional setup and the
-                within-DTE ML percentile. It is not an outcome probability. */}
+            {/* Evidence-first ordering score; it is not a probability. */}
             {(() => {
               const su = setupScore(r.side, tickerMeta?.[r.ticker], tickerTech?.[r.ticker], tickerGex?.[r.ticker]).score;
               const ml = r.notable?.ml_score;
-              const avg = avgScore(su, ml);
-              const title = avg == null
-                ? "Average score unavailable (no SETUP + ML data)"
-                : `AVG = ${avg}/100  (SETUP ${su ?? "—"} + ML ${ml ?? "—"} / 2)\n` +
-                  `Composite rank: within-DTE ML percentile plus directional setup.\n` +
-                  `Use for ordering only; it is not a calibrated probability.`;
+              const evidence = r.notable?.score;
+              const mode = r.notable?.ml_serving_mode;
+              const rank = researchRank(su, ml, evidence, mode);
+              const missing = [su == null ? "Setup" : null, evidence == null ? "NScore" : null]
+                .filter(Boolean)
+                .join(" and ");
+              const title = rank == null
+                ? `Research Rank unavailable: missing ${missing || "components"}.`
+                : `Research Rank ${rank}/100 = evidence ${evidence}, Setup ${su}, ML percentile ${ml}.\n` +
+                  `ML mode ${mode ?? "unknown"}; rank-only influence is capped at ±3.\n` +
+                  `Use for ordering only; it is not an outcome probability.`;
               return (
                 <span
                   className="w-12 text-center font-bold text-sm num"
-                  style={{ color: avgTextColor(avg) }}
+                  style={{ color: researchRankTextColor(rank) }}
                   title={title}
+                  aria-label={title}
                 >
-                  {avg != null ? avg : "—"}
+                  {rank != null ? rank : "—"}
                 </span>
               );
             })()}
@@ -1320,15 +1296,28 @@ export function EntryTape({
             >
               {scoreNum != null ? scoreNum : "—"}
             </span>
-            {/* ML percentile and its separate estimated probability. */}
+            {/* ML percentile. Probability is disclosed only with explicit
+                approved + calibrated metadata. */}
             {(() => {
               const ml = r.notable?.ml_score ?? null;
-              const prob = r.notable?.ml_prob ?? null;
+              const probabilityAllowed = canShowMlProbability(
+                r.notable?.ml_gate_approved,
+                r.notable?.ml_calibration_status,
+              );
+              const prob = probabilityAllowed ? r.notable?.ml_prob ?? null : null;
+              const provenance = [
+                r.notable?.ml_model_version ? `model ${r.notable.ml_model_version}` : null,
+                r.notable?.ml_model_status ? `status ${r.notable.ml_model_status}` : null,
+                r.notable?.ml_cohort ? `cohort ${r.notable.ml_cohort.replaceAll("_", " ")}` : null,
+                r.notable?.ml_horizon_sessions != null ? `${r.notable.ml_horizon_sessions} session horizon` : null,
+                r.notable?.ml_validation_sample_size != null ? `validation n=${r.notable.ml_validation_sample_size}` : null,
+              ].filter(Boolean);
               const mlTitle = ml == null
-                ? "ML score unavailable (model bundle not loaded server-side)"
-                : `ML ${ml} = percentile among similar-DTE recent prints (0-100)\n` +
-                  `${prob != null ? `Estimated probability: ~${prob}% chance of doubling in the next 10 sessions\n` : ""}` +
-                  `${r.notable?.ml_gate_approved ? "Artifact passed the trading-gate validation." : "Research ranking only; artifact is not approved to gate trades."}`;
+                ? "ML percentile unavailable (model bundle not loaded server-side)"
+                : `ML percentile ${ml}/100 among similar-DTE recent prints.\n` +
+                  `${prob != null ? `Calibrated P(2x within the model horizon): ${prob}%.\n` : ""}` +
+                  `${r.notable?.ml_prob != null && !probabilityAllowed ? "Probability hidden: this response does not confirm an approved, calibrated artifact.\n" : ""}` +
+                  `${provenance.length ? provenance.join(" · ") : "Model provenance is not included in this legacy response."}`;
               return (
                 <span
                   className="w-10 text-center font-semibold num max-md:hidden"
@@ -1354,7 +1343,7 @@ export function EntryTape({
                   `(>50 tailwind, <50 fights the trade)\n` +
                   `technical ${pct(s.tech)} · pattern ${pct(s.pat)}${t?.pattern ? ` (${t.pattern})` : ""} · target ${pct(s.tgt)} · dealer ${pct(s.gex)}\n` +
                   `weights .35/.30/.15/.20 (dealer = spot between put/call GEX walls).\n` +
-                  `Heuristic context — not a calibrated predictor like ML.`;
+                  `Heuristic context only; it is not an outcome probability.`;
               return (
                 <span
                   className="w-10 text-center font-semibold num max-md:hidden"
@@ -1508,29 +1497,26 @@ export function EntryTape({
                 </span>
               );
             })()}
-            {/* PRED PEAK — model's regressor forecast, weighted by the
-                calibrated PROBABILITY (ml_prob), never the percentile —
-                weighting by a rank would inflate every top print equally.
-                The raw regressor (reg_peak) outputs E[peak P/L]; on this
-                heavy-tailed target with negative test R² the magnitudes
-                aren't calibrated. Multiplying by (ml_prob/100) shrinks
-                low-confidence predictions toward zero — so an entry with
-                ML=11 / raw_pred=+427% displays as +47%, which is honest
-                ("low probability so probability-weighted expected
-                upside is modest"). Cyan accent matches the ML column. */}
+            {/* Weighted peak is shown only when the response explicitly
+                confirms an approved, calibrated classifier probability. */}
             {(() => {
               const raw = r.notable?.predicted_peak_pnl;
-              const ml = r.notable?.ml_prob;
-              if (raw == null) {
+              const probabilityAllowed = canShowMlProbability(
+                r.notable?.ml_gate_approved,
+                r.notable?.ml_calibration_status,
+              );
+              const probability = probabilityAllowed ? r.notable?.ml_prob ?? null : null;
+              if (raw == null || probability == null) {
+                const unavailableReason = raw == null
+                  ? "Weighted peak unavailable: the peak regressor was not served."
+                  : "Weighted peak hidden: approved, calibrated probability metadata is required.";
                 return (
-                  <span className="w-20 text-right num text-text-muted max-md:hidden" title="Predicted peak unavailable">
+                  <span className="w-20 text-right num text-text-muted max-md:hidden" title={unavailableReason}>
                     —
                   </span>
                 );
               }
-              // Confidence weight from classifier. When ml is absent,
-              // fall back to 0.5 (max-entropy assumption).
-              const weight = ml != null ? Math.max(0, Math.min(1, ml / 100)) : 0.5;
+              const weight = Math.max(0, Math.min(1, probability / 100));
               const effective = raw * weight;
               const color = effective >= 0
                 ? "var(--accent-cyan)" : "var(--accent-red)";
@@ -1540,13 +1526,9 @@ export function EntryTape({
               const title =
                 `Probability-weighted predicted peak: ${effective.toFixed(1)}%\n` +
                 `  raw regressor output: ${raw.toFixed(1)}%\n` +
-                `  × classifier confidence: ${ml ?? "—"}/100 (P[peak > +100%])\n` +
+                `  x calibrated probability: ${probability}/100 (P[peak > +100%])\n` +
                 `\n` +
-                `Why weighted: raw regressor magnitudes are noisy (test R² was negative).\n` +
-                `Shrinking by classifier confidence keeps low-ML rows from showing huge\n` +
-                `expected peaks just because the deep-OTM tail of the training distribution\n` +
-                `is wide. Rank-order across rows is meaningful; treat magnitudes as\n` +
-                `order-of-magnitude estimates.`;
+                `Research estimate only; the ML percentile is not used as probability.`;
               return (
                 <span
                   className="w-20 text-right font-semibold num max-md:hidden"

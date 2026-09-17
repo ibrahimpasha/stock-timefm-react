@@ -5,7 +5,11 @@
  * Keep them pure (no React, no apiClient) so they're trivially testable.
  */
 
-import type { DteFilter, EarningsWindow } from "./types";
+import type {
+  DteFilter,
+  EarningsWindow,
+  MlCalibrationStatus,
+} from "./types";
 
 /**
  * How many days into the future an "Earnings filter" considers when active.
@@ -37,7 +41,8 @@ export function classifySide(
   volOi?: number | null,
   fallback?: string,
 ) {
-  const t = (optType || "").toUpperCase();
+  const rawType = (optType || "").toUpperCase().trim();
+  const t = rawType === "C" ? "CALL" : rawType === "P" ? "PUT" : rawType;
   const fb = (fallback || "").toLowerCase();
   const ask = askPct ?? 50;
   const voi = volOi ?? 0;
@@ -81,14 +86,57 @@ export function normExpiry(s: string | null | undefined): string | null {
 }
 
 /**
- * Parse a Discord-style premium string like "$1.5M" / "$250K" / "$425" into
- * a raw dollar number. Returns 0 for unparseable input.
+ * Parse a Discord-style premium value like "$1.5M" / "$250K" / "$425" into
+ * raw dollars. Numeric API fields pass through unchanged. Returns 0 for
+ * unparseable input so callers can use one conversion path for old and new
+ * response shapes.
  */
-export function parsePremium(s: string): number {
-  const c = (s || "").replace("$", "").replace(/,/g, "").trim();
-  if (c.toUpperCase().endsWith("M")) return parseFloat(c) * 1e6;
-  if (c.toUpperCase().endsWith("K")) return parseFloat(c) * 1e3;
-  return parseFloat(c) || 0;
+export function parsePremium(value: unknown): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const normalized = String(value ?? "")
+    .replace(/[$,\s]/g, "")
+    .toUpperCase();
+  const match = normalized.match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+))([KMB])?$/);
+  if (!match) return 0;
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) return 0;
+  const multiplier = match[2] === "B" ? 1e9 : match[2] === "M" ? 1e6 : match[2] === "K" ? 1e3 : 1;
+  return amount * multiplier;
+}
+
+/** Experimental research ordering, not the persona's final selection. NScore and
+ * directional Setup form the evidence base. A quarantined model can adjust
+ * that base by at most three points; only a governed model joins the weighted
+ * base. Missing base components are reweighted instead of silently becoming
+ * zero. This is an ordering score, never an outcome probability. */
+export function researchRank(
+  setup: number | null | undefined,
+  mlPercentile: number | null | undefined,
+  evidence: number | null | undefined,
+  servingMode: string | null | undefined,
+): number | null {
+  const governed = servingMode === "gate_and_rank";
+  const requested: Array<[number | null | undefined, number]> = governed
+    ? [[mlPercentile, 0.45], [evidence, 0.35], [setup, 0.2]]
+    : [[evidence, 0.65], [setup, 0.35]];
+  const available = requested.filter((item): item is [number, number] =>
+    typeof item[0] === "number" && Number.isFinite(item[0]));
+  const weight = available.reduce((sum, [, value]) => sum + value, 0);
+  if (!weight) return null;
+  const base = available.reduce((sum, [score, value]) => sum + score * value, 0) / weight;
+  const modelAdjustment = !governed && servingMode !== "disabled" && typeof mlPercentile === "number" && Number.isFinite(mlPercentile)
+    ? Math.max(-3, Math.min(3, (mlPercentile - 50) / 10))
+    : 0;
+  return Math.round(Math.max(0, Math.min(100, base + modelAdjustment)));
+}
+
+/** Probability is displayable only when the response explicitly confirms both
+ * model approval and calibration. Missing legacy metadata fails closed. */
+export function canShowMlProbability(
+  approved: boolean | null | undefined,
+  calibrationStatus: MlCalibrationStatus | string | null | undefined,
+): boolean {
+  return approved === true && calibrationStatus === "calibrated";
 }
 
 /**
