@@ -10,14 +10,15 @@ import {
 import { MODEL_LABELS, MODEL_COLORS } from "../../lib/constants";
 import { todayLocalDate } from "../../lib/dateOnly";
 
-// Ordered by out-of-sample backtest rank (2026-07 harness, mean CRPS vs the
-// random-walk baseline across 5/10/15d): rw 1.00, chronos2 1.03, timexer 1.07,
-// dlinear 1.12, itransformer 1.13, timemixer 1.17, then patchtst/timesnet/tide
-// (1.20-1.23). No learned model beats RW on average; ensemble ~= RW, opt-in only.
-const AVAILABLE_MODELS = [
-  "rw",
+// 2026-10-19 backtest verdict: no learned model beats the random walk on
+// range accuracy (CRPS), and none calls direction better than "always up"
+// (best edge -1pp, itransformer/timemixer -14/-17pp at 10d; consensus is
+// worse). So the default view is the RW range only; learned models are
+// research overlays. timexer is removed while its checkpoint fails to load
+// (backend refuses it). Research order = CRPS rank vs RW.
+const PRIMARY_MODELS = ["rw"];
+const RESEARCH_MODELS = [
   "chronos2",
-  "timexer",
   "dlinear",
   "itransformer",
   "timemixer",
@@ -28,9 +29,10 @@ const AVAILABLE_MODELS = [
   "claude",
   "ensemble",
 ];
+const AVAILABLE_MODELS = [...PRIMARY_MODELS, ...RESEARCH_MODELS];
 
-/** Default view: the baseline plus the five best learned models, not the ensemble. */
-export const DEFAULT_MODELS = AVAILABLE_MODELS.slice(0, 6);
+/** Default view: the calibrated random-walk range — no directional call. */
+export const DEFAULT_MODELS = [...PRIMARY_MODELS];
 
 const INTERVALS = ["15m", "30m", "1h", "4h"] as const;
 
@@ -91,6 +93,9 @@ export function ForecastConfig({
   ticker = "",
 }: ForecastConfigProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showResearch, setShowResearch] = useState(
+    () => settings.selectedModels.some((m) => !PRIMARY_MODELS.includes(m)),
+  );
   const availableModels = AVAILABLE_MODELS.filter((model) => settings.forecastType === "daily" || model !== "ensemble");
 
   // The button looks enabled if you only check selectedModels, but the
@@ -117,6 +122,39 @@ export function ForecastConfig({
 
   const selectAll = () => update({ selectedModels: [...availableModels] });
   const clearAll = () => update({ selectedModels: [] });
+
+  const renderChip = (m: string) => {
+    const selected = settings.selectedModels.includes(m);
+    const color = MODEL_COLORS[m] || "#8b949e";
+    return (
+      <button
+        key={m}
+        type="button"
+        aria-pressed={selected}
+        onClick={() => toggleModel(m)}
+        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all ${
+          selected
+            ? "border-2"
+            : "border border-border text-text-muted opacity-50 hover:opacity-80"
+        }`}
+        style={
+          selected
+            ? {
+                borderColor: `${color}60`,
+                background: `${color}12`,
+                color,
+              }
+            : undefined
+        }
+      >
+        <span
+          className="w-2 h-2 rounded-full"
+          style={{ background: color }}
+        />
+        {MODEL_LABELS[m] || m}
+      </button>
+    );
+  };
 
   return (
     <div className="card space-y-4">
@@ -276,39 +314,28 @@ export function ForecastConfig({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {availableModels.map((m) => {
-            const selected = settings.selectedModels.includes(m);
-            const color = MODEL_COLORS[m] || "#8b949e";
-            return (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => toggleModel(m)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all ${
-                  selected
-                    ? "border-2"
-                    : "border border-border text-text-muted opacity-50 hover:opacity-80"
-                }`}
-                style={
-                  selected
-                    ? {
-                        borderColor: `${color}60`,
-                        background: `${color}12`,
-                        color,
-                      }
-                    : undefined
-                }
-              >
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ background: color }}
-                />
-                {MODEL_LABELS[m] || m}
-              </button>
-            );
-          })}
+          {availableModels.filter((m) => PRIMARY_MODELS.includes(m)).map(renderChip)}
         </div>
+        <button
+          type="button"
+          aria-expanded={showResearch}
+          onClick={() => setShowResearch(!showResearch)}
+          className="mt-2 flex items-center gap-1 text-xs text-text-muted hover:text-text-secondary transition-colors"
+        >
+          Research models
+          {showResearch ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        </button>
+        {showResearch && (
+          <>
+            <p className="text-xs text-text-muted mt-1 mb-2">
+              No directional edge in backtest: none beat the random-walk range or an
+              &ldquo;always up&rdquo; call. Overlays for research, not signals.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {availableModels.filter((m) => !PRIMARY_MODELS.includes(m)).map(renderChip)}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Row 3: Advanced + Run */}

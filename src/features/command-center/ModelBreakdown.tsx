@@ -4,6 +4,8 @@ import { formatCurrency } from "../../lib/utils";
 import { BarChart3 } from "lucide-react";
 import type { ModelForecast } from "../../lib/types";
 
+const signed = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+
 interface ModelBreakdownProps {
   models: ModelForecast[];
   currentPrice?: number;
@@ -64,12 +66,23 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
         Model Breakdown
       </h3>
 
+      {sorted.length > 1 && (
+        <p className="text-xs text-text-muted mb-3">
+          Models routinely disagree on direction. In backtests none called up/down better
+          than simply assuming &ldquo;up&rdquo;, so read the 80% range, not the sign.
+        </p>
+      )}
       <div className="space-y-2.5">
         {sorted.map((model) => {
           const color = MODEL_COLORS[model.model] || "var(--text-secondary)";
           const label = MODEL_LABELS[model.model] || model.model;
           const pctChange = forecastReturn(model.end_price, model.current_price);
           const barWidth = Math.max(scalePrice(model.end_price), 4);
+          const last = model.predictions?.[model.predictions.length - 1];
+          const lo = last?.q10 ?? null;
+          const hi = last?.q90 ?? null;
+          const loPct = lo != null ? forecastReturn(lo, model.current_price) : null;
+          const hiPct = hi != null ? forecastReturn(hi, model.current_price) : null;
 
           return (
             <div key={model.model} className="group">
@@ -111,16 +124,18 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
                   )}
                 </div>
 
-                {/* Pct change */}
-                <span
-                  className="num text-xs w-14 text-right shrink-0"
-                  style={{
-                    color: pctChange == null ? "var(--text-muted)" : pctChange >= 0 ? "var(--accent-green)" : "var(--accent-red)",
-                  }}
-                >
+                {/* Median change — neutral ink: no model has a validated directional edge */}
+                <span className="num text-xs w-14 text-right shrink-0 text-text-secondary">
                   {pctChange == null ? "Unknown" : `${pctChange >= 0 ? "+" : ""}${pctChange.toFixed(1)}%`}
                 </span>
               </div>
+              {lo != null && hi != null && (
+                <p className="num text-xs text-text-muted mt-0.5 pl-[5.5rem]">
+                  80% range {formatCurrency(lo)} &ndash; {formatCurrency(hi)}
+                  {loPct != null && hiPct != null &&
+                    ` (${signed(loPct)} / ${signed(hiPct)})`}
+                </p>
+              )}
             </div>
           );
         })}
