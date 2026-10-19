@@ -10,20 +10,27 @@ import {
 import { MODEL_LABELS, MODEL_COLORS } from "../../lib/constants";
 import { todayLocalDate } from "../../lib/dateOnly";
 
+// Ordered by out-of-sample backtest rank (2026-07 harness, mean CRPS vs the
+// random-walk baseline across 5/10/15d): rw 1.00, chronos2 1.03, timexer 1.07,
+// dlinear 1.12, itransformer 1.13, timemixer 1.17, then patchtst/timesnet/tide
+// (1.20-1.23). No learned model beats RW on average; ensemble ~= RW, opt-in only.
 const AVAILABLE_MODELS = [
-  "ensemble",
   "rw",
+  "chronos2",
   "timexer",
+  "dlinear",
   "itransformer",
   "timemixer",
-  "dlinear",
   "patchtst",
   "timesnet",
   "tide",
-  "chronos2",
   "timesfm",
   "claude",
+  "ensemble",
 ];
+
+/** Default view: the baseline plus the five best learned models, not the ensemble. */
+export const DEFAULT_MODELS = AVAILABLE_MODELS.slice(0, 6);
 
 const INTERVALS = ["15m", "30m", "1h", "4h"] as const;
 
@@ -64,7 +71,7 @@ export const DEFAULT_SETTINGS: ForecastSettings = {
   interval: "4h",
   historyDays: 365,
   historyPeriod: "60d",
-  selectedModels: ["ensemble"],
+  selectedModels: DEFAULT_MODELS,
   useCovariates: true,
   usePretrained: true,
   forecastOrigin: todayLocalDate(),
