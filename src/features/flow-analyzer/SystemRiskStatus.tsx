@@ -22,12 +22,14 @@ interface RiskData {
   };
   watchlist: { wla_count: number; wlb_count: number };
   risk: {
+    circuit_breaker_supported?: boolean;
+    circuit_breaker_enabled?: boolean;
     circuit_breaker_state: "FREE" | "FROZEN" | "CASH";
     circuit_breaker_until: string;
     freeze_remaining_min: number;
     drawdown_pct: number;
-    drawdown_freeze_threshold: number;
-    drawdown_cash_threshold: number;
+    drawdown_freeze_threshold: number | null;
+    drawdown_cash_threshold: number | null;
     sector_concentration: Record<string, number>;
     sector_warnings: { sector: string; side: string; count: number }[];
   };
@@ -47,7 +49,8 @@ function fmtMoney(n: number) {
   return `$${n.toFixed(0)}`;
 }
 
-function CircuitBreakerBadge({ state, remainingMin }: { state: string; remainingMin: number }) {
+function CircuitBreakerBadge({ state, remainingMin, supported }: { state: string; remainingMin: number; supported: boolean }) {
+  if (!supported) return <span className="flex items-center gap-1 text-xs text-text-muted"><Shield size={11} />Circuit breaker unavailable</span>;
   if (state === "FREE") {
     return (
       <span className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold"
@@ -75,7 +78,8 @@ function CircuitBreakerBadge({ state, remainingMin }: { state: string; remaining
   );
 }
 
-function DrawdownBar({ drawdown, freezeAt, cashAt }: { drawdown: number; freezeAt: number; cashAt: number }) {
+function DrawdownBar({ drawdown, freezeAt, cashAt, supported }: { drawdown: number; freezeAt: number | null; cashAt: number | null; supported: boolean }) {
+  if (!supported || freezeAt == null || cashAt == null || cashAt >= 0) return <span className="text-xs text-text-muted">Recorded drawdown <span className="num text-text-primary">{drawdown.toFixed(1)}%</span></span>;
   // Visualize 0% to cashAt (e.g., -25%). Drawdown is negative.
   const dd = Math.min(0, drawdown);
   const ddAbs = Math.abs(dd);
@@ -137,9 +141,9 @@ function SlotPills({ slots }: { slots: RiskData["slots"] }) {
             </div>
             <span
               className="font-mono text-xs"
-              style={{ color: isFull ? "var(--accent-red)" : "var(--text-muted)" }}
+              style={{ color: item.max > 0 && isFull ? "var(--accent-red)" : "var(--text-muted)" }}
             >
-              {item.used}/{item.max}
+              {item.max === 0 ? "disabled" : `${item.used}/${item.max}`}
             </span>
           </div>
         );
@@ -207,21 +211,10 @@ export function SystemRiskStatus() {
   const hasLottoBudget = portfolio.lotto_budget > 0;
 
   return (
-    <div
-      className="card py-2 px-3"
-      style={{
-        borderLeft: `3px solid ${
-          risk.circuit_breaker_state === "FROZEN"
-            ? "var(--accent-orange)"
-            : risk.circuit_breaker_state === "CASH"
-              ? "var(--accent-red)"
-              : "var(--accent-cyan)"
-        }`,
-      }}
-    >
+    <div className="card py-2 px-3">
       <div className="flex items-center gap-4 flex-wrap">
         {/* Circuit breaker badge */}
-        <CircuitBreakerBadge state={risk.circuit_breaker_state} remainingMin={risk.freeze_remaining_min} />
+        <CircuitBreakerBadge state={risk.circuit_breaker_state} remainingMin={risk.freeze_remaining_min} supported={risk.circuit_breaker_enabled ?? risk.circuit_breaker_supported ?? false} />
 
         {/* Drawdown bar */}
         <div className="flex-1 min-w-[180px] max-w-[280px]">
@@ -229,6 +222,7 @@ export function SystemRiskStatus() {
             drawdown={risk.drawdown_pct}
             freezeAt={risk.drawdown_freeze_threshold}
             cashAt={risk.drawdown_cash_threshold}
+            supported={risk.circuit_breaker_enabled ?? risk.circuit_breaker_supported ?? false}
           />
         </div>
 

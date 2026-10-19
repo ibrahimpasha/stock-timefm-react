@@ -13,6 +13,8 @@
  * source of truth for filter UI.
  */
 import { useMemo } from "react";
+import { QueryNotice } from "../../../components/QueryNotice";
+import { modelMetadataLabel } from "../../../lib/modelMetadata";
 import { useMultiDateEntries, useTickerPricesBatch } from "./hooks";
 import { estimateOptionPnl } from "./estimator";
 import type { BiasFilter, DteFilter, NotableScore } from "./types";
@@ -24,6 +26,7 @@ import {
 } from "./utils";
 import { formatPremium } from "../../../lib/utils";
 import { daysFromToday } from "../../../lib/dateOnly";
+import { optionIntent, type OptionDirection } from "../../../lib/optionContract";
 import { useTickerMeta, type TickerMeta } from "../../../api/tickerMeta";
 import { useTickerTechnicals, type TickerTechnical } from "../../../api/tickerTechnicals";
 import { useTickerGex, type TickerGex } from "../../../api/tickerGex";
@@ -283,11 +286,12 @@ const _clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, 
  *  lighter — it lags and has partial coverage). Heuristic CONTEXT, not an
  *  empirically-calibrated predictor like ML — read it as a convergence flag. */
 export function setupScore(
-  side: "Bull" | "Bear" | undefined,
+  side: OptionDirection | undefined,
   m: TickerMeta | undefined,
   t: TickerTechnical | undefined,
   g?: TickerGex | undefined,
 ): { score: number | null; tech: number | null; pat: number | null; tgt: number | null; gex: number | null; bull: number } {
+  if (!side || side === "Unknown") return { score: null, tech: null, pat: null, tgt: null, gex: null, bull: 0 };
   const comps: { v: number; w: number }[] = [];
   let tech: number | null = null;
   let pat: number | null = null;
@@ -405,25 +409,10 @@ interface Props {
  *  High ask% (≥55) = lifting offer (buying). Low ask% (<40) = hitting bid
  *  (selling). Mirrors the backend's _corrected_side classifier so the chip
  *  reads the same way across the dashboard. */
-function actionLabel(type: string, askPct: number): string {
-  const t = (type || "").toUpperCase();
-  const isCall = t.includes("CALL");
-  const isPut = t.includes("PUT");
-  const buying = askPct >= 55;
-  if (isCall) return buying ? "call buying" : "call selling";
-  if (isPut) return buying ? "put buying" : "put selling";
-  return type?.toLowerCase() || "flow";
-}
 
-/** Format expiry as M/D (drop year unless it's not the current one). */
+/** Preserve the year for every contract, including current-year expiries. */
 function fmtExpiry(raw: string): string {
-  if (!raw) return "";
-  // Backend gives "12/18/2026" — keep year for LEAPs, drop for near-term.
-  const m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return raw;
-  const [, mo, da, yr] = m;
-  const cur = new Date().getFullYear();
-  return Number(yr) === cur ? `${mo}/${da}` : `${mo}/${da}/${yr.slice(2)}`;
+  return raw;
 }
 
 /** Time-only string from the entry's UTC arrival timestamp. */
@@ -455,18 +444,8 @@ const INDEX_ETFS = new Set([
 /** Inverse/vol ETFs — a CALL here is a market-BEAR bet; inverted in the lean. */
 const BEAR_ETFS = new Set(["SQQQ", "SPXS", "SPXU", "QID", "PSQ", "SH", "UVXY"]);
 
-function correctedSide(entry: Record<string, unknown>): "Bull" | "Bear" {
-  const type = normalizeOptType(entry.type || entry.option_type);
-  const askPct = Number(entry.ask_pct ?? 50);
-  let voi = entry.vol_oi_ratio as number | string | undefined;
-  if (typeof voi === "string") voi = Number(String(voi).replace("x", "").trim()) || 0;
-  let isBuying: boolean;
-  if (askPct >= 55) isBuying = true;
-  else if (askPct < 40) isBuying = false;
-  else isBuying = (Number(voi) || 0) >= 1.5;
-  if (type === "CALL") return isBuying ? "Bull" : "Bear";
-  if (type === "PUT") return isBuying ? "Bear" : "Bull";
-  return (entry.side as "Bull" | "Bear") || "Bull";
+function correctedSide(entry: Record<string, unknown>): OptionDirection {
+  return optionIntent(entry).side;
 }
 
 interface EntryRow {
@@ -474,7 +453,7 @@ interface EntryRow {
   ts: string;
   timeLabel: string;
   ticker: string;
-  side: "Bull" | "Bear";
+  side: OptionDirection;
   action: string;
   contractLabel: string;
   /** Numeric strike value — separated from `contractLabel` so the
@@ -482,6 +461,8 @@ interface EntryRow {
    *  would make "$1000 CALL" sort before "$200 CALL"). */
   strike: number;
   dte: number | null;
+  /** Raw DTE for the P/L estimator — keeps 0DTE (display `dte` nulls it). */
+  pnlDte: number | null;
   dteCategory: { text: string; color: string; bg: string } | null;
   voiRatio: number | null;
   askPct: number | null;
@@ -566,23 +547,34 @@ export function EntryTape({
   // the opposite-side prints with ask>=85, DTE 5-45, single-name, >=$500K
   // graded median +67% 10d peak vs +39% for the consensus. Selection
   // signal only — it does NOT predict the market day (corr ~0).
-  const dayLean = useMemo(() => {
-    let bull = 0, bear = 0;
+  // Lean is per flow date (keyed like EntryRow.flowDate) — pooling several
+  // days would let one euphoric day tag dissent on another.
+  const leanByDate = useMemo(() => {
+    const acc = new Map<string, { bull: number; bear: number }>();
     for (const e of entries) {
       const prem = parsePremium(e.premium_usd ?? e.premium);
       if (prem <= 0) continue;
       let s = correctedSide(e);
+      if (s === "Unknown") continue;
       if (BEAR_ETFS.has(String(e.ticker || "").toUpperCase()))
         s = s === "Bull" ? "Bear" : "Bull";
-      if (s === "Bull") bull += prem; else bear += prem;
+      const d = String(e._date ?? (e.flow_date ?? (dates[0] ?? "")));
+      const a = acc.get(d) ?? { bull: 0, bear: 0 };
+      if (s === "Bull") a.bull += prem; else a.bear += prem;
+      acc.set(d, a);
     }
-    const tot = bull + bear;
-    return tot > 0 ? bull / tot : null;
-  }, [entries]);
-  const leanSide: "Bull" | "Bear" | null =
-    dayLean == null ? null : dayLean >= 0.7 ? "Bull" : dayLean <= 0.3 ? "Bear" : null;
+    const out = new Map<string, number>();
+    for (const [d, a] of acc) if (a.bull + a.bear > 0) out.set(d, a.bull / (a.bull + a.bear));
+    return out;
+  }, [entries, dates]);
+  const sideOf = (lean: number | null | undefined): "Bull" | "Bear" | null =>
+    lean == null ? null : lean >= 0.7 ? "Bull" : lean <= 0.3 ? "Bear" : null;
+  // Header pill only when exactly one date is loaded.
+  const dayLean = leanByDate.size === 1 ? [...leanByDate.values()][0] : null;
+  const leanSide = sideOf(dayLean);
   const isDissent = (r: EntryRow): boolean => {
-    if (!leanSide || r.side === leanSide) return false;
+    const rowLean = sideOf(leanByDate.get(r.flowDate));
+    if (!rowLean || r.side === rowLean) return false;
     const tk = r.ticker.toUpperCase();
     if (INDEX_ETFS.has(tk) || BEAR_ETFS.has(tk)) return false;
     return (r.askPct ?? 0) >= 85 && r.dte != null && r.dte >= 5 && r.dte <= 45
@@ -678,9 +670,7 @@ export function EntryTape({
           && earningsMaxDays != null) {
         const ed = earningsMap[ticker.toUpperCase()];
         if (!ed) continue;
-        const days = Math.ceil(
-          (new Date(ed).getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000,
-        );
+        const days = daysFromToday(ed);
         if (!(days >= 0 && days <= earningsMaxDays)) continue;
       }
       const dteNum = Number(e.dte ?? 0);
@@ -788,10 +778,11 @@ export function EntryTape({
         timeLabel: fmtTime(tsRaw),
         ticker,
         side,
-        action: actionLabel(type, askPct ?? 50),
+        action: optionIntent(e).action,
         contractLabel,
         strike,
         dte: Number.isFinite(dteNum) && dteNum > 0 ? dteNum : null,
+        pnlDte: e.dte != null && Number.isFinite(Number(e.dte)) ? Number(e.dte) : null,
         dteCategory: dteNum > 0 ? dteTag(dteNum) : null,
         voiRatio: voi,
         askPct,
@@ -827,21 +818,17 @@ export function EntryTape({
     const m: Record<string, number | null> = {};
     for (const r of rows) {
       const cur = priceMap[r.ticker] || 0;
-      if (cur <= 0 || r.underlyingFill <= 0) {
+      if (cur <= 0 || r.underlyingFill <= 0 || r.side === "Unknown" || r.action.includes("to close")) {
         m[r.msgId] = null;
         continue;
       }
       if (r.optFill > 0 && r.strike > 0) {
         m[r.msgId] = estimateOptionPnl(
-          r.underlyingFill, cur, r.optFill, r.strike, r.dte ?? 30,
-          r.optType, r.flowDate,
+          r.underlyingFill, cur, r.optFill, r.strike, r.pnlDte ?? 30,
+          r.optType, r.flowDate, r.action.includes("selling"),
         );
       } else {
-        // Fallback: bare underlying % move, direction-adjusted, floored
-        // at -100%. Matches EntryRow's secondary path.
-        const isPut = r.optType.toUpperCase().includes("PUT");
-        const raw = ((cur - r.underlyingFill) / r.underlyingFill) * 100 * (isPut ? -1 : 1);
-        m[r.msgId] = Math.max(-100, Math.round(raw));
+        m[r.msgId] = null;
       }
     }
     return m;
@@ -996,6 +983,9 @@ export function EntryTape({
     );
   }
   if (rows.length === 0) {
+    if (dateQueries.some((q) => q.isError || q.fetchStatus === "paused")) {
+      return <QueryNotice queries={dateQueries} label="Flow entries" />;
+    }
     const dateLabel =
       dates.length === 0 ? "selected dates"
       : dates.length === 1 ? dates[0]
@@ -1020,6 +1010,7 @@ export function EntryTape({
 
   return (
     <div className="space-y-0.5 text-xs">
+      <QueryNotice queries={dateQueries} label="Flow entries" />
       <div className="flex items-center justify-between px-2 py-1 max-md:px-1 max-md:flex-wrap max-md:gap-1">
         <div className="flex items-center gap-2 max-md:gap-1 max-md:overflow-x-auto max-md:flex-nowrap max-md:w-full">
           {(() => {
@@ -1200,12 +1191,12 @@ export function EntryTape({
         {renderHeader("ask%", "ask", "w-14 justify-end max-md:hidden")}
         {renderHeader("ATM%", "atm", "w-16 justify-end max-md:hidden")}
         {renderHeader("premium", "premium", "w-20 justify-end max-md:hidden")}
-        {renderHeader("P/L", "pnl", "w-16 justify-end")}
+        {renderHeader("Est. P/L", "pnl", "w-16 justify-end")}
         {renderHeader("weighted peak", "pred_peak", "w-20 justify-end max-md:hidden")}
       </div>
       {sortedRows.map((r) => {
         const sideColor =
-          r.side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
+          r.side === "Unknown" ? "var(--text-muted)" : r.side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
         const moneyColor =
           r.moneyness == null
             ? "var(--text-muted)"
@@ -1317,7 +1308,7 @@ export function EntryTape({
                 : `ML percentile ${ml}/100 among similar-DTE recent prints.\n` +
                   `${prob != null ? `Calibrated P(2x within the model horizon): ${prob}%.\n` : ""}` +
                   `${r.notable?.ml_prob != null && !probabilityAllowed ? "Probability hidden: this response does not confirm an approved, calibrated artifact.\n" : ""}` +
-                  `${provenance.length ? provenance.join(" · ") : "Model provenance is not included in this legacy response."}`;
+                  `${provenance.length ? provenance.join(" · ") : modelMetadataLabel(r.notable?.metadata)}`;
               return (
                 <span
                   className="w-10 text-center font-semibold num max-md:hidden"
@@ -1377,8 +1368,8 @@ export function EntryTape({
                     border: "1px solid color-mix(in srgb, var(--accent-purple) 35%, transparent)",
                   }}
                   title={
-                    `DISSENT — conviction print against a ${Math.round((dayLean ?? 0) * 100)}% ` +
-                    `${leanSide?.toLowerCase()} tape: single-name, ask% ${r.askPct}, DTE ${r.dte}, ` +
+                    `DISSENT — conviction print against a ${Math.round((leanByDate.get(r.flowDate) ?? 0) * 100)}% ` +
+                    `${sideOf(leanByDate.get(r.flowDate))?.toLowerCase()} tape: single-name, ask% ${r.askPct}, DTE ${r.dte}, ` +
                     `${formatPremium(r.premium)}. Historically (7/16-8/18) these graded ` +
                     `median +67% 10d peak vs +39% for the day's consensus prints. ` +
                     `A print-selection screen, NOT a market-crash forecast.`

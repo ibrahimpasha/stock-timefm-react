@@ -59,6 +59,7 @@ export function useNewsByTicker(ticker: string, days: number = 30) {
     queryFn: () =>
       apiClient.get(`/news/by-ticker/${ticker}?days=${days}`).then((r) => r.data),
     staleTime: STALE_TIMES.flow,
+    refetchInterval: 5 * 60_000,
     enabled: !!ticker,
   });
 }

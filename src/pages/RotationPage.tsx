@@ -7,6 +7,7 @@
  * components against `/market/theme-rotation`.
  */
 import { useState } from "react";
+import { QueryNotice } from "../components/QueryNotice";
 import { GlassPanel, Chip, Segmented } from "../components/Glass";
 import { useSectorRotation, type RotationWindow } from "../api/rotation";
 import {
@@ -25,7 +26,8 @@ const WINDOWS: { value: RotationWindow; label: string }[] = [
 
 export function RotationPage() {
   const [window, setWindow] = useState<RotationWindow>("1M");
-  const { data, isLoading } = useSectorRotation(window);
+  const rotationQuery = useSectorRotation(window);
+  const { data, isLoading } = rotationQuery;
 
   const sectors = data?.sectors ?? [];
   const dates = sectors[0]?.history.map((p) => p.date) ?? [];
@@ -42,16 +44,15 @@ export function RotationPage() {
   if (!data?.ok) {
     return (
       <GlassPanel title="Sector Rotation">
-        <p className="text-xs text-text-muted">
-          {data?.reason ?? "unavailable"}. Run{" "}
-          <code className="num">scripts/backfill_sector_prices.py</code> to populate history.
-        </p>
+        <QueryNotice queries={[rotationQuery]} label="Sector rotation" />
+        {data && <p className="text-xs text-text-muted">{data.reason ?? "Rotation data unavailable"}</p>}
       </GlassPanel>
     );
   }
 
   return (
     <div className="flex flex-col gap-3">
+      <QueryNotice queries={[rotationQuery]} label="Sector rotation" />
       <GlassPanel
         title="Sector Overview"
         actions={

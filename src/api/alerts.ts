@@ -43,6 +43,7 @@ export function useLeaderboard(lookbackDays: number = 30) {
         )
         .then((r) => r.data),
     staleTime: STALE_TIMES.flow,
+    refetchInterval: 60_000,
   });
 }
 
@@ -99,6 +100,7 @@ export function useAlertsPositions(
         )
         .then((r) => r.data),
     staleTime: STALE_TIMES.flow,
+    refetchInterval: 60_000,
     enabled: !!author,
   });
 }

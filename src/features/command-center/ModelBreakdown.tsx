@@ -1,4 +1,5 @@
 import { MODEL_COLORS, MODEL_LABELS } from "../../lib/constants";
+import { forecastReturn } from "../../lib/forecastSeries";
 import { formatCurrency } from "../../lib/utils";
 import { BarChart3 } from "lucide-react";
 import type { ModelForecast } from "../../lib/types";
@@ -67,9 +68,7 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
         {sorted.map((model) => {
           const color = MODEL_COLORS[model.model] || "var(--text-secondary)";
           const label = MODEL_LABELS[model.model] || model.model;
-          const pctChange = currentPrice
-            ? ((model.end_price - currentPrice) / currentPrice) * 100
-            : 0;
+          const pctChange = forecastReturn(model.end_price, model.current_price);
           const barWidth = Math.max(scalePrice(model.end_price), 4);
 
           return (
@@ -116,11 +115,10 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
                 <span
                   className="num text-xs w-14 text-right shrink-0"
                   style={{
-                    color: pctChange >= 0 ? "var(--accent-green)" : "var(--accent-red)",
+                    color: pctChange == null ? "var(--text-muted)" : pctChange >= 0 ? "var(--accent-green)" : "var(--accent-red)",
                   }}
                 >
-                  {pctChange >= 0 ? "+" : ""}
-                  {pctChange.toFixed(1)}%
+                  {pctChange == null ? "Unknown" : `${pctChange >= 0 ? "+" : ""}${pctChange.toFixed(1)}%`}
                 </span>
               </div>
             </div>

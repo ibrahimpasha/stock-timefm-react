@@ -32,6 +32,7 @@ export interface ForecastRunResult {
 export async function runForecastModels(
   ticker: string,
   config: ForecastRunConfig,
+  signal?: AbortSignal,
 ): Promise<ForecastRunResult> {
   const isDaily = config.forecastType === "daily";
   const endpoint = isDaily ? "/forecast/daily" : "/forecast/intraday";
@@ -55,7 +56,7 @@ export async function runForecastModels(
 
   const results = await Promise.allSettled(
     config.selectedModels.map(async (model) => {
-      const { data } = await apiClient.post(endpoint, { ...body, model });
+      const { data } = await apiClient.post(endpoint, { ...body, model }, { signal });
       const predictions = (data.predictions ?? []).map(
         (prediction: { timestamp?: string; date?: string; [key: string]: unknown }) => ({
           ...prediction,
@@ -209,6 +210,7 @@ export interface SignalConvergence {
 }
 
 export interface SignalML {
+  metadata?: import("../lib/modelMetadata").ModelMetadata | null;
   peak_score: number;
   peak_probability?: number | null;
   gate_approved?: boolean;

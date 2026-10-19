@@ -10,6 +10,7 @@ import {
   XCircle,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   TrendingUp,
   TrendingDown,
   Flame,
@@ -25,7 +26,14 @@ import {
 } from "lucide-react";
 import apiClient from "../../api/client";
 import { formatCurrency, changeColor } from "../../lib/utils";
-import { daysFromToday } from "../../lib/dateOnly";
+import { expiryDte, optionType } from "../../lib/optionContract";
+import { marketDate } from "../../lib/liveFeeds";
+import { daysFromToday, parseLocalDate, todayLocalDate, toLocalDateOnly } from "../../lib/dateOnly";
+import { activityWindow, markedExposure, signedPercent } from "../../lib/markFreshness";
+import { observationAge, observationGain, observationHasEvaluation, sortObservations } from "../../lib/watchlist";
+import type { WatchlistSort } from "../../lib/watchlist";
+import { MarkFreshness } from "../../components/MarkFreshness";
+import { QueryNotice } from "../../components/QueryNotice";
 import { useAppStore } from "../../store/useAppStore";
 import { GlassPanel, Chip, Stat, Segmented } from "../../components/Glass";
 import type { ChipTone } from "../../components/Glass";
@@ -133,6 +141,8 @@ interface Position {
   rank_breakdown?: RankBreakdown | null;
   ml_serving_mode?: string | null;
   decision_receipt?: DecisionReceipt | null;
+  last_marked_at?: string | null;
+  mark_status?: string | null;
 }
 
 interface CategoryTrendItem {
@@ -281,8 +291,7 @@ function usePersonaList() {
   });
 }
 
-// Persona watchlist — LIVING WL-A / WL-B: rows persist across days, marked
-// to market from their add-date premium; breakouts promote, dead drop.
+// Price observations and recorded eligibility are separate lifecycle states.
 interface WatchlistRow {
   id?: number;
   ticker: string;
@@ -300,16 +309,23 @@ interface WatchlistRow {
   drop_reason: string | null;
   promoted_at: string | null;
   current_dte?: number | null;
-  decision_state?: "watching" | "triggered" | "eligible" | "blocked" | "entered" | "invalidated";
+  decision_state?: "watching" | "triggered" | "eligible" | "ready" | "blocked" | "entered" | "invalidated" | "needs_review";
   block_reason?: string | null;
   last_evaluated_at?: string | null;
   triggered_at?: string | null;
   added_at?: string | null;
   source_date?: string | null;
   last_marked_at?: string | null;
+  decision_receipt?: DecisionReceipt | null;
+  archived_at?: string | null;
+  current_premium?: number | null;
+  mark_quality?: string | null;
+  provenance_status?: string | null;
+  days_on_list?: number;
 }
 
 interface WatchlistActivity {
+  timezone?: string;
   daily: { date: string; added: number; scans: number }[];
   last_scan_at: string | null;
   last_added_date: string | null;
@@ -318,6 +334,8 @@ interface WatchlistActivity {
   last_marked_at: string | null;
   latest_source_date: string | null;
   last_reset_at: string | null;
+  last_maintenance_at?: string | null;
+  maintenance?: { reviewed: number; retained: number; archived: { id: number; reason: string }[] };
 }
 
 function usePersonaWatchlist(persona: PersonaName, enabled: boolean) {
@@ -332,13 +350,9 @@ function usePersonaWatchlist(persona: PersonaName, enabled: boolean) {
     queryFn: () =>
       apiClient.get(`/smart-trader/watchlist?persona=${persona}`).then((r) => r.data),
     staleTime: 60_000,
-    refetchInterval: 300_000,
+    refetchInterval: 60_000,
     enabled,
   });
-}
-
-function daysOn(added: string): number {
-  return Math.max(0, -daysFromToday(added));
 }
 
 function watchlistTime(value?: string | null): string {
@@ -349,12 +363,16 @@ function watchlistTime(value?: string | null): string {
 }
 
 function WatchlistPanel({ persona }: { persona: PersonaName }) {
-  const { data, isPending, isError, isFetching, refetch } = usePersonaWatchlist(persona, true);
+  const watchlistQuery = usePersonaWatchlist(persona, true);
+  const { data, isPending, isError, isFetching, refetch } = watchlistQuery;
   const queryClient = useQueryClient();
   const [mobileSection, setMobileSection] = useState<"wla" | "wlb" | "history" | null>(null);
-  const [showAll, setShowAll] = useState(false);
-  const [sort, setSort] = useState("newest");
+  const [pages, setPages] = useState({ wla: 0, wlb: 0 });
+  const [pageSize, setPageSize] = useState(12);
+  const [sort, setSort] = useState<WatchlistSort>("newest");
   const [addedFilter, setAddedFilter] = useState("all");
+  const [evidenceFilter, setEvidenceFilter] = useState("evaluated");
+  const [activityExpanded, setActivityExpanded] = useState(false);
   const reset = useMutation({
     mutationFn: (target: PersonaName) => apiClient.post(
       `/smart-trader/watchlist/reset?persona=${target}`, { confirm_persona: target },
@@ -364,27 +382,53 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
     }),
   });
   const activity = data?.activity;
+  const activityTimezone = activity?.timezone ?? "America/New_York";
+  const zoneLabel = activityTimezone === "America/New_York" ? "ET" : activityTimezone === "America/Los_Angeles" ? "PT" : activityTimezone;
+  const activityDates = activityWindow(activity?.daily ?? [], new Date(), activityTimezone);
   const activeCount = (data?.wla.length ?? 0) + (data?.wlb.length ?? 0);
+  const unverifiedCount = [...(data?.wla ?? []), ...(data?.wlb ?? [])].filter(row => !observationHasEvaluation(row)).length;
   const filterAndSort = (rows: WatchlistRow[]) => rows.filter((r) => {
+    const evaluated = observationHasEvaluation(r);
+    if (evidenceFilter === "evaluated" && !evaluated || evidenceFilter === "unverified" && evaluated) return false;
     if (addedFilter === "all") return true;
-    const days = activity?.daily.slice(addedFilter === "today" ? -1 : -7) ?? [];
-    return days.some((d) => d.date === r.added);
-  }).sort((a, b) => {
-    if (sort === "ticker") return a.ticker.localeCompare(b.ticker) || b.added.localeCompare(a.added);
-    if (sort === "pnl") return (b.pnl_pct ?? -Infinity) - (a.pnl_pct ?? -Infinity);
-    if (sort === "checked") return (b.last_evaluated_at ?? "").localeCompare(a.last_evaluated_at ?? "");
-    if (sort === "source") return (b.source_date ?? "").localeCompare(a.source_date ?? "");
-    const order = (b.added_at ?? b.added).localeCompare(a.added_at ?? a.added) || (b.id ?? 0) - (a.id ?? 0);
-    return sort === "oldest" ? -order : order;
+    const added = r.added;
+    return addedFilter === "today" ? added === activityDates.today : added >= activityDates.cutoff && added <= activityDates.today;
   });
-  const wla = filterAndSort(data?.wla ?? []);
-  const wlb = filterAndSort(data?.wlb ?? []);
+  const wla = sortObservations(filterAndSort(data?.wla ?? []), sort);
+  const wlb = sortObservations(filterAndSort(data?.wlb ?? []), sort);
   const visibleSection = mobileSection ?? (wla.length || !wlb.length ? "wla" : "wlb");
-  const contract = (r: WatchlistRow) =>
-    `$${r.strike ?? "?"}${["C", "CALL"].includes(r.option_type) ? "C" : "P"} ${r.expiry}${
-      (r.current_dte ?? r.dte) != null ? ` · ${r.current_dte ?? r.dte}d` : ""
-    }`;
-  const Row = ({ r }: { r: WatchlistRow }) => (
+  const windowFor = (section: "wla" | "wlb", rows: WatchlistRow[]) => {
+    const page = Math.min(pages[section], Math.max(0, Math.ceil(rows.length / pageSize) - 1));
+    return { page, rows: rows.slice(page * pageSize, (page + 1) * pageSize) };
+  };
+  const pager = (section: "wla" | "wlb", rows: WatchlistRow[]) => {
+    if (!rows.length) return null;
+    const { page } = windowFor(section, rows);
+    const name = section === "wla" ? "screened" : "monitoring";
+    return <div className="flex min-h-11 items-center justify-between gap-2 border-t border-border pt-1 text-xs text-text-muted">
+      <span className="num">{page * pageSize + 1}-{Math.min((page + 1) * pageSize, rows.length)} of {rows.length}</span>
+      <div className="flex items-center gap-1">
+        <button type="button" title={`Previous ${name} page`} aria-label={`Previous ${name} page`} disabled={page === 0}
+          onClick={() => setPages(previous => ({ ...previous, [section]: page - 1 }))}
+          className="flex size-11 items-center justify-center rounded-[var(--radius-control)] border border-border disabled:opacity-40"><ChevronLeft size={16} /></button>
+        <button type="button" title={`Next ${name} page`} aria-label={`Next ${name} page`} disabled={(page + 1) * pageSize >= rows.length}
+          onClick={() => setPages(previous => ({ ...previous, [section]: page + 1 }))}
+          className="flex size-11 items-center justify-center rounded-[var(--radius-control)] border border-border disabled:opacity-40"><ChevronRight size={16} /></button>
+      </div>
+    </div>;
+  };
+  const contract = (r: WatchlistRow) => {
+    const type = optionType(r.option_type);
+    const dte = expiryDte(r.expiry, activityDates.today);
+    return `$${r.strike ?? "?"}${type === "CALL" ? "C" : type === "PUT" ? "P" : "?"} ${r.expiry} · ${dte == null ? "DTE unknown" : `${dte}d`}`;
+  };
+  const Row = ({ r }: { r: WatchlistRow }) => {
+    const gain = observationGain(r);
+    const age = observationAge(r.added, activityDates.today);
+    const evaluatedAt = observationHasEvaluation(r) ? r.last_evaluated_at : null;
+    const state = !evaluatedAt
+      ? "needs review" : (r.decision_state ?? "blocked").replaceAll("_", " ");
+    return (
     <>
       <details className="group rounded-[var(--radius-control)] border border-border md:hidden">
         <summary className="flex min-h-11 list-none items-center gap-2 px-3 py-2 text-xs marker:content-none">
@@ -399,82 +443,100 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
           <span className="num min-w-0 flex-1 truncate text-text-muted">
             {contract(r)}
           </span>
-          {r.pnl_pct != null && (
+          {gain != null && (
             <span
               className="num shrink-0 font-semibold"
-              style={{ color: changeColor(r.pnl_pct) }}
+              style={{ color: changeColor(gain) }}
             >
-              {r.pnl_pct >= 0 ? "+" : ""}{r.pnl_pct.toFixed(0)}%
+              {gain >= 0 ? "+" : ""}{gain.toFixed(0)}%
             </span>
           )}
         </summary>
         <div className="space-y-2 px-3 pb-3 pl-10 text-xs">
           <div className="flex flex-wrap items-center gap-1.5">
             <Chip tone={r.decision_state === "eligible" ? "green" : "neutral"}>
-              {r.decision_state ?? "watching"}
+              {state}
             </Chip>
             {r.triggered_at && <Chip tone="blue">Price trigger</Chip>}
             {r.ml_score != null && <Chip tone="blue">ML {r.ml_score}</Chip>}
-            {r.peak_pnl_pct != null && r.peak_pnl_pct >= 30 && (
+            {gain != null && r.peak_pnl_pct != null && r.peak_pnl_pct >= 30 && (
               <Chip tone="neutral" className="num">
                 peak +{r.peak_pnl_pct.toFixed(0)}%
               </Chip>
             )}
-            <span className="text-text-muted">{daysOn(r.added)}d on list</span>
+            <span className="text-text-muted">{age == null ? "Age unknown" : `${age}d on list`}</span>
+            <span className="text-text-muted">{gain == null ? "No verified mark" : "Modeled gain"}</span>
           </div>
           <p className="break-words leading-relaxed text-text-secondary">
-            {r.block_reason || (r.last_evaluated_at ? r.note : "Legacy observation; eligibility not evaluated.")}
+            {r.block_reason || r.note || "No decision note recorded."}
+            {!evaluatedAt && " Eligibility unverified."}
           </p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-text-muted">
             <dt>Added</dt><dd>{watchlistTime(r.added_at ?? r.added)}</dd>
             <dt>Flow date</dt><dd>{r.source_date ?? "Not recorded"}</dd>
-            <dt>Evaluated</dt><dd>{watchlistTime(r.last_evaluated_at)}</dd>
-            <dt>Mark cycle</dt><dd>{watchlistTime(r.last_marked_at)}</dd>
+            <dt>Evaluated</dt><dd>{watchlistTime(evaluatedAt)}</dd>
+            <dt>Mark</dt><dd><MarkFreshness at={r.last_marked_at} quality={r.mark_quality} /></dd>
           </dl>
         </div>
       </details>
       <div className="hidden items-center gap-2 text-xs md:flex md:flex-wrap">
         <span className="w-14 font-mono font-semibold">{r.ticker}</span>
         <span className="num text-text-muted">{contract(r)}</span>
-        {r.pnl_pct != null && (
-          <span className="num font-semibold" style={{ color: changeColor(r.pnl_pct) }}>
-            {r.pnl_pct >= 0 ? "+" : ""}{r.pnl_pct.toFixed(0)}%
+        {gain != null && (
+          <span className="num font-semibold" style={{ color: changeColor(gain) }}>
+            Modeled {gain >= 0 ? "+" : ""}{gain.toFixed(0)}%
           </span>
         )}
-        {r.peak_pnl_pct != null && r.peak_pnl_pct >= 30 && (
+        {gain != null && r.peak_pnl_pct != null && r.peak_pnl_pct >= 30 && (
           <span className="num text-text-muted">peak +{r.peak_pnl_pct.toFixed(0)}%</span>
         )}
         <Chip tone={r.decision_state === "eligible" ? "green" : "neutral"}>
-          {r.decision_state ?? "watching"}
+          {state}
         </Chip>
         {r.triggered_at && <Chip tone="blue">Price trigger</Chip>}
         {r.ml_score != null && <Chip tone="blue">ML {r.ml_score}</Chip>}
-        <span className="text-text-muted">{daysOn(r.added)}d on list</span>
+        <span className="text-text-muted">{age == null ? "Age unknown" : `${age}d on list`}</span>
         <span className="text-text-secondary">Added {watchlistTime(r.added_at ?? r.added)}</span>
         <span className="text-text-muted">Flow {r.source_date ?? "unknown"}</span>
-        <span className="text-text-muted">Evaluated {watchlistTime(r.last_evaluated_at)}</span>
+        <span className="text-text-muted">Evaluated {watchlistTime(evaluatedAt)}</span>
+        <MarkFreshness at={r.last_marked_at} quality={r.mark_quality} />
         <span className="text-text-muted">
-          {r.block_reason || (r.last_evaluated_at ? r.note : "Legacy observation; eligibility not evaluated.")}
+          {r.block_reason || r.note || "No decision note recorded."}
+          {!evaluatedAt && " Eligibility unverified."}
         </span>
       </div>
     </>
   );
+  };
   return (
     <GlassPanel title="Watchlist">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <label className="flex min-h-11 items-center gap-2 text-xs text-text-muted">
           Sort
-          <select aria-label="Sort watchlist" value={sort} onChange={(e) => setSort(e.target.value)}
+          <select aria-label="Sort watchlist" value={sort} onChange={(e) => { setSort(e.target.value as WatchlistSort); setPages({ wla: 0, wlb: 0 }); }}
             className="min-h-11 min-w-0 rounded-[var(--radius-control)] border border-border bg-bg-card px-2 text-xs text-text-primary">
             <option value="newest">Newest added</option><option value="oldest">Oldest added</option>
             <option value="checked">Recently evaluated</option><option value="source">Latest flow date</option>
             <option value="ticker">Ticker A-Z</option><option value="pnl">Modeled gain</option>
           </select>
         </label>
-        <select aria-label="Watchlist additions period" value={addedFilter} onChange={(e) => setAddedFilter(e.target.value)}
-          disabled={!activity} className="min-h-11 rounded-[var(--radius-control)] border border-border bg-bg-card px-2 text-xs text-text-primary">
-          <option value="all">All additions</option><option value="today">Added today (PT)</option><option value="week">Added last 7 days (PT)</option>
+        <select aria-label="Watchlist evidence status" value={evidenceFilter}
+          onChange={event => { setEvidenceFilter(event.target.value); setPages({ wla: 0, wlb: 0 }); }}
+          className="min-h-11 min-w-0 max-w-full rounded-[var(--radius-control)] border border-border bg-bg-card px-2 text-xs text-text-primary">
+          <option value="evaluated">Recorded evaluations</option>
+          <option value="unverified">Needs review ({unverifiedCount})</option>
+          <option value="all">All observations ({activeCount})</option>
         </select>
+        <select aria-label="Watchlist additions period" value={addedFilter} onChange={(e) => { setAddedFilter(e.target.value); setPages({ wla: 0, wlb: 0 }); }}
+          className="min-h-11 rounded-[var(--radius-control)] border border-border bg-bg-card px-2 text-xs text-text-primary">
+          <option value="all">All additions</option><option value="today">Added today ({zoneLabel})</option><option value="week">Added last 7 days ({zoneLabel})</option>
+        </select>
+        <label className="flex min-h-11 items-center gap-2 text-xs text-text-muted">Rows
+          <select aria-label="Watchlist rows per page" value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPages({ wla: 0, wlb: 0 }); }}
+            className="min-h-11 rounded-[var(--radius-control)] border border-border bg-bg-card px-2 text-xs text-text-primary">
+            <option value={12}>12</option><option value={24}>24</option><option value={48}>48</option>
+          </select>
+        </label>
         <div className="ml-auto flex items-center gap-1">
           <button type="button" title="Reload watchlist" aria-label="Reload watchlist" disabled={isFetching}
             onClick={() => void refetch()} className="flex size-11 items-center justify-center text-text-muted disabled:opacity-50">
@@ -488,22 +550,36 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
         </div>
       </div>
       {reset.isError && <p role="alert" className="mb-3 text-xs text-accent-red">Reset failed. Reload the list before trying again.</p>}
-      {reset.isSuccess && <p role="status" className="mb-3 text-xs text-text-secondary">{reset.data.data.archived_count} observations archived. Positions and cash unchanged.</p>}
-      {isError && <p role="alert" className="mb-3 text-xs text-accent-red">Watchlist could not be reloaded. Displayed data may be out of date.</p>}
-      {isPending && <p role="status" className="py-3 text-xs text-text-muted">Loading watchlist...</p>}
+      {reset.isSuccess && reset.data.data.persona === persona && <p role="status" className="mb-3 text-xs text-text-secondary">{reset.data.data.archived_count} observations archived at {watchlistTime(reset.data.data.reset_at)}. Positions and cash unchanged.</p>}
+      <QueryNotice queries={[watchlistQuery]} label="Watchlist" />
+      {isPending && watchlistQuery.fetchStatus !== "paused" && <p role="status" className="py-3 text-xs text-text-muted">Loading watchlist...</p>}
       {activity && <div className="mb-4 space-y-3 border-b border-border pb-3 text-xs">
+        <div className="md:hidden">
+          <button type="button" aria-label="Toggle watchlist activity" title="Watchlist activity"
+            aria-expanded={activityExpanded} aria-controls={`watchlist-activity-${persona}`}
+            onClick={() => setActivityExpanded(previous => !previous)}
+            className="flex min-h-11 w-full items-center justify-between gap-2 text-text-secondary">
+            <span>Added today ({zoneLabel}): <span className="num text-text-primary">{activityDates.todayAdded}</span></span>
+            <ChevronDown size={14} className={activityExpanded ? "rotate-180" : ""} />
+          </button>
+          <p className="text-text-muted">Last scan: {watchlistTime(activity.last_scan_at)}</p>
+          <p className="mt-1 text-text-muted">Latest observed flow: {activity.latest_source_date ?? "Not recorded"}</p>
+        </div>
+        <div id={`watchlist-activity-${persona}`} className={`${activityExpanded ? "block" : "hidden"} space-y-3 md:block`}>
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-text-muted lg:grid-cols-4">
-          <div>Added today (PT)<div className="num mt-1 font-semibold text-text-primary">{activity.daily.at(-1)?.added ?? 0}</div></div>
-          <div>Added in 7 days<div className="num mt-1 font-semibold text-text-primary">{activity.daily.slice(-7).reduce((sum, d) => sum + d.added, 0)}</div></div>
+          <div>Added today ({zoneLabel})<div className="num mt-1 font-semibold text-text-primary">{activityDates.todayAdded}</div></div>
+          <div>Added in 7 days<div className="num mt-1 font-semibold text-text-primary">{activityDates.weekAdded}</div></div>
           <div>Last addition<div className="mt-1 text-text-primary">{watchlistTime(activity.last_added_at ?? activity.last_added_date)}</div></div>
           <div>Last recorded scan<div className="mt-1 text-text-primary">{watchlistTime(activity.last_scan_at)}</div></div>
         </div>
         <div className="flex flex-wrap gap-x-5 gap-y-1 text-text-muted">
           <span>Latest observed flow: {activity.latest_source_date ?? "Not recorded"}</span>
           <span>Last mark cycle: {watchlistTime(activity.last_marked_at)}</span>
+          <span>Last cleanup: {watchlistTime(activity.last_maintenance_at)}</span>
         </div>
+        {!activity.last_scan_at && <p role="status" className="text-accent-orange">No scan receipt available. Eligibility is unverified.</p>}
         <details>
-          <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-text-secondary"><Clock size={14} />Daily activity (14 days, PT)</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-text-secondary"><Clock size={14} />Daily activity (14 days, {zoneLabel})</summary>
           <table className="w-full text-left text-xs">
             <thead className="text-text-muted"><tr><th className="py-2 font-medium">Date</th><th className="font-medium">Added</th><th className="font-medium">Recorded scans</th></tr></thead>
             <tbody>{[...activity.daily].reverse().map((day) => <tr key={day.date} className="border-t border-border">
@@ -511,8 +587,10 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
             </tr>)}</tbody>
           </table>
         </details>
+        </div>
       </div>}
       {data && !activeCount && <p className="mb-3 py-3 text-sm text-text-muted">No active observations for {persona}.</p>}
+      {unverifiedCount > 0 && <p className="mb-3 text-xs text-accent-orange">Unverified legacy observations: {unverifiedCount}</p>}
       <Segmented<"wla" | "wlb" | "history">
         className="mobile-horizontal-strip mb-3 w-full md:hidden"
         ariaLabel="Choose watchlist section"
@@ -530,25 +608,22 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
             Screened observations ({wla.length})
           </div>
           <div className="space-y-1.5">
-            {wla.slice(0, showAll ? undefined : 12).map((r, i) => <Row key={r.id ?? `a${i}`} r={r} />)}
+            {windowFor("wla", wla).rows.map((r, i) => <Row key={r.id ?? `a${i}`} r={r} />)}
             {!wla.length && <div className="py-3 text-center text-sm text-text-muted">No screened observations in this period.</div>}
           </div>
+          {pager("wla", wla)}
         </div>
         <div className={`${visibleSection === "wlb" ? "space-y-1.5" : "hidden"} md:block md:space-y-1.5`}>
           <div className="text-xs font-semibold text-text-muted">
             Monitoring / blocked ({wlb.length})
           </div>
           <div className="space-y-1.5">
-            {wlb.slice(0, showAll ? undefined : 12).map((r, i) => <Row key={r.id ?? `b${i}`} r={r} />)}
+            {windowFor("wlb", wlb).rows.map((r, i) => <Row key={r.id ?? `b${i}`} r={r} />)}
             {!wlb.length && <div className="py-3 text-center text-sm text-text-muted">No monitored observations in this period.</div>}
           </div>
+          {pager("wlb", wlb)}
         </div>
       </div>
-      {(wla.length > 12 || wlb.length > 12) && (
-        <button type="button" onClick={() => setShowAll(!showAll)} className="mt-2 min-h-11 text-xs text-accent">
-          {showAll ? "Show fewer" : "Show all observations"}
-        </button>
-      )}
       <div className={`${visibleSection === "history" ? "mt-3 space-y-1.5" : "hidden"} md:mt-3 ${(data?.history ?? []).length > 0 ? "md:block" : "md:hidden"} md:space-y-1`}>
           <div className="text-xs font-semibold text-text-muted">Recent moves</div>
           {(data?.history ?? []).slice(0, 8).map((r, i) => (
@@ -944,10 +1019,11 @@ const tint = (c: string, pct: number) =>
 /** Days a position has been (or was) held. */
 function daysHeld(entry?: string | null, exit?: string | null): number | null {
   if (!entry) return null;
-  const e = new Date(entry).getTime();
-  const x = (exit ? new Date(exit) : new Date()).getTime();
-  if (Number.isNaN(e) || Number.isNaN(x)) return null;
-  return Math.max(0, Math.round((x - e) / 86_400_000));
+  // Date-only strings parse as LOCAL dates (UTC parse is +1 day in PT).
+  const held = exit
+    ? Math.round((parseLocalDate(exit).getTime() - parseLocalDate(entry).getTime()) / 86_400_000)
+    : -daysFromToday(entry);
+  return Number.isNaN(held) ? null : Math.max(0, held);
 }
 
 /** Option breakeven at expiry: strike ± entry premium (CALL +, PUT −). */
@@ -1085,7 +1161,7 @@ function ScaleTimeline({
       </div>
       {remaining != null && remaining > 0 && (
         <div className="text-xs text-text-muted">
-          {soldCt} of {original} ct booked · stop now at breakeven — runner can&apos;t turn into a loss
+          {soldCt} of {original} ct booked · breakeven exit threshold armed; execution may differ
         </div>
       )}
     </div>
@@ -1239,7 +1315,7 @@ function PositionCard({
                 ${p.strike} {p.option_type}
               </span>
               <span className="text-text-muted text-xs num">
-                exp {p.expiry} ({p.dte_at_entry}d)
+                exp {p.expiry} ({expiryDte(p.expiry, marketDate()) ?? "?"}d now; {p.dte_at_entry ?? "?"}d entry)
               </span>
             </>
           )}
@@ -1297,16 +1373,16 @@ function PositionCard({
               className="num text-sm font-extrabold"
               style={{ color: pnlColor }}
             >
-              {pnl >= 0 ? "+" : ""}
-              {pnl.toFixed(1)}%
+              {signedPercent(p.pnl_pct)}
             </div>
             <div className="text-text-muted text-xs num">
-              {pnlDollars >= 0 ? "+" : ""}${pnlDollars.toFixed(0)}
+              {p.pnl_dollars == null ? "Unknown" : `${pnlDollars >= 0 ? "+" : ""}$${pnlDollars.toFixed(0)}`}
             </div>
           </div>
         </div>
       </div>
       {/* Why this pick — the entry rationale. */}
+      <MarkFreshness at={p.last_marked_at} status={p.mark_status} />
       <WhyPick reason={p.reason} />
       <DecisionAudit p={p} />
 
@@ -1581,15 +1657,7 @@ function ClosedRow({ p, trims = [] }: { p: Position; trims?: Position[] }) {
       : trailPeak
       ? `trailed off +${trailPeak[1]}% peak`
       : reason;
-  // Hold days = exit - entry
-  let holdDays: number | null = null;
-  try {
-    if (p.entry_date && p.exit_date) {
-      const e = new Date(p.entry_date).getTime();
-      const x = new Date(p.exit_date).getTime();
-      holdDays = Math.max(0, Math.round((x - e) / 86_400_000));
-    }
-  } catch { /* ignore */ }
+  const holdDays = p.exit_date ? daysHeld(p.entry_date, p.exit_date) : null;
   return (
     <div
       className="px-3 py-2 rounded-md text-xs space-y-1"
@@ -1811,7 +1879,7 @@ function TradeDecisionHistory({
     (trimsByParent.get(p.id) ?? []).reduce((s, t) => s + (t.realized_pnl_dollars ?? 0), 0);
 
   // Today's exits highlighted up top. Everything else falls under "earlier".
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalDate();
   const todayExits = logical.filter((p) => p.exit_date === today);
   const earlier = logical.filter((p) => p.exit_date !== today);
 
@@ -1970,7 +2038,7 @@ function PositionsTable({
     if (added === "all") return "";
     const d = new Date();
     d.setDate(d.getDate() - (added === "7d" ? 7 : 30));
-    return d.toISOString().slice(0, 10);
+    return toLocalDateOnly(d);
   }, [added]);
 
   const rows = useMemo(() => {
@@ -2048,7 +2116,7 @@ function PositionsTable({
                   {isEquity ? "shares" : `$${p.strike} ${p.option_type} ${p.expiry ?? ""}`}
                 </span>
                 <span className="num shrink-0 text-sm font-bold" style={{ color: changeColor(pnl) }}>
-                  {pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}%
+                  {signedPercent(p.pnl_pct)}
                 </span>
               </summary>
               <div className="space-y-3 px-3 pb-3 pl-10">
@@ -2058,13 +2126,14 @@ function PositionsTable({
                   <Stat label="Entry" value={`$${p.premium_at_entry.toFixed(2)}`} />
                   <Stat label="Now" value={p.current_premium != null ? `$${p.current_premium.toFixed(2)}` : "—"} />
                   <Stat label="Cost" value={formatCurrency(p.cost_basis)} />
-                  <Stat label="Value" value={formatCurrency(p.current_value ?? p.cost_basis)} />
-                  <Stat label="P/L" value={`${(p.pnl_dollars ?? 0) >= 0 ? "+" : ""}$${(p.pnl_dollars ?? 0).toFixed(0)}`} tone={(p.pnl_dollars ?? 0) >= 0 ? "green" : "red"} />
+                  <Stat label="Value" value={p.current_value == null ? "Unknown" : formatCurrency(p.current_value)} />
+                  <Stat label="P/L" value={p.pnl_dollars == null ? "Unknown" : `${p.pnl_dollars >= 0 ? "+" : ""}$${p.pnl_dollars.toFixed(0)}`} tone={p.pnl_dollars == null ? undefined : p.pnl_dollars >= 0 ? "green" : "red"} />
                   <Stat label="Peak" value={p.peak_pnl_pct != null ? `+${p.peak_pnl_pct.toFixed(0)}%` : "—"} />
                 </div>
+                <MarkFreshness at={p.last_marked_at} status={p.mark_status} />
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Chip tone={scaled ? "green" : "neutral"} className="num">
-                    floor {scaled ? "BE" : `${stopPct}%`}
+                    exit threshold {scaled ? "BE" : `${stopPct}%`}
                   </Chip>
                   {trimmed && <Chip tone="green">booked trims</Chip>}
                   {p.ml_score != null && <Chip tone="blue" className="num">ML {p.ml_score}</Chip>}
@@ -2098,7 +2167,7 @@ function PositionsTable({
               <PositionSortHeader column="pnl" activeSort={sortKey} ascending={asc} onSort={toggle}>P/L%</PositionSortHeader>
               <PositionSortHeader column="pnl_dollars" activeSort={sortKey} ascending={asc} onSort={toggle}>P/L$</PositionSortHeader>
               <PositionSortHeader column="peak" activeSort={sortKey} ascending={asc} onSort={toggle}>Peak</PositionSortHeader>
-              <PositionSortHeader activeSort={sortKey} ascending={asc} onSort={toggle}>Floor</PositionSortHeader>
+              <PositionSortHeader activeSort={sortKey} ascending={asc} onSort={toggle}>Exit Threshold</PositionSortHeader>
             </tr>
           </thead>
           <tbody>
@@ -2133,14 +2202,15 @@ function PositionsTable({
                   <td className="px-2 py-1.5 text-right text-text-secondary">${p.premium_at_entry.toFixed(2)}</td>
                   <td className="px-2 py-1.5 text-right text-text-secondary">
                     {p.current_premium != null ? `$${p.current_premium.toFixed(2)}` : "—"}
+                    <MarkFreshness at={p.last_marked_at} status={p.mark_status} />
                   </td>
                   <td className="px-2 py-1.5 text-right text-text-secondary">{formatCurrency(p.cost_basis)}</td>
-                  <td className="px-2 py-1.5 text-right text-text-primary">{formatCurrency(p.current_value ?? p.cost_basis)}</td>
+                  <td className="px-2 py-1.5 text-right text-text-primary">{p.current_value == null ? "Unknown" : formatCurrency(p.current_value)}</td>
                   <td className="px-2 py-1.5 text-right font-bold" style={{ color: changeColor(pnl) }}>
-                    {pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}%
+                    {signedPercent(p.pnl_pct)}
                   </td>
                   <td className="px-2 py-1.5 text-right" style={{ color: changeColor(p.pnl_dollars ?? 0) }}>
-                    {(p.pnl_dollars ?? 0) >= 0 ? "+" : ""}${(p.pnl_dollars ?? 0).toFixed(0)}
+                    {p.pnl_dollars == null ? "Unknown" : `${p.pnl_dollars >= 0 ? "+" : ""}$${p.pnl_dollars.toFixed(0)}`}
                   </td>
                   <td className="px-2 py-1.5 text-right text-text-muted">
                     {p.peak_pnl_pct != null ? `+${p.peak_pnl_pct.toFixed(0)}%` : "—"}
@@ -2310,12 +2380,12 @@ const PERSONA_META: Record<
   },
   builder: {
     label: "Builder",
-    tagline: "Monthlies DTE 25-70, with the market regime, ranked by SETUP + ML + bounded evidence, scale-in tranches, trims, breakeven floor, runners.",
+    tagline: "Monthlies DTE 25-70, 6% size, with the market regime, ranked by SETUP + ML + bounded evidence, scale-in tranches, trims, breakeven floor, runners.",
     stopPct: -50,
   },
   ruby: {
     label: "Ruby",
-    tagline: "Intraday options (ruby-trader v7). Smart's gates but enters TODAY's flow on a 15-min cycle, Sonnet judgment veto, E1 ladder + BE floor, -7% daily loss cap.",
+    tagline: "Intraday options (ruby-trader v7). DTE 8-30, 4% size, shared gates but enters TODAY's flow on a 15-min cycle, Sonnet judgment veto, E1 ladder + BE floor, -7% daily loss cap.",
     stopPct: -40,
   },
   gemfinder: {
@@ -2357,12 +2427,10 @@ export function SmartTrader() {
     queryClient.invalidateQueries({ queryKey: ["smart-trader-history"] });
     queryClient.invalidateQueries({ queryKey: ["smart-trader-categories"] });
     queryClient.invalidateQueries({ queryKey: ["smart-trader-personas"] });
+    queryClient.invalidateQueries({ queryKey: ["smart-trader-watchlist"] });
   };
 
-  // Note: there is intentionally no manual "Run Picks" trigger — the daily
-  // cron is the single source of new positions. A manual re-pick would stack
-  // duplicate positions on top of the existing book, and is a no-op for the
-  // curated Conviction persona.
+  // Scheduled backend selection owns new entries; there is no manual pick action.
   const markMutation = useMutation({
     mutationFn: () =>
       apiClient.post(
@@ -2393,6 +2461,7 @@ export function SmartTrader() {
   if (summaryQuery.isError || !summary) {
     return (
       <div className="card flex items-center justify-center py-10">
+        <QueryNotice queries={[summaryQuery]} label="Smart trader" />
         <QueryErrorState label="Unable to load smart trader." onRetry={() => void summaryQuery.refetch()} />
       </div>
     );
@@ -2451,7 +2520,7 @@ export function SmartTrader() {
         </div>
         {/* Active book at a glance — tagline + size, replaces the old per-button sublines */}
         <div className="line-clamp-2 text-xs leading-relaxed text-text-muted md:line-clamp-none">
-          {PERSONA_META[persona].tagline}
+          {personaRows.find(r => r.name === persona)?.description || summary.persona_description || PERSONA_META[persona].tagline}
           {(() => {
             const row = personaRows.find((r) => r.name === persona);
             return row ? (
@@ -2472,8 +2541,7 @@ export function SmartTrader() {
         )}
       </div>
 
-      {/* Action buttons — no manual "Run Picks": the cron is the only source
-          of new positions (a manual re-pick would stack duplicates). */}
+      {/* Marking and reset actions do not manually select new entries. */}
       <div className="flex min-w-0 flex-wrap gap-2">
         <button
           onClick={() => markMutation.mutate()}
@@ -2487,7 +2555,7 @@ export function SmartTrader() {
           )}
           Mark to Market
         </button>
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:flex-none">
+        <div className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto">
           <span className="text-text-muted text-sm">$</span>
           <input
             type="number"
@@ -2508,7 +2576,7 @@ export function SmartTrader() {
               }
               if (
                 confirm(
-                  `Reset ${PERSONA_META[persona].label} book to $${amt.toLocaleString()}? All picks and history will be erased.`,
+                  `Reset ${PERSONA_META[persona].label} book to $${amt.toLocaleString()}? All picks and history will be erased. On weekdays the endpoint may automatically run new picks and enter positions.`,
                 )
               )
                 resetMutation.mutate(amt);
@@ -2525,6 +2593,10 @@ export function SmartTrader() {
           </button>
         </div>
       </div>
+
+      <QueryNotice queries={[summaryQuery, todayQuery, historyQuery, personaQuery]} label="Persona data" />
+      {(markMutation.isError || resetMutation.isError) && <p role="alert" className="text-xs text-accent-red">Trader action failed. Reload the book before retrying; a timed-out action may have completed.</p>}
+      {resetMutation.isSuccess && <p role="status" className="text-xs text-text-secondary">Reset completed. Reloaded positions show any automatic picks returned by the endpoint.</p>}
 
       {/* Portfolio Summary */}
       <GlassPanel title="TraderJoe Portfolio">
@@ -2579,6 +2651,7 @@ export function SmartTrader() {
             }
           />
         </div>
+        {(() => { const exposure = markedExposure(summary.positions); return exposure.count > 0 && <p className="mt-3 text-xs text-accent-orange">Recorded valuation: {exposure.count} positions ({formatCurrency(exposure.value)} carried exposure) have stale or unknown marks. Portfolio return is not a live quote.</p>; })()}
       </GlassPanel>
 
       {/* Why this works — explainer adapts to active persona */}
@@ -2668,8 +2741,7 @@ export function SmartTrader() {
         >
           {today.picked.length === 0 && today.rejected_count === 0 ? (
             <div className="text-sm text-text-muted text-center py-4">
-              No candidates yet today. Picks fire at 06:30 PT — or click Run
-              Picks above.
+              No entries or rejections recorded for this market date.
             </div>
           ) : (
             <div className="space-y-2">

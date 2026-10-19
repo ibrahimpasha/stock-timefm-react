@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { QueryNotice } from "../components/QueryNotice";
 import {
   MapContainer, TileLayer, CircleMarker, Polygon, Tooltip, Popup, useMap,
 } from "react-leaflet";
@@ -113,7 +114,8 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
   const [colorBy, setColorBy] = useState<ColorBy>("signal");
   const [focusTicker, setFocusTicker] = useState<string | null>(null);
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
-  const { data, isLoading } = useTickerMap(minCap);
+  const mapQuery = useTickerMap(minCap);
+  const { data, isLoading } = mapQuery;
   const { data: taxonomy } = useTickerTaxonomy();
   const activeTicker = useAppStore((s) => s.activeTicker);
   const setActiveTicker = useAppStore((s) => s.setActiveTicker);
@@ -415,8 +417,9 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
           </h2>
           <span className="num text-xs text-text-muted">{filtered.length}</span>
         </div>
+        <QueryNotice queries={[mapQuery]} label="Company map" />
         {filtered.length === 0 ? (
-          <p className="text-xs text-text-muted">No companies match the current filters.</p>
+          !mapQuery.isPending && !mapQuery.isError && mapQuery.fetchStatus !== "paused" && <p className="text-xs text-text-muted">No companies match the current filters.</p>
         ) : (
           <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
             {filtered.map((c) => {

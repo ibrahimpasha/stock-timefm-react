@@ -21,11 +21,15 @@ import apiClient from "../../../api/client";
 import { useAppStore } from "../../../store/useAppStore";
 import { formatPremium } from "../../../lib/utils";
 import { normExpiry, dteTag, parsePremium } from "./utils";
+import { expiryDte, optionType } from "../../../lib/optionContract";
+import { daysFromToday, todayLocalDate } from "../../../lib/dateOnly";
 
 interface AggStats {
   hits: number;
   days_seen: number;
   avg_ask: number | null;
+  /** Rows that actually carried ask% — the avg_ask denominator. */
+  ask_n: number;
   total_premium: number;
   latest_date: string | null;
   /** estimated P/L of the latest hit (or null) */
@@ -40,30 +44,15 @@ function contractKey(c: { ticker: string; strike: number; opt_type: string; expi
 
 function relDays(iso: string | null): string {
   if (!iso) return "—";
-  const dt = new Date(iso);
-  const days = Math.round((Date.now() - dt.getTime()) / 86_400_000);
+  const days = -daysFromToday(iso);
+  if (Number.isNaN(days)) return "—";
   if (days <= 0) return "today";
   if (days === 1) return "1d ago";
   return `${days}d ago`;
 }
 
 function dteFromExpiry(expiry: string | null): number {
-  // Convert "M/D" to dte by parsing roughly with current year. Fallback to 30.
-  if (!expiry) return 30;
-  const md = expiry.match(/^(\d{1,2})\/(\d{1,2})$/);
-  if (!md) return 30;
-  const m = parseInt(md[1], 10);
-  const d = parseInt(md[2], 10);
-  if (!m || !d) return 30;
-  const now = new Date();
-  let y = now.getFullYear();
-  let dt = new Date(y, m - 1, d);
-  // If the date is in the past by >30d, assume next year.
-  if (dt.getTime() < now.getTime() - 30 * 86_400_000) {
-    y += 1;
-    dt = new Date(y, m - 1, d);
-  }
-  return Math.max(0, Math.round((dt.getTime() - now.getTime()) / 86_400_000));
+  return expiryDte(expiry, todayLocalDate()) ?? -1;
 }
 
 export function ContractsView({
@@ -100,8 +89,8 @@ export function ContractsView({
       for (const e of entries) {
         const strike = Number(e.strike) || 0;
         const optType = String(e.type || e.option_type || "").toUpperCase();
-        const ot = optType.includes("PUT") ? "PUT" : "CALL";
-        const exp = normExpiry(e.expiry) || String(e.expiry || "");
+        const ot = optionType(optType) ?? "UNKNOWN";
+        const exp = normExpiry(e.expiry, e.date, e.dte) || String(e.expiry || "");
         const tk = String(e.ticker || "").toUpperCase();
         const key = `${tk}|${strike}|${ot}|${exp}`;
         if (!map[key]) {
@@ -109,6 +98,7 @@ export function ContractsView({
             hits: 0,
             days_seen: 0,
             avg_ask: null,
+            ask_n: 0,
             total_premium: 0,
             latest_date: null,
             latest_pnl: null,
@@ -119,7 +109,8 @@ export function ContractsView({
         s.hits += 1;
         s.total_premium += parsePremium(e.premium || "$0");
         if (typeof e.ask_pct === "number") {
-          s.avg_ask = ((s.avg_ask ?? 0) * (s.hits - 1) + e.ask_pct) / s.hits;
+          s.ask_n += 1;
+          s.avg_ask = ((s.avg_ask ?? 0) * (s.ask_n - 1) + e.ask_pct) / s.ask_n;
         }
         const dt = e.date || "";
         if (!s.latest_date || dt > s.latest_date) {
@@ -136,8 +127,8 @@ export function ContractsView({
       for (const e of entries) {
         const strike = Number(e.strike) || 0;
         const optType = String(e.type || e.option_type || "").toUpperCase();
-        const ot = optType.includes("PUT") ? "PUT" : "CALL";
-        const exp = normExpiry(e.expiry) || String(e.expiry || "");
+        const ot = optionType(optType) ?? "UNKNOWN";
+        const exp = normExpiry(e.expiry, e.date, e.dte) || String(e.expiry || "");
         const tk = String(e.ticker || "").toUpperCase();
         const key = `${tk}|${strike}|${ot}|${exp}`;
         if (!byKey[key]) byKey[key] = new Set();
@@ -199,8 +190,9 @@ export function ContractsView({
           const key = contractKey(c);
           const stats = statsByKey[key];
           const dte = dteFromExpiry(c.expiry_norm);
-          const expired = dte <= 0;
-          const dl = dteTag(dte);
+          const unknownYear = c.expiry_norm?.startsWith("unknown-year:");
+          const expired = !unknownYear && dte < 0;
+          const dl = unknownYear ? null : dteTag(dte);
           const hits = stats?.hits ?? 0;
           const noFlow = hits === 0;
           return (
@@ -228,7 +220,7 @@ export function ContractsView({
               <button
                 type="button"
                 onClick={() => onSelectTicker(c.ticker)}
-                className="flex min-h-6 min-w-0 flex-1 items-center gap-2 rounded text-left"
+                className="flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-2 rounded text-left"
                 aria-label={`Select ${c.ticker} ${c.strike} ${c.opt_type} contract`}
               >
               <span className="font-mono font-bold text-text-primary w-14 shrink-0">{c.ticker}</span>
@@ -240,7 +232,7 @@ export function ContractsView({
               >
                 ${c.strike} {c.opt_type === "CALL" ? "C" : "P"}
               </span>
-              <span className="text-text-muted font-mono w-12 shrink-0">{c.expiry_norm}</span>
+              <span className="text-text-muted font-mono shrink-0">{unknownYear ? `${c.expiry_norm?.slice(13)} (year unknown)` : c.expiry_norm}</span>
               {dl && (
                 <span
                   className="font-mono px-1 rounded shrink-0"

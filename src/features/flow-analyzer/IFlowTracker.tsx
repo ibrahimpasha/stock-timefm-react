@@ -17,6 +17,9 @@
  */
 
 import { useState, useMemo, useRef, useEffect } from "react";
+import { QueryNotice } from "../../components/QueryNotice";
+import { FlowCoverageNotice } from "../../components/FlowCoverageNotice";
+import { flowCoverage } from "../../lib/flowCoverage";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -47,7 +50,7 @@ import { useTaxonomy } from "../../api/taxonomy";
 import { useThemePulseScores } from "../../api/intelGraph";
 import type { BiasFilter, DteFilter, SortMode, EarningsWindow } from "./iflow/types";
 import type { IfHighlight } from "../../store/useDashboardFilters";
-import { EARNINGS_WINDOW_DAYS, parsePremium, matchesDte, classifySide, dteTag } from "./iflow/utils";
+import { EARNINGS_WINDOW_DAYS, matchesDte, classifySide, dteTag } from "./iflow/utils";
 import {
   useIFlowDates,
   useIFlowSummary,
@@ -261,6 +264,7 @@ export function IFlowTracker() {
         bullish: t.bull,
         bearish: t.bear,
         net_premium: formatPremium(t.total_premium),
+        total_premium: t.total_premium,
         latest_ts: t.latest_ts ?? "",
       }));
     }
@@ -283,6 +287,7 @@ export function IFlowTracker() {
       bullish: m.bull,
       bearish: m.bear,
       net_premium: formatPremium(m.premium),
+      total_premium: m.premium,
       latest_ts: m.latest_ts,
     }));
   }, [useSingleDateView, summary, multiSummaryQueries]);
@@ -353,7 +358,8 @@ export function IFlowTracker() {
 
   // Flow P/L per ticker — only fetched when "Highest Returns" sort is on.
   // Server walks all available flow JSON and premium-weights P/L estimates.
-  const { data: flowReturnsData, isFetching: returnsLoading } = useFlowReturns(sort === "returns");
+  const returnsQuery = useFlowReturns(sort === "returns");
+  const { data: flowReturnsData, isFetching: returnsLoading } = returnsQuery;
   const flowReturnsMap = flowReturnsData?.tickers;
   const flowReturnsMeta = flowReturnsData?.meta;
 
@@ -459,7 +465,7 @@ export function IFlowTracker() {
       list.sort((a, b) => b.total_entries - a.total_entries);
     } else if (sort === "premium") {
       list.sort(
-        (a, b) => parsePremium(b.net_premium || "$0") - parsePremium(a.net_premium || "$0"),
+        (a, b) => (b.total_premium ?? 0) - (a.total_premium ?? 0),
       );
     } else if (sort === "score") {
       list.sort((a, b) => {
@@ -479,7 +485,7 @@ export function IFlowTracker() {
         if (scoreB !== scoreA) return scoreB - scoreA;
         return b.total_entries - a.total_entries;
       });
-    } else if (sort === "returns") {
+    } else if (sort === "returns" && flowCoverage(flowReturnsMeta).reliable) {
       // Composite = avg P/L × scored entries. Frequency multiplies score, so
       // a 37-entry +657% ticker decisively beats a 1-entry +5696% outlier.
       list.sort((a, b) => {
@@ -502,7 +508,7 @@ export function IFlowTracker() {
       });
     }
     return list;
-  }, [tickers, bias, search, sort, intelMap, earningsWindow, earningsMap, flowReturnsMap, tradersOnly, authorTickerSet, categoryTickers]);
+  }, [tickers, bias, search, sort, intelMap, earningsWindow, earningsMap, flowReturnsMap, flowReturnsMeta, tradersOnly, authorTickerSet, categoryTickers]);
 
   // Resolve the green-border highlight for one card under the active mode.
   // Returns {on} + a hover title explaining why (and the raw score even when
@@ -523,7 +529,7 @@ export function IFlowTracker() {
         const v = mlByTicker.get(tk);
         if (v == null) return { on: false };
         return v >= highlightMin
-          ? { on: true, title: `Best ML ${v} ≥ ${highlightMin} (percentile vs last 60d of prints)` }
+          ? { on: true, title: `Best contract ML rank ${v} ≥ ${highlightMin}; not a ticker probability` }
           : { on: false, title: `Best ML score ${v}` };
       }
       case "accum": {
@@ -838,13 +844,14 @@ export function IFlowTracker() {
               { value: "premium", label: "Premium" },
               { value: "score", label: "Conviction" },
               { value: "escalating", label: "Escalating" },
-              { value: "returns", label: "Highest Returns" },
+              { value: "returns", label: "Estimated Return Rank" },
             ]}
           />
         </span>
         {sort === "returns" && returnsLoading && (
           <span className="text-xs text-accent-blue animate-pulse">loading returns…</span>
         )}
+        {sort === "returns" && <><QueryNotice queries={[returnsQuery]} label="Flow return estimates" /><FlowCoverageNotice meta={flowReturnsMeta} /></>}
         {sort === "returns" && !returnsLoading && flowReturnsMeta?.earliest_date && (
           <span className="text-xs text-text-muted num">
             flow since {flowReturnsMeta.earliest_date} · {flowReturnsMeta.days_covered}d ·{" "}

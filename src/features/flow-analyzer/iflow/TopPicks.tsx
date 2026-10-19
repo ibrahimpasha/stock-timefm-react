@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { TrendingUp } from "lucide-react";
 import { formatDate } from "../../../lib/utils";
-import { classifySide, dteTag, matchesDte, parsePremium, scoreEntry } from "./utils";
+import { dteTag, matchesDte, parsePremium, scoreEntry } from "./utils";
+import { optionIntent, canonicalExpiry } from "../../../lib/optionContract";
 import { useIFlowEntries, useTickerPricesBatch } from "./hooks";
 import { estimateOptionPnl } from "./estimator";
 import type { DteFilter } from "./types";
@@ -13,6 +14,8 @@ export function entryPnl(
   priceMap: Record<string, number>,
   flowDate: string,
 ): number | null {
+  const intent = optionIntent(e);
+  if (intent.side === "Unknown" || intent.action.includes("to close")) return null;
   const cur = priceMap[String(e.ticker || "").toUpperCase()] || 0;
   const uf = Number(e.underlying_price) || 0;
   const optFill = Number(e.avg_price) || 0;
@@ -21,11 +24,10 @@ export function entryPnl(
   if (optFill > 0 && strike > 0) {
     return estimateOptionPnl(
       uf, cur, optFill, strike, e.dte ?? 30, e.type || e.option_type || "", flowDate,
+      intent.action.includes("selling"),
     );
   }
-  const isPut = String(e.type || e.option_type || "").toUpperCase().includes("PUT");
-  const raw = ((cur - uf) / uf) * 100 * (isPut ? -1 : 1);
-  return Math.max(-100, Math.round(raw));
+  return null;
 }
 
 export function PnlBadge({ pnl }: { pnl: number | null }) {
@@ -37,7 +39,7 @@ export function PnlBadge({ pnl }: { pnl: number | null }) {
       title="Estimated option P/L since the print (delta+theta model)"
       style={{ color, background: `color-mix(in srgb, ${color} 12%, transparent)` }}
     >
-      {pnl >= 0 ? "+" : ""}{pnl.toFixed(0)}%
+      Est. {pnl >= 0 ? "+" : ""}{pnl.toFixed(0)}%
     </span>
   );
 }
@@ -72,13 +74,8 @@ export function TopPicks({ date, dteFilter }: { date: string; dteFilter: DteFilt
       <GexWallLegend />
       <div className="space-y-1">
         {scored.map((e: any, i: number) => {
-          const { side, action } = classifySide(
-            e.type || e.option_type,
-            e.ask_pct,
-            e.vol_oi_ratio,
-            e.side,
-          );
-          const color = side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
+          const { side, action } = optionIntent(e);
+          const color = side === "Unknown" ? "var(--text-muted)" : side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
           const mega =
             parsePremium(e.premium || "$0") >= 1e6 &&
             (e.vol_oi_ratio || 0) >= 10 &&
@@ -104,7 +101,7 @@ export function TopPicks({ date, dteFilter }: { date: string; dteFilter: DteFilt
                 {side}
               </span>
               <span className="text-text-muted italic">{action}</span>
-              <span className="num text-text-muted">{e.expiry}</span>
+              <span className="num text-text-muted">{canonicalExpiry(e.expiry, e._date ?? date, e.dte) ?? `${e.expiry} (year unknown)`}</span>
               {dl && (
                 <span
                   className="num px-1 rounded-full"

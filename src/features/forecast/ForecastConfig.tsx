@@ -84,6 +84,7 @@ export function ForecastConfig({
   ticker = "",
 }: ForecastConfigProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const availableModels = AVAILABLE_MODELS.filter((model) => settings.forecastType === "daily" || model !== "ensemble");
 
   // The button looks enabled if you only check selectedModels, but the
   // handler also bails on empty ticker — making the click silently do
@@ -107,7 +108,7 @@ export function ForecastConfig({
     update({ selectedModels: models });
   };
 
-  const selectAll = () => update({ selectedModels: [...AVAILABLE_MODELS] });
+  const selectAll = () => update({ selectedModels: [...availableModels] });
   const clearAll = () => update({ selectedModels: [] });
 
   return (
@@ -236,6 +237,7 @@ export function ForecastConfig({
             id="forecast-origin"
             type="date"
             value={settings.forecastOrigin}
+            disabled={settings.forecastType === "intraday"}
             max={todayLocalDate()}
             onChange={(e) => update({ forecastOrigin: e.target.value })}
             className="w-full bg-bg-primary border border-border rounded px-2 py-1.5 text-xs font-mono text-text-primary"
@@ -247,7 +249,7 @@ export function ForecastConfig({
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-xs uppercase tracking-wider text-text-muted">
-            Models ({settings.selectedModels.length}/{AVAILABLE_MODELS.length})
+            Models ({settings.selectedModels.length}/{availableModels.length})
           </label>
           <div className="flex gap-2">
             <button
@@ -267,7 +269,7 @@ export function ForecastConfig({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {AVAILABLE_MODELS.map((m) => {
+          {availableModels.map((m) => {
             const selected = settings.selectedModels.includes(m);
             const color = MODEL_COLORS[m] || "#8b949e";
             return (

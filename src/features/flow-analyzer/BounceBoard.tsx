@@ -9,6 +9,7 @@
  * Tables rebuilt daily on the technicals timer.
  */
 import { useMemo, useRef, useState } from "react";
+import { QueryNotice } from "../../components/QueryNotice";
 import { RefreshCw, TrendingUp, TrendingDown } from "lucide-react";
 import { GlassPanel, Chip, Segmented } from "../../components/Glass";
 import { useAppStore } from "../../store/useAppStore";
@@ -490,7 +491,8 @@ function IntradayView() {
       : [];
   const datesKey = [...activeDays].sort().join(",");
 
-  const { data, isFetching } = useIntradayResilience(2, datesKey);
+  const intradayQuery = useIntradayResilience(2, datesKey);
+  const { data, isFetching } = intradayQuery;
   const bars = useIntradayBars(datesKey, picked, theme);
 
   const themes = useMemo(() => {
@@ -656,7 +658,8 @@ function IntradayView() {
               </div>
             );
           })}
-          {!data?.tickers.length && !isFetching && (
+          <QueryNotice queries={[meta0, intradayQuery, bars]} label="Intraday resilience" />
+          {!data?.tickers.length && !isFetching && !intradayQuery.isPending && !intradayQuery.isError && intradayQuery.fetchStatus !== "paused" && (
             <div className="text-xs text-text-muted p-3">No intraday data — refresh from the Daily view.</div>
           )}
         </div>
@@ -668,7 +671,8 @@ function IntradayView() {
 export function BounceBoard() {
   const [mode, setMode] = useState<"intraday" | "daily">("intraday");
   const [view, setView] = useState<"resilient" | "laggards">("resilient");
-  const { data, isFetching } = useResilience(3);
+  const dailyQuery = useResilience(3);
+  const { data, isFetching } = dailyQuery;
   const refresh = useResilienceRefresh();
 
   const tickers = data?.tickers ?? [];
@@ -677,6 +681,8 @@ export function BounceBoard() {
 
   return (
     <div className="space-y-3 p-1">
+      {mode === "daily" && <QueryNotice queries={[dailyQuery]} label="Daily resilience" />}
+      {refresh.isError && <p role="alert" className="text-xs text-accent-red">Resilience refresh failed.</p>}
       {/* Header + mode toggle */}
       <GlassPanel className="p-3">
         <div className="flex items-center justify-between mb-2">
@@ -716,7 +722,7 @@ export function BounceBoard() {
 
       {mode === "intraday" ? (
         <IntradayView />
-      ) : (
+      ) : (dailyQuery.isError || dailyQuery.fetchStatus === "paused") && !data ? null : (
         <DailyView
           view={view}
           setView={setView}

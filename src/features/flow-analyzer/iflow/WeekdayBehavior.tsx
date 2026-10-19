@@ -66,8 +66,12 @@ export function WeekdayBehavior({ ticker }: { ticker: string }) {
       const wd = d.getDay() - 1;
       if (wd < 0 || wd > 4) continue;
       flow[wd].n += 1;
-      if (row.premium != null)
-        flow[wd].prem += row.type.includes("PUT") ? -row.premium : row.premium;
+      // Sign by trade direction, not option type: a sold put is bullish.
+      // Unknown-side prints count toward prints but not the net lean.
+      if (row.premium != null && row.side !== "Unknown") {
+        const bear = row.side ? row.side === "Bear" : row.type.includes("PUT");
+        flow[wd].prem += bear ? -row.premium : row.premium;
+      }
       if (row.peak_pnl_pct_10d != null) flow[wd].peaks.push(row.peak_pnl_pct_10d);
     }
     return { byDay, flow, nDays: byDay.reduce((n, d) => n + d.all.length, 0) };

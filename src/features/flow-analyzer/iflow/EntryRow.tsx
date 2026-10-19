@@ -1,7 +1,8 @@
 import { useId } from "react";
 import { Star } from "lucide-react";
 import { useAppStore } from "../../../store/useAppStore";
-import { classifySide, dteTag, normExpiry } from "./utils";
+import { dteTag, normExpiry } from "./utils";
+import { optionIntent, optionType } from "../../../lib/optionContract";
 import { estimateOptionPnl } from "./estimator";
 
 /**
@@ -28,15 +29,15 @@ export function EntryRow({
   onToggle: (k: string) => void;
 }) {
   const optType = entry.type || entry.option_type || "";
-  const { side, action } = classifySide(optType, entry.ask_pct, entry.vol_oi_ratio, entry.side);
-  const color = side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
+  const { side, action } = optionIntent(entry);
+  const color = side === "Unknown" ? "var(--text-muted)" : side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
   const expanded = expandedKey === entryKey;
   const detailsId = useId();
   const dl = dteTag(entry.dte);
 
   // Star toggles "watch this contract" — keyed on ticker|strike|type|normExpiry.
-  const expiryNorm = normExpiry(entry.expiry) || String(entry.expiry || "");
-  const optTypeUpper = optType.toUpperCase().includes("PUT") ? "PUT" : "CALL";
+  const expiryNorm = normExpiry(entry.expiry, entry._date ?? entry.flow_date, entry.dte) || String(entry.expiry || "");
+  const optTypeUpper = optionType(optType) ?? "UNKNOWN";
   const contractKey = {
     ticker,
     strike: Number(entry.strike) || 0,
@@ -63,17 +64,14 @@ export function EntryRow({
   const flowDate = entry._date || entry.flow_date || "";
 
   let pnl: number | null = null;
-  if (price > 0 && uf > 0 && optFill > 0 && strike > 0) {
-    pnl = estimateOptionPnl(uf, price, optFill, strike, dte, optType, flowDate);
-  } else if (price > 0 && uf > 0) {
-    pnl = Math.round(((price - uf) / uf) * 100 * (optType.toUpperCase().includes("PUT") ? -1 : 1));
-    pnl = Math.max(-100, pnl);
+  if (side !== "Unknown" && !action.includes("to close") && price > 0 && uf > 0 && optFill > 0 && strike > 0) {
+    pnl = estimateOptionPnl(uf, price, optFill, strike, dte, optType, flowDate, action.includes("selling"));
   }
 
   const priceLoading = price <= 0;
   const pnlMissing = !priceLoading && uf <= 0;
   const pnlLabel =
-    pnl !== null ? `${pnl >= 0 ? "+" : ""}${pnl}%` : priceLoading ? "…" : pnlMissing ? "—" : "—";
+    pnl !== null ? `Est. ${pnl >= 0 ? "+" : ""}${pnl}%` : priceLoading ? "…" : pnlMissing ? "—" : "—";
   const pnlColor =
     pnl !== null ? (pnl >= 0 ? "var(--accent-green)" : "var(--accent-red)") : "var(--text-muted)";
 
@@ -84,12 +82,13 @@ export function EntryRow({
       >
         <button
           type="button"
+          disabled={expiryNorm.startsWith("unknown-year:") || optTypeUpper === "UNKNOWN"}
           onClick={(e) => {
             e.stopPropagation();
             toggleWatchedContract(contractKey);
           }}
           className="-ml-0.5 flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded p-0.5 transition-colors hover:bg-bg-card-hover lg:min-h-0 lg:min-w-0"
-          title={watched ? "Unwatch contract" : "Watch contract"}
+          title={expiryNorm.startsWith("unknown-year:") ? "Expiry year unavailable" : watched ? "Unwatch contract" : "Watch contract"}
           aria-label={watched ? `Unwatch ${ticker} contract` : `Watch ${ticker} contract`}
           aria-pressed={watched}
         >
@@ -113,11 +112,11 @@ export function EntryRow({
           <span className="shrink-0 font-mono font-semibold lg:w-10" style={{ color }}>
             {side}
           </span>
-          <span className="shrink-0 italic text-text-muted lg:w-16">{action}</span>
+          <span className="italic text-text-muted">{action}</span>
           <span className="num font-bold text-text-primary">
             ${entry.strike} {optType}
           </span>
-          <span className="num text-text-muted">{entry.expiry}</span>
+          <span className="num text-text-muted">{expiryNorm.startsWith("unknown-year:") ? `${entry.expiry} (year unknown)` : expiryNorm}</span>
           {dl && (
             <span className="num px-1 rounded-full" style={{ color: dl.color, background: dl.bg }}>
               {dl.text}

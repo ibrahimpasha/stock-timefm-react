@@ -108,6 +108,8 @@ export interface TrackedTicker {
   bullish: number;
   bearish: number;
   net_premium: string;
+  /** Numeric premium behind `net_premium` — sort on this, not the display string. */
+  total_premium?: number;
   latest?: string;
   /** Latest per-ticker arrival timestamp (UTC, lex-sortable). Set by the
    *  IFlowTracker merger from `IFlowSummary.tickers[].latest_ts`. Backs the

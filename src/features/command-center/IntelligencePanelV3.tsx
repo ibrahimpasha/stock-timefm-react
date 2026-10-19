@@ -14,6 +14,7 @@
  * at the bottom for callers who still want the full prose view.
  */
 import { useEffect, useState } from "react";
+import { QueryNotice } from "../../components/QueryNotice";
 import {
   ChevronDown,
   ChevronRight,
@@ -368,11 +369,12 @@ export default function IntelligencePanelV3() {
 
   return (
     <div className="card" style={{ maxHeight: "calc(100vh - 220px)", overflowY: "auto" }}>
-      <ForwardCalendar
+      <QueryNotice queries={[calendarQ]} label="Catalyst calendar" />
+      {!(calendarQ.isError || calendarQ.fetchStatus === "paused") || calendarQ.data ? <ForwardCalendar
         events={calendarQ.data?.events ?? []}
         scopedTicker={ticker || null}
         isLoading={calendarQ.isLoading && !calendarQ.data}
-      />
+      /> : null}
 
       {ticker && <IntelDetailCollapsible ticker={ticker} />}
     </div>

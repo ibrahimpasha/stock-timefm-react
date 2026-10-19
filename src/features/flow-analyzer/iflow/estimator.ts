@@ -43,8 +43,14 @@ export function estimateOptionPnl(
   dteAtFill: number,
   optType: string,
   flowDate?: string,
+  sold = false,
 ): number | null {
   if (!underlyingAtFill || !currentPrice || !optFill || optFill <= 0 || !strike) return null;
+  // Mirrors _flow_valuation(): an expired contract is valued by the terminal
+  // expiry payoff, never the delta/theta model. The client has no expiry-day
+  // underlying, so it reports null (= Python's "pending_expiry_evidence").
+  const daysSince = flowDate ? -daysFromToday(flowDate) : 0;
+  if (Number.isFinite(dteAtFill) && daysSince > dteAtFill) return null;
 
   const isPut = optType.toUpperCase().includes("PUT");
   const stockMove = currentPrice - underlyingAtFill;
@@ -72,10 +78,7 @@ export function estimateOptionPnl(
   const deltaGain = optionDelta * stockMove;
 
   // Linear time decay since the fill date.
-  let daysElapsed = 0;
-  if (flowDate) {
-    daysElapsed = Math.max(0, -daysFromToday(flowDate));
-  }
+  const daysElapsed = Math.max(0, daysSince);
   const effectiveDte = Math.max(Number.isFinite(dteAtFill) ? dteAtFill : 30, 5);
   const dailyTheta = optFill / (effectiveDte * 1.8);
   const thetaLoss = Math.min(dailyTheta * daysElapsed, optFill * 0.6);
@@ -85,5 +88,8 @@ export function estimateOptionPnl(
 
   // Floor at -100% (premium = max loss). No upper cap. Round to 2dp to match
   // the Python mirror — badges therefore display "+42.37%" not "+42%".
-  return Math.round(Math.max(-100, pnlPct) * 100) / 100;
+  const pnl = Math.round(Math.max(-100, pnlPct) * 100) / 100;
+  // _flow_valuation(): sold-to-open prints earn the premium the buyer loses
+  // (capped at +100 by the -100 floor above).
+  return sold ? -pnl : pnl;
 }

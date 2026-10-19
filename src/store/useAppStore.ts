@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { canonicalExpiry } from "../lib/optionContract";
 
 interface AppStore {
   /** Currently selected ticker across all pages */
@@ -35,7 +36,7 @@ export interface WatchedContract {
   ticker: string;
   strike: number;
   opt_type: string; // "CALL" or "PUT" (uppercased)
-  expiry_norm: string; // canonical "M/D" string (matches normExpiry in iflow/utils.ts)
+  expiry_norm: string; // Full ISO expiry; legacy yearless watches remain unresolved.
   addedAt: string; // ISO timestamp
 }
 
@@ -107,6 +108,17 @@ export const useAppStore = create<AppStore>()(
     }),
     {
       name: APP_STORAGE_KEY,
+      version: 1,
+      migrate: (state) => {
+        const previous = state as Pick<AppStore, "watchlist" | "watchedContracts">;
+        return {
+          ...previous,
+          watchedContracts: (previous.watchedContracts ?? []).map((c) => ({
+            ...c,
+            expiry_norm: canonicalExpiry(c.expiry_norm) ?? `unknown-year:${c.expiry_norm}`,
+          })),
+        };
+      },
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
         watchlist: s.watchlist,

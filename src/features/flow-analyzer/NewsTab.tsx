@@ -10,6 +10,8 @@
 import { useId, useMemo, useState } from "react";
 import { Filter, X, Globe, Clock } from "lucide-react";
 import { Chip, Segmented } from "../../components/Glass";
+import { QueryNotice } from "../../components/QueryNotice";
+import { parseLocalDate, daysFromToday } from "../../lib/dateOnly";
 import { useAppStore } from "../../store/useAppStore";
 import { relativeAge, absoluteAge } from "../../lib/utils";
 import {
@@ -76,11 +78,8 @@ function groupByDate(items: NewsItem[]): Array<{ date: string; rows: NewsItem[] 
 }
 
 function formatHeaderDate(iso: string): string {
-  const d = new Date(iso + "T00:00:00Z");
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dayMs = 24 * 60 * 60 * 1000;
-  const diff = Math.floor((today.getTime() - d.getTime()) / dayMs);
+  const d = parseLocalDate(iso);
+  const diff = -daysFromToday(iso);
   if (diff === 0) return "Today";
   if (diff === 1) return "Yesterday";
   return d.toLocaleDateString(undefined, {
@@ -307,9 +306,10 @@ export function NewsTab() {
 
       {/* Feed */}
       <div className="card flex-1 overflow-y-auto">
+        <QueryNotice queries={[tickerFilter ? byTicker : feed]} label="News feed" />
         {isLoading ? (
           <div className="text-sm text-text-muted animate-pulse py-4 text-center">Loading...</div>
-        ) : items.length === 0 ? (
+        ) : (tickerFilter ? byTicker : feed).data?.ok === false ? <p role="alert" className="py-4 text-xs text-accent-orange">News feed unavailable.</p> : items.length === 0 && !(tickerFilter ? byTicker : feed).isError && (tickerFilter ? byTicker : feed).fetchStatus !== "paused" ? (
           <div className="text-sm text-text-muted py-4 text-center">
             No news in this window
             {tickerFilter ? ` mentioning ${tickerFilter}` : ""}.

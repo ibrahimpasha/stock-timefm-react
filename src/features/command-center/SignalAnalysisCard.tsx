@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { QueryNotice } from "../../components/QueryNotice";
+import { modelMetadataLabel } from "../../lib/modelMetadata";
 import { useSignalAnalysis, useMarketPrice, useMarketHistory } from "../../api/forecast";
 import { Sparkline, RangeBar, Tag } from "../../components/CCPrimitives";
 import { Chip } from "../../components/Glass";
@@ -163,7 +165,8 @@ function SrcDot({ label, n, tint: t }: { label: string; n: number; tint: string 
  * auditable signal gauges: Technical, cross-source Convergence, ML contract research.
  */
 export function SignalAnalysisCard({ ticker }: Props) {
-  const { data, isLoading } = useSignalAnalysis(ticker);
+  const signalQuery = useSignalAnalysis(ticker);
+  const { data, isLoading } = signalQuery;
   const { data: mp } = useMarketPrice(ticker);
   const { data: hist } = useMarketHistory(ticker, 180); // shares the chart's cache
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -224,6 +227,7 @@ export function SignalAnalysisCard({ ticker }: Props) {
 
   return (
     <div className="card">
+      <QueryNotice queries={[signalQuery]} label="Signal analysis" />
       {/* Header */}
       <div className="flex items-center gap-2 mb-2.5">
         <Activity size={14} className="text-accent-blue" />
@@ -329,7 +333,7 @@ export function SignalAnalysisCard({ ticker }: Props) {
         </div>
       )}
 
-      {!isLoading && !hasAny && (profile || mp) && (
+      {!signalQuery.isPending && !signalQuery.isError && signalQuery.fetchStatus !== "paused" && !hasAny && (profile || mp) && (
         <div className="text-xs text-text-muted pt-2 border-t border-border text-center">
           No technical, convergence, or ML research signal yet for {ticker}.
         </div>
@@ -497,7 +501,8 @@ export function SignalAnalysisCard({ ticker }: Props) {
                     Probability withheld because approved calibration metadata is not confirmed.
                   </div>
                 ) : null}
-                {!hasMlProvenance && (
+                {ml.metadata && <p className="mt-2 break-words text-xs text-text-muted">{modelMetadataLabel(ml.metadata)}</p>}
+                {!hasMlProvenance && !ml.metadata && (
                   <div className="mt-2 text-xs text-text-muted">
                     Model provenance is unavailable in this legacy response; percentile remains research-only context.
                   </div>

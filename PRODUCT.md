@@ -1,46 +1,36 @@
-# Product Context
+# Product
 
 ## Register
 
-Product
+product
 
 ## Users
 
-The primary user is an active stock and options operator who monitors the
-dashboard on desktop and Android Chrome. They scan for changes, prioritize
-paper-trade candidates, and investigate the evidence behind a signal.
+Stock and options researchers comparing evidence and monitoring paper portfolios
+on desktop and Android Chrome.
 
 ## Product Purpose
 
-Stock-TimeFM unifies options flow, trader activity, market context, themes,
-forecasts, and research into one capital-preservation decision surface.
-Success means the operator can identify what changed, understand why it
-matters, and inspect the supporting evidence quickly on either desktop or
-mobile without confusing a rank, probability, or gate status.
+Investigate signals, understand selection decisions, and evaluate paper strategies.
+Research scores and modeled outcomes must remain distinct from validated results.
 
 ## Brand Personality
 
-Precise, restrained, and investigative.
+Precise, restrained, accountable. Preserve the existing design system in DESIGN.md.
 
-## Anti-References
+## Anti-references
 
-- Not a marketing site or oversized hero experience.
-- Not a generic SaaS card mosaic.
-- Not a decorative imitation of a financial terminal.
-- Not a desktop table scaled down until it technically fits a phone.
-- Not a live-trading or order-entry product.
+No marketing shell, decorative dashboards, or visual claims of predictive certainty.
+No live-order controls.
 
 ## Design Principles
 
-1. Put the current decision and its state before supporting detail.
-2. Preserve evidence and uncertainty; quiet data is not a bearish signal.
-3. Use progressive disclosure on small screens without removing workflows.
-4. Keep desktop density while making mobile targets touch-native and stable.
-5. Use color semantically and never as the only carrier of meaning.
+- Keep evidence provenance and blocking reasons visible.
+- Separate price triggers, eligibility, selection, and outcomes.
+- Preserve API contracts and existing investigation workflows.
+- Use progressive disclosure for dense data on phones.
 
-## Accessibility and Inclusion
+## Accessibility & Inclusion
 
-Target WCAG AA contrast, keyboard access, visible focus, reduced-motion
-preferences, and 44px minimum touch targets for primary controls. Support
-Android Chrome from 320px portrait through phone landscape, including display
-cutouts and browser safe areas.
+Use the existing semantic theme tokens, keyboard-accessible controls, text labels
+for states, and touch-friendly targets. Preserve readable mobile layouts.

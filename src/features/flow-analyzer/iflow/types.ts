@@ -17,6 +17,7 @@ export type MlCalibrationStatus = "calibrated" | "uncalibrated";
  * rolls out the expanded contract. Every field stays optional so cached and
  * legacy responses remain renderable. */
 export interface MlScoreProvenance {
+  metadata?: import("../../../lib/modelMetadata").ModelMetadata | null;
   ml_model_status?: string | null;
   ml_model_version?: string | null;
   ml_serving_mode?: MlServingMode | string | null;
@@ -80,6 +81,11 @@ export interface FlowReturn {
 }
 
 export interface FlowReturnsMeta {
+  ticker_count?: number;
+  ticker_priced?: number;
+  price_coverage_pct?: number;
+  tickers_missing_price?: string[];
+  benchmark_missing?: string[];
   earliest_date: string | null;
   latest_date: string | null;
   days_covered: number;

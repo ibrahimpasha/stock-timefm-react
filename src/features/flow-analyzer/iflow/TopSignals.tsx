@@ -1,9 +1,9 @@
 import { useMemo } from "react";
+import { optionIntent } from "../../../lib/optionContract";
 import { Sparkles } from "lucide-react";
 import { useIFlowEntries, useTickerPricesBatch } from "./hooks";
 import {
   canShowMlProbability,
-  classifySide,
   dteTag,
   parsePremium,
   researchRank,
@@ -83,7 +83,8 @@ export function TopSignals({ date, dteFilter }: { date: string; dteFilter: DteFi
         notable?.ml_calibration_status,
       );
       const mlProbability = probabilityAllowed ? notable?.ml_prob ?? null : null;
-      const { side } = classifySide(e.type || e.option_type, e.ask_pct, e.vol_oi_ratio, e.side);
+      const { side } = optionIntent(e);
+      if (side === "Unknown") continue;
       const su = setupScore(side as "Bull" | "Bear", tickerMeta?.[ticker], tickerTech?.[ticker], tickerGex?.[ticker]);
       const evidence = notable?.score ?? null;
       const servingMode = notable?.ml_serving_mode ?? null;

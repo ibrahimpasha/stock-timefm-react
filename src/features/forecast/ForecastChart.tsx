@@ -11,6 +11,7 @@ import { BarChart3 } from "lucide-react";
 import type { OHLCV, ModelForecast, Prediction } from "../../lib/types";
 import { MODEL_COLORS, MODEL_LABELS } from "../../lib/constants";
 import { parseLocalDate, toLocalDateOnly } from "../../lib/dateOnly";
+import { forecastPoints } from "../../lib/forecastSeries";
 
 interface ChartOverlays {
   showMA: string[];       // e.g. ["MA20", "MA50"]
@@ -28,6 +29,7 @@ interface ForecastChartProps {
   isLoading: boolean;
   actualPrices?: { date: string; price: number }[];
   forecastOrigin?: string;
+  intraday?: boolean;
   overlays?: ChartOverlays;
   className?: string;
   /** Inner chart-canvas height in px. Default 420 — pass a smaller value
@@ -77,14 +79,7 @@ function pointsFromOrigin(
   dates: string[],
   values: number[],
 ) {
-  const byDate = new Map<string, number>([[originDate, originValue]]);
-  dates.forEach((date, index) => {
-    const value = values[index];
-    if (date > originDate && Number.isFinite(value)) byDate.set(date, value);
-  });
-  return [...byDate.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, value]) => ({ time: toTime(date), value }));
+  return forecastPoints(dates, values, false, { time: originDate, value: originValue });
 }
 
 type PredictionWithBands = Prediction & {
@@ -111,6 +106,7 @@ export function ForecastChart({
   isLoading,
   actualPrices,
   forecastOrigin,
+  intraday = false,
   overlays,
   className = "",
   height = 420,
@@ -121,16 +117,17 @@ export function ForecastChart({
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRefs = useRef<ISeriesApi<"Candlestick" | "Line" | "Histogram" | "Area">[]>([]);
+  const chartHistory = useMemo(() => intraday ? [] : historicalData ?? [], [intraday, historicalData]);
 
   const buildChart = useCallback(() => {
-    if (!containerRef.current || !historicalData || historicalData.length === 0) return;
-
     // Clean up previous chart
     if (chartRef.current) {
       chartRef.current.remove();
       chartRef.current = null;
       seriesRefs.current = [];
     }
+    if (!containerRef.current || (!intraday && chartHistory.length === 0)) return;
+    const historicalData = chartHistory;
 
     const chart = createChart(containerRef.current, {
       layout: {
@@ -154,7 +151,7 @@ export function ForecastChart({
       },
       timeScale: {
         borderColor: "rgba(48, 54, 61, 0.45)",
-        timeVisible: false,
+        timeVisible: intraday,
         rightOffset: 5,
       },
       handleScroll: { vertTouchDrag: false },
@@ -286,7 +283,7 @@ export function ForecastChart({
 
     // --- Forecast lines per model ---
     // Anchor to forecastOrigin if provided (saved forecast), else last candle date
-    let originDate = historicalData[historicalData.length - 1].date;
+    let originDate = historicalData.at(-1)?.date ?? "";
     if (forecastOrigin) {
       // Find the closest trading day on or before the origin in our data
       const match = historicalData
@@ -298,7 +295,7 @@ export function ForecastChart({
     const lastClose = (
       historicalData.find((d) => d.date === originDate) ||
       historicalData[historicalData.length - 1]
-    ).close;
+    )?.close;
 
     const visibleForecasts = forecasts.filter((f) =>
       selectedModels.includes(f.model)
@@ -307,41 +304,40 @@ export function ForecastChart({
     for (const forecast of visibleForecasts) {
       const color = MODEL_COLORS[forecast.model] || "#8b949e";
       const responseDates = forecast.predictions.map((prediction) =>
-        (prediction.timestamp || prediction.date || "").slice(0, 10),
+        intraday ? prediction.timestamp : (prediction.timestamp || prediction.date || "").slice(0, 10),
       );
       const dates =
         responseDates.length === forecast.prices.length && responseDates.every(Boolean)
           ? responseDates
-          : futureDates(lastDate, forecast.prices.length);
+          : intraday ? [] : futureDates(lastDate, forecast.prices.length);
+      const anchor = Number.isFinite(forecast.current_price) && forecast.current_price > 0
+        ? forecast.current_price : lastClose;
+      const points = (values: number[]) => intraday
+        ? forecastPoints(dates, values, true)
+        : pointsFromOrigin(lastDate, anchor ?? NaN, dates, values);
 
       // Quantile bands (q10-q90 shading) if predictions have quantiles
       if (hasQuantileBands(forecast.predictions)) {
         // Outer band (q10-q90)
         const q90Series = chart.addLineSeries({
-          color: "transparent",
+          color,
           lineWidth: 1,
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
         });
         const q10Series = chart.addLineSeries({
-          color: "transparent",
+          color,
           lineWidth: 1,
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
         });
 
-        const q90Data = pointsFromOrigin(
-          lastDate,
-          lastClose,
-          dates,
+        const q90Data = points(
           forecast.predictions.map((prediction) => prediction.q90),
         );
-        const q10Data = pointsFromOrigin(
-          lastDate,
-          lastClose,
-          dates,
+        const q10Data = points(
           forecast.predictions.map((prediction) => prediction.q10),
         );
 
@@ -349,25 +345,6 @@ export function ForecastChart({
         q10Series.setData(q10Data);
         seriesRefs.current.push(q90Series, q10Series);
 
-        // Inner band (q25-q75) as area
-        const areaSeries = chart.addAreaSeries({
-          topColor: `${color}18`,
-          bottomColor: `${color}05`,
-          lineColor: "transparent",
-          lineWidth: 1,
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false,
-        });
-
-        const areaData = pointsFromOrigin(
-          lastDate,
-          lastClose,
-          dates,
-          forecast.predictions.map((prediction) => (prediction.q25 + prediction.q75) / 2),
-        );
-        areaSeries.setData(areaData);
-        seriesRefs.current.push(areaSeries);
       }
 
       // Forecast line (dotted)
@@ -381,7 +358,7 @@ export function ForecastChart({
         title: MODEL_LABELS[forecast.model] || forecast.model,
       });
 
-      const lineData = pointsFromOrigin(lastDate, lastClose, dates, forecast.prices);
+      const lineData = points(forecast.prices);
       forecastLine.setData(lineData);
       seriesRefs.current.push(forecastLine);
     }
@@ -418,7 +395,7 @@ export function ForecastChart({
 
     // Fit content
     chart.timeScale().fitContent();
-  }, [historicalData, forecasts, selectedModels, actualPrices, forecastOrigin, showMA, showBB, showRSI]);
+  }, [chartHistory, intraday, forecasts, selectedModels, actualPrices, forecastOrigin, showMA, showBB, showRSI]);
 
   // Build chart whenever data changes
   useEffect(() => {
@@ -440,7 +417,7 @@ export function ForecastChart({
 
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [historicalData]);
+  }, [buildChart]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -456,7 +433,7 @@ export function ForecastChart({
   // ticker's history is in flight, so check length too — otherwise a ticker
   // switch leaves the PREVIOUS ticker's chart frozen on screen until the fetch
   // lands. Showing the spinner makes the switch feel immediate.
-  if (!historicalData || historicalData.length === 0) {
+  if (intraday ? forecasts.length === 0 : chartHistory.length === 0) {
     return (
       <div
         className={`card flex items-center justify-center ${className}`}
@@ -481,14 +458,16 @@ export function ForecastChart({
     <div className={`card ${className}`}>
       {/* Chart legend */}
       <div className="flex items-center gap-4 mb-2 flex-wrap">
-        <span className="text-xs text-text-muted flex items-center gap-1.5">
+        {!intraday && showMA.includes("MA20") && <span className="text-xs text-text-muted flex items-center gap-1.5">
           <span className="w-4 h-0.5 inline-block" style={{ backgroundColor: "#ffa500" }} />
           MA20
-        </span>
-        <span className="text-xs text-text-muted flex items-center gap-1.5">
+        </span>}
+        {!intraday && showMA.includes("MA50") && <span className="text-xs text-text-muted flex items-center gap-1.5">
           <span className="w-4 h-0.5 inline-block" style={{ backgroundColor: "#bc8cff" }} />
           MA50
-        </span>
+        </span>}
+        {intraday && <span className="text-xs text-text-muted">Intraday forecast · historical bars unavailable</span>}
+        {forecasts.some((f) => hasQuantileBands(f.predictions)) && <span className="text-xs text-text-muted">q10 / q90 bounds</span>}
         {forecasts
           .filter((f) => selectedModels.includes(f.model))
           .map((f) => (

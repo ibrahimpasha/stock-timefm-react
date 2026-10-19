@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { useAppStore } from "../store/useAppStore";
-import { runForecastModels, useMarketHistory, useMarketPrice } from "../api/forecast";
+import { runForecastModels, useMarketHistory } from "../api/forecast";
+import { createLatestRequest } from "../lib/latestRequest";
+import { QueryNotice } from "../components/QueryNotice";
 import { useFlowAlerts } from "../api/flow";
 
 // Command Center feature components
@@ -315,10 +317,11 @@ export function CommandCenterPage() {
 
   // Keep enough candles to show the selected training window and historical
   // forecast origin on the same chart.
-  const { data: history, isLoading: historyLoading } = useMarketHistory(
+  const historyQuery = useMarketHistory(
     ticker,
     Math.max(180, settings.historyDays),
   );
+  const { data: history, isLoading: historyLoading } = historyQuery;
 
   // Normalize history rows to OHLCV shape the chart expects.
   const historicalData: OHLCV[] = (history ?? []).map(
@@ -339,18 +342,24 @@ export function CommandCenterPage() {
   //    button after changing models/horizon/origin. NOTE: the underlying 8-model
   //    stack lost to a random-walk baseline on CRPS (2026-05-30) — the numbers
   //    are advisory, not a tradable price target.
-  const { data: marketPrice } = useMarketPrice(ticker);
-  const [customForecasts, setCustomForecasts] = useState<ModelForecast[]>([]);
+  const [forecastResult, setForecastResult] = useState<{
+    ticker: string; settings: ForecastSettings; forecasts: ModelForecast[];
+  } | null>(null);
+  const customForecasts = forecastResult?.ticker === ticker ? forecastResult.forecasts : [];
+  const executedSettings = forecastResult?.ticker === ticker ? forecastResult.settings : settings;
+  const requests = useRef(createLatestRequest());
   const [isRunningForecast, setIsRunningForecast] = useState(false);
   const [forecastError, setForecastError] = useState<string | null>(null);
 
   const runForecast = useCallback(async () => {
     if (!ticker || settings.selectedModels.length === 0) return;
+    const request = requests.current.begin();
     setIsRunningForecast(true);
     setForecastError(null);
     try {
-      const { forecasts, failedModels } = await runForecastModels(ticker, settings);
-      setCustomForecasts(forecasts);
+      const { forecasts, failedModels } = await runForecastModels(ticker, settings, request.signal);
+      if (!request.isCurrent()) return;
+      setForecastResult({ ticker, settings, forecasts });
       if (failedModels.length > 0) {
         setForecastError(
           forecasts.length > 0
@@ -359,24 +368,24 @@ export function CommandCenterPage() {
         );
       }
     } catch (err) {
+      if (!request.isCurrent()) return;
       console.error("Forecast run failed:", err);
-      setCustomForecasts([]);
+      setForecastResult(null);
       setForecastError("Forecast request failed. Try again shortly.");
     } finally {
-      setIsRunningForecast(false);
+      if (request.isCurrent()) setIsRunningForecast(false);
     }
   }, [ticker, settings]);
 
   // Auto-run once per ticker (clears the prior ticker's forecast first). Settings
   // edits don't re-trigger — the user re-runs explicitly via the config button.
-  const autoRanFor = useRef<string>("");
+  const runForecastRef = useRef(runForecast);
+  useEffect(() => { runForecastRef.current = runForecast; }, [runForecast]);
   useEffect(() => {
-    if (!ticker || autoRanFor.current === ticker) return;
-    autoRanFor.current = ticker;
-    setCustomForecasts([]);
-    setForecastError(null);
-    void runForecast();
-  }, [ticker, runForecast]);
+    const current = requests.current;
+    if (ticker) void runForecastRef.current();
+    return () => current.cancel();
+  }, [ticker]);
 
   const openDetail = () => {
     setDetailOpen(true);
@@ -580,14 +589,16 @@ export function CommandCenterPage() {
                 <ForecastChart
                   historicalData={historicalData}
                   forecasts={customForecasts}
-                  selectedModels={settings.selectedModels}
+                  selectedModels={executedSettings.selectedModels}
                   isLoading={historyLoading || isRunningForecast}
-                  forecastOrigin={settings.forecastOrigin}
+                  forecastOrigin={executedSettings.forecastOrigin}
+                  intraday={executedSettings.forecastType === "intraday"}
+                  overlays={settings}
                   height={300}
                 />
+                <QueryNotice queries={[historyQuery]} label="Price history" />
                 <ModelBreakdown
                   models={customForecasts}
-                  currentPrice={marketPrice?.price}
                   isLoading={isRunningForecast}
                 />
 

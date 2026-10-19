@@ -1,7 +1,8 @@
-# Design Spec — "Modern Glass" remodel (2026-07)
+# Legacy Design Spec — "Modern Glass" remodel (2026-07)
 
-The single source of truth for the visual remodel. Every component edit must
-follow these rules; deviations break cross-page coherence.
+This historical spec is superseded by `DESIGN.md`, which is the current source
+of truth. Existing routes may still contain these patterns while they are
+migrated; new work must follow `DESIGN.md` and `PRODUCT.md`.
 
 ## Concept
 

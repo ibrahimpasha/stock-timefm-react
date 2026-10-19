@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { QueryNotice } from "../components/QueryNotice";
+import { marketDate } from "../lib/liveFeeds";
 import { Users, TrendingUp, ArrowUpDown } from "lucide-react";
 
 import { useAppStore } from "../store/useAppStore";
@@ -32,7 +34,7 @@ const SORT_LABELS: Record<SortMode, string> = {
   n_calls: "Calls",
   today: "Today",
   win_rate: "Win %",
-  mean_pl_pct: "Mean P/L",
+  mean_pl_pct: "Mean Reported Outcome",
   latest: "Latest",
   author: "Author",
 };
@@ -342,7 +344,8 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
     null,
   );
 
-  const { data, isLoading, isFetching } = useAlertsPositions(author ?? "", 60);
+  const positionsQuery = useAlertsPositions(author ?? "", 60);
+  const { data, isLoading, isFetching } = positionsQuery;
 
   if (!author) {
     return (
@@ -364,6 +367,7 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
 
   if (!data || data.ok === false) {
     return (
+      <div><QueryNotice queries={[positionsQuery]} label="Trader positions" />
       <EmptyState
         title="Trader profile unavailable"
         body={
@@ -371,7 +375,7 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
             ? `Backend returned: ${data.reason}.`
             : "Could not load this trader's positions."
         }
-      />
+      /></div>
     );
   }
 
@@ -448,6 +452,8 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
 
   return (
     <div className="flex flex-col gap-3 min-h-0">
+      <QueryNotice queries={[positionsQuery]} label="Trader positions" />
+      <p className="text-xs text-text-muted">Reported peak/exit outcomes, not fill-weighted realized or portfolio returns.</p>
       {/* Header card — glass-strong so the detail column reads as the
           focused layer over the ambient field. */}
       <section className="glass-strong p-4">
@@ -486,7 +492,7 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
           {sparkPoints.length >= 2 && (
             <div className="text-right">
               <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-1">
-                Cumulative P/L
+                Outcome Sum (pp)
               </div>
               <Sparkline
                 points={sparkPoints}
@@ -505,7 +511,7 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
                   color: changeColor(sparkPoints[sparkPoints.length - 1]),
                 }}
               >
-                {formatPercentRaw(sparkPoints[sparkPoints.length - 1], 1)}
+                {sparkPoints[sparkPoints.length - 1].toFixed(1)} pp
               </div>
             </div>
           )}
@@ -518,12 +524,12 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
         >
           <Stat label="Positions" value={String(nPositions)} />
           <Stat
-            label="Realized"
+            label="With Exits"
             value={String(nRealized)}
             sub={nPositions ? `${nRealized}/${nPositions}` : undefined}
           />
           <Stat
-            label="Win"
+            label="Positive Exits"
             value={winPct}
             tone={
               winRate != null
@@ -534,13 +540,13 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
             }
           />
           <Stat
-            label="Mean P/L"
+            label="Mean Outcome"
             value={
               <span style={{ color: meanPlColor }}>{meanPlStr}</span>
             }
           />
           <Stat
-            label="Cumulative P/L"
+            label="Outcome Sum (pp)"
             value={
               sparkPoints.length >= 1 ? (
                 <span
@@ -550,10 +556,7 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
                     ),
                   }}
                 >
-                  {formatPercentRaw(
-                    sparkPoints[sparkPoints.length - 1] || 0,
-                    1,
-                  )}
+                  {(sparkPoints[sparkPoints.length - 1] || 0).toFixed(1)} pp
                 </span>
               ) : (
                 "—"
@@ -617,10 +620,11 @@ export function TraderLeaderboardPage() {
   const [sortDesc, setSortDesc] = useState<boolean>(true);
   const [selected, setSelected] = useState<string | null>(null);
 
-  const { data, isLoading, isFetching } = useLeaderboard(lookback);
+  const leaderboardQuery = useLeaderboard(lookback);
+  const { data, isLoading, isFetching } = leaderboardQuery;
   // Pass the user's LOCAL calendar day — the backend defaults to the UTC day,
   // which rolls over at 5pm PT and blanks the evening review window.
-  const { data: todayData } = useTradersToday(new Date().toLocaleDateString("en-CA"));
+  const { data: todayData } = useTradersToday(marketDate());
   const todayMap = useMemo<Record<string, number>>(() => {
     const m: Record<string, number> = {};
     todayData?.authors?.forEach((a) => {
@@ -660,6 +664,7 @@ export function TraderLeaderboardPage() {
 
   return (
     <div className="flex min-w-0 flex-col space-y-4">
+      <QueryNotice queries={[leaderboardQuery]} label="Trader leaderboard" />
       {/* Header */}
       <div className="flex items-start justify-between gap-2 max-sm:flex-col">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
@@ -684,7 +689,7 @@ export function TraderLeaderboardPage() {
       <SignalsView />
 
       {/* Body */}
-      {data && data.ok === false ? (
+      {(leaderboardQuery.isError || leaderboardQuery.fetchStatus === "paused") && !data ? null : data && data.ok === false ? (
         <EmptyState
           title="Alerts pipeline not yet initialized"
           body="Start the fetcher service (`stock-timefm-alerts.service`) and run `scripts/parse_and_score_alerts.py` to populate the alerts DB. This page will populate on the next refresh once the tables exist."
@@ -704,8 +709,8 @@ export function TraderLeaderboardPage() {
         </div>
       ) : rows.length === 0 ? (
         <EmptyState
-          title="No alerts in last 30 days"
-          body="The alerts DB exists but contains no parsed trade calls in this window. Backfill via `scripts/parse_and_score_alerts.py` over historical alerts."
+          title={`No alerts in last ${lookback} days`}
+          body="No parsed trade calls returned for this window."
         />
       ) : (
         <div className="grid grid-cols-12 gap-4 items-start">

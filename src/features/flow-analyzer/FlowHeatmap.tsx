@@ -1,4 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { QueryNotice } from "../../components/QueryNotice";
+import { FlowCoverageNotice } from "../../components/FlowCoverageNotice";
+import { flowCoverage } from "../../lib/flowCoverage";
 import {
   Grid3x3,
   Download,
@@ -156,7 +159,8 @@ export function FlowHeatmap() {
   const { data: meta } = useTickerMeta();
   const { data: taxonomy } = useTickerTaxonomy();
 
-  const { data: datesData } = useIFlowDates();
+  const datesQuery = useIFlowDates();
+  const { data: datesData } = datesQuery;
   const dates = useMemo(() => datesData?.dates ?? [], [datesData]);
   const latestDate = dates[0]?.date ?? "";
 
@@ -203,7 +207,10 @@ export function FlowHeatmap() {
 
   const summaries = useMultiDateSummaries(activeDates, "all");
   const loading = activeDates.length > 0 && summaries.some((q) => q.isLoading && !q.data);
-  const { data: returns } = useFlowReturns(colorMetric === "pl");
+  const returnsQuery = useFlowReturns(colorMetric === "pl");
+  const { data: returns } = returnsQuery;
+  const coverage = flowCoverage(returns?.meta);
+  const feedFailed = datesQuery.isError || datesQuery.fetchStatus === "paused" || summaries.some(q => q.isError || q.fetchStatus === "paused");
   const { data: technicals } = useTickerTechnicals(); // reference data, cached
 
   // Merge per-ticker across the selected dates.
@@ -274,13 +281,13 @@ export function FlowHeatmap() {
 
   const colorValue = useCallback(
     (c: Cell): number | null => {
-      if (colorMetric === "pl") return returns?.tickers?.[c.ticker]?.avg_pnl_pct ?? null;
+      if (colorMetric === "pl") return coverage.reliable ? returns?.tickers?.[c.ticker]?.avg_pnl_pct ?? null : null;
       if (colorMetric === "target") return meta?.[c.ticker]?.target_pct ?? null;
       if (colorMetric === "technical") return technicals?.[c.ticker]?.tech_score ?? null;
       if (colorMetric === "pattern") return signedPattern(technicals?.[c.ticker]);
       return biasOf(c) * 100;
     },
-    [colorMetric, returns, meta, technicals]
+    [colorMetric, returns, meta, technicals, coverage.reliable]
   );
 
   // Raw 0..100 strength + direction for the threshold-based pulse metrics
@@ -516,6 +523,8 @@ export function FlowHeatmap() {
   return (
     <div className="space-y-3">
       <style>{HEATMAP_KEYFRAMES}</style>
+      <QueryNotice queries={[datesQuery, ...summaries, ...(colorMetric === "pl" ? [returnsQuery] : [])]} label="Heat map data" />
+      {colorMetric === "pl" && <FlowCoverageNotice meta={returns?.meta} />}
       {/* ── Controls ─────────────────────────────────────────── */}
       <div className="flex items-center gap-2 flex-wrap">
         {viewToggle}
@@ -696,7 +705,7 @@ export function FlowHeatmap() {
             loading flow…
           </div>
         )}
-        {!loading && vcells.length === 0 && (
+        {!loading && !feedFailed && !datesQuery.isPending && vcells.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center text-text-muted text-sm">
             {cells.length > 0 && filtersActive
               ? "No tickers match the active filters."

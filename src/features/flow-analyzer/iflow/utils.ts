@@ -10,6 +10,7 @@ import type {
   EarningsWindow,
   MlCalibrationStatus,
 } from "./types";
+import { canonicalExpiry, optionIntent } from "../../../lib/optionContract";
 
 /**
  * How many days into the future an "Earnings filter" considers when active.
@@ -27,62 +28,25 @@ export const EARNINGS_WINDOW_DAYS: Record<EarningsWindow, number> = {
 /**
  * Decide whether an entry is institutional Bull or Bear given the raw fields.
  *
- * Logic precedence:
- *   1. If the upstream `side` already says BULL/BEAR, trust it and just pick
- *      the right action label from the option type.
- *   2. Otherwise infer from ask% (>=55 = buying, <40 = selling) with vol/OI
- *      ratio as the tiebreaker for the 40-55 band.
- *
- * Output `action` is plain English ("call buying", "put selling") for UI use.
+ * Legacy numeric-only callers use ask% with vol/OI as the gray-band tiebreaker.
+ * Entry callers must use optionIntent(entry) to honor explicit action receipts.
  */
 export function classifySide(
   optType: string,
   askPct?: number | null,
   volOi?: number | null,
-  fallback?: string,
+  _fallback?: string,
 ) {
-  const rawType = (optType || "").toUpperCase().trim();
-  const t = rawType === "C" ? "CALL" : rawType === "P" ? "PUT" : rawType;
-  const fb = (fallback || "").toLowerCase();
-  const ask = askPct ?? 50;
-  const voi = volOi ?? 0;
-  const buying = ask >= 55 ? true : ask < 40 ? false : voi >= 1.5;
-
-  if (fb.includes("bull") || fb.includes("bear")) {
-    const side = fb.includes("bull") ? ("Bull" as const) : ("Bear" as const);
-    let action = "";
-    if (t.includes("CALL")) action = side === "Bull" ? "call buying" : "call selling";
-    else if (t.includes("PUT")) action = side === "Bear" ? "put buying" : "put selling";
-    return { side, action };
-  }
-
-  if (t.includes("CALL")) {
-    return buying
-      ? { side: "Bull" as const, action: "call buying" }
-      : { side: "Bear" as const, action: "call selling" };
-  }
-  if (t.includes("PUT")) {
-    return buying
-      ? { side: "Bear" as const, action: "put buying" }
-      : { side: "Bull" as const, action: "put selling" };
-  }
-  return { side: "Bear" as "Bull" | "Bear", action: "" };
+  return optionIntent({ type: optType, ask_pct: askPct, vol_oi_ratio: volOi });
 }
 
 /**
- * Normalize an expiry to canonical "M/D" so "05/22", "2026-05-22", "5/22"
- * all compare equal. Mirrors backend `_norm_expiry` in
- * `src/alerts_positions.py` so frontend grouping matches backend grouping.
+ * Preserve the expiry year. Yearless legacy values remain unresolved unless
+ * the source calendar date and entry DTE can establish the contract year.
  */
-export function normExpiry(s: string | null | undefined): string | null {
+export function normExpiry(s: string | null | undefined, sourceDate?: string | null, dte?: number | null): string | null {
   if (!s) return null;
-  const v = String(s).trim().toLowerCase();
-  if (!v) return null;
-  const iso = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (iso) return `${parseInt(iso[2], 10)}/${parseInt(iso[3], 10)}`;
-  const md = v.match(/^(\d{1,2})\/(\d{1,2})(?:\/\d{2,4})?$/);
-  if (md) return `${parseInt(md[1], 10)}/${parseInt(md[2], 10)}`;
-  return v;
+  return canonicalExpiry(s, sourceDate, dte) ?? `unknown-year:${s.trim()}`;
 }
 
 /**
@@ -184,7 +148,7 @@ export function scoreEntry(e: any): number {
   const voi = e.vol_oi_ratio || 0;
   const ask = e.ask_pct || 0;
   const dte = e.dte || 0;
-  const { side } = classifySide(e.type || e.option_type, e.ask_pct, e.vol_oi_ratio, e.side);
+  const { side } = optionIntent(e);
   const t = (e.type || e.option_type || "").toUpperCase();
   if (prem >= 5e6) s += 2.5;
   else if (prem >= 1e6) s += 2;

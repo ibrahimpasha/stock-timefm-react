@@ -15,6 +15,7 @@ import { useQuery, useQueries, keepPreviousData } from "@tanstack/react-query";
 import apiClient from "../../../api/client";
 import { tickersKey } from "../../../api/cacheKey";
 import { STALE_TIMES } from "../../../lib/constants";
+import { activeFlowInterval } from "../../../lib/liveFeeds";
 import type {
   DteFilter,
   IFlowSummaryData,
@@ -36,6 +37,7 @@ export function useIFlowDates() {
     queryKey: ["iflow", "dates"],
     queryFn: () => apiClient.get("/flow/iflow/dates").then((r) => r.data),
     staleTime: STALE_TIMES.flow,
+    refetchInterval: 60_000,
   });
 }
 
@@ -46,6 +48,7 @@ export function useIFlowSummary(date: string, dte: DteFilter) {
     queryKey: ["iflow", "summary", date, dte],
     queryFn: () => apiClient.get(`/flow/iflow/summary?date=${date}${p}`).then((r) => r.data),
     staleTime: STALE_TIMES.flow,
+    refetchInterval: () => activeFlowInterval(date),
     enabled: !!date,
   });
 }
@@ -59,6 +62,7 @@ export function useMultiDateSummaries(dates: string[], dte: DteFilter) {
       queryFn: () =>
         apiClient.get<IFlowSummaryData>(`/flow/iflow/summary?date=${date}${p}`).then((r) => r.data),
       staleTime: STALE_TIMES.flow,
+      refetchInterval: () => activeFlowInterval(date),
       enabled: !!date,
     })),
   });
@@ -76,6 +80,7 @@ export function useMultiDateEntries(dates: string[], includeNotable = false) {
       queryFn: () =>
         apiClient.get<{ entries: any[] }>(`/flow/iflow/entries?date=${date}${n}`).then((r) => r.data),
       staleTime: STALE_TIMES.flow,
+      refetchInterval: () => activeFlowInterval(date),
       enabled: !!date,
     })),
   });
@@ -89,6 +94,7 @@ export function useIFlowEntries(date: string, ticker?: string, includeNotable = 
     queryKey: ["iflow", "entries", date, ticker || "", includeNotable],
     queryFn: () => apiClient.get(`/flow/iflow/entries?date=${date}${t}${n}`).then((r) => r.data),
     staleTime: STALE_TIMES.flow,
+    refetchInterval: () => activeFlowInterval(date),
     enabled: !!date,
   });
 }
@@ -118,6 +124,7 @@ export function useIFlowHistory(ticker: string) {
     // were artificially clipped by the previous 30-day default.
     queryFn: () => apiClient.get(`/flow/iflow/history?ticker=${ticker}&days=365`).then((r) => r.data),
     staleTime: STALE_TIMES.flow,
+    refetchInterval: 60_000,
     enabled: !!ticker,
   });
 }
@@ -291,6 +298,8 @@ export function useTickerPricesBatch(tickers: string[]) {
 export interface LifetimeRow {
   flow_date: string;
   type: string;
+  /** Bull/Bear from trade action (sold puts are Bull); Unknown when ambiguous. */
+  side?: "Bull" | "Bear" | "Unknown";
   premium: number | null;
   peak_pnl_pct_10d: number | null;
   terminal_pnl_pct: number | null;

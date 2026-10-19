@@ -6,7 +6,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../../api/client";
 import { formatCurrency, changeColor } from "../../lib/utils";
 import { GlassPanel, Chip, Stat } from "../../components/Glass";
-import { useTickerPricesBatch } from "./iflow/hooks";
+import { premiumChange, markedExposure, signedPercent } from "../../lib/markFreshness";
+import { MarkFreshness } from "../../components/MarkFreshness";
+import { QueryNotice } from "../../components/QueryNotice";
+import { expiryDte } from "../../lib/optionContract";
+import { marketDate } from "../../lib/liveFeeds";
 import type { ChipTone } from "../../components/Glass";
 import {
   Loader2,
@@ -34,8 +38,8 @@ interface Position {
   current_premium: number | null;
   cost_basis: number;
   current_value: number | null;
-  pnl_pct: number;
-  pnl_dollars: number;
+  pnl_pct: number | null;
+  pnl_dollars: number | null;
   score: number;
   scaled_out: number;
   status: string;
@@ -44,6 +48,11 @@ interface Position {
   slot_type?: string;
   entry_date?: string;
   analysis?: string;
+  last_marked_at?: string | null;
+  updated_at?: string | null;
+  mark_status?: string | null;
+  mark_quality?: string | null;
+  exit_policy?: { stop_pct: number; tp1_pct: number; tp2_pct: number } | null;
 }
 
 interface FlowPaperSummary {
@@ -91,6 +100,10 @@ interface IFlowWatchlistItem {
   source?: string;
   list?: string;
   tier?: string;
+  current_premium?: number | null;
+  last_marked_at?: string | null;
+  updated_at?: string | null;
+  block_reason?: string | null;
 }
 
 interface IFlowSynthesis {
@@ -134,59 +147,11 @@ function useIFlowSynthesis() {
   });
 }
 
-/**
- * Estimate option P/L % using delta approximation.
- * underlyingAtFill is unknown for watchlist items, so we estimate from strike + option type.
- * For WL items: ref_premium is the institutional fill price, current price is estimated from underlying movement.
- */
-function estimateWatchlistPnl(
-  currentPrice: number, strike: number, optionType: string,
-  refPremium: number, addedDate?: string,
-): number | null {
-  if (!currentPrice || !strike || !refPremium || refPremium <= 0) return null;
-
-  const isPut = (optionType || "").toUpperCase().includes("PUT");
-
-  // Estimate underlying at time of flow (rough: assume stock was near strike for ATM, or deduce from moneyness)
-  // Simple approach: intrinsic value change as a lower bound
-  const intrinsicNow = isPut
-    ? Math.max(0, strike - currentPrice)
-    : Math.max(0, currentPrice - strike);
-
-  // Estimate current option price: at minimum the intrinsic, plus some time value
-  // Time value estimate: ref_premium minus intrinsic at fill, decayed
-  let daysElapsed = 0;
-  if (addedDate) {
-    const fd = new Date(addedDate);
-    const now = new Date();
-    daysElapsed = Math.max(0, Math.round((now.getTime() - fd.getTime()) / 86400000));
-  }
-
-  // Better approach: assume ref_premium was fair at entry, estimate change
-  // If stock moved toward strike = option gained, away = lost
-  const otmPct = isPut ? (currentPrice - strike) / strike : (strike - currentPrice) / strike;
-  let pnlMultiplier: number;
-  if (otmPct < -0.05) {
-    // ITM -- option is worth at least intrinsic
-    pnlMultiplier = (intrinsicNow + refPremium * 0.15) / refPremium - 1;
-  } else if (otmPct < 0.02) {
-    // Near ATM -- modest gain/loss
-    pnlMultiplier = -otmPct * 3 - daysElapsed * 0.015;
-  } else {
-    // OTM -- losing time value
-    pnlMultiplier = -0.1 - otmPct * 2 - daysElapsed * 0.02;
-  }
-
-  const pnlPct = pnlMultiplier * 100;
-  return Math.round(Math.max(-99, Math.min(pnlPct, 999)));
-}
-
 function PnlBadge({ pnl }: { pnl: number | null }) {
-  if (pnl === null) return null;
+  if (pnl === null) return <span className="text-xs text-text-muted">Mark unknown</span>;
   return (
     <Chip tone={pnl >= 0 ? "green" : "red"} className="num">
-      {pnl >= 0 ? "+" : ""}
-      {pnl}%
+      mark {signedPercent(pnl)}
     </Chip>
   );
 }
@@ -310,10 +275,17 @@ function PaperQueryError({ label, onRetry }: { label: string; onRetry: () => voi
 
 export function FlowPaperTrading() {
   const queryClient = useQueryClient();
-  const { data: summary, isLoading, isError, refetch } = useFlowPaperSummary();
+  const summaryQuery = useFlowPaperSummary();
+  const { data: summary, isLoading, refetch } = summaryQuery;
   const statusQuery = useIFlowTraderStatus();
   const watchlistQuery = useIFlowTraderWatchlist();
   const synthesisQuery = useIFlowSynthesis();
+  const riskQuery = useQuery<{ risk: { exit_policy?: Record<string, { stop_pct: number; trim_pct: number; take_profit_pct: number }> } }>({
+    queryKey: ["iflow-trader-risk"],
+    queryFn: () => apiClient.get("/iflow-trader/status").then(r => r.data),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  });
   const { data: iflowStatus } = statusQuery;
   const { data: iflowWatchlist } = watchlistQuery;
   const { data: synthesis } = synthesisQuery;
@@ -358,18 +330,6 @@ export function FlowPaperTrading() {
     [iflowWatchlist],
   );
 
-  // Fetch current prices for all watchlist tickers to compute "what if" P/L
-  // (must be before any early returns to satisfy React hooks rules)
-  const wlTickers = useMemo(() => {
-    const set = new Set<string>();
-    for (const w of wla) if (w.ticker) set.add(w.ticker);
-    for (const w of wlb) if (w.ticker) set.add(w.ticker);
-    return [...set];
-  }, [wla, wlb]);
-  const wlPricesQuery = useTickerPricesBatch(wlTickers);
-  const { data: wlPricesData } = wlPricesQuery;
-  const wlPrices = wlPricesData?.prices;
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12 text-text-muted text-sm gap-2">
@@ -379,11 +339,12 @@ export function FlowPaperTrading() {
     );
   }
 
-  if (isError || !summary) {
+  if (!summary) {
     return (
       <div className="flex items-center justify-center py-12 text-accent-red text-sm gap-2">
         <AlertTriangle size={16} />
         <span>Unable to load flow trader.</span>
+        <QueryNotice queries={[summaryQuery]} label="Flow trader" />
         <button
           type="button"
           onClick={() => void refetch()}
@@ -401,6 +362,8 @@ export function FlowPaperTrading() {
 
   return (
     <div className="space-y-4">
+      <QueryNotice queries={[summaryQuery, statusQuery, watchlistQuery, synthesisQuery]} label="Flow trader feeds" />
+      {(scanMutation.isError || resetMutation.isError || synthesisMutation.isError) && <p role="alert" className="text-xs text-accent-red">Trader action failed. Reload before retrying; a timed-out action may have completed.</p>}
       {/* Action buttons */}
       <div className="flex gap-2">
         <button
@@ -436,15 +399,13 @@ export function FlowPaperTrading() {
       {synthesisQuery.isError && !synthesis && (
         <PaperQueryError label="Unable to load trader synthesis." onRetry={() => void synthesisQuery.refetch()} />
       )}
-      {wlPricesQuery.isError && wlTickers.length > 0 && !wlPricesData && (
-        <PaperQueryError label="Unable to load watchlist prices." onRetry={() => void wlPricesQuery.refetch()} />
-      )}
 
       {/* System Risk Status (drawdown, circuit breaker, slots, sector warnings) */}
       <SystemRiskStatus />
 
       {/* Portfolio Summary */}
       <GlassPanel title="Flow Trader Portfolio">
+        {(() => { const exposure = markedExposure(positions); return exposure.count > 0 && <p className="mb-3 text-xs text-accent-orange">Recorded valuation: {exposure.count} positions ({formatCurrency(exposure.value)} carried exposure) have stale, incomplete, unverified or unknown marks. Return is not a live quote.</p>; })()}
         <div className="flex items-center justify-between mb-3 gap-3">
           <div className="num text-2xl font-extrabold text-text-primary">
             {formatCurrency(summary.total_value)}
@@ -593,16 +554,19 @@ export function FlowPaperTrading() {
           </div>
           <div className="space-y-2">
             {positions.map((pos) => {
-              const pnlColor = changeColor(pos.pnl_pct);
+              const pnlColor = pos.pnl_pct == null ? "var(--text-muted)" : changeColor(pos.pnl_pct);
               const sideColor =
                 pos.side === "Bull"
                   ? "var(--accent-green)"
                   : "var(--accent-red)";
               const isExpanded = expandedPos === pos.id;
-              const pnlDollars = pos.pnl_dollars ?? ((pos.current_value ?? 0) - pos.cost_basis);
-              const stopTarget = pos.entry_premium * 0.7;
-              const tp1Target = pos.entry_premium * 1.5;
-              const tp2Target = pos.entry_premium * 2.0;
+              const pnlDollars = pos.pnl_dollars;
+              const configured = riskQuery.data?.risk?.exit_policy?.[pos.slot_type ?? ""];
+              const policy = pos.exit_policy ?? (configured ? { stop_pct: configured.stop_pct, tp1_pct: configured.trim_pct, tp2_pct: configured.take_profit_pct } : null);
+              const hasPolicy = policy && [policy.stop_pct, policy.tp1_pct, policy.tp2_pct].every(Number.isFinite);
+              const stopTarget = pos.entry_premium * (1 + (policy?.stop_pct ?? 0) / 100);
+              const tp1Target = pos.entry_premium * (1 + (policy?.tp1_pct ?? 0) / 100);
+              const tp2Target = pos.entry_premium * (1 + (policy?.tp2_pct ?? 0) / 100);
               const slotLabel = pos.slot_type === "day_trade" ? "DT" : "SW";
 
               return (
@@ -622,8 +586,8 @@ export function FlowPaperTrading() {
                     }
                   }}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Chip
                         tone={pos.slot_type === "day_trade" ? "blue" : "purple"}
                         className="num"
@@ -651,7 +615,7 @@ export function FlowPaperTrading() {
                       <div className="text-right text-xs">
                         <div className="text-text-muted">Value</div>
                         <div className="num text-text-primary">
-                          {formatCurrency(pos.current_value ?? 0)}
+                          {pos.current_value == null ? "Unknown" : formatCurrency(pos.current_value)}
                         </div>
                       </div>
                       <div className="text-right">
@@ -660,12 +624,12 @@ export function FlowPaperTrading() {
                           className="num text-sm font-extrabold"
                           style={{ color: pnlColor }}
                         >
-                          {pos.pnl_pct >= 0 ? "+" : ""}
-                          {pos.pnl_pct.toFixed(1)}%
+                          {signedPercent(pos.pnl_pct)}
                         </div>
                       </div>
                     </div>
                   </div>
+                  <MarkFreshness at={pos.last_marked_at ?? pos.updated_at} status={pos.mark_status} quality={pos.mark_quality} />
 
                   {isExpanded && (
                     <div className="mt-3 pt-3 border-t border-border space-y-2">
@@ -689,7 +653,7 @@ export function FlowPaperTrading() {
                         <div>
                           <div className="text-text-muted">P/L $</div>
                           <div className="num font-semibold" style={{ color: pnlColor }}>
-                            {pnlDollars >= 0 ? "+" : ""}${pnlDollars.toFixed(0)}
+                            {pnlDollars == null ? "Unknown" : `${pnlDollars >= 0 ? "+" : ""}$${pnlDollars.toFixed(0)}`}
                           </div>
                         </div>
                         <div>
@@ -702,7 +666,7 @@ export function FlowPaperTrading() {
                         </div>
                         <div>
                           <div className="text-text-muted">Expiry</div>
-                          <div className="num text-text-primary">{pos.expiry}</div>
+                          <div className="num text-text-primary">{pos.expiry} ({expiryDte(pos.expiry, marketDate()) ?? "?"}d)</div>
                         </div>
                         <div>
                           <div className="text-text-muted">Slot</div>
@@ -719,20 +683,21 @@ export function FlowPaperTrading() {
                         </div>
                       )}
 
-                      <div className="flex items-center gap-3 text-xs num pt-1">
+                      {!hasPolicy && <p className="text-xs text-text-muted">Exit policy unavailable</p>}
+                      {hasPolicy && <div className="flex flex-wrap items-center gap-3 text-xs num pt-1">
                         <span className="text-text-muted">Targets:</span>
                         <span className="text-accent-red">
-                          Stop ${stopTarget.toFixed(2)} (-30%)
+                          Stop ${stopTarget.toFixed(2)} ({signedPercent(policy.stop_pct, 0)})
                         </span>
                         <span className="text-accent-orange">
-                          TP1 ${tp1Target.toFixed(2)} (+50%)
+                          TP1 ${tp1Target.toFixed(2)} ({signedPercent(policy.tp1_pct, 0)})
                         </span>
                         <span className="text-accent-green">
-                          TP2 ${tp2Target.toFixed(2)} (+100%)
+                          TP2 ${tp2Target.toFixed(2)} ({signedPercent(policy.tp2_pct, 0)})
                         </span>
-                      </div>
+                      </div>}
 
-                      <div className="relative h-2 rounded-full bg-border overflow-hidden">
+                      {hasPolicy && pos.current_premium != null && <div className="relative h-2 rounded-full bg-border overflow-hidden">
                         {(() => {
                           const range = tp2Target - stopTarget;
                           const pos_pct = range > 0
@@ -745,7 +710,7 @@ export function FlowPaperTrading() {
                                 className="absolute h-full rounded-full transition-all"
                                 style={{
                                   width: `${pos_pct}%`,
-                                  background: pos.pnl_pct >= 0
+                                  background: (pos.pnl_pct ?? 0) >= 0
                                     ? "var(--accent-green)"
                                     : "var(--accent-red)",
                                 }}
@@ -757,7 +722,7 @@ export function FlowPaperTrading() {
                             </>
                           );
                         })()}
-                      </div>
+                      </div>}
                     </div>
                   )}
                 </div>
@@ -791,18 +756,17 @@ export function FlowPaperTrading() {
                     w.option_type === "CALL" || w.option_type === "C"
                       ? "var(--accent-green)"
                       : "var(--accent-red)";
-                  const curPrice = wlPrices?.[w.ticker] || 0;
-                  const pnl = estimateWatchlistPnl(curPrice, Number(w.strike), w.option_type, w.ref_premium);
+                  const pnl = premiumChange(w.current_premium, w.ref_premium, w.last_marked_at);
                   return (
                     <div
                       key={w.id ?? idx}
-                      className="flex items-center justify-between px-3 py-1.5 rounded-md"
+                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-md"
                       style={{
                         background: "color-mix(in srgb, var(--accent-green) 5%, transparent)",
                         border: "1px solid color-mix(in srgb, var(--accent-green) 24%, transparent)",
                       }}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <ScoreBadge score={w.score} />
                         <SideIcon side={w.side} />
                         <span className="font-mono text-sm font-bold text-text-primary">
@@ -829,6 +793,7 @@ export function FlowPaperTrading() {
                           </span>
                         )}
                         <PnlBadge pnl={pnl} />
+                        <MarkFreshness at={w.last_marked_at} />
                       </div>
                     </div>
                   );
@@ -850,18 +815,17 @@ export function FlowPaperTrading() {
                     w.option_type === "CALL" || w.option_type === "C"
                       ? "var(--accent-green)"
                       : "var(--accent-red)";
-                  const curPrice = wlPrices?.[w.ticker] || 0;
-                  const pnl = estimateWatchlistPnl(curPrice, Number(w.strike), w.option_type, w.ref_premium);
+                  const pnl = premiumChange(w.current_premium, w.ref_premium, w.last_marked_at);
                   return (
                     <div
                       key={w.id ?? idx}
-                      className="flex items-center justify-between px-3 py-1.5 rounded-md"
+                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-md"
                       style={{
                         background: "color-mix(in srgb, var(--accent-orange) 5%, transparent)",
                         border: "1px solid color-mix(in srgb, var(--accent-orange) 24%, transparent)",
                       }}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <ScoreBadge score={w.score} />
                         <SideIcon side={w.side} />
                         <span className="font-mono text-sm font-bold text-text-primary">
@@ -880,11 +844,12 @@ export function FlowPaperTrading() {
                       </div>
                       <div className="flex items-center gap-3">
                         <PnlBadge pnl={pnl} />
+                        <MarkFreshness at={w.last_marked_at} />
                         <span className="text-sm text-text-muted num">
                           ref ${typeof w.ref_premium === "number" ? w.ref_premium.toFixed(2) : w.ref_premium}
                         </span>
                         <span className="text-xs text-text-muted italic">
-                          awaiting ML
+                          {w.block_reason ?? "Monitoring"}
                         </span>
                       </div>
                     </div>
