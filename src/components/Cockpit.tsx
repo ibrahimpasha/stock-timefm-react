@@ -129,7 +129,9 @@ export function BarRow({
   trailing,
   onClick,
   title,
+  labelWidth = "4.25rem",
 }: {
+  labelWidth?: string;
   label: ReactNode;
   value: number;
   max: number;
@@ -163,7 +165,7 @@ export function BarRow({
       {trailing !== undefined && <span className="num text-right text-xs text-text-muted">{trailing}</span>}
     </>
   );
-  const cols = trailing !== undefined ? "4.25rem minmax(0,1fr) 4.5rem 2.75rem" : "4.25rem minmax(0,1fr) 4.5rem";
+  const cols = `${labelWidth} minmax(0,1fr) 4.5rem${trailing !== undefined ? " 2.75rem" : ""}`;
   const cls = "grid min-h-6 items-center gap-2.5 rounded-md px-1 text-left";
   return onClick ? (
     <button type="button" title={title} onClick={onClick} className={`${cls} data-row w-full`} style={{ gridTemplateColumns: cols }}>

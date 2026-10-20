@@ -10,26 +10,16 @@ import { todayLocalDate } from "../../lib/dateOnly";
 import { CockpitButton } from "../../components/Cockpit";
 import { Segmented } from "../../components/Glass";
 
-// Default = one model, so the card shows a single call instead of six that
-// disagree. chronos2 is the best learned model on range accuracy (CRPS) in
-// the 2026-10-19 backtest. The random-walk baseline is NOT offered here at
-// all (user: "don't want to see Random Walk Baseline") — it stays a backend
-// benchmark only. timexer stays out while its checkpoint fails to load.
-const PRIMARY_MODELS = ["chronos2"];
-const RESEARCH_MODELS = [
-  "dlinear",
-  "itransformer",
-  "timemixer",
-  "patchtst",
-  "timesnet",
-  "tide",
-  "timesfm",
-  "claude",
-  "ensemble",
-];
+// Default = six learned models side by side (user wants to see them all, not
+// just one). The random-walk baseline is NOT offered in the UI (user: "don't
+// want to see Random Walk Baseline"); it stays a backend benchmark. Only the
+// first model draws a range cone (see ForecastChart) so the chart stays
+// readable. timexer stays out while its checkpoint fails to load.
+const PRIMARY_MODELS = ["chronos2", "timesfm", "timemixer", "patchtst", "itransformer", "dlinear"];
+const RESEARCH_MODELS = ["timesnet", "tide", "claude", "ensemble"];
 const AVAILABLE_MODELS = [...PRIMARY_MODELS, ...RESEARCH_MODELS];
 
-/** Default view: chronos2 alone. */
+/** Default view: the six primary models. */
 export const DEFAULT_MODELS = [...PRIMARY_MODELS];
 
 const INTERVALS = ["15m", "30m", "1h", "4h"] as const;
@@ -150,7 +140,7 @@ export function ForecastConfig({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-xs leading-relaxed text-text-muted">
-        Chronos-2 by default. Add other models below to compare.
+        Six models by default; the shaded range belongs to the first one.
       </p>
       {/* Row 1: Type + Horizon + History + Origin */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">

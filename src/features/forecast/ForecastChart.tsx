@@ -323,7 +323,7 @@ export function ForecastChart({
       // opposite directions. Fill = q90 area, then a q10 area painted in the
       // card background masks everything below q10 (future zone only, so it
       // hides no candles).
-      if (hasQuantileBands(forecast.predictions)) {
+      if (forecast === visibleForecasts[0] && hasQuantileBands(forecast.predictions)) {
         const q90Data = points(forecast.predictions.map((prediction) => prediction.q90));
         const q10Data = points(forecast.predictions.map((prediction) => prediction.q10));
         const bandColor = `${color}2e`;
@@ -480,7 +480,7 @@ export function ForecastChart({
           MA50
         </span>}
         {intraday && <span className="text-xs text-text-muted">Intraday forecast · historical bars unavailable</span>}
-        {forecasts.some((f) => hasQuantileBands(f.predictions)) && <span className="text-xs text-text-muted">shaded = 80% likely range</span>}
+        {forecasts.some((f) => hasQuantileBands(f.predictions)) && <span className="text-xs text-text-muted">shaded = 80% likely range ({MODEL_LABELS[forecasts.find((f) => selectedModels.includes(f.model))?.model ?? ""] ?? "first model"})</span>}
         {forecasts
           .filter((f) => selectedModels.includes(f.model))
           .map((f) => (

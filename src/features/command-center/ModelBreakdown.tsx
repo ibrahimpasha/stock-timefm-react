@@ -75,11 +75,12 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
               value={pct ?? 0}
               max={maxAbs}
               diverging
+              labelWidth="7.5rem"
               tone="info"
               display={pct == null ? "Unknown" : signed(pct)}
               title={`${label}: ${formatCurrency(model.end_price)}`}
             />
-            <p className="num pl-[4.875rem] text-xs text-text-muted">
+            <p className="num pl-5 text-xs text-text-muted">
               {formatCurrency(model.end_price)}
               {lo != null && hi != null && (
                 <>
