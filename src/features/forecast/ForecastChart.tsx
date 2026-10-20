@@ -297,6 +297,8 @@ export function ForecastChart({
       historicalData[historicalData.length - 1]
     )?.close;
 
+    const maskColor =
+      getComputedStyle(containerRef.current).getPropertyValue("--bg-card").trim() || "#16181c";
     const visibleForecasts = forecasts.filter((f) =>
       selectedModels.includes(f.model)
     );
@@ -316,35 +318,38 @@ export function ForecastChart({
         ? forecastPoints(dates, values, true)
         : pointsFromOrigin(lastDate, anchor ?? NaN, dates, values);
 
-      // Quantile bands (q10-q90 shading) if predictions have quantiles
+      // 80% range (q10-q90) as a shaded cone, NOT two more lines: drawn as
+      // lines in the model color they read as extra forecasts pointing in
+      // opposite directions. Fill = q90 area, then a q10 area painted in the
+      // card background masks everything below q10 (future zone only, so it
+      // hides no candles).
       if (hasQuantileBands(forecast.predictions)) {
-        // Outer band (q10-q90)
-        const q90Series = chart.addLineSeries({
-          color,
+        const q90Data = points(forecast.predictions.map((prediction) => prediction.q90));
+        const q10Data = points(forecast.predictions.map((prediction) => prediction.q10));
+        const bandColor = `${color}2e`;
+        const upper = chart.addAreaSeries({
+          lineColor: `${color}66`,
           lineWidth: 1,
+          lineStyle: LineStyle.Dotted,
+          topColor: bandColor,
+          bottomColor: bandColor,
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
         });
-        const q10Series = chart.addLineSeries({
-          color,
+        const mask = chart.addAreaSeries({
+          lineColor: `${color}66`,
           lineWidth: 1,
+          lineStyle: LineStyle.Dotted,
+          topColor: maskColor,
+          bottomColor: maskColor,
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: false,
         });
-
-        const q90Data = points(
-          forecast.predictions.map((prediction) => prediction.q90),
-        );
-        const q10Data = points(
-          forecast.predictions.map((prediction) => prediction.q10),
-        );
-
-        q90Series.setData(q90Data);
-        q10Series.setData(q10Data);
-        seriesRefs.current.push(q90Series, q10Series);
-
+        upper.setData(q90Data);
+        mask.setData(q10Data);
+        seriesRefs.current.push(upper, mask);
       }
 
       // Forecast line (dotted)
@@ -393,8 +398,16 @@ export function ForecastChart({
       seriesRefs.current.push(actualLine);
     }
 
-    // Fit content
-    chart.timeScale().fitContent();
+    // Daily: open on the last ~3 months plus the forecast so the 10-day
+    // projection isn't a few pixels at the edge of a year of candles.
+    // Scroll/zoom still reaches the full history.
+    const horizon = Math.max(0, ...visibleForecasts.map((f) => f.prices.length));
+    if (!intraday && historicalData.length > 70) {
+      const last = historicalData.length - 1;
+      chart.timeScale().setVisibleLogicalRange({ from: last - 65, to: last + horizon + 4 });
+    } else {
+      chart.timeScale().fitContent();
+    }
   }, [chartHistory, intraday, forecasts, selectedModels, actualPrices, forecastOrigin, showMA, showBB, showRSI]);
 
   // Build chart whenever data changes
@@ -467,7 +480,7 @@ export function ForecastChart({
           MA50
         </span>}
         {intraday && <span className="text-xs text-text-muted">Intraday forecast · historical bars unavailable</span>}
-        {forecasts.some((f) => hasQuantileBands(f.predictions)) && <span className="text-xs text-text-muted">q10 / q90 bounds</span>}
+        {forecasts.some((f) => hasQuantileBands(f.predictions)) && <span className="text-xs text-text-muted">shaded = 80% likely range</span>}
         {forecasts
           .filter((f) => selectedModels.includes(f.model))
           .map((f) => (

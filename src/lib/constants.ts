@@ -1,17 +1,19 @@
 /** Model display colors — keyed by model name from the backend */
+/** Model display colors — keyed by model name from the backend. Never green
+ *  or red (those read as up/down) and never the MA20/MA50 orange/purple. */
 export const MODEL_COLORS: Record<string, string> = {
   prophet: "#58a6ff",
-  dlinear: "#3fb950",
-  patchtst: "#f85149",
-  itransformer: "#bc8cff",
-  timemixer: "#ffa500",
+  dlinear: "#6aa8ff",
+  patchtst: "#f08ae6",
+  itransformer: "#e6e6e6",
+  timemixer: "#f5d36b",
   timexer: "#40e0d0",
-  timesnet: "#ff6b9d",
-  timesfm: "#e3b341",
+  timesnet: "#ff8fab",
+  timesfm: "#c4b5fd",
   arima: "#8b949e",
-  deepar: "#da3633",
-  tide: "#79c0ff",
-  chronos2: "#ffa500",
+  deepar: "#9aa5ff",
+  tide: "#94e2d5",
+  chronos2: "#4fd0dc",
   claude: "#cc785c",
   ensemble: "#f0c040",
   rw: "#60a5fa",
