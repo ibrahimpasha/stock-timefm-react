@@ -3,7 +3,6 @@ import { QueryNotice } from "../../components/QueryNotice";
 import { FlowCoverageNotice } from "../../components/FlowCoverageNotice";
 import { flowCoverage } from "../../lib/flowCoverage";
 import {
-  Grid3x3,
   Download,
   ChevronDown,
   Maximize2,
@@ -12,7 +11,6 @@ import {
   Radio,
   LayoutGrid,
   Map as MapIcon,
-  Sigma,
 } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { Segmented } from "../../components/Glass";
@@ -521,13 +519,51 @@ export function FlowHeatmap() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <style>{HEATMAP_KEYFRAMES}</style>
       <QueryNotice queries={[datesQuery, ...summaries, ...(colorMetric === "pl" ? [returnsQuery] : [])]} label="Heat map data" />
       {colorMetric === "pl" && <FlowCoverageNotice meta={returns?.meta} />}
-      {/* ── Controls: one toolbar row; rarely-touched knobs live in Options ── */}
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* ── Focal summary: what the map is showing right now ── */}
+      <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-4">
+        <div className="flex flex-wrap items-end gap-x-10 gap-y-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-medium text-text-muted">
+              {activeDates.length > 1 ? "Premium across selected days" : "Premium on the tape"}
+            </span>
+            <span className="num text-3xl font-semibold tracking-tight text-text-primary">
+              {formatPremium(totalPremium)}
+            </span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-medium text-text-muted">Tickers</span>
+            <span className="num text-3xl font-semibold tracking-tight text-text-primary">
+              {filtersActive ? (
+                <>
+                  {vcells.length}
+                  <span className="text-lg font-normal text-text-muted">/{cells.length}</span>
+                </>
+              ) : (
+                cells.length
+              )}
+            </span>
+          </div>
+          {activeDates.length > 1 && (
+            <div
+              className="flex flex-col gap-0.5"
+              title="Flow from these dates is merged (unioned). Click a single date to view just that day."
+            >
+              <span className="text-xs font-medium text-text-muted">Days merged</span>
+              <span className="num text-3xl font-semibold tracking-tight text-text-primary">
+                {activeDates.length}
+              </span>
+            </div>
+          )}
+        </div>
         {viewToggle}
+      </div>
+
+      {/* ── Controls: date strip + the three encodings people change; the rest live in Options ── */}
+      <div className="flex flex-wrap items-center gap-2">
         {/* Date strip — a mini entry-volume histogram: each day's bar height is
             its flow entry count, so heavy days stand out at a glance. */}
         <div
@@ -587,37 +623,23 @@ export function FlowHeatmap() {
         <MetricSelect label="Size" icon={Maximize2} value={sizeMetric} onChange={(v) => patchHeatmap({ sizeMetric: v as SizeMetric })} options={SIZE_OPTIONS} />
         <MetricSelect label="Color" icon={Palette} value={colorMetric} onChange={(v) => patchHeatmap({ colorMetric: v as ColorMetric })} options={COLOR_OPTIONS} />
         <MetricSelect label="Group" icon={Layers} value={groupBy} onChange={(v) => patchHeatmap({ groupBy: v as GroupBy })} options={GROUP_OPTIONS} />
-        <MetricSelect label="Pulse" icon={Radio} value={pulse} onChange={(v) => patchHeatmap({ pulse: v as Pulse })} options={PULSE_OPTIONS} />
-
-        <div className="ml-auto flex items-center gap-3 text-xs text-text-muted">
-          {activeDates.length > 1 && (
-            <span title="Flow from these dates is merged (unioned). Click a single date to view just that day.">
-              <span className="num text-text-primary">{activeDates.length}</span> days merged
-            </span>
-          )}
-          <span className="inline-flex items-center gap-1">
-            <Grid3x3 size={12} />
-            <span className="num font-semibold text-text-primary">
-              {filtersActive ? `${vcells.length}/${cells.length}` : cells.length}
-            </span>
-            tickers
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Sigma size={12} />
-            <span className="num font-semibold text-text-primary">{formatPremium(totalPremium)}</span>
-            total
-          </span>
-          <ColorLegend metric={colorMetric} />
-        </div>
       </div>
 
       <details className="group text-xs">
-        <summary className="inline-flex cursor-pointer select-none items-center gap-1 text-text-muted hover:text-text-primary">
-          <ChevronDown size={12} className="transition-transform group-open:rotate-180" />
-          Options
-          {filtersActive && <span className="text-accent-blue">· filters on</span>}
+        <summary className="inline-flex min-h-8 cursor-pointer select-none items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary">
+          <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
+          Pulse and filters
+          {pulse !== "off" && (
+            <span className="tag" style={{ "--tag": "var(--accent-blue)" } as React.CSSProperties}>
+              pulse: {PULSE_OPTIONS.find((o) => o.id === pulse)?.label}
+            </span>
+          )}
+          {filtersActive && (
+            <span className="tag" style={{ "--tag": "var(--accent-blue)" } as React.CSSProperties}>filters on</span>
+          )}
         </summary>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <MetricSelect label="Pulse" icon={Radio} value={pulse} onChange={(v) => patchHeatmap({ pulse: v as Pulse })} options={PULSE_OPTIONS} />
           {/* Threshold for the score-based pulses (ML / TA / pattern).
               Earnings pulses gate on the ER window instead. */}
           {(pulse === "ml" || pulse === "play" || pulse === "technical" || pulse === "pattern") && (
@@ -694,12 +716,23 @@ export function FlowHeatmap() {
         </div>
       </details>
 
+      {/* ── Legend: what color and size mean, right above the map ── */}
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-text-secondary">
+        <span className="max-w-[72ch]">
+          Area = <span className="font-medium text-text-primary">{SIZE_OPTIONS.find((o) => o.id === sizeMetric)?.label}</span>
+          {" · "}
+          Color = <span className="font-medium text-text-primary">{COLOR_OPTIONS.find((o) => o.id === colorMetric)?.label}</span>
+          <span className="text-text-muted"> — {COLOR_OPTIONS.find((o) => o.id === colorMetric)?.hint}</span>
+        </span>
+        <ColorLegend metric={colorMetric} />
+      </div>
+
       {/* ── Treemap ──────────────────────────────────────────── */}
       <div
         ref={boxRef}
         className="relative w-full border overflow-hidden bg-bg-primary"
         style={{
-          height: "calc(100vh - 320px)",
+          height: "calc(100vh - 380px)",
           minHeight: 460,
           borderRadius: "var(--radius-panel)",
           borderColor: "var(--glass-border)",
@@ -808,7 +841,9 @@ function tileBg(metric: ColorMetric, value: number | null): string {
   else if (metric === "pattern") t = clamp(value / 80, -1, 1);
   else t = clamp(value / 100, -1, 1);
   const mag = Math.abs(t);
-  const pct = Math.round(10 + 62 * mag); // 10%..72% mixed into the card bg
+  // 8%..50%: capped so text-primary stays legible on the strongest tiles in
+  // both themes (dark: light ink on a mid-dark wash; light: dark ink on a pale one).
+  const pct = Math.round(8 + 42 * mag);
   const accent = t >= 0 ? "var(--accent-green)" : "var(--accent-red)";
   return `color-mix(in srgb, ${accent} ${pct}%, var(--bg-card))`;
 }
@@ -920,17 +955,17 @@ function Tile({
       )}
       {showTicker && (
         <span
-          className="num font-semibold text-text-primary leading-none"
-          style={{ fontSize: Math.min(18, Math.max(9, Math.min(w / 4.5, h / 2.2))) }}
+          className="num font-semibold text-text-primary leading-none tracking-tight"
+          style={{ fontSize: Math.min(22, Math.max(10, Math.min(w / 4.2, h / 2.2))) }}
         >
           {cell.ticker}
         </span>
       )}
       {showVal && (
-        <span className="num text-text-primary/80 leading-none mt-1 text-xs">{label}</span>
+        <span className="num mt-1 text-xs font-medium leading-none text-text-primary" style={{ opacity: 0.85 }}>{label}</span>
       )}
       {showName && (
-        <span className="text-text-secondary leading-tight mt-0.5 px-1 text-xs line-clamp-1">{name}</span>
+        <span className="mt-0.5 line-clamp-1 px-1 text-xs leading-tight text-text-primary" style={{ opacity: 0.7 }}>{name}</span>
       )}
     </button>
   );
@@ -1065,19 +1100,20 @@ function ColorLegend({ metric }: { metric: ColorMetric }) {
     pattern: ["bearish", "bullish"],
   };
   const [lo, hi] = ends[metric];
+  // Sampled from tileBg() so the legend shows the exact tile washes.
+  const stops = [-1, -0.5, 0, 0.5, 1].map((t) => tileBg("bias", t * 100));
   return (
-    <span
-      className="inline-flex items-center gap-1.5 text-xs"
-    >
-      <span style={{ color: "var(--accent-red)" }}>{lo}</span>
+    <span className="inline-flex items-center gap-2 text-xs">
+      <span className="font-medium text-accent-red">{lo}</span>
       <span
-        className="inline-block h-2.5 w-16 rounded-full"
-        style={{
-          background:
-            "linear-gradient(90deg, var(--accent-red), color-mix(in srgb, var(--text-muted) 25%, transparent), var(--accent-green))",
-        }}
+        className="inline-block h-3 w-28 rounded-sm border border-border"
+        style={{ background: `linear-gradient(90deg, ${stops.join(", ")})` }}
       />
-      <span style={{ color: "var(--accent-green)" }}>{hi}</span>
+      <span className="font-medium text-accent-green">{hi}</span>
+      <span className="ml-2 inline-flex items-center gap-1 text-text-muted" title="No value for this metric">
+        <span className="inline-block h-3 w-3 rounded-sm border border-border bg-bg-card" />
+        no data
+      </span>
     </span>
   );
 }

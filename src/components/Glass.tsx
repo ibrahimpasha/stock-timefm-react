@@ -110,9 +110,9 @@ export function Stat({
 }) {
   return (
     <div className="stat flex min-w-0 flex-col gap-0.5">
-      <span className="text-xs text-text-muted truncate">{label}</span>
+      <span className="text-xs font-medium text-text-muted truncate">{label}</span>
       <span
-        className="text-sm font-semibold num truncate"
+        className="text-xl font-semibold num truncate tracking-tight"
         style={
           tone
             ? { color: `var(--accent-${tone})` }

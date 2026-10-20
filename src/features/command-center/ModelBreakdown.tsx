@@ -13,7 +13,7 @@ interface ModelBreakdownProps {
 
 function SkeletonBreakdown() {
   return (
-    <div className="card animate-pulse">
+    <div className="animate-pulse pt-2">
       <div className="h-4 w-32 rounded bg-text-muted/20 mb-4" />
       {[...Array(5)].map((_, i) => (
         <div key={i} className="flex items-center gap-2 mb-3">
@@ -31,9 +31,9 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
 
   if (!models || models.length === 0) {
     return (
-      <div className="card">
-        <h3 className="text-sm font-semibold text-text-primary mb-2">Model breakdown</h3>
-        <p className="text-sm text-text-muted py-2">No model data available.</p>
+      <div className="pt-2">
+        <h4 className="text-base font-semibold text-text-primary mb-1">Model breakdown</h4>
+        <p className="text-sm text-text-muted">No model data available.</p>
       </div>
     );
   }
@@ -54,8 +54,8 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
   };
 
   return (
-    <div className="card">
-      <h3 className="text-sm font-semibold text-text-primary mb-2">Model breakdown</h3>
+    <div className="pt-2">
+      <h4 className="text-base font-semibold text-text-primary mb-1.5">Model breakdown</h4>
 
       {sorted.length > 1 && (
         <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary mb-4">
@@ -63,7 +63,7 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
           than simply assuming &ldquo;up&rdquo;, so read the 80% range, not the sign.
         </p>
       )}
-      <div className="space-y-3">
+      <div className="divide-y divide-border">
         {sorted.map((model) => {
           const color = MODEL_COLORS[model.model] || "var(--text-secondary)";
           const label = MODEL_LABELS[model.model] || model.model;
@@ -76,7 +76,7 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
           const hiPct = hi != null ? forecastReturn(hi, model.current_price) : null;
 
           return (
-            <div key={model.model} className="group">
+            <div key={model.model} className="group py-2.5">
               <div className="flex items-center gap-2">
                 {/* Model label */}
                 <span className="flex w-24 shrink-0 items-center gap-1.5 text-sm text-text-primary">
@@ -110,12 +110,12 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
                 </div>
 
                 {/* Median change — neutral ink: no model has a validated directional edge */}
-                <span className="num text-sm w-16 text-right shrink-0 text-text-secondary">
+                <span className="num text-sm font-semibold w-16 text-right shrink-0 text-text-primary">
                   {pctChange == null ? "Unknown" : `${pctChange >= 0 ? "+" : ""}${pctChange.toFixed(1)}%`}
                 </span>
               </div>
               {lo != null && hi != null && (
-                <p className="text-xs text-text-muted mt-0.5 pl-[6.5rem]">
+                <p className="text-xs text-text-muted mt-1 pl-[6.5rem]">
                   80% range <span className="num">{formatCurrency(lo)} &ndash; {formatCurrency(hi)}
                   {loPct != null && hiPct != null &&
                     ` (${signed(loPct)} / ${signed(hiPct)})`}</span>
@@ -128,7 +128,7 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
 
       {/* Legend */}
       {currentPrice && (
-        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border">
+        <div className="flex items-center gap-2 pt-3 border-t border-border">
           <div className="border-l border-dashed border-text-secondary h-3" />
           <span className="text-xs text-text-muted">
             Current <span className="num">{formatCurrency(currentPrice)}</span>

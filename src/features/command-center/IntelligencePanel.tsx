@@ -189,7 +189,7 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
           )}
         </div>
         {refreshError && (
-          <div className="mb-2 text-xs text-accent-red">
+          <div role="alert" className="callout mb-3" style={{ "--callout": "var(--accent-red)" } as React.CSSProperties}>
             {refreshError}
           </div>
         )}
@@ -206,7 +206,7 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
 
   return (
     <div>
-      <div className="flex items-center justify-end gap-2 mb-3">
+      <div className="flex items-center justify-start gap-2 mb-4">
         <div className="flex items-center gap-2">
           {fromCache && (
             <span
@@ -243,7 +243,7 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
         </div>
       </div>
       {refreshError && (
-        <div className="mb-2 text-xs text-accent-red">
+        <div role="alert" className="callout mb-3" style={{ "--callout": "var(--accent-red)" } as React.CSSProperties}>
           {refreshError}
         </div>
       )}
@@ -254,11 +254,11 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
           intel sections below carry the factual narrative without a synthesized
           directional call. */}
 
-      <div className="space-y-5">
+      <div className="space-y-6">
         {sections.map((section, idx) => (
           <div key={idx}>
-            <h4 className="text-sm font-semibold text-text-primary mb-1">{section.title}</h4>
-            <p className="max-w-[72ch] text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
+            <h4 className="text-base font-semibold text-text-primary mb-1.5">{section.title}</h4>
+            <p className="prose-read max-w-[72ch] text-text-secondary whitespace-pre-wrap">
               {section.content}
             </p>
           </div>

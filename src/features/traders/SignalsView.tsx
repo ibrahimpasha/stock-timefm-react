@@ -25,7 +25,7 @@ import {
 } from "../../api/alerts";
 import { useAppStore } from "../../store/useAppStore";
 import { Sparkline, RangeBar } from "../../components/CCPrimitives";
-import { GlassPanel, Segmented, Chip, type ChipTone } from "../../components/Glass";
+import { Segmented, Chip, type ChipTone } from "../../components/Glass";
 import {
   relativeAge,
   absoluteAge,
@@ -96,7 +96,7 @@ function Th({
   );
 }
 
-const TD_BASE = "px-2.5 py-2";
+const TD_BASE = "px-2.5 py-2.5";
 
 /* ── Shared empty / loading bits ─────────────────────────── */
 
@@ -240,12 +240,7 @@ function TrendingTab({
                       <button
                         type="button"
                         onClick={() => onTickerClick(r.ticker)}
-                        className="num text-sm font-semibold text-accent-blue cursor-pointer"
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          padding: 0,
-                        }}
+                        className="ticker cursor-pointer text-sm transition-colors hover:text-accent-blue"
                       >
                         {r.ticker}
                       </button>
@@ -404,9 +399,9 @@ function TickerDrawer({
   return (
     <div className="mt-4 border-t border-border pt-3">
       <header className="flex items-center justify-between pb-2">
-        <span className="text-sm font-semibold text-text-primary">
-          <span className="num">{ticker}</span> mention history
-        </span>
+        <h3 className="font-display text-lg font-medium text-text-primary">
+          <span className="ticker">{ticker}</span> mention history
+        </h3>
         <button
           type="button"
           onClick={onClose}
@@ -657,9 +652,9 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
           {/* Sparkline header */}
           <div className="flex items-center gap-4 mb-3">
             <div>
-              <div className="text-sm font-semibold text-text-primary mb-1">
-                <span className="num">{ticker}</span> sentiment trajectory
-              </div>
+              <h3 className="mb-2 font-display text-lg font-medium text-text-primary">
+                <span className="ticker">{ticker}</span> sentiment trajectory
+              </h3>
               <Sparkline
                 points={sentSeries}
                 width={240}
@@ -671,11 +666,14 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
                 }
                 fill
               />
-              <div
-                className="num text-sm mt-1 font-semibold"
-                style={{ color: changeColor(lastSent) }}
-              >
-                Last {lastSent.toFixed(2)}
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-xs text-text-muted">Last</span>
+                <span
+                  className="num text-2xl font-semibold tracking-tight"
+                  style={{ color: changeColor(lastSent) }}
+                >
+                  {lastSent.toFixed(2)}
+                </span>
               </div>
             </div>
           </div>
@@ -740,9 +738,9 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
           <div
             className="border-t border-border pt-3"
           >
-            <div className="text-sm font-semibold text-text-primary mb-1.5">
+            <h3 className="mb-1.5 text-sm font-semibold text-text-primary">
               Daily catalysts
-            </div>
+            </h3>
             <div className="max-h-40 overflow-auto divide-y divide-border">
               {points
                 .filter(
@@ -827,17 +825,17 @@ function AdminTab({ onTickerClick }: { onTickerClick: (t: string) => void }) {
       {data.authors.map((a) => (
         <div key={a.author}>
           <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-sm font-semibold text-text-primary">{a.author}</span>
+            <h3 className="font-display text-lg font-medium text-text-primary">{a.author}</h3>
             <span className="text-xs text-text-muted">
               <span className="num">{a.n_calls}</span> posts
             </span>
           </div>
-          <div className="text-sm text-text-secondary mb-1.5 max-w-[72ch]">{a.style}</div>
+          <p className="mb-2 max-w-[72ch] text-sm text-text-secondary">{a.style}</p>
           <div className="divide-y divide-border">
             {a.calls.map((c) => (
               <div
                 key={c.msg_id}
-                className="flex items-start gap-2.5 py-2 text-sm"
+                className="flex items-start gap-2.5 py-2.5 text-sm"
               >
                 <span className="num text-xs text-text-muted w-12 shrink-0 pt-0.5">{c.ts.slice(5, 10)}</span>
                 <span
@@ -851,19 +849,19 @@ function AdminTab({ onTickerClick }: { onTickerClick: (t: string) => void }) {
                     <button
                       key={t}
                       onClick={() => onTickerClick(t)}
-                      className="num font-semibold text-accent-blue hover:underline"
+                      className="ticker transition-colors hover:text-accent-blue"
                     >
                       {t}
                     </button>
                   ))}
                 </span>
-                <span className="text-text-secondary min-w-0 leading-relaxed">
+                <span className="min-w-0 max-w-[72ch] font-display text-base leading-relaxed text-text-secondary">
                   {c.thesis}
                   {c.levels && (
-                    <span className="text-text-muted"> · {c.levels}</span>
+                    <span className="font-sans text-sm text-text-muted"> · {c.levels}</span>
                   )}
                   {c.from_image && (
-                    <span className="text-text-muted"> · chart</span>
+                    <span className="font-sans text-sm text-text-muted"> · chart</span>
                   )}
                 </span>
               </div>
@@ -898,40 +896,29 @@ export function SignalsView() {
   }
 
   return (
-    <GlassPanel
-      title="Signals"
-      actions={
-        <>
-          <span className="text-xs text-text-muted max-md:hidden">
-            Mentions, catalysts, first-callers
-          </span>
-          <Segmented<SignalsTab>
-            options={[
-              {
-                value: "trending",
-                label: "Trending",
-              },
-              {
-                value: "leaders",
-                label: "Leaders",
-              },
-              {
-                value: "sentiment",
-                label: "Sentiment",
-              },
-              {
-                value: "admin",
-                label: "Admin",
-              },
-            ]}
-            value={tab}
-            onChange={setTab}
-          />
-        </>
-      }
-    >
-      {/* Tab body */}
-      <div>
+    <section className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <div>
+          <h2 className="section-title">Signals</h2>
+          <p className="section-sub">
+            Mentions, catalysts and first-callers across every trader
+          </p>
+        </div>
+        <Segmented<SignalsTab>
+          ariaLabel="Signals view"
+          options={[
+            { value: "trending", label: "Trending" },
+            { value: "leaders", label: "Leaders" },
+            { value: "sentiment", label: "Sentiment" },
+            { value: "admin", label: "Admin" },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
+      </div>
+
+      {/* Tab body — one card around the dense dataset */}
+      <div className="card min-w-0">
         {tab === "trending" && (
           <>
             <TrendingTab
@@ -953,6 +940,6 @@ export function SignalsView() {
         )}
         {tab === "admin" && <AdminTab onTickerClick={handleTickerClick} />}
       </div>
-    </GlassPanel>
+    </section>
   );
 }

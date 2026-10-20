@@ -75,14 +75,14 @@ function styleFor(m: TraderMatch): ChipStyle {
   if (m.tier === "contract") {
     if (m.aligned) {
       return {
-        color: "white",
+        color: "var(--bg-primary)",
         background: "var(--accent-green)",
         border: "var(--accent-green)",
       };
     }
     // contract + direction conflict -> solid red (active fade)
     return {
-      color: "white",
+      color: "var(--bg-primary)",
       background: "var(--accent-red)",
       border: "var(--accent-red)",
     };
@@ -158,7 +158,7 @@ export function TraderMatchChips({ matches }: { matches: TraderMatch[] }) {
         return (
           <span
             key={`${m.author}-${m.ts}-${i}`}
-            className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded"
+            className="num rounded px-1.5 py-0.5 text-xs font-bold"
             style={{
               color: s.color,
               background: s.background,
@@ -173,7 +173,7 @@ export function TraderMatchChips({ matches }: { matches: TraderMatch[] }) {
       })}
       {overflow.length > 0 && (
         <span
-          className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded"
+          className="num rounded px-1.5 py-0.5 text-xs font-bold"
           style={{
             color: "var(--text-muted)",
             background: "transparent",

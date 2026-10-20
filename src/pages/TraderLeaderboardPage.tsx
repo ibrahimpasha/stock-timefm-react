@@ -77,11 +77,9 @@ function cmpTs(a: string | null, b: string | null): number {
 function EmptyState({ title, body }: { title: string; body: string }) {
   return (
     <div className="flex items-center justify-center min-h-80">
-      <div className="card max-w-lg text-center">
-        <h2 className="text-sm font-semibold text-text-primary mb-2">
-          {title}
-        </h2>
-        <p className="text-sm text-text-muted leading-relaxed">{body}</p>
+      <div className="max-w-lg text-center">
+        <h2 className="section-title mb-2">{title}</h2>
+        <p className="text-sm text-text-secondary leading-relaxed">{body}</p>
       </div>
     </div>
   );
@@ -222,9 +220,9 @@ function LeaderboardTable({
                     : undefined,
                 }}
               >
-                <td className="px-3 py-2">
-                  <div className="flex min-w-0 items-baseline gap-2">
-                  <span className="num w-5 shrink-0 text-right text-xs text-text-muted">
+                <td className="px-3 py-2.5">
+                  <div className="flex min-w-0 items-baseline gap-2.5">
+                  <span className={`num w-5 shrink-0 text-right text-sm ${i < 3 ? "font-semibold text-text-primary" : "text-text-muted"}`}>
                     {i + 1}
                   </span>
                   <div className="min-w-0">
@@ -244,14 +242,14 @@ function LeaderboardTable({
                   </button>
                   {r.top_ticker && (
                     <div className="text-xs text-text-muted">
-                      top <span className="num">{r.top_ticker}</span>
+                      top <span className="ticker text-text-secondary">{r.top_ticker}</span>
                     </div>
                   )}
                   </div>
                   </div>
                 </td>
                 <td
-                  className="num px-3 py-2 text-right text-sm text-text-secondary"
+                  className="num px-3 py-2.5 text-right text-sm text-text-secondary"
                 >
                   {r.n_calls}
                   {r.n_realized > 0 && (
@@ -264,7 +262,7 @@ function LeaderboardTable({
                   )}
                 </td>
                 <td
-                  className={`num px-3 py-2 text-right text-sm ${
+                  className={`num px-3 py-2.5 text-right text-sm ${
                     (todayMap[r.author] || 0) > 0
                       ? "font-semibold text-text-primary"
                       : "text-text-muted"
@@ -273,7 +271,7 @@ function LeaderboardTable({
                 >
                   {todayMap[r.author] || 0}
                 </td>
-                <td className="px-3 py-2 min-w-24">
+                <td className="px-3 py-2.5 min-w-24">
                   {winPct != null ? (
                     <div className="flex items-center gap-1.5">
                       <span
@@ -291,7 +289,7 @@ function LeaderboardTable({
                   )}
                 </td>
                 <td
-                  className="num px-3 py-2 text-right text-sm font-semibold"
+                  className="num px-3 py-2.5 text-right text-sm font-semibold"
                   style={{
                     color:
                       r.mean_pl_pct != null
@@ -304,7 +302,7 @@ function LeaderboardTable({
                     : "—"}
                 </td>
                 <td
-                  className="num px-3 py-2 text-right text-xs text-text-muted whitespace-nowrap"
+                  className="num px-3 py-2.5 text-right text-xs text-text-muted whitespace-nowrap"
                   title={absoluteAge(r.latest_call_ts) || ""}
                 >
                   {relativeAge(r.latest_call_ts) || "—"}
@@ -346,7 +344,7 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
 
   if (isLoading || (isFetching && !data)) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         <SkeletonCard height={120} />
         <SkeletonCard height={300} />
       </div>
@@ -438,72 +436,79 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
   const meanPlColor =
     meanPl != null ? changeColor(meanPl) : "var(--text-muted)";
 
+  const outcomeSum =
+    sparkPoints.length >= 1 ? sparkPoints[sparkPoints.length - 1] : null;
+
   return (
-    <div className="flex flex-col gap-3 min-h-0">
+    <div className="flex min-h-0 min-w-0 flex-col gap-8">
       <QueryNotice queries={[positionsQuery]} label="Trader positions" />
-      <p className="text-xs text-text-muted">Reported peak/exit outcomes, not fill-weighted realized or portfolio returns.</p>
-      <section className="card">
-        <div className="flex items-start justify-between gap-4">
+
+      {/* Hero: who, and the one number that summarizes them. */}
+      <header className="flex flex-col gap-5">
+        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
           <div className="min-w-0 flex-1">
-            <div
-              className="text-lg font-semibold text-text-primary truncate"
-              title={author}
-            >
+            <h2 className="headline truncate" title={author}>
               {author}
-            </div>
-            {leaderboardRow?.top_ticker && (
-              <div className="mt-1.5 text-sm text-text-secondary">
-                Top ticker{" "}
-                <button
-                  type="button"
-                  onClick={() => setActiveTicker(leaderboardRow.top_ticker!)}
-                  aria-label={`Select ${leaderboardRow.top_ticker} ticker`}
-                  className="num text-sm font-semibold cursor-pointer p-0"
-                  style={{
-                    color: "var(--accent-blue)",
-                    background: "transparent",
-                    border: "none",
-                  }}
-                >
-                  {leaderboardRow.top_ticker}
-                </button>
-              </div>
-            )}
+            </h2>
+            <p className="mt-2 text-sm text-text-secondary">
+              {leaderboardRow?.top_ticker && (
+                <>
+                  Most traded{" "}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTicker(leaderboardRow.top_ticker!)}
+                    aria-label={`Select ${leaderboardRow.top_ticker} ticker`}
+                    className="ticker cursor-pointer text-accent-blue hover:underline"
+                  >
+                    {leaderboardRow.top_ticker}
+                  </button>
+                  <span className="text-text-muted"> · </span>
+                </>
+              )}
+              <span className="text-text-muted">
+                Reported peak/exit outcomes, not fill-weighted realized or
+                portfolio returns.
+              </span>
+            </p>
           </div>
 
-          {/* Cumulative P/L sparkline — the hero number of the panel */}
-          {sparkPoints.length >= 2 && (
-            <div className="text-right">
-              <div className="text-xs text-text-muted mb-1">
-                Outcome sum (pp)
-              </div>
+          {/* Cumulative outcome — the hero number of the panel */}
+          <div className="flex shrink-0 items-end gap-4">
+            {sparkPoints.length >= 2 && (
               <Sparkline
                 points={sparkPoints}
-                width={140}
-                height={36}
+                width={160}
+                height={44}
                 color={
-                  sparkPoints[sparkPoints.length - 1] >= 0
+                  (outcomeSum ?? 0) >= 0
                     ? "var(--accent-green)"
                     : "var(--accent-red)"
                 }
                 fill
               />
+            )}
+            <div className="text-right">
+              <div className="text-xs text-text-muted">Outcome sum</div>
               <div
-                className="num text-lg font-semibold mt-0.5"
+                className="num text-3xl font-semibold tracking-tight"
                 style={{
-                  color: changeColor(sparkPoints[sparkPoints.length - 1]),
+                  color:
+                    outcomeSum != null
+                      ? changeColor(outcomeSum)
+                      : "var(--text-muted)",
                 }}
               >
-                {sparkPoints[sparkPoints.length - 1].toFixed(1)} pp
+                {outcomeSum != null ? `${outcomeSum.toFixed(1)}` : "—"}
+                <span className="ml-1 text-base font-medium text-text-muted">
+                  pp
+                </span>
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Metric strip — summary Stats (derived from positions) */}
-        <div
-          className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-4 border-t border-border pt-3"
-        >
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border pt-4 sm:grid-cols-4">
           <Stat label="Positions" value={String(nPositions)} />
           <Stat
             label="With exits"
@@ -523,68 +528,47 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
           />
           <Stat
             label="Mean outcome"
-            value={
-              <span style={{ color: meanPlColor }}>{meanPlStr}</span>
-            }
-          />
-          <Stat
-            label="Outcome sum (pp)"
-            value={
-              sparkPoints.length >= 1 ? (
-                <span
-                  style={{
-                    color: changeColor(
-                      sparkPoints[sparkPoints.length - 1] || 0,
-                    ),
-                  }}
-                >
-                  {(sparkPoints[sparkPoints.length - 1] || 0).toFixed(1)} pp
-                </span>
-              ) : (
-                "—"
-              )
-            }
+            value={<span style={{ color: meanPlColor }}>{meanPlStr}</span>}
           />
         </div>
-      </section>
+      </header>
 
-      {/* Trader Brief — collapsible LLM digest. Sits above positions because
-          it gives the meta-context (style, sectors, watching) the per-position
-          list doesn't carry. Default collapsed; one click to expand, one click
-          to generate. */}
+      {/* Trader Brief — collapsible LLM digest (style, sectors, watching). */}
       <TraderBrief author={author} />
 
       {/* Positions list */}
-      <section className="card overflow-hidden" style={{ padding: 0 }}>
-        <header className="flex items-baseline gap-2 border-b border-border px-4 py-3">
-          <h3 className="text-sm font-semibold text-text-primary">Positions</h3>
-          <span className="num text-xs text-text-muted">{positions.length}</span>
-        </header>
-        {positions.length === 0 ? (
-          <div className="py-5 text-center text-sm text-text-muted">
-            No positions in window.
-          </div>
-        ) : (
-          <div className="flex flex-col divide-y divide-border">
-            {positions.map((p) => {
-              const k = positionKeyString(p.position_key);
-              return (
-                <TraderPositionRow
-                  key={k}
-                  position={p}
-                  expanded={expandedPositionKey === k}
-                  activeTicker={activeTicker}
-                  onToggle={(key) =>
-                    setExpandedPositionKey((cur) =>
-                      cur === key ? null : key,
-                    )
-                  }
-                  onTickerClick={(t) => setActiveTicker(t)}
-                />
-              );
-            })}
-          </div>
-        )}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-baseline gap-2">
+          <h3 className="section-title">Positions</h3>
+          <span className="num text-sm text-text-muted">{positions.length}</span>
+        </div>
+        <div className="card overflow-hidden" style={{ padding: 0 }}>
+          {positions.length === 0 ? (
+            <div className="py-6 text-center text-sm text-text-muted">
+              No positions in window.
+            </div>
+          ) : (
+            <div className="flex flex-col divide-y divide-border">
+              {positions.map((p) => {
+                const k = positionKeyString(p.position_key);
+                return (
+                  <TraderPositionRow
+                    key={k}
+                    position={p}
+                    expanded={expandedPositionKey === k}
+                    activeTicker={activeTicker}
+                    onToggle={(key) =>
+                      setExpandedPositionKey((cur) =>
+                        cur === key ? null : key,
+                      )
+                    }
+                    onTickerClick={(t) => setActiveTicker(t)}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );
@@ -653,14 +637,6 @@ export function TraderLeaderboardPage() {
       </header>
       <QueryNotice queries={[leaderboardQuery]} label="Trader leaderboard" />
 
-      {/* Today's raw chronological activity — what each trader posted today,
-          straight from extracted_calls. No state derivation, no stitching. */}
-      <TradersTodayFeed />
-
-      {/* Signals view — trending tickers, first-mention leaders, sentiment.
-          Self-contained; falls back to an empty state until A/B endpoints land. */}
-      <SignalsView />
-
       {/* Body */}
       {(leaderboardQuery.isError || leaderboardQuery.fetchStatus === "paused") && !data ? null : data && data.ok === false ? (
         <EmptyState
@@ -669,13 +645,13 @@ export function TraderLeaderboardPage() {
         />
       ) : isLoading || (isFetching && !data) ? (
         <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 lg:col-span-4 space-y-2">
+          <div className="col-span-12 lg:col-span-5 xl:col-span-4 space-y-2">
             <SkeletonCard height={48} />
             <SkeletonCard height={48} />
             <SkeletonCard height={48} />
             <SkeletonCard height={48} />
           </div>
-          <div className="col-span-12 lg:col-span-8 space-y-3">
+          <div className="col-span-12 lg:col-span-7 xl:col-span-8 space-y-3">
             <SkeletonCard height={120} />
             <SkeletonCard height={360} />
           </div>
@@ -686,47 +662,40 @@ export function TraderLeaderboardPage() {
           body="No parsed trade calls returned for this window."
         />
       ) : (
-        <div className="grid grid-cols-12 gap-4 items-start">
-          {/* Left: leaderboard list */}
-          <div
-            className="col-span-12 lg:col-span-4 card overflow-hidden"
-            style={{ padding: 0 }}
-          >
-            <div
-              className="flex flex-col gap-2 border-b border-border px-4 pt-3 pb-3"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-text-primary">
-                  Leaderboard
-                </h3>
-                <span className="text-xs text-text-muted inline-flex items-center gap-1">
-                  {SORT_LABELS[sortMode]}
-                  <ArrowUpDown size={10} className="opacity-70" />
-                  {sortDesc ? "desc" : "asc"}
-                </span>
-              </div>
-              <div className="overflow-x-auto">
-                <Segmented<SortMode>
-                  ariaLabel="Leaderboard sort"
-                  options={SORT_OPTIONS}
-                  value={sortMode}
-                  onChange={handleSort}
-                />
-              </div>
+        <div className="grid grid-cols-12 items-start gap-x-10 gap-y-8">
+          {/* Left: the ranking — the page's focal point */}
+          <section className="col-span-12 flex min-w-0 flex-col gap-3 lg:col-span-5 xl:col-span-4">
+            <div>
+              <h2 className="section-title">Leaderboard</h2>
+              <p className="section-sub inline-flex items-center gap-1">
+                Ranked by {SORT_LABELS[sortMode].toLowerCase()}
+                <ArrowUpDown size={11} className="opacity-70" aria-hidden="true" />
+                {sortDesc ? "high to low" : "low to high"}
+              </p>
             </div>
-            <LeaderboardTable
-              rows={rows}
-              selected={activeSelected}
-              onSelect={setSelected}
-              sortMode={sortMode}
-              onSort={handleSort}
-              sortDesc={sortDesc}
-              todayMap={todayMap}
-            />
-          </div>
+            <div className="overflow-x-auto">
+              <Segmented<SortMode>
+                ariaLabel="Leaderboard sort"
+                options={SORT_OPTIONS}
+                value={sortMode}
+                onChange={handleSort}
+              />
+            </div>
+            <div className="card overflow-hidden" style={{ padding: 0 }}>
+              <LeaderboardTable
+                rows={rows}
+                selected={activeSelected}
+                onSelect={setSelected}
+                sortMode={sortMode}
+                onSort={handleSort}
+                sortDesc={sortDesc}
+                todayMap={todayMap}
+              />
+            </div>
+          </section>
 
-          {/* Right: profile */}
-          <div className="col-span-12 lg:col-span-8">
+          {/* Right: selected trader profile */}
+          <div className="col-span-12 min-w-0 lg:col-span-7 xl:col-span-8">
             <TraderProfile
               author={activeSelected}
               leaderboardRow={selectedRow}
@@ -734,6 +703,18 @@ export function TraderLeaderboardPage() {
           </div>
         </div>
       )}
+
+      {/* Secondary band: cross-trader signals + today's raw feed (rail). */}
+      <div className="mt-4 grid grid-cols-12 items-start gap-x-10 gap-y-8 border-t border-border pt-8">
+        <div className="col-span-12 min-w-0 xl:col-span-8">
+          <SignalsView />
+        </div>
+        <div className="col-span-12 min-w-0 xl:col-span-4">
+          {/* Today's raw chronological activity — straight from
+              extracted_calls. No state derivation, no stitching. */}
+          <TradersTodayFeed />
+        </div>
+      </div>
     </div>
   );
 }

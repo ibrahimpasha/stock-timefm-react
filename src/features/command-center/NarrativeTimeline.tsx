@@ -69,7 +69,7 @@ function NarrativeEventRow({
   const nodeSize = Math.max(8, Math.min(14, 8 + Number(event.strength ?? 0) * 4));
 
   return (
-    <div className="relative pl-6 pb-3 last:pb-0">
+    <div className="relative pl-7 pb-5 last:pb-0">
       <div
         className="absolute left-[3px] top-1 rounded-full border"
         style={{
@@ -92,7 +92,7 @@ function NarrativeEventRow({
         <button
           type="button"
           onClick={hasExpansion ? onToggle : undefined}
-          className="mt-1 flex w-full items-start gap-1.5 text-left text-sm text-text-primary"
+          className="data-row -ml-1 mt-1 flex w-full items-start gap-1.5 px-1 py-0.5 text-left text-sm text-text-primary"
           aria-expanded={hasExpansion ? expanded : undefined}
         >
           {hasExpansion ? (
@@ -104,12 +104,12 @@ function NarrativeEventRow({
           ) : (
             <span className="mt-1 h-3 w-[13px] shrink-0" />
           )}
-          <span className="min-w-0 flex-1 truncate font-medium">{event.title}</span>
+          <span className={`min-w-0 flex-1 font-medium leading-snug ${expanded ? "" : "line-clamp-2"}`} title={event.title}>{event.title}</span>
         </button>
 
         {expanded && hasExpansion && (
           <div className="mt-2 ml-5 space-y-2 text-xs">
-            {event.detail && <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">{event.detail}</p>}
+            {event.detail && <p className="prose-read max-w-[72ch] text-text-secondary">{event.detail}</p>}
             {(event.sentiment || event.strength != null) && (
               <div className="flex flex-wrap gap-x-3 text-text-muted">
                 {event.sentiment && (
@@ -165,13 +165,13 @@ export function NarrativeTimeline({
   );
 
   return (
-    <section className="card">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-text-primary">Narrative timeline</h3>
-        <div className="text-xs text-text-muted">
+    <section aria-label="Narrative timeline">
+      <div className="mb-5">
+        <h3 className="section-title">Narrative timeline</h3>
+        <p className="section-sub">
           <span className="num">{data?.summary.event_count ?? events.length}</span> events · last{" "}
-          <span className="num">{data?.window_hours ?? hours}h</span>
-        </div>
+          <span className="num">{data?.window_hours ?? hours}h</span> · oldest first
+        </p>
       </div>
 
       {isLoading ? (
@@ -181,13 +181,13 @@ export function NarrativeTimeline({
           <div className="h-4 w-2/3 rounded bg-text-muted/15" />
         </div>
       ) : isError ? (
-        <div className="flex items-start gap-2 text-sm text-text-secondary">
-          <Info size={14} className="mt-0.5 shrink-0 text-accent-orange" />
+        <div role="alert" className="callout flex items-start gap-2">
+          <Info size={14} className="mt-0.5 shrink-0" />
           Narrative events are unavailable for {ticker}. The rest of the analysis panel is unchanged.
         </div>
       ) : events.length === 0 ? (
         <div className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">
-          <p className="font-medium text-text-primary">No strong narrative events in this window.</p>
+          <p className="text-base font-semibold text-text-primary">No strong narrative events in this window.</p>
           <p className="mt-1">
             Quiet tape is not bearish by itself. It means news, flow, voices, traders, forecasts,
             earnings, and macro inputs did not produce strong evidence for {ticker} over the last{" "}
@@ -197,7 +197,7 @@ export function NarrativeTimeline({
       ) : (
         <>
           {data?.summary.sources_seen && data.summary.sources_seen.length > 0 && (
-            <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
+            <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
               {data.summary.sources_seen.map((source) => (
                 <span key={source} className="inline-flex items-center gap-1.5">
                   <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: colorForSource(source) }} />

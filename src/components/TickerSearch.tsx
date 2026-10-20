@@ -143,7 +143,7 @@ export function TickerSearch({
         Ticker or company
       </label>
       <div
-        className="control-surface flex min-h-8 items-center gap-2 rounded-full border px-3 py-1.5 transition-colors"
+        className="control-surface flex min-h-10 items-center gap-2.5 rounded-full border px-4 py-2 transition-colors"
         style={{ boxShadow: "var(--shadow-1)" }}
       >
         <Search size={16} className="text-text-muted shrink-0" aria-hidden="true" />
@@ -167,7 +167,7 @@ export function TickerSearch({
           onFocus={() => query.trim() && setOpen(true)}
           onKeyDown={onKeyDown}
           placeholder="Ticker or company"
-          className={`bg-transparent border-none outline-none text-text-primary text-sm ${inputWidth} placeholder:text-text-muted`}
+          className={`bg-transparent border-none outline-none text-text-primary text-sm font-medium ${inputWidth} placeholder:font-normal placeholder:text-text-muted`}
           spellCheck={false}
           autoComplete="off"
         />
@@ -186,7 +186,7 @@ export function TickerSearch({
           id={listboxId}
           role="listbox"
           aria-label="Ticker suggestions"
-          className="glass-strong absolute right-0 z-50 mt-1.5 w-[min(18rem,calc(100vw-1rem))] max-h-[min(20rem,60dvh)] overflow-y-auto py-1"
+          className="glass-strong absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-1rem))] max-h-[min(24rem,60dvh)] overflow-y-auto p-1.5"
           style={{ boxShadow: "var(--shadow-3)" }}
         >
           {matches.map((m, i) => (
@@ -201,14 +201,14 @@ export function TickerSearch({
                 e.preventDefault();
                 choose(m.ticker);
               }}
-              className={`flex min-h-7 w-full cursor-pointer items-center gap-3 px-3 py-1.5 text-left transition-colors ${
+              className={`data-row flex min-h-11 w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left lg:min-h-10 ${
                 i === highlight ? "bg-bg-card-hover" : ""
               }`}
             >
-              <span className="num text-sm text-text-primary w-14 shrink-0">
+              <span className="ticker text-sm w-16 shrink-0">
                 {m.ticker}
               </span>
-              <span className="text-xs text-text-muted truncate">{m.name}</span>
+              <span className="min-w-0 flex-1 truncate text-sm text-text-secondary">{m.name}</span>
             </div>
           ))}
         </div>

@@ -5,7 +5,7 @@ import {
   TrendingUp, TrendingDown, ChevronDown, ChevronRight, Target,
   AlertOctagon, Activity, RefreshCw,
 } from "lucide-react";
-import { Segmented } from "../../components/Glass";
+import { Segmented, Stat } from "../../components/Glass";
 
 interface ClosedPosition {
   ticker: string;
@@ -113,7 +113,7 @@ function TradeRow({ pos }: { pos: ClosedPosition }) {
   return (
     <div>
       <div
-        className="flex items-center gap-2 px-1 py-2 text-xs cursor-pointer hover:bg-bg-card-hover"
+        className="data-row flex cursor-pointer items-center gap-3 px-2 py-2.5"
         role="button"
         tabIndex={0}
         aria-expanded={expanded}
@@ -125,62 +125,61 @@ function TradeRow({ pos }: { pos: ClosedPosition }) {
           }
         }}
       >
-        {expanded ? <ChevronDown size={12} className="text-text-muted" /> : <ChevronRight size={12} className="text-text-muted" />}
-        <SideIcon size={12} style={{ color: sideColor }} />
-        <span className="num font-semibold text-text-primary w-12">{pos.ticker}</span>
-        <span className="num text-text-primary">${pos.strike} {pos.option_type}</span>
-        {pos.is_lotto && <span className="text-xs text-text-muted">lotto</span>}
-        <span className="num text-text-muted">×{pos.contracts}</span>
-        <span className="num text-text-muted">{pos.expiry}</span>
-        <span
-          className="ml-auto flex items-center gap-1 text-xs"
-          style={{ color: exitInfo.color }}
-        >
-          <ExitIcon size={12} />
-          {exitInfo.label}
-        </span>
-        <span className="num font-semibold w-16 text-right" style={{ color: pnlColor }}>
+        {expanded ? <ChevronDown size={14} className="shrink-0 text-text-muted" /> : <ChevronRight size={14} className="shrink-0 text-text-muted" />}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <SideIcon size={13} className="shrink-0 self-center" style={{ color: sideColor }} />
+            <span className="ticker text-sm">{pos.ticker}</span>
+            <span className="num truncate text-xs text-text-secondary">
+              ${pos.strike} {pos.option_type} {pos.expiry} <span className="text-text-muted">×{pos.contracts}</span>
+            </span>
+            {pos.is_lotto && <span className="tag">lotto</span>}
+          </div>
+          <div className="mt-0.5 flex items-center gap-1 text-xs" style={{ color: exitInfo.color }}>
+            <ExitIcon size={12} />
+            {exitInfo.label}
+            <span className="num ml-2 text-text-muted">{fmtDate(pos.closed_at)}</span>
+          </div>
+        </div>
+        <span className={`w-20 shrink-0 text-right text-lg font-semibold ${isWin ? "delta-up" : "delta-down"}`}>
           {pos.pnl_pct >= 0 ? "+" : ""}{pos.pnl_pct.toFixed(1)}%
-        </span>
-        <span className="text-text-muted num text-xs w-20 text-right">
-          {fmtDate(pos.closed_at)}
         </span>
       </div>
       {expanded && (
-        <div className="pl-6 pr-1 pb-3 pt-1 space-y-3 text-xs">
+        <div className="space-y-4 pb-4 pl-9 pr-2 pt-1 text-xs">
           {/* Trade lifecycle */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
             <div>
               <div className="text-text-muted">Entry</div>
-              <div className="num text-text-primary">${pos.entry_price?.toFixed(2)}</div>
+              <div className="num text-sm text-text-primary">${pos.entry_price?.toFixed(2)}</div>
             </div>
             <div>
               <div className="text-text-muted">Exit</div>
-              <div className="num" style={{ color: pnlColor }}>${pos.exit_price?.toFixed(2)}</div>
+              <div className="num text-sm" style={{ color: pnlColor }}>${pos.exit_price?.toFixed(2)}</div>
             </div>
             <div>
               <div className="text-text-muted">Hold</div>
-              <div className="num text-text-primary">{holdDuration(pos.filled_at, pos.closed_at)}</div>
+              <div className="num text-sm text-text-primary">{holdDuration(pos.filled_at, pos.closed_at)}</div>
             </div>
             <div>
               <div className="text-text-muted">Score</div>
-              <div className="num text-text-primary">{pos.score?.toFixed(2)}</div>
+              <div className="num text-sm text-text-primary">{pos.score?.toFixed(2)}</div>
             </div>
             <div>
               <div className="text-text-muted">DTE at fill</div>
-              <div className="num text-text-primary">{pos.dte}</div>
+              <div className="num text-sm text-text-primary">{pos.dte}</div>
             </div>
             <div>
               <div className="text-text-muted">Cost basis</div>
-              <div className="num text-text-primary">${pos.cost?.toFixed(0)}</div>
+              <div className="num text-sm text-text-primary">${pos.cost?.toFixed(0)}</div>
             </div>
             <div>
               <div className="text-text-muted">Trim level</div>
-              <div className="num text-text-primary">{pos.trim_level ?? 0}</div>
+              <div className="num text-sm text-text-primary">{pos.trim_level ?? 0}</div>
             </div>
             <div>
               <div className="text-text-muted">Filled at</div>
-              <div className="num text-text-primary">{fmtDate(pos.filled_at)}</div>
+              <div className="num text-sm text-text-primary">{fmtDate(pos.filled_at)}</div>
             </div>
           </div>
 
@@ -216,7 +215,7 @@ function TradeRow({ pos }: { pos: ClosedPosition }) {
           {/* Why exited */}
           <div>
             <div className="text-text-muted mb-1">Why exited</div>
-            <span className="text-text-primary num">{pos.exit_reason}</span>
+            <span className="num text-sm text-text-primary">{pos.exit_reason}</span>
           </div>
         </div>
       )}
@@ -265,9 +264,13 @@ export function TradeDecisionLog() {
   const winRate = data.length > 0 ? (wins / data.length) * 100 : 0;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Filter + stats (the parent disclosure already titles this section) */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="grid grid-cols-2 gap-8">
+          <Stat label="Win rate" value={`${winRate.toFixed(0)}%`} tone={winRate >= 50 ? "green" : "red"} />
+          <Stat label="Avg P/L" value={`${totalPnlPct >= 0 ? "+" : ""}${totalPnlPct.toFixed(1)}%`} tone={totalPnlPct >= 0 ? "green" : "red"} />
+        </div>
         <Segmented
           ariaLabel="Filter trades"
           value={filter}
@@ -278,25 +281,11 @@ export function TradeDecisionLog() {
             { value: "losses", label: <>Losses <span className="num">{losses}</span></> },
           ]}
         />
-        <div className="flex items-center gap-4 text-xs">
-          <span>
-            <span className="text-text-muted">Win rate</span>{" "}
-            <span className="num font-semibold" style={{ color: winRate >= 50 ? "var(--accent-green)" : "var(--accent-red)" }}>
-              {winRate.toFixed(0)}%
-            </span>
-          </span>
-          <span>
-            <span className="text-text-muted">Avg P/L</span>{" "}
-            <span className="num font-semibold" style={{ color: totalPnlPct >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
-              {totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(1)}%
-            </span>
-          </span>
-        </div>
       </div>
 
       {/* Trade rows */}
       {filtered.length === 0 ? (
-        <div className="text-xs text-text-muted py-8 text-center">
+        <div className="py-8 text-center text-sm text-text-muted">
           No trades match the filter
         </div>
       ) : (

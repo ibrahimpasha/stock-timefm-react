@@ -1,9 +1,9 @@
 import { WeekdayBehavior } from "./WeekdayBehavior";
 import { useMemo, useState } from "react";
-import { Eye, ShieldCheck } from "lucide-react";
 import { useAdminAnalysis, type AdminCall } from "../../../api/alerts";
 import { useFlowPicks } from "../../../api/flow";
 import { BullBearBar } from "../../../components/BullBearBar";
+import { Stat } from "../../../components/Glass";
 import { PickCard } from "../../../components/PickCard";
 import { formatDate } from "../../../lib/utils";
 import type { TrackedTicker } from "../../../lib/types";
@@ -31,30 +31,31 @@ function AdminDeskBlock({ ticker }: { ticker: string }) {
     d === "bull" ? "var(--accent-green)" : d === "bear" ? "var(--accent-red)"
     : d === "macro" ? "var(--accent-blue)" : "var(--text-muted)";
   return (
-    <div className="card">
-      <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-text-primary">
-        <ShieldCheck size={13} className="text-accent-purple" />
-        Admin desk
-        <span className="text-xs font-normal text-text-muted">
-          {calls.length} mention{calls.length > 1 ? "s" : ""} · 14d
-        </span>
-      </div>
+    <section>
+      <h3 className="section-title">Admin desk</h3>
+      <p className="section-sub mb-2">
+        {calls.length} mention{calls.length > 1 ? "s" : ""} in #admin-analysis · last 14 days
+      </p>
       <div className="divide-y divide-border">
         {calls.map((c) => (
-          <div key={c.msg_id} className="max-w-[72ch] py-2 text-sm leading-relaxed">
-            <span className="num text-text-muted">{c.ts.slice(5, 10)}</span>
-            <span className="mx-1.5 text-xs font-medium" style={{ color: dirColor(c.direction) }}>
-              {c.direction.charAt(0).toUpperCase() + c.direction.slice(1)}
-            </span>
-            <span className="text-text-muted">{c.author}</span>
-            <span className="text-text-secondary"> — {c.thesis}</span>
-            {c.levels && (
-              <span className="num text-text-primary"> · {c.levels}</span>
-            )}
+          <div key={c.msg_id} className="max-w-[72ch] py-2.5">
+            <div className="flex items-baseline gap-2 text-xs">
+              <span className="num text-text-muted">{c.ts.slice(5, 10)}</span>
+              <span className="font-medium" style={{ color: dirColor(c.direction) }}>
+                {c.direction.charAt(0).toUpperCase() + c.direction.slice(1)}
+              </span>
+              <span className="text-text-muted">{c.author}</span>
+            </div>
+            <p className="mt-1 text-sm leading-relaxed text-text-secondary">
+              {c.thesis}
+              {c.levels && (
+                <span className="num text-text-primary"> · {c.levels}</span>
+              )}
+            </p>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -215,81 +216,87 @@ export function TickerDetail({
   const toggle = (k: string) => setExpanded(expanded === k ? null : k);
 
   return (
-    <div className="space-y-4">
-      <div className="card">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Eye size={14} className="text-text-muted" />
-            <span className="num text-lg font-semibold text-text-primary">{ticker}</span>
-          </div>
-          <span className="text-xs text-text-muted">
-            <span className="num text-text-secondary">{trackedData.total_entries}</span> entries
-          </span>
-        </div>
-        <BullBearBar bull={trackedData.bullish} total={total} />
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <span className="text-text-muted">
-            Net premium{" "}
-            <span className="num text-text-primary">{trackedData.net_premium}</span>
-          </span>
+    <div className="space-y-8">
+      <header className="space-y-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <h2 className="ticker text-3xl tracking-tight">{ticker}</h2>
           <EarningsBadge
             isoDate={earningsData?.earnings_date ?? null}
             session={earningsData?.earnings_session ?? null}
           />
         </div>
-      </div>
+        <div className="grid grid-cols-3 gap-x-6 gap-y-3">
+          <Stat label="Net premium" value={trackedData.net_premium} />
+          <Stat label="Entries" value={trackedData.total_entries.toLocaleString()} />
+          <Stat
+            label="Bull / bear"
+            value={
+              <>
+                <span className="delta-up">{trackedData.bullish}</span>
+                <span className="text-text-muted"> / </span>
+                <span className="delta-down">{trackedData.bearish}</span>
+              </>
+            }
+          />
+        </div>
+        <BullBearBar bull={trackedData.bullish} total={total} />
+      </header>
 
       <AdminDeskBlock ticker={ticker} />
 
       <WeekdayBehavior ticker={ticker} />
 
       {tickerPicks.length > 0 && (
-        <div>
-          <h4 className="mb-2 text-sm font-semibold text-text-primary">
-            Picks <span className="num text-xs font-normal text-text-muted">{tickerPicks.length}</span>
-          </h4>
-          <div className="space-y-2">
+        <section>
+          <h3 className="section-title mb-3 flex items-baseline gap-2">
+            Picks <span className="num text-sm font-normal text-text-muted">{tickerPicks.length}</span>
+          </h3>
+          <div className="space-y-3">
             {tickerPicks.map((p) => (
               <PickCard key={p.id} pick={p} />
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      <div>
-        <h4 className="mb-2 text-sm font-semibold text-text-primary">
+      <section>
+        <h3 className="section-title">
+          {tradersOnly
+            ? "Trader positions"
+            : isAllDates
+            ? "Flow history"
+            : isSingleDate
+            ? `Flow on ${formatDate(singleDate)}`
+            : `Flow across ${selectedDates.size} dates`}
+        </h3>
+        <p className="section-sub mb-3">
           {tradersOnly ? (
-            <span>
-              Trader positions <span className="num text-xs font-normal text-text-muted">{totalTraderPositions}</span>
-            </span>
+            <>
+              <span className="num">{totalTraderPositions}</span> position{totalTraderPositions === 1 ? "" : "s"}
+            </>
           ) : (
             <>
-              {isAllDates
-                ? "Flow history"
-                : isSingleDate
-                ? `Flow on ${formatDate(singleDate)}`
-                : `Flow across ${selectedDates.size} dates`}
-              <span className="ml-1.5 num text-xs font-normal text-text-muted">{totalEntries}</span>
+              <span className="num">{totalEntries}</span> entr{totalEntries === 1 ? "y" : "ies"}, largest premium first
               {totalTraderPositions > 0 && (
-                <span className="ml-2 text-xs font-normal text-accent-purple">
-                  + {totalTraderPositions} trader position{totalTraderPositions === 1 ? "" : "s"}
+                <span className="text-accent-purple">
+                  {" "}+ <span className="num">{totalTraderPositions}</span> trader position{totalTraderPositions === 1 ? "" : "s"}
                 </span>
               )}
             </>
           )}
-        </h4>
+        </p>
         {loading ? (
           <div className="animate-pulse text-sm text-text-muted">Loading…</div>
         ) : dateKeys.length === 0 ? (
-          <div className="text-sm text-text-muted text-center py-4">
+          <div className="py-6 text-center text-sm text-text-muted">
             No entries match filters
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-6">
             {dateKeys.map((date) => (
               <div key={date}>
                 {!isSingleDate && (
-                  <div className="mb-1 border-b border-border pb-1.5 text-xs font-medium text-text-secondary">
+                  <div className="mb-1 border-b border-border pb-1.5 text-sm font-medium text-text-primary">
                     {formatDate(date)}
                   </div>
                 )}
@@ -319,7 +326,7 @@ export function TickerDetail({
             ))}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

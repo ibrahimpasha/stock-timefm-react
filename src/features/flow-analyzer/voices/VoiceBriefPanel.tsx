@@ -15,11 +15,6 @@ import {
   Brain,
   RefreshCw,
   Loader2,
-  Target,
-  Sparkles,
-  Eye,
-  TrendingUp,
-  AlertTriangle,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
@@ -51,210 +46,162 @@ function PickTicker({ t }: { t: string }) {
     <button
       type="button"
       onClick={() => setActiveTicker(t)}
-      className="num inline-block font-semibold text-xs text-text-primary hover:text-accent-blue"
+      className="ticker inline-block text-sm hover:text-accent-blue"
     >
       {t}
     </button>
   );
 }
 
+function TickerList({ tickers }: { tickers: string[] }) {
+  return (
+    <span className="ml-1 inline-flex flex-wrap items-baseline gap-x-2">
+      {tickers.map((t) => (
+        <PickTicker key={t} t={t} />
+      ))}
+    </span>
+  );
+}
+
 function Section({
-  icon: Icon,
   title,
   count,
   children,
 }: {
-  icon: React.ElementType;
   title: string;
   count?: number;
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5 border-t border-border pt-3">
-      <h4 className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
-        <Icon size={13} className="text-text-muted" />
+    <section className="space-y-2 border-t border-border pt-5">
+      <h4 className="font-display text-lg font-medium text-text-primary">
         {title}
         {count !== undefined && (
-          <span className="num text-xs font-normal text-text-muted">{count}</span>
+          <span className="num ml-2 align-middle text-xs font-normal text-text-muted">{count}</span>
         )}
       </h4>
       {children}
-    </div>
+    </section>
   );
 }
 
 function BriefBody({ content }: { content: SynthesisContent }) {
   return (
-    <div className="max-w-[72ch] space-y-3">
-      {/* Sentiment + overall view */}
-      <div>
-        <div className="flex items-center gap-2 mb-1 text-xs">
-          <span className="text-text-muted">Sentiment</span>
-          <span
-            className="font-semibold capitalize"
-            style={{ color: sentColor(content.overall_sentiment) }}
-          >
-            {content.overall_sentiment}
-          </span>
-        </div>
-        <p className="text-sm text-text-primary leading-relaxed">
+    <div className="max-w-[68ch] space-y-5">
+      {/* Sentiment + overall view: the lead of the brief */}
+      <div className="space-y-2">
+        <span
+          className="tag capitalize"
+          style={{ "--tag": sentColor(content.overall_sentiment) } as React.CSSProperties}
+        >
+          {content.overall_sentiment}
+        </span>
+        <p className="font-display text-xl leading-snug text-text-primary text-pretty">
           {content.overall_view || "—"}
         </p>
       </div>
 
-      {/* Top thesis */}
       {content.top_thesis && (
-        <Section icon={Target} title="Top thesis">
-          <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
-            {content.top_thesis}
-          </p>
+        <Section title="Top thesis">
+          <p className="prose-read whitespace-pre-wrap">{content.top_thesis}</p>
         </Section>
       )}
 
-      {/* Sectors */}
       {content.sector_focus.length > 0 && (
-        <Section
-          icon={Sparkles}
-          title="Sector focus"
-          count={content.sector_focus.length}
-        >
-          <div className="space-y-1">
+        <Section title="Sector focus" count={content.sector_focus.length}>
+          <div className="space-y-1.5">
             {content.sector_focus.map((s) => (
-              <div key={s.sector} className="flex items-center gap-2">
-                <span className="text-xs text-text-primary capitalize w-36 truncate">
-                  {s.sector}
-                </span>
-                <div className="flex-1 h-2 rounded-full bg-bg-card overflow-hidden">
+              <div key={s.sector} className="grid grid-cols-[9rem_minmax(0,1fr)_3rem] items-center gap-3">
+                <span className="truncate text-sm capitalize text-text-primary">{s.sector}</span>
+                <div className="h-1.5 overflow-hidden rounded-full bg-border">
                   <div
                     className="h-full rounded-full"
-                    style={{
-                      width: `${Math.min(100, s.weight_pct)}%`,
-                      background: sentColor(s.lean),
-                    }}
+                    style={{ width: `${Math.min(100, s.weight_pct)}%`, background: sentColor(s.lean) }}
                   />
                 </div>
-                <span className="text-xs num text-text-muted w-10 text-right">
-                  {s.weight_pct}%
-                </span>
+                <span className="num text-right text-sm text-text-secondary">{s.weight_pct}%</span>
               </div>
             ))}
           </div>
         </Section>
       )}
 
-      {/* High conviction */}
       {content.high_conviction.length > 0 && (
-        <Section
-          icon={Target}
-          title="High conviction"
-          count={content.high_conviction.length}
-        >
-          <div className="space-y-1.5">
+        <Section title="High conviction" count={content.high_conviction.length}>
+          <div className="divide-y divide-border">
             {content.high_conviction.map((h) => (
-              <div key={h.ticker} className="flex items-start gap-2 text-sm leading-snug">
-                <div className="flex flex-col items-center w-12 shrink-0">
+              <div key={h.ticker} className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4 py-3">
+                <div className="flex flex-col items-start gap-1">
                   <PickTicker t={h.ticker} />
-                  <span className="text-xs font-medium" style={{ color: sentColor(h.sentiment) }} title={h.sentiment}>
-                    {h.sentiment[0]?.toUpperCase()}
+                  <span
+                    className="tag capitalize"
+                    style={{ "--tag": sentColor(h.sentiment) } as React.CSSProperties}
+                  >
+                    {h.sentiment}
                   </span>
                   <span className="num text-xs text-text-muted" title="Evidence count">×{h.evidence_count}</span>
                 </div>
-                <p className="text-text-secondary leading-relaxed">{h.thesis}</p>
+                <p className="prose-read">{h.thesis}</p>
               </div>
             ))}
           </div>
         </Section>
       )}
 
-      {/* Bottlenecks */}
       {content.bottlenecks.length > 0 && (
-        <Section
-          icon={AlertTriangle}
-          title="Bottlenecks"
-          count={content.bottlenecks.length}
-        >
-          <div className="space-y-1">
+        <Section title="Bottlenecks" count={content.bottlenecks.length}>
+          <ul className="space-y-3">
             {content.bottlenecks.map((b, idx) => (
-              <div key={idx} className="text-sm text-text-secondary leading-snug">
-                <span className="text-text-primary">{b.description}</span>
+              <li key={idx} className="space-y-0.5">
+                <p className="text-sm leading-relaxed text-text-primary">{b.description}</p>
                 {b.exposed_tickers.length > 0 && (
-                  <span className="ml-2">
-                    →{" "}
-                    {b.exposed_tickers.map((t, i) => (
-                      <span key={t}>
-                        {i > 0 && <span className="text-text-muted">, </span>}
-                        <PickTicker t={t} />
-                      </span>
-                    ))}
-                  </span>
+                  <p className="text-xs text-text-muted">
+                    Exposed <TickerList tickers={b.exposed_tickers} />
+                  </p>
                 )}
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Private → public */}
-      {content.private_companies.length > 0 && (
-        <Section
-          icon={Eye}
-          title="Private to public proxies"
-          count={content.private_companies.length}
-        >
-          <div className="space-y-1">
-            {content.private_companies.map((p, idx) => (
-              <div key={idx} className="text-sm text-text-secondary leading-snug">
-                <span className="font-semibold text-text-primary">{p.name}</span>
-                <span className="text-text-muted"> — {p.rationale}</span>
-                {p.public_proxies.length > 0 && (
-                  <div className="mt-0.5 ml-3">
-                    <span className="text-xs text-text-muted mr-1">
-                      Proxies
-                    </span>
-                    {p.public_proxies.map((t, i) => (
-                      <span key={t}>
-                        {i > 0 && <span className="text-text-muted">, </span>}
-                        <PickTicker t={t} />
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Emerging themes */}
-      {content.emerging_themes.length > 0 && (
-        <Section
-          icon={TrendingUp}
-          title="Emerging themes"
-          count={content.emerging_themes.length}
-        >
-          <ul className="space-y-1 text-sm text-text-secondary leading-snug">
-            {content.emerging_themes.map((t, idx) => (
-              <li key={idx}>
-                <span className="font-semibold text-text-primary">{t.theme}</span>
-                <span className="text-text-muted"> — {t.rationale}</span>
               </li>
             ))}
           </ul>
         </Section>
       )}
 
-      {/* Watch list */}
+      {content.private_companies.length > 0 && (
+        <Section title="Private to public proxies" count={content.private_companies.length}>
+          <ul className="space-y-3">
+            {content.private_companies.map((p, idx) => (
+              <li key={idx} className="space-y-0.5">
+                <div className="text-sm font-medium text-text-primary">{p.name}</div>
+                <p className="text-sm leading-relaxed text-text-secondary">{p.rationale}</p>
+                {p.public_proxies.length > 0 && (
+                  <p className="text-xs text-text-muted">
+                    Proxies <TickerList tickers={p.public_proxies} />
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {content.emerging_themes.length > 0 && (
+        <Section title="Emerging themes" count={content.emerging_themes.length}>
+          <ul className="space-y-2">
+            {content.emerging_themes.map((t, idx) => (
+              <li key={idx} className="text-sm leading-relaxed text-text-secondary">
+                <span className="font-medium text-text-primary">{t.theme}</span> — {t.rationale}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
       {content.watch_list.length > 0 && (
-        <Section
-          icon={Eye}
-          title="Watch list"
-          count={content.watch_list.length}
-        >
-          <div className="space-y-1">
+        <Section title="Watch list" count={content.watch_list.length}>
+          <div className="divide-y divide-border">
             {content.watch_list.map((w, idx) => (
-              <div key={idx} className="text-sm leading-snug">
+              <div key={idx} className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 py-2">
                 <PickTicker t={w.ticker} />
-                <span className="text-text-muted ml-2">{w.why_watch}</span>
+                <span className="text-sm leading-relaxed text-text-secondary">{w.why_watch}</span>
               </div>
             ))}
           </div>
@@ -298,32 +245,28 @@ export function VoiceBriefPanel({
   const hasContent = !!content;
 
   return (
-    <div className="card p-3">
+    <div className="card">
       {/* Collapsed header — clickable */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-2 text-left"
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 text-left"
       >
-        <div className="flex items-center gap-2">
-          <Brain size={14} className="text-text-muted" />
-          <span className="text-sm font-semibold text-text-primary">
-            Voice brief
-          </span>
-          <span className="text-xs text-text-muted">
-            @{voiceUsername}
-          </span>
-          {data?.generated_at && (
-            <span
-              className="text-xs text-text-muted"
-              title={absoluteAge(data.generated_at) || ""}
-            >
-              · {relativeAge(data.generated_at)}
-            </span>
-          )}
-          {!hasContent && !isFetching && !isError && (
-            <span className="text-xs text-text-muted">not generated yet</span>
-          )}
+        <div className="flex min-w-0 items-center gap-3">
+          <Brain size={16} className="shrink-0 text-text-muted" />
+          <div className="min-w-0">
+            <div className="section-title">Voice brief</div>
+            <div className="section-sub">
+              @{voiceUsername}
+              {data?.generated_at && (
+                <span title={absoluteAge(data.generated_at) || ""}>
+                  {" "}· {relativeAge(data.generated_at)}
+                </span>
+              )}
+              {!hasContent && !isFetching && !isError && <span> · not generated yet</span>}
+            </div>
+          </div>
         </div>
         {open ? (
           <ChevronUp size={14} className="text-text-muted" />
@@ -334,7 +277,7 @@ export function VoiceBriefPanel({
 
       {/* Expanded body */}
       {open && (
-        <div className="mt-3 space-y-3">
+        <div className="mt-5 space-y-5">
           {/* Controls */}
           <div className="flex items-center gap-2 flex-wrap">
             <Segmented
@@ -382,7 +325,7 @@ export function VoiceBriefPanel({
 
 
           {generate.isError && (
-            <div className="text-xs text-accent-red" role="alert">
+            <div className="callout" style={{ "--callout": "var(--accent-red)" } as React.CSSProperties} role="alert">
               {generate.error instanceof Error && generate.error.message
                 ? generate.error.message
                 : "The voice brief could not be generated. Try again."}
@@ -390,7 +333,7 @@ export function VoiceBriefPanel({
           )}
 
           {isError && !data && (
-            <div className="flex items-center justify-center gap-2 py-4 text-xs text-accent-red" role="alert">
+            <div className="callout flex flex-wrap items-center gap-2" style={{ "--callout": "var(--accent-red)" } as React.CSSProperties} role="alert">
               <span>
                 {error instanceof Error && error.message
                   ? error.message

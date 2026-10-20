@@ -9,7 +9,7 @@
  */
 import { useId, useMemo, useState } from "react";
 import { Filter, X, Clock } from "lucide-react";
-import { Chip, Segmented } from "../../components/Glass";
+import { Chip, Segmented, Stat } from "../../components/Glass";
 import { QueryNotice } from "../../components/QueryNotice";
 import { parseLocalDate, daysFromToday } from "../../lib/dateOnly";
 import { useAppStore } from "../../store/useAppStore";
@@ -101,13 +101,13 @@ function NewsRow({ item }: { item: NewsItem }) {
   const detailsId = useId();
   return (
     <div
-      className="cursor-pointer px-2 py-2 transition-colors hover:bg-bg-card-hover"
+      className="cursor-pointer rounded-[var(--radius-control)] px-3 py-3.5 transition-colors hover:bg-bg-card-hover"
       style={{ background: sentimentBgColor(item.sentiment, rowAlpha * 0.5) }}
       onClick={() => setExpanded((v) => !v)}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-4">
         <span
-          className="num w-11 shrink-0 pt-0.5 text-xs text-text-muted"
+          className="num w-11 shrink-0 pt-1 text-xs text-text-muted"
           title={absoluteAge(item.posted_at)}
         >
           {item.posted_at.slice(11, 16)}
@@ -121,15 +121,15 @@ function NewsRow({ item }: { item: NewsItem }) {
             }}
             aria-expanded={expanded}
             aria-controls={item.sentiment_score !== null ? detailsId : undefined}
-            className="block w-full max-w-[72ch] text-left text-sm leading-snug text-text-primary"
+            className="block w-full max-w-[68ch] text-left font-display text-lg leading-snug text-text-primary text-pretty"
           >
             {item.headline}
           </button>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-text-muted">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-text-muted">
             {isAnalyzed && item.sentiment && (
               <span
-                className="font-medium"
-                style={{ color: sentColor }}
+                className="tag"
+                style={{ "--tag": sentColor } as React.CSSProperties}
                 title={`sentiment_score ${score.toFixed(2)} (row tint α=${rowAlpha.toFixed(2)})`}
               >
                 {item.sentiment}
@@ -155,7 +155,7 @@ function NewsRow({ item }: { item: NewsItem }) {
                   e.stopPropagation();
                   setActiveTicker(t);
                 }}
-                className="num font-semibold text-text-secondary hover:text-accent-blue transition-colors"
+                className="ticker text-xs transition-colors hover:text-accent-blue"
               >
                 {t}
               </button>
@@ -180,36 +180,19 @@ function StatsStrip() {
   const { data } = useNewsStats();
   if (!data) return null;
   return (
-    <div className="flex items-center gap-3 text-xs text-text-muted">
-      <span>
-        <span className="text-text-primary num font-semibold">
-          {data.total_canonical}
-        </span>{" "}
-        items
-      </span>
-      <span>
-        <span className="text-accent-green num font-semibold">
-          {data.analyzed}
-        </span>{" "}
-        analyzed
-      </span>
-      {data.pending > 0 && (
-        <span>
-          <span className="text-text-primary num font-semibold">
-            {data.pending}
-          </span>{" "}
-          pending
-        </span>
-      )}
+    <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+      <Stat label="Headlines" value={data.total_canonical} />
+      <Stat label="Tagged" value={data.analyzed} />
+      {data.pending > 0 && <Stat label="Pending" value={data.pending} />}
       {data.duplicates > 0 && (
         <span title="Relay duplicates excluded by default">
-          <span className="text-text-muted num">{data.duplicates}</span> dup
+          <Stat label="Duplicates hidden" value={data.duplicates} />
         </span>
       )}
       {data.latest_posted_at && (
-        <span className="flex items-center gap-1" title={absoluteAge(data.latest_posted_at)}>
+        <span className="flex items-center gap-1 pb-1 text-xs text-text-muted" title={absoluteAge(data.latest_posted_at)}>
           <Clock size={11} />
-          latest {relativeAge(data.latest_posted_at)}
+          Latest {relativeAge(data.latest_posted_at)}
         </span>
       )}
     </div>
@@ -235,9 +218,11 @@ export function NewsTab() {
   const isLoading = tickerFilter ? byTicker.isLoading : feed.isLoading;
 
   return (
-    <div className="flex flex-col gap-3" style={{ height: "calc(100vh - 220px)", minHeight: 420 }}>
+    <div className="flex flex-col gap-6" style={{ height: "calc(100vh - 220px)", minHeight: 420 }}>
+      <StatsStrip />
+
       {/* Header */}
-      <div className="flex flex-wrap items-center gap-3 pb-2">
+      <div className="flex flex-wrap items-center gap-3">
         {tickerFilter ? (
           <Chip>
             <Filter size={11} />
@@ -276,9 +261,9 @@ export function NewsTab() {
           </button>
         )}
 
-        <div className="ml-auto">
-          <StatsStrip />
-        </div>
+        <span className="ml-auto hidden text-xs text-text-muted sm:inline">
+          Row tint = sentiment strength. Click a headline for details.
+        </span>
       </div>
 
       {/* Feed */}
@@ -286,19 +271,19 @@ export function NewsTab() {
         <QueryNotice queries={[tickerFilter ? byTicker : feed]} label="News feed" />
         {isLoading ? (
           <div className="text-sm text-text-muted animate-pulse py-4 text-center">Loading...</div>
-        ) : (tickerFilter ? byTicker : feed).data?.ok === false ? <p role="alert" className="py-4 text-sm text-accent-orange">News feed unavailable.</p> : items.length === 0 && !(tickerFilter ? byTicker : feed).isError && (tickerFilter ? byTicker : feed).fetchStatus !== "paused" ? (
+        ) : (tickerFilter ? byTicker : feed).data?.ok === false ? <p role="alert" className="callout my-4">News feed unavailable.</p> : items.length === 0 && !(tickerFilter ? byTicker : feed).isError && (tickerFilter ? byTicker : feed).fetchStatus !== "paused" ? (
           <div className="text-sm text-text-muted py-4 text-center">
             No news in this window
             {tickerFilter ? ` mentioning ${tickerFilter}` : ""}.
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-8">
             {groups.map((g) => (
               <div key={g.date}>
-                <div className="sticky top-0 z-10 bg-bg-card py-1.5 text-sm font-semibold text-text-primary">
-                  {formatHeaderDate(g.date)}
-                  <span className="ml-2 num text-xs font-normal text-text-muted">
-                    {g.rows.length}
+                <div className="sticky top-0 z-10 flex items-baseline gap-2 border-b border-border bg-bg-card pb-2 pt-1">
+                  <h3 className="section-title">{formatHeaderDate(g.date)}</h3>
+                  <span className="num text-xs text-text-muted">
+                    {g.rows.length} headlines
                   </span>
                 </div>
                 <div className="divide-y divide-border">

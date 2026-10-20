@@ -24,10 +24,10 @@ export function BullBearBar({
       {showLabels && (
         <div className="flex justify-between text-xs num mb-1">
           <span style={{ color: "var(--accent-green)" }}>
-            BULL {bullPct.toFixed(0)}%
+            Bull {bullPct.toFixed(0)}%
           </span>
           <span style={{ color: "var(--accent-red)" }}>
-            {bearPct.toFixed(0)}% BEAR
+            {bearPct.toFixed(0)}% bear
           </span>
         </div>
       )}

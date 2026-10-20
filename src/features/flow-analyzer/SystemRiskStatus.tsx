@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../../api/client";
-import { Chip } from "../../components/Glass";
+import { Chip, Stat } from "../../components/Glass";
 import {
-  Shield, AlertTriangle, AlertOctagon, Lock, TrendingDown,
-  Layers, Coins, Activity, RefreshCw,
+  Shield, AlertTriangle, AlertOctagon, Lock, Activity, RefreshCw,
 } from "lucide-react";
 
 interface RiskData {
@@ -78,7 +77,14 @@ function CircuitBreakerBadge({ state, remainingMin, supported }: { state: string
 }
 
 function DrawdownBar({ drawdown, freezeAt, cashAt, supported }: { drawdown: number; freezeAt: number | null; cashAt: number | null; supported: boolean }) {
-  if (!supported || freezeAt == null || cashAt == null || cashAt >= 0) return <span className="text-xs text-text-muted">Recorded drawdown <span className="num text-text-primary">{drawdown.toFixed(1)}%</span></span>;
+  if (!supported || freezeAt == null || cashAt == null || cashAt >= 0) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="text-xs font-medium text-text-muted">Recorded drawdown</span>
+        <span className="num text-3xl font-semibold tracking-tight text-text-primary">{drawdown.toFixed(1)}%</span>
+      </div>
+    );
+  }
   // Visualize 0% to cashAt (e.g., -25%). Drawdown is negative.
   const dd = Math.min(0, drawdown);
   const ddAbs = Math.abs(dd);
@@ -93,9 +99,12 @@ function DrawdownBar({ drawdown, freezeAt, cashAt, supported }: { drawdown: numb
   else if (ddAbs >= freezeAbs * 0.7) color = "var(--accent-yellow)";
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-text-muted whitespace-nowrap">Drawdown</span>
-      <div className="relative flex-1 h-1.5 rounded-full bg-border overflow-hidden min-w-[80px]">
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium text-text-muted">Drawdown from peak</span>
+      <span className="num text-3xl font-semibold tracking-tight" style={{ color }}>
+        {drawdown >= 0 ? "+" : ""}{drawdown.toFixed(1)}%
+      </span>
+      <div className="relative h-1.5 w-full min-w-[120px] overflow-hidden rounded-full bg-border">
         <div
           className="absolute h-full rounded-full transition-all duration-500"
           style={{ width: `${fillPct}%`, background: color }}
@@ -106,8 +115,8 @@ function DrawdownBar({ drawdown, freezeAt, cashAt, supported }: { drawdown: numb
           title={`Freeze at ${freezeAt}%`}
         />
       </div>
-      <span className="num text-xs font-semibold whitespace-nowrap" style={{ color }}>
-        {drawdown >= 0 ? "+" : ""}{drawdown.toFixed(1)}%
+      <span className="text-xs text-text-muted">
+        Freeze at <span className="num">{freezeAt}%</span> · cash-out at <span className="num">{cashAt}%</span>
       </span>
     </div>
   );
@@ -120,17 +129,17 @@ function SlotPills({ slots }: { slots: RiskData["slots"] }) {
     { label: "Lotto", used: slots.lotto.used, max: slots.lotto.max, color: "var(--accent-blue)" },
   ];
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
       {items.map((item) => {
         const isFull = item.used >= item.max;
         return (
           <div key={item.label} className="flex items-center gap-1">
-            <span className="text-xs text-text-muted">{item.label}</span>
+            <span className="w-10 text-xs text-text-secondary">{item.label}</span>
             <div className="flex items-center gap-0.5">
               {Array.from({ length: item.max }, (_, i) => (
                 <div
                   key={i}
-                  className="w-2.5 h-2.5 rounded-sm"
+                  className="h-3 w-3 rounded-sm"
                   style={{
                     background: i < item.used ? item.color : "transparent",
                     border: `1px solid ${i < item.used ? item.color : "var(--border)"}`,
@@ -154,18 +163,16 @@ function SlotPills({ slots }: { slots: RiskData["slots"] }) {
 function SectorWarnings({ warnings }: { warnings: RiskData["risk"]["sector_warnings"] }) {
   if (warnings.length === 0) return null;
   return (
-    <div className="flex items-center gap-3 flex-wrap">
+    <div className="callout flex flex-wrap items-center gap-x-4 gap-y-1" title="3+ same-direction positions in one sector">
+      <span className="flex items-center gap-1.5 font-medium">
+        <AlertTriangle size={13} /> Sector concentration
+      </span>
       {warnings.map((w, i) => {
         const isBull = w.side === "Bull";
-        const color = isBull ? "var(--accent-green)" : "var(--accent-red)";
         return (
-          <span
-            key={i}
-            className="flex items-center gap-1 text-xs text-text-secondary"
-            title="3+ same-direction positions in one sector"
-          >
-            <AlertTriangle size={12} className="text-accent-orange" />
-            {w.sector} <span style={{ color }}>{w.side}</span> <span className="num">×{w.count}</span>
+          <span key={i} className="text-text-secondary">
+            {w.sector} <span className={isBull ? "delta-up" : "delta-down"}>{w.side}</span>{" "}
+            <span className="num">×{w.count}</span>
           </span>
         );
       })}
@@ -204,64 +211,41 @@ export function SystemRiskStatus() {
   const { portfolio, risk, slots } = data;
   const hasLottoBudget = portfolio.lotto_budget > 0;
 
-  return (
-    <div className="card py-3 px-4">
-      <div className="flex items-center gap-x-6 gap-y-2 flex-wrap">
-        {/* Circuit breaker badge */}
-        <CircuitBreakerBadge state={risk.circuit_breaker_state} remainingMin={risk.freeze_remaining_min} supported={risk.circuit_breaker_enabled ?? risk.circuit_breaker_supported ?? false} />
+  const cbSupported = risk.circuit_breaker_enabled ?? risk.circuit_breaker_supported ?? false;
 
-        {/* Drawdown bar */}
-        <div className="flex-1 min-w-[180px] max-w-[280px]">
+  return (
+    <div className="card flex flex-col gap-5 px-5 py-4">
+      <div className="flex flex-wrap items-start justify-between gap-x-10 gap-y-5">
+        {/* Focal: drawdown */}
+        <div className="min-w-[200px] max-w-[320px] flex-1">
           <DrawdownBar
             drawdown={risk.drawdown_pct}
             freezeAt={risk.drawdown_freeze_threshold}
             cashAt={risk.drawdown_cash_threshold}
-            supported={risk.circuit_breaker_enabled ?? risk.circuit_breaker_supported ?? false}
+            supported={cbSupported}
           />
         </div>
 
-        {/* Peak value */}
-        <div className="flex items-center gap-1 text-xs">
-          <TrendingDown size={12} className="text-text-muted" />
-          <span className="text-text-muted">Peak</span>
-          <span className="num text-text-primary">{fmtMoney(portfolio.peak_value)}</span>
-        </div>
-
-        {/* Slots */}
-        <div className="flex items-center gap-1.5">
-          <Layers size={12} className="text-text-muted" />
-          <SlotPills slots={slots} />
-        </div>
-
-        {/* Lotto budget */}
-        {hasLottoBudget && (
-          <div className="flex items-center gap-1 text-xs">
-            <Coins size={12} className="text-text-muted" />
-            <span className="text-text-muted">Lotto budget</span>
-            <span className="num text-text-primary font-semibold">
-              {fmtMoney(portfolio.lotto_budget)}
-            </span>
-          </div>
-        )}
-
-        {/* Watchlist counts */}
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-text-muted">Watchlist</span>
-          <span className="text-text-muted">
-            A <span className="num text-text-primary">{data.watchlist.wla_count}</span>
-            {" · "}
-            B <span className="num text-text-primary">{data.watchlist.wlb_count}</span>
-          </span>
+        {/* Secondary figures */}
+        <div className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-3">
+          <Stat label="Peak value" value={fmtMoney(portfolio.peak_value)} />
+          {hasLottoBudget && <Stat label="Lotto budget" value={fmtMoney(portfolio.lotto_budget)} />}
+          <Stat
+            label="Watchlist A · B"
+            value={<>{data.watchlist.wla_count}<span className="text-text-muted"> · </span>{data.watchlist.wlb_count}</>}
+          />
         </div>
       </div>
 
-      {/* Sector warnings (second row, only if present) */}
-      {risk.sector_warnings.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center gap-3">
-          <span className="text-xs text-text-muted">Sector concentration</span>
-          <SectorWarnings warnings={risk.sector_warnings} />
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-border pt-3">
+        <CircuitBreakerBadge state={risk.circuit_breaker_state} remainingMin={risk.freeze_remaining_min} supported={cbSupported} />
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-muted">Slots</span>
+          <SlotPills slots={slots} />
         </div>
-      )}
+      </div>
+
+      <SectorWarnings warnings={risk.sector_warnings} />
     </div>
   );
 }

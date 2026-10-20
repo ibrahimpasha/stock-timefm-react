@@ -78,7 +78,7 @@ export function EntryRow({
   return (
     <div>
       <div
-        className="flex min-w-0 cursor-pointer items-start gap-1 px-0 py-2 text-xs transition-colors hover:bg-bg-card-hover lg:items-center lg:gap-2 lg:px-2"
+        className="data-row flex min-w-0 cursor-pointer items-start gap-1 px-0 py-2.5 text-xs lg:items-center lg:gap-2 lg:px-2"
       >
         <button
           type="button"
@@ -112,25 +112,26 @@ export function EntryRow({
           <span className="shrink-0 font-medium lg:w-10" style={{ color }}>
             {side}
           </span>
-          <span className="text-text-muted">{action}</span>
-          <span className="num font-semibold text-text-primary">
+          <span className="num shrink-0 text-sm font-semibold text-text-primary">
             ${entry.strike} {optType}
           </span>
-          <span className="num text-text-muted">{expiryNorm.startsWith("unknown-year:") ? `${entry.expiry} (year unknown)` : expiryNorm}</span>
-          {dl && (
-            <span className="text-text-muted">{dl.text.toLowerCase()}</span>
-          )}
-          {entry.vol_oi_ratio > 0 && (
-            <span className="num text-text-secondary" title="Volume / open interest">
-              {Number(entry.vol_oi_ratio).toFixed(1)}x
-            </span>
-          )}
-          {entry.ask_pct > 0 && (
-            <span className="num text-text-secondary" title="Filled at ask">{entry.ask_pct}% ask</span>
-          )}
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-text-muted">
+            <span>{action}</span>
+            <span className="num">{expiryNorm.startsWith("unknown-year:") ? `${entry.expiry} (year unknown)` : expiryNorm}</span>
+            {dl && <span>{dl.text.toLowerCase()}</span>}
+            {entry.vol_oi_ratio > 0 && (
+              <span className="num" title="Volume / open interest">
+                {Number(entry.vol_oi_ratio).toFixed(1)}x
+              </span>
+            )}
+            {entry.ask_pct > 0 && (
+              <span className="num" title="Filled at ask">{entry.ask_pct}% ask</span>
+            )}
+          </span>
+          <span className="num ml-auto shrink-0 text-right text-sm font-semibold text-text-primary">{entry.premium}</span>
           <span
-            className="num font-semibold shrink-0"
-            style={{ color: pnlColor, minWidth: 48, textAlign: "right" }}
+            className="num w-20 shrink-0 text-right font-semibold"
+            style={{ color: pnlColor }}
             title={
               pnl !== null
                 ? "Estimated P/L since fill"
@@ -141,18 +142,16 @@ export function EntryRow({
           >
             {pnlLabel}
           </span>
-          <span className="text-text-secondary ml-auto num">{entry.premium}</span>
         </button>
       </div>
       {expanded && entry.analysis && (
         <div
           id={detailsId}
-          className="mb-2 ml-12 mr-2 max-w-[72ch] rounded px-3 py-2 text-sm leading-relaxed text-text-secondary"
-          style={{ background: "color-mix(in srgb, var(--bg-card) 50%, transparent)" }}
+          className="prose-read mb-3 ml-12 mr-2 max-w-[68ch] pt-1 max-lg:ml-2"
         >
           {entry.analysis}
           {(entry.underlying_price || entry.avg_price) && (
-            <div className="mt-1.5 num text-xs text-text-muted">
+            <div className="mt-2 num text-xs text-text-muted">
               {entry.underlying_price ? `Underlying @ fill: $${entry.underlying_price}` : ""}
               {price > 0 ? ` | Now: $${price.toFixed(2)}` : ""}
               {entry.underlying_price && price > 0

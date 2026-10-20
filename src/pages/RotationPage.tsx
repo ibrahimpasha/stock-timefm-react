@@ -8,7 +8,7 @@
  */
 import { useState } from "react";
 import { QueryNotice } from "../components/QueryNotice";
-import { GlassPanel, Chip, Segmented } from "../components/Glass";
+import { Segmented } from "../components/Glass";
 import { useSectorRotation, type RotationWindow } from "../api/rotation";
 import {
   SectorStrip, RotationMap, RotationTimeline, MomentumRanking, InsightLine, AlertFeed,
@@ -64,73 +64,99 @@ export function RotationPage() {
     return (
       <div className="desk-page">
         {header}
-        <GlassPanel title="Sector rotation">
-          <QueryNotice queries={[rotationQuery]} label="Sector rotation" />
-          {data && <p className="text-sm text-text-muted">{data.reason ?? "Rotation data unavailable"}</p>}
-        </GlassPanel>
+        <QueryNotice queries={[rotationQuery]} label="Sector rotation" />
+        {data && <p className="callout max-w-[72ch]">{data.reason ?? "Rotation data unavailable"}</p>}
       </div>
     );
   }
+
+  const [lead, ...rest] = data.insights;
 
   return (
     <div className="desk-page">
       {header}
       <QueryNotice queries={[rotationQuery]} label="Sector rotation" />
-      <GlassPanel
-        title="Sector overview"
-        actions={
-          <span className="text-xs text-text-muted">
-            Sorted by {window} momentum score
+
+      {/* lead: the rotation story in one sentence */}
+      {lead && (
+        <section className="flex flex-col gap-4 max-w-[72ch]">
+          <span className="text-sm text-text-muted">
+            <span className="num">{window}</span> read · as of <span className="num">{data.as_of}</span>
           </span>
-        }
-      >
-        <SectorStrip sectors={sectors} />
-      </GlassPanel>
-
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(340px,520px)_minmax(0,1.15fr)_minmax(0,0.85fr)] gap-4">
-        <GlassPanel title="Rotation map">
-          <RotationMap sectors={sectors} atIndex={idx} />
-          <RotationScrubber
-            dates={dates}
-            index={idx}
-            onChange={(next) => {
-              const nextIndex = typeof next === "function" ? next(idx) : next;
-              setSelectedDate(dates[nextIndex] ?? null);
-            }}
-          />
-        </GlassPanel>
-
-        <div className="flex flex-col gap-4 min-w-0">
-          <GlassPanel title="Rotation timeline">
-            <RotationTimeline sectors={sectors} />
-          </GlassPanel>
-          <GlassPanel
-            title="Momentum ranking"
-            actions={<Chip>{window}</Chip>}
-          >
-            <MomentumRanking sectors={sectors} />
-          </GlassPanel>
-        </div>
-
-        <div className="flex flex-col gap-4 min-w-0">
-          <GlassPanel title="Insights" actions={<Chip>{window}</Chip>}>
-            <ul className="flex flex-col gap-3 text-sm text-text-secondary leading-relaxed max-w-[72ch]">
-              {data.insights.map((ins, i) => (
-                <li key={i} className="flex gap-2">
-                  <span className="mt-2 size-1.5 rounded-full shrink-0 bg-text-muted" />
+          <div className="headline">
+            <InsightLine ins={lead} />
+          </div>
+          {rest.length > 0 && (
+            <ul className="flex flex-col gap-2 text-base leading-relaxed text-text-secondary">
+              {rest.map((ins, i) => (
+                <li key={i} className="flex gap-3">
+                  <span className="mt-2.5 size-1.5 rounded-full shrink-0 bg-text-muted" />
                   <InsightLine ins={ins} />
                 </li>
               ))}
             </ul>
-          </GlassPanel>
-          <GlassPanel
-            title="Live rotation alerts"
-            actions={<span className="text-xs text-text-muted num">{data.as_of}</span>}
-          >
-            <AlertFeed alerts={data.alerts} />
-          </GlassPanel>
+          )}
+        </section>
+      )}
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <h2 className="section-title">Sectors</h2>
+          <p className="section-sub">Sorted by {window} momentum score</p>
+        </div>
+        <div className="border-y border-border py-4">
+          <SectorStrip sectors={sectors} />
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(360px,560px)_minmax(0,1fr)] gap-8">
+        <section className="flex flex-col gap-3 min-w-0">
+          <div>
+            <h2 className="section-title">Rotation map</h2>
+            <p className="section-sub">Relative strength across, momentum up. Scrub or play to replay the window.</p>
+          </div>
+          <div className="card">
+            <RotationMap sectors={sectors} atIndex={idx} />
+            <RotationScrubber
+              dates={dates}
+              index={idx}
+              onChange={(next) => {
+                const nextIndex = typeof next === "function" ? next(idx) : next;
+                setSelectedDate(dates[nextIndex] ?? null);
+              }}
+            />
+          </div>
+        </section>
+
+        <div className="flex flex-col gap-8 min-w-0">
+          <section className="flex flex-col gap-3">
+            <div>
+              <h2 className="section-title">Momentum ranking</h2>
+              <p className="section-sub">Score from −10 to +10 over <span className="num">{window}</span></p>
+            </div>
+            <div className="card">
+              <MomentumRanking sectors={sectors} />
+            </div>
+          </section>
+          <section className="flex flex-col gap-3">
+            <div>
+              <h2 className="section-title">Rotation timeline</h2>
+              <p className="section-sub">RS-Ratio per sector over the window</p>
+            </div>
+            <div className="card">
+              <RotationTimeline sectors={sectors} />
+            </div>
+          </section>
         </div>
       </div>
+
+      <section className="flex flex-col gap-3 max-w-4xl">
+        <div>
+          <h2 className="section-title">Quadrant changes</h2>
+          <p className="section-sub">Live rotation alerts, as of <span className="num">{data.as_of}</span></p>
+        </div>
+        <AlertFeed alerts={data.alerts} />
+      </section>
 
       <p className="text-xs text-text-muted leading-relaxed max-w-[72ch]">
         {data.sessions} sessions vs {data.benchmark}. RS-Ratio / RS-Momentum are the standard open

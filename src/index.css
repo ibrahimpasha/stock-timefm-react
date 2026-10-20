@@ -1,67 +1,73 @@
 @import "tailwindcss";
 
-/* Operational surface tokens. The legacy variable names remain a compatibility
- * contract; the material is now solid and quiet for fast, dense data scanning. */
+/* 2026-10 v2 identity. Ink-blue neutrals (hue 265, low chroma), one indigo
+ * interaction accent, green/red reserved for signed values. Variable NAMES are
+ * a compatibility contract (--accent-blue IS the interaction accent); values
+ * are OKLCH. Serif display face (Newsreader) for page titles and reading
+ * prose; Inter for UI; JetBrains Mono for numbers/tickers only. */
 
 @theme {
-  --color-bg-primary: #0b0d10;
-  --color-bg-card: #13171c;
-  --color-bg-card-hover: #1d232a;
-  --color-border: #333b46;
-  --color-accent-green: #42cf83;
-  --color-accent-red: #ff7278;
-  --color-accent-blue: #65a9ff;
-  --color-accent-purple: #bd91ff;
-  --color-accent-orange: #ffad66;
-  --color-accent-cyan: #48c4d4;
-  --color-accent-yellow: #efd26d;
-  --color-accent-fuchsia: #ea8be9;
-  --color-text-primary: #f4f7fb;
-  --color-text-secondary: #b6c0cc;
-  --color-text-muted: #8b96a5;
+  --color-bg-primary: oklch(0.16 0.009 265);
+  --color-bg-card: oklch(0.2 0.011 265);
+  --color-bg-card-hover: oklch(0.24 0.013 265);
+  --color-border: oklch(0.3 0.013 265);
+  --color-accent-green: oklch(0.79 0.16 155);
+  --color-accent-red: oklch(0.71 0.18 22);
+  --color-accent-blue: oklch(0.74 0.13 272);
+  --color-accent-purple: oklch(0.74 0.14 310);
+  --color-accent-orange: oklch(0.79 0.14 62);
+  --color-accent-cyan: oklch(0.79 0.1 210);
+  --color-accent-yellow: oklch(0.87 0.13 95);
+  --color-accent-fuchsia: oklch(0.75 0.16 345);
+  --color-text-primary: oklch(0.97 0.004 265);
+  --color-text-secondary: oklch(0.83 0.01 265);
+  --color-text-muted: oklch(0.67 0.014 265);
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", monospace;
   --font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
+  --font-display: "Newsreader Variable", "Newsreader", Georgia, serif;
 }
 
 :root {
-  --bg-primary: #0b0d10;
-  --bg-card: #13171c;
-  --bg-card-hover: #1d232a;
-  --border: #333b46;
-  --accent-green: #42cf83;
-  --accent-red: #ff7278;
-  --accent-blue: #65a9ff;
-  --accent-purple: #bd91ff;
-  --accent-orange: #ffad66;
-  --accent-cyan: #48c4d4;
-  --accent-yellow: #efd26d;
-  --accent-fuchsia: #ea8be9;
-  --text-primary: #f4f7fb;
-  --text-secondary: #b6c0cc;
-  --text-muted: #8b96a5;
-  --control-bg: #171c22;
-  --control-boundary: #596675;
-  --control-selected-bg: #2567b7;
-  --control-selected-text: #ffffff;
+  --bg-primary: oklch(0.16 0.009 265);
+  --bg-card: oklch(0.2 0.011 265);
+  --bg-card-hover: oklch(0.24 0.013 265);
+  --border: oklch(0.3 0.013 265);
+  --accent-green: oklch(0.79 0.16 155);
+  --accent-red: oklch(0.71 0.18 22);
+  --accent-blue: oklch(0.74 0.13 272);
+  --accent-purple: oklch(0.74 0.14 310);
+  --accent-orange: oklch(0.79 0.14 62);
+  --accent-cyan: oklch(0.79 0.1 210);
+  --accent-yellow: oklch(0.87 0.13 95);
+  --accent-fuchsia: oklch(0.75 0.16 345);
+  --text-primary: oklch(0.97 0.004 265);
+  --text-secondary: oklch(0.83 0.01 265);
+  --text-muted: oklch(0.67 0.014 265);
+  --control-bg: oklch(0.2 0.011 265);
+  --control-boundary: oklch(0.42 0.016 265);
+  --control-selected-bg: oklch(0.52 0.17 272);
+  --control-selected-text: oklch(0.99 0 0);
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", monospace;
   --font-sans: "Inter Variable", "Inter", system-ui, sans-serif;
+  --font-display: "Newsreader Variable", "Newsreader", Georgia, serif;
 
-  --surface-inset: #0f1216;
-  --glass-bg: rgba(19, 23, 28, 0.92);
-  --glass-bg-strong: rgba(11, 13, 16, 0.94);
-  --card-bg: #13171c;
-  --glass-border: #333b46;
-  --glass-highlight: rgba(255, 255, 255, 0.035);
-  --glass-blur: 12px;
+  --surface-inset: oklch(0.135 0.008 265);
+  --glass-bg: oklch(0.2 0.011 265 / 0.92);
+  --glass-bg-strong: oklch(0.16 0.009 265 / 0.86);
+  --card-bg: oklch(0.2 0.011 265);
+  --glass-border: oklch(0.3 0.013 265);
+  --glass-highlight: oklch(1 0 0 / 0.04);
+  --glass-blur: 14px;
 
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.24);
-  --shadow-2: 0 4px 8px -4px rgba(0, 0, 0, 0.4);
-  --shadow-3: 0 10px 24px -12px rgba(0, 0, 0, 0.62);
+  --shadow-1: 0 1px 2px oklch(0 0 0 / 0.24);
+  --shadow-2: 0 6px 16px -8px oklch(0 0 0 / 0.5);
+  --shadow-3: 0 18px 40px -16px oklch(0 0 0 / 0.7);
 
-  --radius-panel: 8px;
-  --radius-control: 6px;
+  --radius-panel: 12px;
+  --radius-control: 8px;
   --radius-chip: 999px;
 
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --accent-gradient: var(--accent-blue);
   --mobile-app-bar-height: calc(3.25rem + env(safe-area-inset-top));
   --mobile-bottom-nav-height: calc(3.75rem + env(safe-area-inset-bottom));
@@ -74,58 +80,56 @@
 }
 
 /* ── Light theme ──────────────────────────────────────────────────────────
- * Toggled by setting data-theme="light" on <html> (see src/store/useTheme.ts).
- * Override BOTH var families: the Tailwind `@theme` --color-* tokens (so
- * utility classes flip) and the runtime --* vars. Accents darkened for
- * legibility on a light surface. Glass surfaces go near-opaque white — true
- * translucency composites muddy over a light field. */
+ * Toggled by data-theme="light" on <html> (src/store/useTheme.ts). Override
+ * BOTH var families. Neutral off-white tinted toward the same ink hue — not
+ * cream. Accents darkened to clear 4.5:1 on white. */
 :root[data-theme="light"] {
-  --color-bg-primary: #f2f4f7;
-  --color-bg-card: #ffffff;
-  --color-bg-card-hover: #f7f9fb;
-  --color-border: #ccd3dc;
-  --color-accent-green: #08783f;
-  --color-accent-red: #c72e3a;
-  --color-accent-blue: #1769c2;
-  --color-accent-purple: #6e3fbd;
-  --color-accent-orange: #ad4d12;
-  --color-accent-cyan: #08798a;
-  --color-accent-yellow: #806700;
-  --color-accent-fuchsia: #9d2d95;
-  --color-text-primary: #11151a;
-  --color-text-secondary: #3f4854;
-  --color-text-muted: #5f6b78;
+  --color-bg-primary: oklch(0.975 0.003 265);
+  --color-bg-card: oklch(1 0 0);
+  --color-bg-card-hover: oklch(0.96 0.005 265);
+  --color-border: oklch(0.89 0.008 265);
+  --color-accent-green: oklch(0.52 0.14 155);
+  --color-accent-red: oklch(0.53 0.19 25);
+  --color-accent-blue: oklch(0.5 0.18 272);
+  --color-accent-purple: oklch(0.5 0.17 310);
+  --color-accent-orange: oklch(0.55 0.15 50);
+  --color-accent-cyan: oklch(0.52 0.1 215);
+  --color-accent-yellow: oklch(0.55 0.12 90);
+  --color-accent-fuchsia: oklch(0.52 0.19 345);
+  --color-text-primary: oklch(0.2 0.015 265);
+  --color-text-secondary: oklch(0.38 0.015 265);
+  --color-text-muted: oklch(0.5 0.015 265);
 
-  --bg-primary: #f2f4f7;
-  --bg-card: #ffffff;
-  --bg-card-hover: #f7f9fb;
-  --border: #ccd3dc;
-  --accent-green: #08783f;
-  --accent-red: #c72e3a;
-  --accent-blue: #1769c2;
-  --accent-purple: #6e3fbd;
-  --accent-orange: #ad4d12;
-  --accent-cyan: #08798a;
-  --accent-yellow: #806700;
-  --accent-fuchsia: #9d2d95;
-  --text-primary: #11151a;
-  --text-secondary: #3f4854;
-  --text-muted: #5f6b78;
-  --control-bg: #ffffff;
-  --control-boundary: #697687;
-  --control-selected-bg: #1769c2;
-  --control-selected-text: #ffffff;
+  --bg-primary: oklch(0.975 0.003 265);
+  --bg-card: oklch(1 0 0);
+  --bg-card-hover: oklch(0.96 0.005 265);
+  --border: oklch(0.89 0.008 265);
+  --accent-green: oklch(0.52 0.14 155);
+  --accent-red: oklch(0.53 0.19 25);
+  --accent-blue: oklch(0.5 0.18 272);
+  --accent-purple: oklch(0.5 0.17 310);
+  --accent-orange: oklch(0.55 0.15 50);
+  --accent-cyan: oklch(0.52 0.1 215);
+  --accent-yellow: oklch(0.55 0.12 90);
+  --accent-fuchsia: oklch(0.52 0.19 345);
+  --text-primary: oklch(0.2 0.015 265);
+  --text-secondary: oklch(0.38 0.015 265);
+  --text-muted: oklch(0.5 0.015 265);
+  --control-bg: oklch(1 0 0);
+  --control-boundary: oklch(0.7 0.015 265);
+  --control-selected-bg: oklch(0.5 0.18 272);
+  --control-selected-text: oklch(1 0 0);
 
-  --surface-inset: #e9edf2;
-  --glass-bg: rgba(255, 255, 255, 0.92);
-  --glass-bg-strong: rgba(255, 255, 255, 0.96);
-  --card-bg: #ffffff;
-  --glass-border: #ccd3dc;
-  --glass-highlight: rgba(255, 255, 255, 0.72);
+  --surface-inset: oklch(0.955 0.005 265);
+  --glass-bg: oklch(1 0 0 / 0.92);
+  --glass-bg-strong: oklch(0.975 0.003 265 / 0.88);
+  --card-bg: oklch(1 0 0);
+  --glass-border: oklch(0.89 0.008 265);
+  --glass-highlight: oklch(1 0 0 / 0.72);
 
-  --shadow-1: 0 1px 2px rgba(23, 26, 33, 0.06);
-  --shadow-2: 0 4px 8px -4px rgba(23, 26, 33, 0.14);
-  --shadow-3: 0 10px 24px -12px rgba(23, 26, 33, 0.24);
+  --shadow-1: 0 1px 2px oklch(0.2 0.02 265 / 0.06);
+  --shadow-2: 0 6px 16px -8px oklch(0.2 0.02 265 / 0.16);
+  --shadow-3: 0 18px 40px -16px oklch(0.2 0.02 265 / 0.26);
 
   color-scheme: light;
 }
@@ -137,7 +141,7 @@
 }
 
 html {
-  font-size: 17.5px;
+  font-size: 17px;
   color-scheme: dark;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
@@ -206,7 +210,8 @@ table td.num {
   background: var(--card-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-panel);
-  padding: 1rem;
+  box-shadow: var(--shadow-1);
+  padding: 1.125rem 1.25rem;
   transition: background 0.18s ease, border-color 0.18s ease,
     box-shadow 0.18s ease, transform 0.18s ease;
 }
@@ -215,7 +220,7 @@ table td.num {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-panel);
-  padding: 1rem;
+  padding: 1.125rem 1.25rem;
 }
 
 .glass-strong {
@@ -240,8 +245,111 @@ table td.num {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.875rem;
 }
+
+.glass-panel__header h3 {
+  font-size: 0.9375rem;
+  letter-spacing: -0.005em;
+}
+
+/* Display face: page titles, the brief's headline and reading prose. */
+.font-display,
+.prose-read {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+}
+
+.prose-read {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  text-wrap: pretty;
+}
+
+h1, h2 {
+  text-wrap: balance;
+}
+
+/* ── v2 recipes (see DESIGN.md "v2 identity") ─────────────────────────── */
+/* Section heading inside a page: serif, quiet weight, generous space above. */
+.section-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-size: 1.3125rem;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.section-sub {
+  margin: 0.2rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+/* Lead headline of a story-like block (brief headline, pillar report). */
+.headline {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-size: clamp(1.5rem, 1.1rem + 1.2vw, 2.125rem);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.ticker {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.delta-up { color: var(--accent-green); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.delta-down { color: var(--accent-red); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Neutral inline tag; tint only through the --tag var when it carries state. */
+.tag {
+  --tag: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.0625rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--tag) 14%, transparent);
+  color: var(--tag);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* Interactive data row (lists/tables). */
+.data-row {
+  border-radius: var(--radius-control);
+  transition: background 140ms ease;
+}
+
+.data-row:hover {
+  background: var(--bg-card-hover);
+}
+
+/* Callout for a warning/caveat attached to a row: tinted, full border. */
+.callout {
+  --callout: var(--accent-orange);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in oklch, var(--callout) 30%, transparent);
+  border-radius: var(--radius-control);
+  background: color-mix(in oklch, var(--callout) 9%, transparent);
+  color: color-mix(in oklch, var(--callout) 80%, var(--text-primary));
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
 
 /* Shared form/selection surfaces use a visible edge in both themes. */
 .control-surface,
@@ -292,7 +400,7 @@ table td.num {
   width: 100%;
   min-width: 0;
   flex: 1;
-  padding: 1.25rem 1.5rem 2rem;
+  padding: 1.75rem 2rem 2.5rem;
 }
 
 .app-sidebar {
@@ -313,15 +421,58 @@ table td.num {
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  min-height: 3.25rem;
+  min-height: 3.5rem;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 0.75rem;
-  padding: 0 1.5rem;
+  padding: 0 2rem;
   background: var(--glass-bg-strong);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+.app-brand__mark {
+  display: inline-grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: none;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--accent-blue);
+  color: var(--bg-primary);
+}
+
+.app-brand__name {
+  font-family: var(--font-display);
+  font-size: 1.1875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.market-clock {
+  --clock: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.market-clock[data-tone="open"] { --clock: var(--accent-green); }
+.market-clock[data-tone="pre"],
+.market-clock[data-tone="post"] { --clock: var(--accent-orange); }
+
+.market-clock__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--clock);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--clock) 22%, transparent);
+}
+
+.market-clock__label {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .page-loading {
@@ -348,20 +499,19 @@ table td.num {
     position: sticky;
     top: 0;
     display: flex;
-    width: 13.5rem;
+    width: 14.5rem;
     height: 100dvh;
     flex: none;
     flex-direction: column;
-    gap: 1.25rem;
-    padding: 1rem 0.75rem;
+    gap: 1.75rem;
+    padding: 1.125rem 0.875rem 1rem;
     border-right: 1px solid var(--border);
     background: var(--surface-inset);
   }
 
   .app-brand {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 700;
+    min-height: 2.5rem;
+    padding: 0 0.375rem;
   }
 
   .app-sidebar__nav {
@@ -379,21 +529,21 @@ table td.num {
   }
 
   .app-sidebar__label {
-    padding: 0 0.5rem 0.35rem;
+    padding: 0 0.625rem 0.4rem;
     color: var(--text-muted);
-    font-size: 0.7rem;
-    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 500;
   }
 
   .app-nav-item {
     display: flex;
-    min-height: 2.25rem;
+    min-height: 2.375rem;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0 0.6rem;
+    gap: 0.7rem;
+    padding: 0 0.625rem;
     border-radius: var(--radius-control);
     color: var(--text-secondary);
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
     font-weight: 500;
     text-decoration: none;
     transition: color 160ms ease, background 160ms ease;
@@ -406,8 +556,8 @@ table td.num {
 
   .app-nav-item--active {
     color: var(--text-primary);
-    background: var(--bg-card);
-    box-shadow: inset 0 0 0 1px var(--border);
+    font-weight: 600;
+    background: color-mix(in oklch, var(--accent-blue) 16%, transparent);
   }
 
   .app-nav-item--active svg {
@@ -512,7 +662,7 @@ table td.num {
 
 .mobile-more-sheet__item--active {
   color: var(--accent-blue);
-  background: color-mix(in srgb, var(--accent-blue) 10%, transparent);
+  background: color-mix(in oklch, var(--accent-blue) 10%, transparent);
 }
 
 @keyframes sheet-in {
@@ -543,7 +693,13 @@ table td.num {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.5rem;
+  animation: page-in 320ms var(--ease-out);
+}
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
 }
 
 .desk-header {
@@ -556,16 +712,18 @@ table td.num {
 .desk-header__title h1 {
   margin: 0;
   color: var(--text-primary);
-  font-size: 1.375rem;
-  font-weight: 650;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-size: 2.25rem;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .desk-header__title p {
-  margin: 0.2rem 0 0;
-  color: var(--text-muted);
-  font-size: 0.8125rem;
+  margin: 0.35rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
 }
 
 .desk-header__actions {
@@ -579,7 +737,8 @@ table td.num {
   grid-column: 1 / -1;
   display: flex;
   min-width: 0;
-  gap: 1.25rem;
+  gap: 1.75rem;
+  margin-top: 0.5rem;
   overflow-x: auto;
   border-bottom: 1px solid var(--border);
   scrollbar-width: none;
@@ -588,11 +747,11 @@ table td.num {
 .desk-tab {
   position: relative;
   display: inline-flex;
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   flex: none;
   align-items: center;
   color: var(--text-muted);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   font-weight: 500;
   text-decoration: none;
   transition: color 160ms ease;
@@ -613,7 +772,7 @@ table td.num {
   left: 0;
   height: 2px;
   border-radius: 2px;
-  background: var(--accent-blue);
+  background: var(--text-primary);
   content: "";
 }
 
@@ -643,7 +802,7 @@ table td.num {
   min-width: 1.25rem;
   padding: 0 0.3rem;
   border-radius: var(--radius-chip);
-  background: color-mix(in srgb, var(--accent-orange) 18%, transparent);
+  background: color-mix(in oklch, var(--accent-orange) 18%, transparent);
   color: var(--accent-orange);
   font-size: 0.7rem;
   text-align: center;

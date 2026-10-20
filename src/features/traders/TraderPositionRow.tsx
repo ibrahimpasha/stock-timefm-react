@@ -248,7 +248,7 @@ export function TraderPositionRow({
     <div>
       {/* Main row — clickable */}
       <div
-        className="text-sm py-2 px-4 hover:bg-bg-card-hover transition-colors cursor-pointer flex items-center gap-2.5 flex-wrap"
+        className="data-row text-sm py-2.5 px-4 cursor-pointer flex items-center gap-x-3 gap-y-1 flex-wrap"
         onClick={() => onToggle(key)}
       >
         {/* Latest-activity date — leftmost so the eye sees recency at a glance.
@@ -299,7 +299,7 @@ export function TraderPositionRow({
               e.stopPropagation();
               onTickerClick?.(ticker);
             }}
-            className="num font-semibold shrink-0 text-sm cursor-pointer rounded-[var(--radius-control)]"
+            className="ticker shrink-0 text-sm cursor-pointer rounded-[var(--radius-control)]"
             style={{
               color: tickerHi
                 ? "var(--accent-blue)"
@@ -399,7 +399,7 @@ export function TraderPositionRow({
             </span>
           )}
           <span
-            className="num font-semibold shrink-0 text-sm min-w-14 text-right"
+            className="num font-semibold shrink-0 text-base min-w-16 text-right"
             style={{ color: pnlColor }}
             title={pnlTitle}
           >
@@ -425,7 +425,7 @@ export function TraderPositionRow({
       {expanded && (
         <div
           id={detailsId}
-          className="text-sm pt-1 pr-4 pb-3 pl-16 text-text-secondary flex flex-col gap-2 leading-relaxed"
+          className="text-sm pt-1 pr-4 pb-4 pl-16 max-sm:pl-4 text-text-secondary flex flex-col gap-3 leading-relaxed"
         >
           <div className="text-xs font-medium text-text-muted">
             Timeline · <span className="num">{position.events.length}</span>
@@ -438,7 +438,7 @@ export function TraderPositionRow({
               return (
                 <div
                   key={`${ev.alert_id}-${ev.ts}`}
-                  className="flex flex-wrap items-center gap-x-2.5 gap-y-1 py-1.5"
+                  className="flex flex-wrap items-center gap-x-2.5 gap-y-1 py-2"
                 >
                   <span className="w-12 shrink-0 text-xs font-medium text-text-primary">
                     {sentence(chip.label)}
@@ -495,7 +495,7 @@ export function TraderPositionRow({
                   )}
 
                   {ev.rationale && (
-                    <span className="text-sm text-text-secondary basis-full pl-[3.625rem]">
+                    <span className="font-display text-base leading-relaxed text-text-secondary basis-full pl-[3.625rem] max-sm:pl-0">
                       {ev.rationale}
                     </span>
                   )}

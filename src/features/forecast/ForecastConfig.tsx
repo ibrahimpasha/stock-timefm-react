@@ -85,12 +85,12 @@ export const DEFAULT_SETTINGS: ForecastSettings = {
 
 /** Shared on/off pill for every toggle in this form — one accent, no rainbow. */
 const pill = (on: boolean) =>
-  `px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+  `min-h-8 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
     on
       ? "border border-accent-blue/40 bg-accent-blue/10 text-text-primary"
       : "border border-border text-text-muted hover:text-text-secondary"
   }`;
-const fieldLabel = "text-xs text-text-muted mb-1 block";
+const fieldLabel = "text-xs font-medium text-text-muted mb-1.5 block";
 
 export function ForecastConfig({
   settings,
@@ -148,8 +148,15 @@ export function ForecastConfig({
   };
 
   return (
-    <div className="card space-y-4">
-      <h3 className="text-sm font-semibold text-text-primary">Forecast</h3>
+    <div className="flex flex-col gap-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="section-title">Forecast</h3>
+          <p className="section-sub">
+            Random-walk range by default. Learned models are research overlays with no backtested edge.
+          </p>
+        </div>
+      </div>
       {/* Row 1: Type + Horizon + History + Origin */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
         {/* Forecast Type */}
@@ -196,7 +203,7 @@ export function ForecastConfig({
                 }
                 className="flex-1 accent-[var(--accent-blue)]"
               />
-              <span className="num text-xs text-text-primary w-6 text-right">
+              <span className="num text-sm font-semibold text-text-primary w-6 text-right">
                 {settings.forecastDays}
               </span>
             </div>
@@ -214,7 +221,7 @@ export function ForecastConfig({
                 }
                 className="flex-1 accent-[var(--accent-blue)]"
               />
-              <span className="num text-xs text-text-primary w-10 text-right">
+              <span className="num text-sm font-semibold text-text-primary w-12 text-right">
                 {settings.forecastMinutes}m
               </span>
             </div>
@@ -239,7 +246,7 @@ export function ForecastConfig({
                 }
                 className="flex-1 accent-[var(--accent-blue)]"
               />
-              <span className="num text-xs text-text-primary w-8 text-right">
+              <span className="num text-sm font-semibold text-text-primary w-9 text-right">
                 {settings.historyDays}
               </span>
             </div>
@@ -248,7 +255,7 @@ export function ForecastConfig({
               id="forecast-history"
               value={settings.interval}
               onChange={(e) => update({ interval: e.target.value })}
-              className="w-full bg-bg-primary border border-border rounded-md px-2 py-1 text-xs num text-text-primary"
+              className="control-surface w-full min-h-8 border rounded-md px-2 py-1 text-xs num text-text-primary"
             >
               {INTERVALS.map((i) => (
                 <option key={i} value={i}>
@@ -271,7 +278,7 @@ export function ForecastConfig({
             disabled={settings.forecastType === "intraday"}
             max={todayLocalDate()}
             onChange={(e) => update({ forecastOrigin: e.target.value })}
-            className="w-full bg-bg-primary border border-border rounded-md px-2 py-1 text-xs num text-text-primary"
+            className="control-surface w-full min-h-8 border rounded-md px-2 py-1 text-xs num text-text-primary"
           />
         </div>
       </div>
@@ -279,8 +286,8 @@ export function ForecastConfig({
       {/* Row 2: Models */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-text-muted">
-            Models <span className="num">{settings.selectedModels.length}/{availableModels.length}</span>
+          <span className="text-sm font-semibold text-text-primary">
+            Models <span className="num font-normal text-text-muted">{settings.selectedModels.length}/{availableModels.length}</span>
           </span>
           <div className="flex gap-2">
             <button
@@ -341,7 +348,7 @@ export function ForecastConfig({
           onClick={onRunForecast}
           disabled={runDisabled}
           title={disabledReason || "Run forecast across selected models"}
-          className="flex items-center gap-2 px-4 py-1.5 rounded-md bg-accent-blue text-bg-primary font-semibold text-sm transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex min-h-9 items-center gap-2 px-4 py-2 rounded-md bg-accent-blue text-bg-primary font-semibold text-sm transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isLoading ? (
             <>
@@ -357,7 +364,7 @@ export function ForecastConfig({
         </button>
       </div>
       {disabledReason && !isLoading && (
-        <div className="text-xs text-text-muted text-right -mt-2">
+        <div className="text-xs text-text-muted text-right -mt-3">
           {disabledReason}
         </div>
       )}

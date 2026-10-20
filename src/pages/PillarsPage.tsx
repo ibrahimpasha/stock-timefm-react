@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { Layers, AlertTriangle, Cpu, Activity, ChevronRight, Network, Compass, Rocket, BookOpen, RefreshCw } from "lucide-react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { ChevronRight, RefreshCw } from "lucide-react";
 import {
   usePillars,
   usePillar,
@@ -27,8 +27,8 @@ function fmtCap(n?: number | null): string {
 
 const SEV: Record<string, { color: string; bg: string }> = {
   Critical: { color: "var(--accent-red)", bg: "color-mix(in srgb, var(--accent-red) 14%, transparent)" },
-  High: { color: "var(--accent-orange, #e3a008)", bg: "color-mix(in srgb, var(--accent-orange) 14%, transparent)" },
-  Moderate: { color: "var(--accent-yellow, #d4a72c)", bg: "color-mix(in srgb, var(--accent-yellow) 12%, transparent)" },
+  High: { color: "var(--accent-orange)", bg: "color-mix(in srgb, var(--accent-orange) 14%, transparent)" },
+  Moderate: { color: "var(--accent-yellow)", bg: "color-mix(in srgb, var(--accent-yellow) 12%, transparent)" },
 };
 
 // Only Critical is a state worth color; High/Moderate read as plain text.
@@ -42,7 +42,7 @@ function accumColor(label?: string): string {
   if (l.includes("STRONG_ACCUM") || l.includes("ESCALAT")) return "var(--accent-green)";
   if (l.includes("ACCUM")) return "var(--accent-green)";
   if (l.includes("DIST")) return "var(--accent-red)";
-  if (l.includes("BATTLE")) return "var(--accent-orange, #e3a008)";
+  if (l.includes("BATTLE")) return "var(--accent-orange)";
   return "var(--text-muted)";
 }
 
@@ -79,10 +79,14 @@ function TickerChip({
 }
 
 function SeverityBadge({ severity }: { severity: string }) {
+  const tone = SEV_TONE[severity];
   return (
-    <Chip tone={SEV_TONE[severity] ?? "neutral"}>
+    <span
+      className="tag"
+      style={tone ? ({ "--tag": `var(--accent-${tone})` } as CSSProperties) : undefined}
+    >
       {severity}
-    </Chip>
+    </span>
   );
 }
 
@@ -96,15 +100,13 @@ function BottleneckCard({
   onTicker: (t: string) => void;
 }) {
   return (
-    <div className="flex flex-col gap-2 border-t border-border pt-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-semibold text-text-primary">{b.name}</span>
-          <SeverityBadge severity={b.severity} />
-          {b.timeline && (
-            <span className="text-xs num text-text-muted">{b.timeline}</span>
-          )}
-        </div>
+    <div className="flex flex-col gap-3 border-t border-border pt-4">
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <h4 className="font-display text-lg font-medium leading-snug text-text-primary">{b.name}</h4>
+        <SeverityBadge severity={b.severity} />
+        {b.timeline && (
+          <span className="ml-auto text-xs num text-text-muted">{b.timeline}</span>
+        )}
       </div>
       {b.detail && <p className="text-sm leading-relaxed text-text-secondary max-w-[72ch]">{b.detail}</p>}
       {b.graphify_concept && (
@@ -162,7 +164,7 @@ function PurityScatter({
 
   if (pts.length < 3) {
     return (
-      <div className="text-sm text-text-muted text-center px-1 py-6">
+      <div className="text-sm text-text-muted px-1 py-6 max-w-[72ch]">
         Value × purity scatter needs PEG + purity estimates from the research pass
         (still generating, or sparse for this pillar). The company table below has the full universe.
       </div>
@@ -179,17 +181,17 @@ function PurityScatter({
         {/* quadrant guides at PEG=1.0 (fair) and purity=0.6 (pure) */}
         <line x1={x(1)} y1={PAD} x2={x(1)} y2={H - PAD} stroke="var(--border)" strokeDasharray="3 3" />
         <line x1={PAD} y1={y(0.6)} x2={W - PAD} y2={y(0.6)} stroke="var(--border)" strokeDasharray="3 3" />
-        <text x={PAD + 6} y={PAD + 12} className="fill-text-muted" style={{ fontSize: 11 }}>
+        <text x={PAD + 6} y={PAD + 12} className="fill-text-secondary" style={{ fontSize: 12 }}>
           Value + pure
         </text>
-        <text x={W - PAD - 6} y={PAD + 12} textAnchor="end" className="fill-text-muted" style={{ fontSize: 11 }}>
+        <text x={W - PAD - 6} y={PAD + 12} textAnchor="end" className="fill-text-secondary" style={{ fontSize: 12 }}>
           Premium + pure
         </text>
-        <text x={PAD + 6} y={H - PAD - 6} className="fill-text-muted" style={{ fontSize: 11 }}>
+        <text x={PAD + 6} y={H - PAD - 6} className="fill-text-secondary" style={{ fontSize: 12 }}>
           Value + diversified
         </text>
         {/* axis labels */}
-        <text x={W / 2} y={H - 8} textAnchor="middle" className="fill-text-muted" style={{ fontSize: 11 }}>
+        <text x={W / 2} y={H - 8} textAnchor="middle" className="fill-text-secondary" style={{ fontSize: 12 }}>
           PEG  ·  cheaper →← richer
         </text>
         <text
@@ -230,7 +232,7 @@ function PurityScatter({
                 stroke={col}
                 strokeOpacity={0.7}
               />
-              <text x={cx} y={cy + 3} textAnchor="middle" className="fill-text-primary num" style={{ fontSize: 10 }}>
+              <text x={cx} y={cy + 4} textAnchor="middle" className="fill-text-primary num" style={{ fontSize: 11, fontWeight: 600 }}>
                 {c.ticker}
               </text>
               <title>
@@ -267,11 +269,11 @@ function CompanyTable({
             key={c.ticker}
             type="button"
             onClick={() => onTicker(c.ticker)}
-            className="min-h-11 w-full px-2 py-2.5 text-left transition-colors hover:bg-bg-card-hover"
+            className="data-row min-h-11 w-full px-2 py-2.5 text-left"
             style={{ background: c.ticker === active ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : undefined }}
           >
             <span className="flex min-w-0 items-center gap-2">
-              <span className="flex items-center gap-1 num text-sm font-semibold text-text-primary">
+              <span className="ticker flex items-center gap-1 text-sm">
                 {c.ticker}
                 {c.featured && <span className="h-1.5 w-1.5 rounded-full bg-accent-blue" title="Researched name" />}
               </span>
@@ -314,10 +316,10 @@ function CompanyTable({
             key={c.ticker}
             type="button"
             onClick={() => onTicker(c.ticker)}
-            className="grid grid-cols-[64px_1fr_44px_52px_44px_52px_56px_56px] items-center gap-2 px-2 py-2 text-left text-xs transition-colors hover:bg-bg-card-hover"
+            className="data-row grid grid-cols-[64px_1fr_44px_52px_44px_52px_56px_56px] items-center gap-2 px-2 py-2.5 text-left text-sm"
             style={{ background: c.ticker === active ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : undefined }}
           >
-            <span className="flex items-center gap-1 num font-semibold text-text-primary">
+            <span className="ticker flex items-center gap-1">
               {c.ticker}
               {c.featured && <span className="h-1.5 w-1.5 rounded-full bg-accent-blue" title="Researched name" />}
             </span>
@@ -341,7 +343,7 @@ function CompanyTable({
         <button
           type="button"
           onClick={() => setShowAll((v) => !v)}
-          className="min-h-11 px-2 py-2 text-left text-xs text-text-muted transition-colors hover:text-text-secondary md:min-h-0"
+          className="min-h-11 self-start px-2 py-2 text-left text-sm font-medium text-accent-blue transition-colors hover:text-text-primary md:min-h-0"
         >
           {showAll ? "Show fewer" : `Show all ${companies.length} names →`}
         </button>
@@ -377,17 +379,17 @@ function SupplyChainMap({ layers, onTicker }: { layers: SupplyChainLayer[]; onTi
   return (
     <div className="flex flex-col divide-y divide-border">
       {layers.map((L, i) => (
-        <div key={L.layer} className="flex items-start gap-3 py-2">
-          <div className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center bg-bg-card-hover text-xs num font-semibold text-text-muted">
+        <div key={L.layer} className="flex items-start gap-4 py-3">
+          <div className="shrink-0 w-7 font-display text-2xl leading-none text-text-muted num text-right">
             {i + 1}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <span className="text-sm font-semibold text-text-primary">{L.layer}</span>
-              {L.role && <span className="text-xs text-text-muted">{L.role}</span>}
+            <div className="flex items-baseline gap-x-2 gap-y-0.5 flex-wrap">
+              <span className="text-base font-semibold text-text-primary">{L.layer}</span>
+              {L.role && <span className="text-sm text-text-muted">{L.role}</span>}
             </div>
             {L.tickers.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1.5">
+              <div className="flex flex-wrap gap-1.5 mt-2">
                 {L.tickers.map((t) => (
                   <PlainTickerChip key={t.ticker} b={t} onClick={onTicker} />
                 ))}
@@ -404,11 +406,12 @@ function SupplyChainMap({ layers, onTicker }: { layers: SupplyChainLayer[]; onTi
 
 function AllocationCallout({ text, accent }: { text: string; accent: string }) {
   return (
-    <div className="border-t border-border pt-3">
-      <h3 className="text-sm font-semibold text-text-primary mb-1.5 flex items-center gap-1.5">
-        <Compass size={14} style={{ color: accent }} /> Where to allocate
-      </h3>
-      <p className="text-sm leading-relaxed text-text-secondary max-w-[72ch]">{text}</p>
+    <div
+      className="rounded-[var(--radius-panel)] px-5 py-4"
+      style={{ background: `color-mix(in srgb, ${accent} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${accent} 28%, transparent)` }}
+    >
+      <h3 className="section-title mb-2">Where to allocate</h3>
+      <p className="prose-read text-text-primary max-w-[68ch]">{text}</p>
     </div>
   );
 }
@@ -419,9 +422,9 @@ function PreIpoSection({ items, onTicker }: { items: PreIpoCompany[]; onTicker: 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-1">
       {items.map((c) => (
-        <div key={c.name} className="flex flex-col gap-1.5 border-t border-border py-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-text-primary">{c.name}</span>
+        <div key={c.name} className="flex flex-col gap-2 border-t border-border py-4">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-base font-semibold text-text-primary">{c.name}</span>
             {c.category && (
               <span className="text-xs text-text-muted">{c.category}</span>
             )}
@@ -439,7 +442,7 @@ function PreIpoSection({ items, onTicker }: { items: PreIpoCompany[]; onTicker: 
               {c.public_proxies.map((t) => (
                 <button key={t} type="button" onClick={() => onTicker(t)} className="cursor-pointer">
                   <Chip tone="neutral">
-                    <span className="num font-semibold">{t}</span>
+                    <span className="ticker">{t}</span>
                   </Chip>
                 </button>
               ))}
@@ -453,102 +456,114 @@ function PreIpoSection({ items, onTicker }: { items: PreIpoCompany[]; onTicker: 
 
 /* ── pillar detail ───────────────────────────────────────────────────── */
 
-function PillarBody({ d, onTicker, active }: { d: PillarDetail; onTicker: (t: string) => void; active: string }) {
+function Section({ title, sub, children }: { title: string; sub?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3">
+      <div>
+        <h3 className="section-title">{title}</h3>
+        {sub && <p className="section-sub">{sub}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function HeroFigure({ value, label, color }: { value: ReactNode; label: string; color?: string }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className="text-3xl font-semibold num tracking-tight" style={{ color: color ?? "var(--text-primary)" }}>
+        {value}
+      </span>
+      <span className="text-sm text-text-muted">{label}</span>
+    </div>
+  );
+}
+
+function PillarBody({
+  d,
+  onTicker,
+  active,
+  title,
+}: {
+  d: PillarDetail;
+  onTicker: (t: string) => void;
+  active: string;
+  title?: string;
+}) {
   const s = d.stats;
   return (
-    <div className="flex flex-col gap-6">
-      {/* stat strip */}
-      <div className="flex flex-col gap-1.5">
-        {d.tagline && <p className="text-base font-semibold text-text-primary max-w-[72ch]">{d.tagline}</p>}
-        <div className="flex items-center gap-2 flex-wrap text-sm text-text-muted">
-          <span><span className="num text-text-secondary">{s.n_companies}</span> companies</span>
-          <span>·</span>
-          <span><span className="num" style={{ color: "var(--accent-red)" }}>{s.n_critical}</span> critical bottlenecks</span>
-          <span>·</span>
-          <span><span className="num text-text-secondary">{fmtCap(s.total_market_cap)}</span> aggregate cap</span>
-          {!d.has_research && (
-            <span className="animate-pulse">· Research generating…</span>
+    <div className="flex flex-col gap-10">
+      {/* hero: pillar name, tagline, three big numbers */}
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-3">
+          {title && (
+            <h2 className="font-display flex items-center gap-3 text-3xl font-medium leading-tight tracking-tight text-text-primary">
+              <span className="size-3 shrink-0 rounded-full" style={{ background: d.accent }} aria-hidden="true" />
+              {title}
+            </h2>
           )}
+          {d.tagline && <p className="prose-read text-text-primary max-w-[64ch]">{d.tagline}</p>}
         </div>
+        <div className="grid grid-cols-3 gap-6 border-t border-border pt-4 max-w-2xl">
+          <HeroFigure value={s.n_companies} label="companies" />
+          <HeroFigure value={s.n_critical} label="critical bottlenecks" color="var(--accent-red)" />
+          <HeroFigure value={fmtCap(s.total_market_cap)} label="aggregate cap" />
+        </div>
+        {!d.has_research && (
+          <p className="text-sm text-text-muted animate-pulse">Research generating…</p>
+        )}
       </div>
 
-      {/* demand thesis */}
       {d.demand_thesis && (
-        <section>
-          <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1.5">
-            <Activity size={14} className="text-text-muted" /> Demand
-          </h3>
-          <p className="text-sm leading-relaxed text-text-secondary max-w-[72ch]">{d.demand_thesis}</p>
-        </section>
+        <Section title="Demand">
+          <p className="prose-read max-w-[68ch]">{d.demand_thesis}</p>
+        </Section>
       )}
 
-      {/* supply-chain map */}
       {d.supply_chain.length > 0 && (
-        <section>
-          <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1.5">
-            <Network size={14} className="text-text-muted" /> Supply chain — upstream → downstream
-          </h3>
+        <Section title="Supply chain" sub="Upstream to downstream">
           <SupplyChainMap layers={d.supply_chain} onTicker={onTicker} />
-        </section>
+        </Section>
       )}
 
-      {/* bottleneck matrix */}
-      <section>
-        <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1.5">
-          <AlertTriangle size={14} className="text-text-muted" /> Bottleneck matrix
-        </h3>
+      <Section title="Bottleneck matrix" sub="Who owns the chokepoint, and who is gated by it">
         {d.bottlenecks.length === 0 ? (
           <div className="text-sm text-text-muted">
             {d.has_research ? "No bottlenecks mapped." : "Generating from the graphify chokepoints + intel…"}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6">
             {d.bottlenecks.map((b) => (
               <BottleneckCard key={b.name} b={b} onTicker={onTicker} />
             ))}
           </div>
         )}
-      </section>
+      </Section>
 
-      {/* scatter + table */}
-      <section>
-        <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1.5">
-          <Layers size={14} className="text-text-muted" /> Company universe — value × purity
-        </h3>
-        <div className="mb-4">
+      <Section title="Company universe" sub="Value × purity — bubble size is market cap, click any name">
+        <div className="card flex flex-col gap-4">
           <PurityScatter companies={d.companies} accent={d.accent} onTicker={onTicker} />
+          <div className="border-t border-border pt-3">
+            <CompanyTable companies={d.companies} onTicker={onTicker} active={active} />
+          </div>
         </div>
-        <CompanyTable companies={d.companies} onTicker={onTicker} active={active} />
-      </section>
+      </Section>
 
-      {/* pre-IPO / private */}
+      {d.allocation && <AllocationCallout text={d.allocation} accent={d.accent} />}
+
       {d.pre_ipo.length > 0 && (
-        <section>
-          <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1.5">
-            <Rocket size={14} className="text-text-muted" /> Pre-IPO &amp; private — the names you can't buy yet
-          </h3>
+        <Section title="Pre-IPO & private" sub="The names you can't buy yet">
           <PreIpoSection items={d.pre_ipo} onTicker={onTicker} />
-        </section>
+        </Section>
       )}
 
-      {/* where to allocate */}
-      {d.allocation && (
-        <section>
-          <AllocationCallout text={d.allocation} accent={d.accent} />
-        </section>
-      )}
-
-      {/* emerging tech */}
       {d.emerging_tech.length > 0 && (
-        <section>
-          <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1.5">
-            <Cpu size={14} className="text-text-muted" /> Emerging tech radar
-          </h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-1">
+        <Section title="Emerging tech radar">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-1">
             {d.emerging_tech.map((t) => (
-              <div key={t.name} className="flex flex-col gap-1.5 border-t border-border py-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-text-primary">{t.name}</span>
+              <div key={t.name} className="flex flex-col gap-2 border-t border-border py-4">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className="text-base font-semibold text-text-primary">{t.name}</span>
                   {t.status && <span className="text-xs text-text-muted">{t.status}</span>}
                   {t.timeline && <span className="text-xs num text-text-muted ml-auto">{t.timeline}</span>}
                 </div>
@@ -567,22 +582,20 @@ function PillarBody({ d, onTicker, active }: { d: PillarDetail; onTicker: (t: st
               </div>
             ))}
           </div>
-        </section>
+        </Section>
       )}
 
-      {/* risks */}
       {d.risks.length > 0 && (
-        <section>
-          <h3 className="text-sm font-semibold text-text-primary mb-2">Risks &amp; substitution threats</h3>
-          <div className="flex flex-col gap-2 max-w-[72ch]">
+        <Section title="Risks & substitution threats">
+          <ol className="flex flex-col gap-3 max-w-[72ch]">
             {d.risks.map((r) => (
-              <div key={r.risk} className="text-sm leading-relaxed">
+              <li key={r.risk} className="text-sm leading-relaxed">
                 <span className="font-semibold text-text-primary">{r.risk}.</span>{" "}
                 <span className="text-text-secondary">{r.detail}</span>
-              </div>
+              </li>
             ))}
-          </div>
-        </section>
+          </ol>
+        </Section>
       )}
     </div>
   );
@@ -609,7 +622,7 @@ function MarkdownLite({ md }: { md: string }) {
   const flush = (k: string) => {
     if (bullets.length) {
       out.push(
-        <ul key={`ul-${k}`} className="list-disc pl-5 my-2 space-y-1.5">{bullets}</ul>,
+        <ul key={`ul-${k}`} className="list-disc pl-6 my-3 space-y-2 marker:text-text-muted">{bullets}</ul>,
       );
       bullets = [];
     }
@@ -618,21 +631,39 @@ function MarkdownLite({ md }: { md: string }) {
     const line = raw.trimEnd();
     if (line.startsWith("- ")) {
       bullets.push(
-        <li key={i} className="text-sm leading-relaxed text-text-secondary">{mdInline(line.slice(2))}</li>,
+        <li key={i} className="prose-read">{mdInline(line.slice(2))}</li>,
       );
       return;
     }
     flush(String(i));
     if (line === "") return;
-    if (line === "---") { out.push(<hr key={i} className="my-5 border-border" />); return; }
-    if (line.startsWith("#### ")) { out.push(<h4 key={i} className="text-sm font-semibold text-text-primary mt-4 mb-1">{mdInline(line.slice(5))}</h4>); return; }
-    if (line.startsWith("### ")) { out.push(<h3 key={i} className="text-base font-semibold text-text-primary mt-5 mb-1.5">{mdInline(line.slice(4))}</h3>); return; }
-    if (line.startsWith("## ")) { out.push(<h2 key={i} className="text-lg font-semibold text-text-primary mt-6 mb-2">{mdInline(line.slice(3))}</h2>); return; }
-    if (line.startsWith("# ")) { out.push(<h1 key={i} className="text-xl font-semibold text-text-primary mt-2 mb-3">{mdInline(line.slice(2))}</h1>); return; }
-    out.push(<p key={i} className="text-sm leading-relaxed text-text-secondary my-2">{mdInline(line)}</p>);
+    if (line === "---") { out.push(<hr key={i} className="my-8 border-border" />); return; }
+    if (line.startsWith("#### ")) { out.push(<h4 key={i} className="text-base font-semibold text-text-primary mt-6 mb-1">{mdInline(line.slice(5))}</h4>); return; }
+    if (line.startsWith("### ")) { out.push(<h3 key={i} className="font-display text-xl font-medium text-text-primary mt-8 mb-2">{mdInline(line.slice(4))}</h3>); return; }
+    if (line.startsWith("## ")) { out.push(<h2 key={i} className="font-display text-2xl font-medium tracking-tight text-text-primary mt-10 mb-3">{mdInline(line.slice(3))}</h2>); return; }
+    if (line.startsWith("# ")) { out.push(<h1 key={i} className="font-display text-3xl font-medium tracking-tight text-text-primary mt-2 mb-4">{mdInline(line.slice(2))}</h1>); return; }
+    out.push(<p key={i} className="prose-read my-3">{mdInline(line)}</p>);
   });
   flush("end");
-  return <div className="max-w-[72ch]">{out}</div>;
+  return <div className="max-w-[68ch]">{out}</div>;
+}
+
+function RetryCallout({ text, onRetry }: { text: string; onRetry: () => void }) {
+  return (
+    <div
+      className="callout flex flex-wrap items-center gap-3"
+      style={{ "--callout": "var(--accent-red)" } as CSSProperties}
+    >
+      <span>{text}</span>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex min-h-8 items-center gap-1 rounded-full border border-border px-3 py-1 text-xs font-medium text-text-secondary hover:text-text-primary"
+      >
+        <RefreshCw size={12} /> Retry
+      </button>
+    </div>
+  );
 }
 
 function WeeklyReportSection() {
@@ -641,69 +672,48 @@ function WeeklyReportSection() {
   const [open, setOpen] = useState(true);
   const archive = data?.available_reports ?? [];
   if (isError && !data) {
-    return (
-      <div className="card flex items-center gap-2 text-sm text-accent-red">
-        <AlertTriangle size={13} />
-        <span>Unable to load the weekly AI report.</span>
-        <button
-          type="button"
-          onClick={() => void refetch()}
-          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-text-secondary hover:text-text-primary"
-        >
-          <RefreshCw size={11} /> Retry
-        </button>
-      </div>
-    );
+    return <RetryCallout text="Unable to load the weekly AI report." onRetry={() => void refetch()} />;
   }
   if (!data?.available || !data.markdown) return null;
   return (
-    <section className="card">
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="flex min-h-11 min-w-0 basis-full items-center gap-2 text-left sm:basis-auto sm:flex-1"
-        >
-          <BookOpen size={16} className="text-text-muted shrink-0" />
-          <span className="text-sm font-semibold text-text-primary truncate">
-            {data.title || "Weekly AI Report"}
-          </span>
-          {archive.length <= 1 && data.date && (
-            <span className="text-xs num text-text-muted">{data.date}</span>
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <span className="text-sm text-text-muted">This week's synthesis</span>
+        <h2 className="headline">{data.title || "Weekly AI Report"}</h2>
+        <div className="flex flex-wrap items-center gap-3 text-sm text-text-muted">
+          {archive.length <= 1 && data.date && <span className="num">{data.date}</span>}
+          {archive.length > 1 && (
+            // Archive picker — every past report stays reachable; nothing is
+            // overwritten, each run adds a new dated file. Default = newest.
+            <select
+              value={data.file ?? ""}
+              onChange={(e) => setPick(e.target.value || null)}
+              title="Pick a past weekly report"
+              className="control-surface num min-h-11 shrink-0 rounded-full border px-3 py-1 text-xs text-text-secondary sm:min-h-8"
+            >
+              {archive.map((r, i) => (
+                <option key={r.file} value={r.file}>
+                  {r.date}{i === 0 ? " (latest)" : ""}
+                </option>
+              ))}
+            </select>
           )}
-        </button>
-        {archive.length > 1 && (
-          // Archive picker — every past report stays reachable; nothing is
-          // overwritten, each run adds a new dated file. Default = newest.
-          <select
-            value={data.file ?? ""}
-            onChange={(e) => setPick(e.target.value || null)}
-            title="Pick a past weekly report"
-            className="num min-h-11 shrink-0 rounded border border-border bg-bg-card px-1.5 py-0.5 text-xs text-text-secondary sm:min-h-0"
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-accent-blue hover:text-text-primary sm:min-h-8"
           >
-            {archive.map((r, i) => (
-              <option key={r.file} value={r.file}>
-                {r.date}{i === 0 ? " (latest)" : ""}
-              </option>
-            ))}
-          </select>
-        )}
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-md sm:min-h-0 sm:min-w-0"
-          aria-label={open ? "Hide report" : "Show report"}
-        >
-          <span className="hidden text-xs text-text-muted sm:inline">{open ? "Hide" : "Show"}</span>
-          <ChevronRight
-            size={15}
-            className="text-text-muted"
-            style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}
-          />
-        </button>
+            {open ? "Hide report" : "Read the report"}
+            <ChevronRight
+              size={15}
+              style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}
+            />
+          </button>
+        </div>
       </div>
       {open && (
-        <div className="mt-3 pt-3 border-t border-border max-h-[72vh] overflow-y-auto pr-1">
+        <div className="max-h-[72vh] overflow-y-auto border-y border-border py-2 pr-2">
           <MarkdownLite md={data.markdown} />
         </div>
       )}
@@ -731,10 +741,10 @@ export function PillarsPage() {
           <p>Start from what the world physically needs, trace the supply chain, find where it gets stuck</p>
         </div>
       </header>
-      <div className="xl:flex xl:items-start xl:gap-6">
-      <div className="flex-1 min-w-0 flex flex-col gap-5">
+      <div className="xl:flex xl:items-start xl:gap-10">
+      <div className="flex-1 min-w-0 flex flex-col gap-12">
       {overview?.intro && (
-        <p className="text-sm text-text-secondary leading-relaxed max-w-[72ch]">{overview.intro}</p>
+        <p className="prose-read max-w-[68ch]">{overview.intro}</p>
       )}
 
       {/* Weekly AI Report — the latest cross-layer synthesis (wiki-archived) */}
@@ -742,118 +752,99 @@ export function PillarsPage() {
 
       {/* cross-pillar chokepoints */}
       {!!overview?.cross_pillar_chokepoints?.length && (
-        <section className="card">
-          <h2 className="text-sm font-semibold text-text-primary mb-2">
-            Chokepoints that span pillars
-          </h2>
+        <section className="flex flex-col gap-3">
+          <div>
+            <h2 className="section-title">Chokepoints that span pillars</h2>
+            <p className="section-sub">Constraints that bind more than one buildout at once</p>
+          </div>
           {/* Each evidence row owns the same responsive column template. */}
-          <div className="divide-y divide-border text-sm">
+          <div className="divide-y divide-border border-y border-border">
             {overview.cross_pillar_chokepoints.map((c) => (
-              <div key={c.name} className="pillar-chokepoint-row grid items-start gap-x-3 gap-y-1 py-2">
-                <span className="font-semibold text-text-primary">{c.name}</span>
-                <span className="text-xs text-text-muted pt-0.5">
+              <div key={c.name} className="pillar-chokepoint-row grid items-baseline gap-x-4 gap-y-1 px-2 py-3">
+                <span className="text-base font-semibold text-text-primary">{c.name}</span>
+                <span className="text-xs text-text-muted">
                   {c.pillars.map((p) => p.replace(/_/g, " ")).join(" · ")}
                 </span>
-                <span className="text-text-secondary leading-relaxed">{c.why}</span>
+                <span className="text-sm text-text-secondary leading-relaxed">{c.why}</span>
               </div>
             ))}
           </div>
         </section>
       )}
 
-      {/* pillar tabs */}
-      {overviewQuery.isError && !overview && (
-        <div className="card flex items-center gap-2 text-sm text-accent-red">
-          <AlertTriangle size={14} />
-          <span>Unable to load structural pillars.</span>
-          <button
-            type="button"
-            onClick={() => void overviewQuery.refetch()}
-            className="inline-flex items-center gap-1 rounded border border-border px-2.5 py-1 text-xs text-text-secondary hover:text-text-primary"
-          >
-            <RefreshCw size={11} /> Retry
-          </button>
-        </div>
-      )}
-      <div className="flex items-stretch gap-2 flex-wrap" role="group" aria-label="Choose a pillar">
-        {tabs.map((t) => {
-          const on = t.key === selected;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              aria-pressed={on}
-              onClick={() => setSelected(t.key)}
-              className="min-h-11 min-w-[220px] flex-1 rounded-lg border px-3 py-2.5 text-left transition-colors hover:bg-bg-card-hover"
-              style={{
-                borderColor: on ? t.accent : "var(--border)",
-                background: on ? `color-mix(in srgb, ${t.accent} 8%, var(--bg-card))` : "var(--bg-card)",
-              }}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-text-primary">
-                  <span className="size-2 shrink-0 rounded-full" style={{ background: t.accent }} />
-                  <span className="truncate">{t.title}</span>
-                </span>
-                <ChevronRight size={14} className="text-text-muted shrink-0" />
-              </div>
-              <div className="flex items-center gap-2 mt-1 text-xs text-text-muted">
-                <span><span className="num">{t.stats?.n_companies ?? 0}</span> companies</span>
-                <span>·</span>
-                <span><span className="num" style={{ color: "var(--accent-red)" }}>{t.stats?.n_critical ?? 0}</span> critical</span>
-                <span>·</span>
-                <span className="num">{fmtCap(t.stats?.total_market_cap)}</span>
-              </div>
-              {!!t.top_bottlenecks?.length && (
-                <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-text-secondary">
-                  {t.top_bottlenecks.map((b) => (
-                    <span key={b.name} className="inline-flex items-center gap-1" title={`${b.severity} bottleneck`}>
-                      <span
-                        className="size-1.5 shrink-0 rounded-full"
-                        style={{ background: (SEV[b.severity] || SEV.Moderate).color }}
-                      />
-                      {b.name}
-                    </span>
-                  ))}
+      {/* pillar tabs + detail */}
+      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-3">
+        <h2 className="section-title">Pillars</h2>
+        {overviewQuery.isError && !overview && (
+          <RetryCallout text="Unable to load structural pillars." onRetry={() => void overviewQuery.refetch()} />
+        )}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-3" role="group" aria-label="Choose a pillar">
+          {tabs.map((t) => {
+            const on = t.key === selected;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setSelected(t.key)}
+                className="min-h-11 rounded-[var(--radius-panel)] border px-4 py-3 text-left transition-colors hover:bg-bg-card-hover"
+                style={{
+                  borderColor: on ? `color-mix(in srgb, ${t.accent} 60%, transparent)` : "var(--border)",
+                  background: on ? `color-mix(in srgb, ${t.accent} 10%, var(--bg-card))` : "transparent",
+                }}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-2 font-display text-lg font-medium text-text-primary">
+                    <span className="size-2.5 shrink-0 rounded-full" style={{ background: t.accent }} />
+                    <span className="truncate">{t.title}</span>
+                  </span>
+                  <ChevronRight size={15} className="text-text-muted shrink-0" />
                 </div>
-              )}
-            </button>
-          );
-        })}
+                <div className="flex items-center gap-2 mt-1 text-xs text-text-muted">
+                  <span><span className="num text-text-secondary">{t.stats?.n_companies ?? 0}</span> companies</span>
+                  <span>·</span>
+                  <span><span className="num" style={{ color: "var(--accent-red)" }}>{t.stats?.n_critical ?? 0}</span> critical</span>
+                  <span>·</span>
+                  <span className="num text-text-secondary">{fmtCap(t.stats?.total_market_cap)}</span>
+                </div>
+                {!!t.top_bottlenecks?.length && (
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-text-secondary">
+                    {t.top_bottlenecks.map((b) => (
+                      <span key={b.name} className="inline-flex items-center gap-1" title={`${b.severity} bottleneck`}>
+                        <span
+                          className="size-1.5 shrink-0 rounded-full"
+                          style={{ background: (SEV[b.severity] || SEV.Moderate).color }}
+                        />
+                        {b.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* detail */}
-      <section className="card">
-        {sel && (
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-text-primary">
-            <Layers size={16} style={{ color: sel.accent }} /> {sel.title}
-          </h2>
-        )}
+      <section className="border-t border-border pt-8">
         {isLoading ? (
-          <div className="animate-pulse space-y-2">
-            <div className="h-4 w-1/2 rounded bg-text-muted/20" />
+          <div className="animate-pulse space-y-3">
+            <div className="h-8 w-1/2 rounded bg-text-muted/20" />
             <div className="h-24 w-full rounded bg-text-muted/10" />
           </div>
         ) : detailQuery.isError || !detail ? (
-          <div className="flex items-center justify-center gap-2 py-8 text-sm text-accent-red">
-            <AlertTriangle size={14} />
-            <span>Unable to load this pillar.</span>
-            <button
-              type="button"
-              onClick={() => void detailQuery.refetch()}
-              className="inline-flex items-center gap-1 rounded border border-border px-2.5 py-1 text-xs text-text-secondary hover:text-text-primary"
-            >
-              <RefreshCw size={11} /> Retry
-            </button>
-          </div>
+          <RetryCallout text="Unable to load this pillar." onRetry={() => void detailQuery.refetch()} />
         ) : (
-          <PillarBody d={detail} onTicker={setActiveTicker} active={activeTicker} />
+          <PillarBody d={detail} onTicker={setActiveTicker} active={activeTicker} title={sel?.title} />
         )}
       </section>
       </div>
+      </div>
 
       {/* AI buildout stack — interactive supply-chain viz, sticky side rail */}
-      <aside className="mt-5 xl:mt-0 xl:w-[380px] shrink-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
+      <aside className="mt-12 xl:mt-0 xl:w-[380px] shrink-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
         <SupplyStackViz />
       </aside>
       </div>

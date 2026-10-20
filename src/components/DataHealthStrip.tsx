@@ -60,9 +60,9 @@ export function DataHealthStrip() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-[min(18rem,calc(100vw-1rem))] rounded-lg border border-border bg-bg-card p-2 shadow-xl">
-          <div className="flex items-center justify-between px-2 py-1">
-            <span className="text-xs font-semibold text-text-primary">
+        <div className="absolute right-0 top-full z-50 mt-1.5 w-[min(21rem,calc(100vw-1rem))] rounded-lg border border-border bg-bg-card p-2" style={{ boxShadow: "var(--shadow-3)" }}>
+          <div className="flex items-baseline justify-between gap-3 px-2 pb-2 pt-1">
+            <span className="font-display text-lg leading-tight text-text-primary">
               Data feeds
             </span>
             {data && (
@@ -72,17 +72,17 @@ export function DataHealthStrip() {
             )}
           </div>
           {isError && (
-            <div className="px-2 py-1.5 text-xs" style={{ color: "var(--accent-red)" }}>
+            <div className="callout mx-1 mb-1" style={{ "--callout": "var(--accent-red)" } as React.CSSProperties}>
               {connectionIssue(error).message}
             </div>
           )}
           {data?.sources.map((s) => (
             <div
               key={s.key}
-              className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-bg-card-hover"
+              className="data-row flex items-center gap-2.5 px-2 py-2"
             >
               <Dot status={s.status} />
-              <span className="text-xs text-text-primary flex-1 truncate">
+              <span className="text-sm text-text-primary flex-1 truncate">
                 {s.label}
               </span>
               {s.note && (
@@ -100,7 +100,7 @@ export function DataHealthStrip() {
                 </span>
               )}
               <span
-                className="text-xs tabular-nums shrink-0"
+                className="num text-xs shrink-0"
                 style={{ color: STATUS_VAR[s.status] }}
               >
                 {s.age_human}

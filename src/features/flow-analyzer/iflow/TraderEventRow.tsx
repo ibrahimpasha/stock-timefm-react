@@ -196,7 +196,7 @@ export function TraderEventRow({
       {/* Header row — clickable. Purple leading dot marks a human trader event. */}
       <button
         type="button"
-        className="flex min-h-11 w-full min-w-0 cursor-pointer flex-wrap items-center gap-2 px-2 py-2 text-left text-xs transition-colors hover:bg-bg-card-hover lg:min-h-7 lg:flex-nowrap"
+        className="data-row flex min-h-11 w-full min-w-0 cursor-pointer flex-wrap items-center gap-2 px-2 py-2.5 text-left text-xs lg:min-h-7 lg:flex-nowrap"
         onClick={() => setExpanded((s) => !s)}
         aria-expanded={expanded}
         aria-controls={detailsId}
@@ -223,7 +223,7 @@ export function TraderEventRow({
           {cap(ev)}
         </span>
 
-        <span className="num shrink-0 font-semibold text-text-primary">
+        <span className="num shrink-0 text-sm font-semibold text-text-primary">
           {strike != null ? `$${strike}${opt ? ` ${opt}` : ""}` : "Shares"}
         </span>
         {exp && <span className="num shrink-0 text-text-muted">{exp}</span>}
@@ -276,15 +276,7 @@ export function TraderEventRow({
       {expanded && (
         <div
           id={detailsId}
-          className="text-xs"
-          style={{
-            padding: "4px 12px 12px 28px",
-            color: "var(--text-secondary)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-            lineHeight: 1.5,
-          }}
+          className="flex flex-col gap-3 pb-4 pl-7 pr-3 pt-1 text-xs leading-normal text-text-secondary"
         >
           {isFetching && !data && (
             <span className="animate-pulse text-text-muted">
@@ -298,7 +290,7 @@ export function TraderEventRow({
           )}
           {position && (
             <>
-              <div className="text-xs text-text-muted">
+              <div className="text-sm text-text-muted">
                 {cap(position.status)} · <span className="num">{position.events.length}</span> event
                 {position.events.length === 1 ? "" : "s"} · current P/L{" "}
                 {position.current_pl_pct != null ? (
@@ -310,7 +302,7 @@ export function TraderEventRow({
                 )}
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div className="flex flex-col divide-y divide-border">
                 {position.events.map((e: AlertPositionEvent) => {
                   const eType = (e.event_type || "status").toLowerCase();
                   const c = EVENT_COLORS[eType] || "var(--text-muted)";
@@ -318,86 +310,48 @@ export function TraderEventRow({
                   return (
                     <div
                       key={`${e.alert_id}-${e.ts}`}
-                      style={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        alignItems: "baseline",
-                        gap: 8,
-                        paddingBottom: 6,
-                        borderBottom: "1px solid var(--border)",
-                      }}
+                      className="flex flex-wrap items-baseline gap-2 py-2"
                     >
-                      <span className="text-xs font-medium" style={{ color: c, minWidth: 50 }}>
+                      <span className="min-w-[50px] text-xs font-medium" style={{ color: c }}>
                         {cap(eType)}
                       </span>
-                      <span
-                        className="num text-text-muted"
-                        style={{ fontSize: 12 }}
-                        title={absoluteAge(e.ts) || ""}
-                      >
+                      <span className="num text-xs text-text-muted" title={absoluteAge(e.ts) || ""}>
                         {shortDate(e.ts)}
                       </span>
                       {e.exit_pct != null && (
-                        <span
-                          className="num"
-                          style={{
-                            color: changeColor(e.exit_pct),
-                            fontWeight: 600,
-                            fontSize: 12,
-                          }}
-                        >
+                        <span className="num text-xs font-semibold" style={{ color: changeColor(e.exit_pct) }}>
                           {e.exit_pct >= 0 ? "+" : ""}
                           {e.exit_pct}%
                         </span>
                       )}
                       {e.premium != null && (
-                        <span
-                          className="num text-text-secondary"
-                          style={{ fontSize: 12 }}
-                          title="premium"
-                        >
+                        <span className="num text-xs text-text-secondary" title="premium">
                           @{Number(e.premium).toFixed(2)}
                         </span>
                       )}
                       {e.entry_underlying != null && (
-                        <span
-                          className="num text-text-muted"
-                          style={{ fontSize: 12 }}
-                          title="underlying at event"
-                        >
+                        <span className="num text-xs text-text-muted" title="underlying at event">
                           und {Number(e.entry_underlying).toFixed(2)}
                         </span>
                       )}
                       {e.pl_underlying != null && (
                         <span
-                          className="num"
-                          style={{
-                            color: changeColor(e.pl_underlying),
-                            fontSize: 12,
-                          }}
+                          className="num text-xs"
+                          style={{ color: changeColor(e.pl_underlying) }}
                           title="position P/L estimate"
                         >
                           pl {formatPercentRaw(e.pl_underlying, 2)}
                         </span>
                       )}
                       {sizing.length > 0 && (
-                        <span className="num text-text-muted" style={{ fontSize: 12 }}>
+                        <span className="num text-xs text-text-muted">
                           [{sizing.join(", ")}]
                         </span>
                       )}
                       {e.rationale && (
-                        <span
-                          style={{
-                            color: "var(--text-secondary)",
-                            fontSize: 13,
-                            lineHeight: 1.6,
-                            maxWidth: "72ch",
-                            flexBasis: "100%",
-                            marginLeft: 58,
-                          }}
-                        >
+                        <p className="prose-read ml-[58px] max-w-[68ch] basis-full text-base! max-sm:ml-0">
                           {e.rationale}
-                        </span>
+                        </p>
                       )}
                     </div>
                   );
@@ -410,16 +364,7 @@ export function TraderEventRow({
                   onClick={() => setShowMessages((s) => !s)}
                   aria-expanded={showMessages}
                   aria-controls={messagesId}
-                  style={{
-                    background: "transparent",
-                    border: "1px solid var(--border)",
-                    color: "var(--text-secondary)",
-                    fontSize: 12,
-                    padding: "3px 10px",
-                    borderRadius: 999,
-                    cursor: "pointer",
-                    alignSelf: "flex-start",
-                  }}
+                  className="self-start rounded-full border border-border px-3 py-1 text-xs text-text-secondary transition-colors hover:text-text-primary"
                 >
                   {showMessages
                     ? "Hide messages"
@@ -428,28 +373,15 @@ export function TraderEventRow({
               )}
 
               {showMessages && (
-                <div id={messagesId} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div id={messagesId} className="flex flex-col gap-3">
                   {position.events
                     .filter((e) => e.content)
                     .map((e) => (
-                      <div
-                        key={`msg-${e.alert_id}`}
-                        style={{ display: "flex", flexDirection: "column", gap: 4 }}
-                      >
-                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                      <div key={`msg-${e.alert_id}`} className="flex flex-col gap-1">
+                        <div className="text-xs text-text-muted">
                           <span className="num">{shortDate(e.ts)}</span> · {cap((e.event_type || "event").toLowerCase())}
                         </div>
-                        <div
-                          style={{
-                            whiteSpace: "pre-wrap",
-                            fontSize: 12,
-                            color: "var(--text-secondary)",
-                            padding: "4px 0 4px 10px",
-                            lineHeight: 1.6,
-                            maxHeight: 180,
-                            overflow: "auto",
-                          }}
-                        >
+                        <div className="max-h-[180px] overflow-auto whitespace-pre-wrap py-1 pl-2.5 text-xs leading-relaxed text-text-secondary">
                           {e.content}
                         </div>
                       </div>
@@ -458,7 +390,7 @@ export function TraderEventRow({
               )}
 
               {position.opened_at && (
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                <div className="text-xs text-text-muted">
                   Opened {relativeAge(position.opened_at)}
                 </div>
               )}

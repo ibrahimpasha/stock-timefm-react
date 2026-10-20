@@ -1,6 +1,7 @@
 import { PickCard } from "../../components/PickCard";
 import { useFlowPicks } from "../../api/flow";
-import { History, Archive } from "lucide-react";
+import { Archive } from "lucide-react";
+import { Stat } from "../../components/Glass";
 
 export function PickHistory() {
   const { data: closedPicks, isLoading } = useFlowPicks("closed");
@@ -40,32 +41,14 @@ export function PickHistory() {
   return (
     <div>
       {/* Summary bar */}
-      <div className="flex items-center gap-4 mb-4 text-xs">
-        <div className="flex items-center gap-1.5">
-          <History size={13} className="text-text-secondary" />
-          <span className="text-text-secondary">
-            <span className="num">{sorted.length}</span> closed picks
-          </span>
-        </div>
-        <div>
-          <span className="text-text-muted">Win rate </span>
-          <span
-            className="num font-semibold"
-            style={{ color: winRate >= 50 ? "var(--accent-green)" : "var(--accent-red)" }}
-          >
-            {winRate.toFixed(0)}%
-          </span>
-        </div>
-        <div>
-          <span className="text-text-muted">Avg P/L </span>
-          <span
-            className="num font-semibold"
-            style={{ color: avgPnl >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}
-          >
-            {avgPnl >= 0 ? "+" : ""}
-            {avgPnl.toFixed(1)}%
-          </span>
-        </div>
+      <div className="mb-4">
+        <h3 className="section-title">Closed picks</h3>
+        <p className="section-sub">Most recent entry first.</p>
+      </div>
+      <div className="mb-6 grid grid-cols-3 gap-6 sm:max-w-md">
+        <Stat label="Closed" value={sorted.length} />
+        <Stat label="Win rate" value={`${winRate.toFixed(0)}%`} tone={winRate >= 50 ? "green" : "red"} />
+        <Stat label="Avg P/L" value={`${avgPnl >= 0 ? "+" : ""}${avgPnl.toFixed(1)}%`} tone={avgPnl >= 0 ? "green" : "red"} />
       </div>
 
       {/* Pick cards */}

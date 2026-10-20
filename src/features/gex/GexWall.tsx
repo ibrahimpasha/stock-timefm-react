@@ -127,17 +127,21 @@ export function GexWall({
  */
 export function GexWallLegend() {
   return (
-    <div className="flex items-start gap-1.5 text-xs leading-relaxed text-text-muted mb-2">
-      <span className="font-semibold">P</span>
-      <span className="mt-1.5 inline-block shrink-0 rounded-full" style={{ width: 28, height: 5, background: "var(--bg-card-hover)" }} />
-      <span className="font-semibold">C</span>
-      <span>
-        put wall → call wall · <span style={{ color: "var(--accent-green)" }}>▮</span> spot
+    <details className="mb-3 text-xs text-text-muted">
+      <summary className="inline-flex cursor-pointer items-center gap-1.5 text-text-secondary hover:text-text-primary">
+        <span className="font-semibold">P</span>
+        <span className="inline-block shrink-0 rounded-full" style={{ width: 28, height: 5, background: "var(--bg-card-hover)" }} />
+        <span className="font-semibold">C</span>
+        <span>How to read the dealer-wall bar</span>
+      </summary>
+      <p className="mt-1.5 max-w-[72ch] leading-relaxed">
+        Put wall → call wall · <span style={{ color: "var(--accent-green)" }}>▮</span> spot
         (<span style={{ color: "var(--accent-green)" }}>green</span> = at put wall, support with room above;{" "}
         <span style={{ color: "var(--accent-red)" }}>red</span> = pressed into call wall) ·{" "}
         <span style={{ color: "var(--text-primary)" }}>▲</span> this strike
-        (<span style={{ color: "var(--accent-orange)" }}>orange</span> = outside the walls). Hover for detail.
-      </span>
-    </div>
+        (<span style={{ color: "var(--accent-orange)" }}>orange</span> = outside the walls). Hover a bar for detail;
+        click it to open the full GEX grid.
+      </p>
+    </details>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../../api/client";
-import { GlassPanel, Segmented } from "../../components/Glass";
+import { Segmented } from "../../components/Glass";
 import { useTrackedTickers } from "../../api/flow";
 import { STALE_TIMES } from "../../lib/constants";
 import { formatPremium } from "../../lib/utils";
@@ -184,12 +184,12 @@ function AccumulationChart({ ticker }: { ticker: string }) {
   const labelColor = label.includes("BULL") ? "var(--accent-green)" : label.includes("BEAR") ? "var(--accent-red)" : "var(--text-muted)";
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="num text-sm font-semibold text-text-primary">{ticker}</span>
-          <span className="text-xs font-medium" style={{ color: labelColor }}>{label.replace(/_/g, " ").toLowerCase()}</span>
-          <span className="text-xs text-text-muted">score <span className="num">{score.toFixed(2)}</span></span>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="ticker text-lg">{ticker}</span>
+          <span className="tag" style={{ "--tag": labelColor } as React.CSSProperties}>{label.replace(/_/g, " ").toLowerCase()}</span>
+          <span className="text-xs text-text-muted">score <span className="num text-base font-semibold text-text-primary">{score.toFixed(2)}</span></span>
         </div>
         {data.summary?.strikes_escalating && (
           <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: "var(--accent-green)" }}>
@@ -218,13 +218,15 @@ function AccumulationChart({ ticker }: { ticker: string }) {
 
       {/* Exit signals */}
       {data.exit_signals && data.exit_signals.length > 0 && (
-        <div className="space-y-1 border-t border-border pt-2">
+        <div className="callout space-y-1">
+          <div className="flex items-center gap-1.5 font-medium">
+            <AlertTriangle size={12} /> Exit signals
+          </div>
           {data.exit_signals.map((sig, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs">
-              <AlertTriangle size={11} style={{ color: "var(--accent-orange)" }} />
-              <span className="num text-text-muted">{sig.contract}</span>
-              <span className="font-semibold" style={{ color: "var(--accent-red)" }}>{sig.signal}</span>
-              <span className="text-text-muted">{sig.detail}</span>
+            <div key={i} className="flex flex-wrap items-baseline gap-x-2">
+              <span className="num">{sig.contract}</span>
+              <span className="font-semibold">{sig.signal}</span>
+              <span className="text-text-secondary">{sig.detail}</span>
             </div>
           ))}
         </div>
@@ -265,12 +267,12 @@ function StrikeChart({ ticker }: { ticker: string }) {
   const drift = ((last - first) / first) * 100;
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="num text-sm font-semibold text-text-primary">{ticker}</span>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="ticker text-lg">{ticker}</span>
           <span className="text-xs text-text-muted">Strike drift</span>
-          <span className="text-xs num font-semibold" style={{ color: drift > 0 ? "var(--accent-green)" : drift < 0 ? "var(--accent-red)" : "var(--text-muted)" }}>
+          <span className="text-base num font-semibold" style={{ color: drift > 0 ? "var(--accent-green)" : drift < 0 ? "var(--accent-red)" : "var(--text-muted)" }}>
             {drift >= 0 ? "+" : ""}{drift.toFixed(1)}%
           </span>
         </div>
@@ -372,7 +374,7 @@ function SectorClustering() {
           const bearish = s.bull_pct < 45;
           const momentum = s.tickers.length >= 3;
           return (
-            <div key={s.sector} className="text-xs space-y-1">
+            <div key={s.sector} className="space-y-1.5 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-text-primary">{s.sector}</span>
                 <span className="text-text-muted"><span className="num">{s.total_entries}</span> flows</span>
@@ -381,11 +383,11 @@ function SectorClustering() {
                 <div className="flex-1 h-1.5 rounded-full bg-border overflow-hidden">
                   <div className="h-full rounded-full" style={{ width: `${s.bull_pct}%`, background: "var(--accent-green)" }} />
                 </div>
-                <span className="num w-8 text-right" style={{ color: bullish ? "var(--accent-green)" : bearish ? "var(--accent-red)" : "var(--text-muted)" }}>
+                <span className="num w-10 text-right text-sm font-semibold" style={{ color: bullish ? "var(--accent-green)" : bearish ? "var(--accent-red)" : "var(--text-muted)" }}>
                   {s.bull_pct.toFixed(0)}%
                 </span>
               </div>
-              <div className="num text-text-muted">{s.tickers.join(", ")}</div>
+              <div className="num text-text-muted">{s.tickers.join(" · ")}</div>
               {momentum && (bullish || bearish) && (
                 <div className="flex items-center gap-1 font-medium" style={{ color: bullish ? "var(--accent-green)" : "var(--accent-red)" }}>
                   {bullish ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
@@ -457,16 +459,16 @@ function TopMovers() {
         const isBear = m.label.includes("BEAR");
         const hasExits = m.exitCount > 0;
         return (
-          <div key={m.ticker} className="flex items-center gap-3 px-2 py-2 text-xs transition-colors hover:bg-bg-card-hover">
-            <span className="num text-sm font-semibold text-text-primary w-14">{m.ticker}</span>
-            <span className="font-medium" style={{ color: isBull ? "var(--accent-green)" : isBear ? "var(--accent-red)" : "var(--text-muted)" }}>
+          <div key={m.ticker} className="data-row flex items-center gap-3 px-2 py-2.5 text-sm">
+            <span className="ticker w-16 text-base">{m.ticker}</span>
+            <span className="min-w-0 truncate" style={{ color: isBull ? "var(--accent-green)" : isBear ? "var(--accent-red)" : "var(--text-muted)" }}>
               {m.label.replace(/_/g, " ").replace("ACCUMULATION", "ACCUM").toLowerCase()}
             </span>
-            <span className="num text-text-muted">{m.days}d</span>
-            {m.escalating && <span style={{ color: "var(--accent-green)" }}><ArrowUpRight size={11} /></span>}
-            {hasExits && <span className="flex items-center gap-0.5 num" style={{ color: "var(--accent-orange)" }}><AlertTriangle size={10} />{m.exitCount}</span>}
-            <span className="ml-auto num text-text-muted">{formatPremium(m.total)}</span>
-            <span className="num font-semibold w-14 text-right" style={{ color: m.premiumTrend > 10 ? "var(--accent-green)" : m.premiumTrend < -10 ? "var(--accent-red)" : "var(--text-muted)" }}>
+            <span className="num text-xs text-text-muted" title="Days active">{m.days}d</span>
+            {m.escalating && <span className="tag" style={{ "--tag": "var(--accent-green)" } as React.CSSProperties} title="Strikes escalating"><ArrowUpRight size={11} />escalating</span>}
+            {hasExits && <span className="tag" style={{ "--tag": "var(--accent-orange)" } as React.CSSProperties} title="Exit signals"><AlertTriangle size={10} /><span className="num">{m.exitCount}</span> exit</span>}
+            <span className="ml-auto num text-text-secondary" title="Total premium">{formatPremium(m.total)}</span>
+            <span className="num w-16 text-right text-base font-semibold" title="Premium trend, 2nd half vs 1st half" style={{ color: m.premiumTrend > 10 ? "var(--accent-green)" : m.premiumTrend < -10 ? "var(--accent-red)" : "var(--text-muted)" }}>
               {m.premiumTrend >= 0 ? "+" : ""}{m.premiumTrend.toFixed(0)}%
             </span>
           </div>
@@ -545,15 +547,15 @@ function UnusualActivity() {
         const color = isBull ? "var(--accent-green)" : "var(--accent-red)";
         const optType = e.type || e.option_type || "";
         return (
-          <div key={i} className="flex items-center gap-3 text-xs px-2 py-2 transition-colors hover:bg-bg-card-hover">
-            <span className={`num w-5 ${e._unusualScore >= 6 ? "font-semibold text-text-primary" : "text-text-muted"}`} title="Unusual score">{e._unusualScore}</span>
-            <span className="num text-sm font-semibold text-text-primary w-14">{e.ticker}</span>
+          <div key={i} className="data-row flex items-center gap-3 px-2 py-2.5 text-xs">
+            <span className={`num w-6 text-base ${e._unusualScore >= 6 ? "font-semibold text-text-primary" : "text-text-muted"}`} title="Unusual score">{e._unusualScore}</span>
+            <span className="ticker w-14 text-sm">{e.ticker}</span>
             <span style={{ color }} className="font-medium w-8">{isBull ? "Bull" : "Bear"}</span>
             <span className="num text-text-primary">${e.strike} {optType}</span>
             <span className="num text-text-muted">{e.expiry}</span>
             {e.vol_oi_ratio > 0 && <span className="num text-text-secondary" title="Vol/OI">{Number(e.vol_oi_ratio).toFixed(1)}x</span>}
             {e.ask_pct > 0 && <span className="num text-text-secondary">{e.ask_pct}% ask</span>}
-            <span className="ml-auto num text-text-secondary">{e.premium}</span>
+            <span className="ml-auto num text-sm font-semibold text-text-primary">{e.premium}</span>
             <span className="text-text-muted num w-12">{e._date?.slice(5)}</span>
           </div>
         );
@@ -626,9 +628,9 @@ function ContractTracker() {
         const isExpanded = expanded === c.key;
         return (
           <div key={c.key}>
-            <div className="flex items-center gap-3 text-xs px-2 py-2 cursor-pointer hover:bg-bg-card-hover transition-colors"
+            <div className="data-row flex cursor-pointer items-center gap-3 px-2 py-2.5 text-xs"
               onClick={() => setExpanded(isExpanded ? null : c.key)}>
-              <span className="num text-sm font-semibold text-text-primary w-14">{c.ticker}</span>
+              <span className="ticker w-14 text-sm">{c.ticker}</span>
               <span style={{ color }} className="font-medium w-8">{isBull ? "Bull" : "Bear"}</span>
               <span className="num text-text-primary">${c.strike} {c.optType}</span>
               <span className="num text-text-muted">{c.expiry}</span>
@@ -636,7 +638,7 @@ function ContractTracker() {
                 <Target size={10} />
                 {c.daysActive}d / {c.totalEntries}x
               </span>
-              <span className="ml-auto num text-text-secondary">{formatPremium(c.totalPremium)}</span>
+              <span className="ml-auto num text-sm font-semibold text-text-primary">{formatPremium(c.totalPremium)}</span>
             </div>
             {isExpanded && (
               <div className="space-y-0.5 pb-2 pl-[4.25rem]">
@@ -696,8 +698,8 @@ function FlowVsPrice({ ticker }: { ticker: string }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <span className="num text-sm font-semibold text-text-primary">{ticker}</span>
+      <div className="flex items-baseline gap-3">
+        <span className="ticker text-lg">{ticker}</span>
         <span className="text-xs text-text-muted">Price and flow overlay</span>
       </div>
       <ResponsiveContainer width="100%" height={220}>
@@ -961,138 +963,127 @@ export function FlowIntel() {
 
   const ChartComponent = view === "strikes" ? StrikeChart : AccumulationChart;
 
+  const subHead = (title: string, note?: string, sub?: string) => (
+    <div>
+      <h4 className="font-display text-lg font-medium text-text-primary">
+        {title}
+        {note && <span className="ml-2 font-sans text-xs font-normal text-text-muted">{note}</span>}
+      </h4>
+      {sub && <p className="section-sub max-w-[72ch]">{sub}</p>}
+    </div>
+  );
+
   return (
-    <div className="space-y-4">
-      {/* View tabs */}
-      <Segmented<IntelView>
-        className="flex-wrap"
-        value={view}
-        onChange={setView}
-        options={([
-          ["accumulation", "Accumulation", Activity],
-          ["strikes", "Strike drift", TrendingUp],
-          ["unusual", "Unusual", Zap],
-          ["contracts", "Contracts", Target],
-          ["flowprice", "Flow vs price", Crosshair],
-          ["expiry", "Expiry map", Calendar],
-          ["sectors", "Sectors", Layers],
-        ] as const).map(([id, label, Icon]) => ({
-          value: id as IntelView,
-          label: (
-            <span className="inline-flex items-center gap-1.5">
-              <Icon size={12} />
-              {label}
-            </span>
-          ),
-        }))}
-      />
-
-      {/* Top Movers summary (always visible) */}
-      <GlassPanel
-        title={
-          <>
-            Multi-day movers <span className="font-normal text-text-muted">7d, 2+ entries</span>
-          </>
-        }
-      >
-        <TopMovers />
-      </GlassPanel>
-
-      {/* Accumulation / Strikes views */}
-      {(view === "accumulation" || view === "strikes") && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-text-primary">
-            {view === "accumulation" ? "Ticker accumulation" : "Strike escalation and de-escalation"}
-          </h3>
-          <TickerSelector
-            tickers={topTickers} selected={selectedTicker} onSelect={handleSelectTicker}
-            pinned={pinned} onPin={handlePin} onUnpin={handleUnpin}
-          />
-          {selectedTicker ? (
-            <div className="card">
-              <ChartComponent ticker={selectedTicker} />
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {displayTickers.slice(0, 6).map((t) => (
-                <div key={t} className="card">
-                  <ChartComponent ticker={t} />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {view === "unusual" && (
-        <GlassPanel
-          title={
-            <>
-              Unusual activity <span className="font-normal text-text-muted">5 days, score 3+</span>
-            </>
-          }
-        >
-          <p className="mb-3 max-w-[72ch] text-sm leading-relaxed text-text-secondary">
-            Entries scored by premium outlier + vol/OI spike + ask% conviction. Higher score = more abnormal.
-          </p>
-          <UnusualActivity />
-        </GlassPanel>
-      )}
-
-      {view === "contracts" && (
-        <GlassPanel
-          title={
-            <>
-              Repeated contracts <span className="font-normal text-text-muted">10 days</span>
-            </>
-          }
-        >
-          <p className="mb-3 max-w-[72ch] text-sm leading-relaxed text-text-secondary">
-            Same contract (ticker+strike+expiry) appearing on multiple days = institutional conviction. Click to expand daily breakdown.
-          </p>
-          <ContractTracker />
-        </GlassPanel>
-      )}
-
-      {view === "flowprice" && (
+    <div className="space-y-10">
+      {/* Lead: who is being accumulated across days (always visible) */}
+      <section className="space-y-3">
         <div>
-          <h3 className="mb-1 text-sm font-semibold text-text-primary">
-            Flow vs price <span className="font-normal text-text-muted">30 days</span>
-          </h3>
-          <p className="mb-3 max-w-[72ch] text-sm leading-relaxed text-text-secondary">
-            Price action overlaid with daily bull/bear flow. Did the stock move after institutional flow?
+          <h3 className="section-title">Multi-day movers</h3>
+          <p className="section-sub max-w-[72ch]">
+            7 days, 2+ entries, ranked by accumulation score. Right column is premium trend, recent half vs early half.
           </p>
-          <FlowVsPriceView
-            tickers={topTickers}
-            pinned={pinned}
-            selected={selectedTicker}
-            onSelect={handleSelectTicker}
-            onPin={handlePin}
-            onUnpin={handleUnpin}
+        </div>
+        <div className="card">
+          <TopMovers />
+        </div>
+      </section>
+
+      <section className="space-y-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3 className="section-title">Deep dive</h3>
+            <p className="section-sub">Pick a lens on recent flow.</p>
+          </div>
+          <Segmented<IntelView>
+            className="flex-wrap"
+            value={view}
+            onChange={setView}
+            options={([
+              ["accumulation", "Accumulation", Activity],
+              ["strikes", "Strike drift", TrendingUp],
+              ["unusual", "Unusual", Zap],
+              ["contracts", "Contracts", Target],
+              ["flowprice", "Flow vs price", Crosshair],
+              ["expiry", "Expiry map", Calendar],
+              ["sectors", "Sectors", Layers],
+            ] as const).map(([id, label, Icon]) => ({
+              value: id as IntelView,
+              label: (
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon size={12} />
+                  {label}
+                </span>
+              ),
+            }))}
           />
         </div>
-      )}
 
-      {view === "expiry" && (
-        <GlassPanel
-          title={
-            <>
-              Expiry premium heatmap <span className="font-normal text-text-muted">7 days</span>
-            </>
-          }
-        >
-          <p className="mb-3 max-w-[72ch] text-sm leading-relaxed text-text-secondary">
-            Where is premium concentrated by expiry? Tall bars = gamma walls. Shows which dates institutions are targeting.
-          </p>
-          <ExpiryHeatmap />
-        </GlassPanel>
-      )}
+        {/* Accumulation / Strikes views */}
+        {(view === "accumulation" || view === "strikes") && (
+          <div className="space-y-4">
+            {subHead(view === "accumulation" ? "Ticker accumulation" : "Strike escalation and de-escalation")}
+            <TickerSelector
+              tickers={topTickers} selected={selectedTicker} onSelect={handleSelectTicker}
+              pinned={pinned} onPin={handlePin} onUnpin={handleUnpin}
+            />
+            {selectedTicker ? (
+              <div className="card">
+                <ChartComponent ticker={selectedTicker} />
+              </div>
+            ) : (
+              <div className="grid gap-4 xl:grid-cols-2">
+                {displayTickers.slice(0, 6).map((t) => (
+                  <div key={t} className="card">
+                    <ChartComponent ticker={t} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-      {view === "sectors" && (
-        <GlassPanel title={<>Sector flow clustering <span className="font-normal text-text-muted">7 days</span></>}>
-          <SectorClustering />
-        </GlassPanel>
-      )}
+        {view === "unusual" && (
+          <div className="space-y-3">
+            {subHead("Unusual activity", "5 days, score 3+", "Entries scored by premium outlier + vol/OI spike + ask% conviction. Higher score = more abnormal.")}
+            <div className="card"><UnusualActivity /></div>
+          </div>
+        )}
+
+        {view === "contracts" && (
+          <div className="space-y-3">
+            {subHead("Repeated contracts", "10 days", "Same contract (ticker+strike+expiry) appearing on multiple days = institutional conviction. Click to expand daily breakdown.")}
+            <div className="card"><ContractTracker /></div>
+          </div>
+        )}
+
+        {view === "flowprice" && (
+          <div className="space-y-3">
+            {subHead("Flow vs price", "30 days", "Price action overlaid with daily bull/bear flow. Did the stock move after institutional flow?")}
+            <FlowVsPriceView
+              tickers={topTickers}
+              pinned={pinned}
+              selected={selectedTicker}
+              onSelect={handleSelectTicker}
+              onPin={handlePin}
+              onUnpin={handleUnpin}
+            />
+          </div>
+        )}
+
+        {view === "expiry" && (
+          <div className="space-y-3">
+            {subHead("Expiry premium heatmap", "7 days", "Where is premium concentrated by expiry? Tall bars = gamma walls. Shows which dates institutions are targeting.")}
+            <div className="card"><ExpiryHeatmap /></div>
+          </div>
+        )}
+
+        {view === "sectors" && (
+          <div className="space-y-3">
+            {subHead("Sector flow clustering", "7 days")}
+            <div className="card"><SectorClustering /></div>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

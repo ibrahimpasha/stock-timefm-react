@@ -181,22 +181,22 @@ export function ThemeSection({
   }, [bySubGroup, subGroupBy]);
 
   return (
-    <div className="mb-4 min-w-0">
+    <section className="mb-8 min-w-0">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="flex min-h-11 w-full min-w-0 items-center gap-1 rounded px-1 py-1.5 text-left transition-colors hover:bg-bg-card-hover md:-mx-2 md:min-h-0 md:gap-2 md:px-2"
+        className="data-row flex min-h-11 w-full min-w-0 items-baseline gap-2 border-b border-border px-1 pb-2 pt-1 text-left md:-mx-2 md:min-h-0 md:gap-3 md:px-2"
         title={categoryDescription || ""}
       >
         {expanded ? (
-          <ChevronDown size={14} className="text-text-muted shrink-0" />
+          <ChevronDown size={15} className="shrink-0 self-center text-text-muted" />
         ) : (
-          <ChevronRight size={14} className="text-text-muted shrink-0" />
+          <ChevronRight size={15} className="shrink-0 self-center text-text-muted" />
         )}
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary md:flex-none">
+        <span className="section-title min-w-0 flex-1 truncate md:flex-none">
           {sentenceCase(category)}
         </span>
-        <span className="flex shrink-0 items-center gap-2 text-xs text-text-muted">
+        <span className="flex shrink-0 items-center gap-3 text-sm text-text-muted">
           <span className="num">{tickerCount}</span>
           <span className="num max-sm:hidden">
             <span style={{ color: "var(--accent-green)" }}>{bull}</span>
@@ -204,7 +204,7 @@ export function ThemeSection({
             <span style={{ color: "var(--accent-red)" }}>{bear}</span>
           </span>
           <span
-            className="num"
+            className="num font-semibold"
             style={{ color: netBull ? "var(--accent-green)" : "var(--accent-red)" }}
           >
             {formatPremium(premium)}
@@ -231,7 +231,7 @@ export function ThemeSection({
       </button>
 
       {expanded && (
-        <div className="mt-2 min-w-0 space-y-4 pl-1 md:pl-6">
+        <div className="mt-4 min-w-0 space-y-5 pl-1 md:pl-6">
           {subGroupOrder.map((key) => {
             const items = bySubGroup[key];
             if (!items.length) return null;
@@ -250,7 +250,7 @@ export function ThemeSection({
             return (
               <div key={key}>
                 <div
-                  className="mb-2 flex min-w-0 items-baseline gap-2 text-xs"
+                  className="mb-2 flex min-w-0 items-baseline gap-2 text-sm"
                   title={
                     isThemeMode
                       ? themeDesc || (isSentinel ? "Tickers with no theme tag" : "")
@@ -277,11 +277,11 @@ export function ThemeSection({
                       </span>
                     ) : null;
                   })()}
-                  <span className="min-w-0 flex-1 truncate text-text-muted max-sm:hidden">
+                  <span className="min-w-0 flex-1 truncate text-xs text-text-muted max-sm:hidden">
                     {secondary}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   {items.map((t) => (
                     <div key={t.ticker}>{renderCard(t)}</div>
                   ))}
@@ -291,6 +291,6 @@ export function ThemeSection({
           })}
         </div>
       )}
-    </div>
+    </section>
   );
 }

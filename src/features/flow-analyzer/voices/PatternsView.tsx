@@ -17,9 +17,9 @@
  * global activeTicker so the rest of the dashboard re-aligns.
  */
 import { useMemo } from "react";
-import { Sparkles, Zap, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { ArrowUp, ArrowDown, Minus } from "lucide-react";
 import { useAppStore } from "../../../store/useAppStore";
-import { Segmented } from "../../../components/Glass";
+import { Segmented, Stat } from "../../../components/Glass";
 import { relativeAge } from "../../../lib/utils";
 import {
   useVoicesPatterns,
@@ -69,7 +69,7 @@ function VelocityTable({
         </div>
       )}
       {rows.length === 0 && (
-        <div className="text-sm text-text-muted">
+        <div className="py-4 text-sm text-text-muted">
           No velocity data yet — backfill needs at least two windows of history.
         </div>
       )}
@@ -78,23 +78,23 @@ function VelocityTable({
         return (
           <div
             key={r.ticker}
-            className="grid grid-cols-12 items-center gap-2 py-2 px-2 hover:bg-bg-card-hover cursor-pointer"
+            className="data-row grid cursor-pointer grid-cols-12 items-center gap-2 px-2 py-2.5"
             onClick={() => onPick(r.ticker)}
           >
-            <span className="col-span-2 num font-semibold text-xs text-text-primary truncate">
+            <span className="ticker col-span-2 truncate text-sm">
               {r.ticker}
             </span>
-            <span className="col-span-1 text-xs num text-text-muted text-right">
+            <span className="col-span-1 text-right text-sm num text-text-secondary">
               {r.mentions_recent}
             </span>
-            <span className="col-span-2 inline-flex items-center gap-1 text-xs num">
+            <span className="col-span-2 inline-flex items-center gap-1 text-sm num font-semibold">
               <VelocityArrow delta={r.delta} />
               <span style={{ color: sentColor(r.net_sentiment) }}>
                 {r.delta >= 0 ? "+" : ""}
                 {r.delta}
               </span>
               {r.is_new && (
-                <span className="font-sans text-xs text-text-muted">new</span>
+                <span className="tag font-sans" style={{ "--tag": "var(--accent-blue)" } as React.CSSProperties}>new</span>
               )}
             </span>
             <div className="col-span-5 h-1.5 rounded-full bg-bg-card overflow-hidden">
@@ -153,10 +153,10 @@ function ClusterCard({
   }, [cluster, internalPairs]);
 
   return (
-    <div className="card space-y-2">
+    <div className="card space-y-3">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <h4 className="text-sm font-semibold text-text-primary">
-          <span className="num">{hub}</span> basket
+        <h4 className="font-display text-lg font-medium text-text-primary">
+          <span className="ticker text-base">{hub}</span> basket
         </h4>
         <span className="text-xs text-text-muted">
           Cluster C{cluster.id} · <span className="num">{cluster.size}</span> tickers · <span className="num">{cluster.internal_edges}</span> edges
@@ -192,7 +192,7 @@ function ClusterCard({
 
       {/* Top 3 internal pair edges */}
       {internalPairs.length > 0 && (
-        <div className="text-xs text-text-muted num">
+        <div className="border-t border-border pt-2 text-xs text-text-muted num">
           {internalPairs.slice(0, 4).map((p) => (
             <span key={`${p.a}-${p.b}`} className="mr-3">
               {p.a}↔{p.b}
@@ -221,54 +221,60 @@ export function PatternsView({
 
   const handlePick = (t: string) => setActiveTicker(t);
 
+  const top = velocity[0];
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-8">
       {/* Window selector */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3">
         <Segmented
           ariaLabel="Patterns window"
           value={String(windowDays)}
           onChange={(v) => onWindowChange(Number(v))}
           options={WINDOWS.map((w) => ({ value: String(w.days), label: w.label }))}
         />
-        {cooc && (
-          <span className="ml-auto text-xs text-text-muted">
-            <span className="num">{cooc.n_tickers}</span> tickers across <span className="num">{cooc.n_tweets_considered}</span> tweets ·{" "}
-            <span className="num">{cooc.pairs.length}</span> pairs · <span className="num">{cooc.clusters.length}</span> clusters
-          </span>
-        )}
         {isFetching && (
           <span className="text-xs text-text-muted animate-pulse">Refreshing…</span>
         )}
       </div>
 
-      {/* Velocity panel */}
-      <div className="card space-y-2">
-        <div className="flex flex-wrap items-baseline gap-x-2">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-            <Zap size={13} className="text-text-muted" />
-            Conviction velocity
-          </h3>
-          <span className="text-xs text-text-muted">
-            Mention delta vs prior {windowDays}d
-          </span>
+      {/* Headline numbers */}
+      {(top || cooc) && (
+        <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+          {top && (
+            <button type="button" className="text-left" onClick={() => handlePick(top.ticker)}>
+              <Stat
+                label="Top momentum"
+                value={top.ticker}
+                sub={`${top.delta >= 0 ? "+" : ""}${top.delta} mentions vs prior ${windowDays}d`}
+              />
+            </button>
+          )}
+          {cooc && <Stat label="Tickers" value={cooc.n_tickers} sub={`across ${cooc.n_tweets_considered} tweets`} />}
+          {cooc && <Stat label="Pairs" value={cooc.pairs.length} />}
+          {cooc && <Stat label="Baskets" value={cooc.clusters.length} />}
         </div>
-        <VelocityTable rows={velocity.slice(0, 20)} onPick={handlePick} />
-      </div>
+      )}
+
+      {/* Velocity panel */}
+      <section className="space-y-3">
+        <div>
+          <h3 className="section-title">Conviction velocity</h3>
+          <p className="section-sub">Mention delta vs prior {windowDays}d, ranked by momentum</p>
+        </div>
+        <div className="card">
+          <VelocityTable rows={velocity.slice(0, 20)} onPick={handlePick} />
+        </div>
+      </section>
 
       {/* Co-occurrence clusters */}
-      <div className="space-y-2 pt-2">
-        <div className="flex flex-wrap items-baseline gap-x-2">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-            <Sparkles size={13} className="text-text-muted" />
-            Co-occurrence baskets
-          </h3>
-          <span className="text-xs text-text-muted">
-            Tickers mentioned together, the implicit baskets
-          </span>
+      <section className="space-y-3">
+        <div>
+          <h3 className="section-title">Co-occurrence baskets</h3>
+          <p className="section-sub">Tickers mentioned together, the implicit baskets</p>
         </div>
         {!cooc || cooc.clusters.length === 0 ? (
-          <div className="card text-sm text-text-muted">
+          <div className="py-4 text-sm text-text-muted">
             No clusters yet — needs at least 2 tweets each mentioning 2+ tickers.
           </div>
         ) : (
@@ -329,7 +335,7 @@ export function PatternsView({
             </div>
           </details>
         )}
-      </div>
+      </section>
     </div>
   );
 }

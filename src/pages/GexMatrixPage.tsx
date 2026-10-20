@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { GlassPanel, Segmented } from "../components/Glass";
+import { Segmented } from "../components/Glass";
 import {
   useGexMatrix,
   useGexTickers,
@@ -152,6 +152,11 @@ export function GexMatrixPage() {
     );
   }, [data, spot]);
 
+  // Net dealer gamma across every loaded expiry — the one number to read first.
+  const netGex = data?.ok && data.totals
+    ? Object.values(data.totals).reduce((sum, t) => sum + (t?.gex ?? 0), 0)
+    : null;
+
   const header = (
     <div className="flex w-full min-w-0 flex-wrap items-center gap-2 lg:w-auto">
       <Segmented options={METRICS} value={metric} onChange={setMetric} ariaLabel="Metric" />
@@ -167,16 +172,41 @@ export function GexMatrixPage() {
           <h1>GEX</h1>
           <p>Dealer gamma, vega and open interest by strike and expiry</p>
         </div>
-        {data?.ok && (
-          <div className="desk-header__actions text-sm text-text-secondary">
-            <span className="num font-semibold text-text-primary">{data.ticker}</span>
-            <span className="num">${spot.toFixed(2)}</span>
-            <span className="num text-xs text-text-muted">{data.updated_at?.slice(0, 16).replace("T", " ")}</span>
-          </div>
-        )}
       </header>
-      <GlassPanel title="Dealer positioning matrix">
-        <div className="flex flex-wrap items-center gap-2 mb-4">
+
+      {/* hero: the name, where spot is, and the net dealer stance */}
+      <section className="flex flex-wrap items-end gap-x-10 gap-y-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-sm text-text-muted">Ticker</span>
+          <span className="ticker text-3xl">{data?.ok ? data.ticker : ticker}</span>
+        </div>
+        {data?.ok && (
+          <>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-text-muted">Spot</span>
+              <span className="num text-3xl font-semibold tracking-tight text-text-primary">${spot.toFixed(2)}</span>
+            </div>
+            {netGex != null && (
+              <div className="flex flex-col gap-1" title="Sum of net dealer GEX across the loaded expiries">
+                <span className="text-sm text-text-muted">Net GEX, all expiries</span>
+                <span className={`${netGex >= 0 ? "delta-up" : "delta-down"} text-3xl font-semibold tracking-tight`}>
+                  {money(netGex)}
+                </span>
+              </div>
+            )}
+            <span className="num pb-1 text-xs text-text-muted">
+              Updated {data.updated_at?.slice(0, 16).replace("T", " ")}
+            </span>
+          </>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <h2 className="section-title">Dealer positioning matrix</h2>
+          <p className="section-sub">Strikes down, expiries across. Heat scales to the 95th percentile of on-screen cells.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <div className="mobile-horizontal-strip flex w-full min-w-0 gap-1 overflow-x-auto lg:w-auto lg:flex-wrap lg:overflow-visible">
             {(tickers ?? []).map((t) => (
               <button
@@ -184,9 +214,9 @@ export function GexMatrixPage() {
                 type="button"
                 onClick={() => { setTicker(t.ticker); setParams({ ticker: t.ticker }); }}
                 aria-pressed={t.ticker === ticker}
-                className={`min-h-11 shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors lg:min-h-0 ${
+                className={`num min-h-11 shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-colors lg:min-h-8 ${
                   t.ticker === ticker
-                    ? "bg-accent-blue/15 text-accent-blue"
+                    ? "segmented-option-active"
                     : "text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
                 }`}
               >
@@ -200,14 +230,12 @@ export function GexMatrixPage() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Any ticker…"
               aria-label="Look up a ticker's dealer positioning"
-              className="min-h-11 w-28 px-2 py-1 rounded-full text-xs bg-bg-card border border-border lg:min-h-0
-                         text-text-primary placeholder:text-text-muted focus:outline-none
-                         focus:border-accent-blue num"
+              className="control-surface num min-h-11 w-32 rounded-full border px-3 py-1 text-xs text-text-primary placeholder:text-text-muted focus:outline-none lg:min-h-8"
             />
           </form>
           <div className="w-full min-w-0 lg:ml-auto lg:w-auto">{header}</div>
         </div>
-
+      <div className="card">
         {isLoading && !data && (
           <p className="text-sm text-text-muted animate-pulse">Loading chain…</p>
         )}
@@ -222,7 +250,7 @@ export function GexMatrixPage() {
               type="button"
               disabled={building}
               onClick={() => refresh.mutate(ticker)}
-              className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors
+              className="min-h-9 px-4 py-1.5 rounded-full text-sm font-medium transition-colors
                          bg-accent-blue/15 text-accent-blue hover:bg-accent-blue/25
                          disabled:opacity-60"
             >
@@ -240,7 +268,7 @@ export function GexMatrixPage() {
           <div className="overflow-x-auto">
             {/* max-w keeps cells from stretching to absurd widths when a ticker
                 only has a few expiries loaded */}
-            <table className="text-xs border-separate w-full max-w-5xl" style={{ borderSpacing: 2 }}>
+            <table className="text-sm border-separate w-full max-w-5xl" style={{ borderSpacing: 2 }}>
               <thead>
                 <tr>
                   <th className="text-left text-xs font-medium text-text-muted px-2 sticky left-0 bg-[var(--card-bg)] z-10 w-20">
@@ -340,18 +368,26 @@ export function GexMatrixPage() {
             </table>
           </div>
         )}
-      </GlassPanel>
+      </div>
+      </section>
 
-      <p className="text-xs leading-relaxed text-text-muted max-w-[72ch]">
-        Sign convention: dealers long calls, short puts. Positive (green) gamma dampens moves
-        through that strike; negative (red) amplifies them. <strong>Green is dealer positioning,
-        not a buy signal</strong> — a big green cell often acts as a magnet/pin, and a call there
-        still needs spot to travel to it. Hover any cell for the % move required and the
-        call&apos;s delta. Greeks are Black-Scholes from each
-        chain's own implied vol — yfinance does not publish them. Refreshed by
-        <code className="num"> scripts/backfill_gex_matrix.py</code> on the daily timer, so the
-        grid is end-of-day positioning, not a live tape.
-      </p>
+      <div className="flex flex-col gap-3 max-w-[72ch]">
+        <p className="callout">
+          Sign convention: dealers long calls, short puts. Positive (green) gamma dampens moves
+          through that strike; negative (red) amplifies them. <strong>Green is dealer positioning,
+          not a buy signal</strong> — a big green cell often acts as a magnet/pin, and a call there
+          still needs spot to travel to it.
+        </p>
+        <details className="text-sm text-text-muted">
+          <summary className="cursor-pointer text-text-secondary hover:text-text-primary">How the grid is built</summary>
+          <p className="mt-2 leading-relaxed">
+            Hover any cell for the % move required and the call&apos;s delta. Greeks are Black-Scholes
+            from each chain's own implied vol — yfinance does not publish them. Refreshed by
+            <code className="num"> scripts/backfill_gex_matrix.py</code> on the daily timer, so the
+            grid is end-of-day positioning, not a live tape.
+          </p>
+        </details>
+      </div>
     </div>
   );
 }

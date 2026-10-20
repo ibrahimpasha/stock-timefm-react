@@ -1,13 +1,8 @@
 import { PickCard } from "../../components/PickCard";
 import { useFlowPicks, useClosePick } from "../../api/flow";
-import { formatPercentRaw, changeColor } from "../../lib/utils";
-import {
-  Target,
-  TrendingUp,
-  Trophy,
-  BarChart3,
-  Loader2,
-} from "lucide-react";
+import { formatPercentRaw } from "../../lib/utils";
+import { Loader2 } from "lucide-react";
+import { Stat } from "../../components/Glass";
 
 /* ── Summary Metrics Row ─────────────────────────────────── */
 
@@ -22,46 +17,17 @@ function SummaryMetrics({
   winRate: number;
   avgPnl: number;
 }) {
-  const metrics = [
-    {
-      label: "Open picks",
-      value: openCount.toString(),
-      icon: Target,
-      color: "var(--text-primary)",
-    },
-    {
-      label: "Closed",
-      value: closedCount.toString(),
-      icon: BarChart3,
-      color: "var(--text-primary)",
-    },
-    {
-      label: "Win rate",
-      value: `${winRate.toFixed(0)}%`,
-      icon: Trophy,
-      color: winRate >= 50 ? "var(--accent-green)" : "var(--accent-red)",
-    },
-    {
-      label: "Avg P/L",
-      value: formatPercentRaw(avgPnl),
-      icon: TrendingUp,
-      color: changeColor(avgPnl),
-    },
-  ];
-
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-      {metrics.map((m) => (
-        <div key={m.label} className="flex items-center gap-2">
-          <m.icon size={14} className="shrink-0 text-text-muted" />
-          <div>
-            <div className="text-xs text-text-muted">{m.label}</div>
-            <div className="num font-semibold text-sm" style={{ color: m.color }}>
-              {m.value}
-            </div>
-          </div>
-        </div>
-      ))}
+    <div className="mb-8 flex flex-wrap items-end gap-x-10 gap-y-4">
+      <div className="flex flex-col gap-0.5">
+        <span className="text-xs font-medium text-text-muted">Open picks</span>
+        <span className="num text-3xl font-semibold tracking-tight text-text-primary">{openCount}</span>
+      </div>
+      <div className="grid grid-cols-3 gap-6">
+        <Stat label="Closed" value={closedCount} />
+        <Stat label="Win rate" value={`${winRate.toFixed(0)}%`} tone={winRate >= 50 ? "green" : "red"} />
+        <Stat label="Avg P/L" value={formatPercentRaw(avgPnl)} tone={avgPnl >= 0 ? "green" : "red"} />
+      </div>
     </div>
   );
 }
@@ -109,9 +75,9 @@ export function ActivePicks() {
       />
 
       {open.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-sm text-text-secondary">No active picks</p>
-          <p className="text-xs text-text-muted mt-1">
+        <div className="py-10 text-center">
+          <p className="section-title">No active picks</p>
+          <p className="mt-1 text-sm text-text-muted">
             Analyze flow data to generate picks
           </p>
         </div>

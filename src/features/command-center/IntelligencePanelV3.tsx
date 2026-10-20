@@ -135,9 +135,9 @@ function SectionHeader({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between mb-2">
-      <h3 className="text-sm font-semibold text-text-primary">{label}</h3>
-      {right ? <div className="flex items-center gap-2">{right}</div> : null}
+    <div className="mb-3">
+      <h3 className="section-title">{label}</h3>
+      {right ? <p className="section-sub">{right}</p> : null}
     </div>
   );
 }
@@ -182,7 +182,7 @@ function ForwardCalendar({
   // geopolitical = red, earnings = orange.
   const categoryColor = (cat?: string): string => {
     const c = (cat || "").toLowerCase();
-    if (c === "ticker") return "var(--accent-purple, #c084fc)";
+    if (c === "ticker") return "var(--accent-purple)";
     if (c === "geopolitical") return "var(--accent-red)";
     if (c === "earnings") return "var(--accent-orange)";
     return "var(--accent-blue)";
@@ -192,13 +192,13 @@ function ForwardCalendar({
     days != null && days <= 1 ? "var(--accent-orange)" : "var(--text-muted)";
 
   return (
-    <section className="mb-4 pb-4 border-b border-border">
+    <section aria-label="Upcoming catalysts">
       <SectionHeader
         label="Upcoming catalysts"
         right={
-          <span className="text-xs text-text-muted">
+          <>
             Next <span className="num">14</span> days{scopedTicker ? <> · <span className="num">{scopedTicker}</span></> : null}
-          </span>
+          </>
         }
       />
       {isLoading && top.length === 0 ? (
@@ -241,10 +241,10 @@ function ForwardCalendar({
                       ? `${Math.abs(dn)}d ago`
                       : `in ${dn}d`;
             return (
-              <div key={`${ev.date}-${i}`} className="flex gap-2.5 py-2">
+              <div key={`${ev.date}-${i}`} className="data-row flex gap-3 px-2 py-2.5">
                 <span
                   aria-hidden
-                  className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full"
+                  className="mt-[8px] h-2 w-2 shrink-0 rounded-full"
                   style={{ background: categoryColor(ev.category) }}
                 />
                 <div className="min-w-0 flex-1">
@@ -272,9 +272,9 @@ function ForwardCalendar({
                       {ev.category || ev.source || ""}
                     </span>
                   </div>
-                  <div className="mt-0.5 flex items-baseline gap-2 text-xs text-text-muted">
+                  <div className="mt-1 flex items-baseline gap-2 text-xs text-text-muted">
                     <span className="num" title={fmtCalendarDateFull(ev.date)}>{fmtCalendarDate(ev.date)}</span>
-                    {inLabel && <span className="num" style={{ color: urgencyTone(dn) }}>{inLabel}</span>}
+                    {inLabel && <span className="num font-medium" style={{ color: urgencyTone(dn) }}>{inLabel}</span>}
                     {explainer && (
                       <span className="min-w-0 flex-1 truncate" title={explainer}>
                         {explainer}
@@ -299,21 +299,23 @@ function IntelDetailCollapsible({ ticker }: { ticker: string | null }) {
   // behind a click was wasted friction.
   const [open, setOpen] = useState(true);
   return (
-    <section>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="w-full flex items-center gap-1.5 text-sm font-semibold text-text-primary py-1 transition-opacity hover:opacity-90"
-      >
-        {open ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
-        Intel detail
-        <span className="ml-auto text-xs font-normal text-text-muted">
-          {open ? "Hide" : "8 categories"}
-        </span>
-      </button>
+    <section aria-label="Intel">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            className="section-title flex items-center gap-1.5 text-left transition-opacity hover:opacity-90"
+          >
+            Intel
+            {open ? <ChevronDown size={16} className="text-text-muted" /> : <ChevronRight size={16} className="text-text-muted" />}
+          </button>
+          <p className="section-sub">Web-search research brief{open ? "" : " · 8 categories"}</p>
+        </div>
+      </div>
       {open && (
-        <div className="mt-2">
+        <div className="mt-4">
           <IntelligencePanel thesis={null} ticker={ticker || undefined} />
         </div>
       )}
@@ -337,7 +339,7 @@ export default function IntelligencePanelV3() {
   const calendarQ = useCalendar(14, ticker || undefined);
 
   return (
-    <div className="card" style={{ maxHeight: "calc(100vh - 220px)", overflowY: "auto" }}>
+    <div className="flex flex-col gap-9">
       <QueryNotice queries={[calendarQ]} label="Catalyst calendar" />
       {!(calendarQ.isError || calendarQ.fetchStatus === "paused") || calendarQ.data ? <ForwardCalendar
         events={calendarQ.data?.events ?? []}

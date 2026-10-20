@@ -18,10 +18,10 @@ const tint = (c: string, pct: number) => `color-mix(in srgb, ${c} ${pct}%, trans
 
 /** Edge color tokens — keep in sync with the row icons + SVG spokes. */
 const EDGE_COLOR = {
-  related: "var(--accent-cyan, #22d3ee)",
-  chokepoint: "var(--accent-orange, #e37f2e)",
-  peer: "var(--accent-purple, #c084fc)",
-  concept: "var(--accent-yellow, #eab308)",
+  related: "var(--accent-cyan)",
+  chokepoint: "var(--accent-orange)",
+  peer: "var(--accent-purple)",
+  concept: "var(--accent-yellow)",
   group: "var(--accent-blue)",
   tied: "var(--text-muted)",
 } as const;
@@ -30,9 +30,9 @@ const EDGE_COLOR = {
  *  BOTTLENECK is the scarce-supply tell, CONSUMER is demand-side. */
 const ROLE_COLOR: Record<StructuralRole, string> = {
   PLATFORM: "var(--accent-blue)",
-  ENABLER: "var(--accent-cyan, #22d3ee)",
+  ENABLER: "var(--accent-cyan)",
   BOTTLENECK: "var(--accent-red)",
-  CONSUMER: "var(--accent-purple, #c084fc)",
+  CONSUMER: "var(--accent-purple)",
   NEUTRAL: "var(--text-muted)",
 };
 
@@ -95,7 +95,7 @@ function MiniGraphSvg({
         </g>
       ))}
       <circle cx={CX} cy={CY} r={11} fill="var(--accent-green)" />
-      <text x={CX} y={CY + 3} textAnchor="middle" fontSize={10} fontFamily="ui-monospace, monospace" fontWeight={700} fill="var(--bg-card, #0d1117)">
+      <text x={CX} y={CY + 3} textAnchor="middle" fontSize={10} fontFamily="ui-monospace, monospace" fontWeight={700} fill="var(--bg-card)">
         {ticker.length > 4 ? ticker.slice(0, 4) : ticker}
       </text>
     </svg>
@@ -132,7 +132,7 @@ function TickerChip({
       title={role ? role.toLowerCase() : undefined}
       className="inline-flex items-baseline gap-1 cursor-pointer text-text-primary hover:text-accent-blue"
     >
-      <span className="num font-semibold">{ticker}</span>
+      <span className="ticker">{ticker}</span>
       {role && <span className="text-xs text-text-muted">{role.slice(0, 4).toLowerCase()}</span>}
     </button>
   );
@@ -156,8 +156,8 @@ function ConceptChip({ name, confidence }: { name: string; confidence?: string }
 /** A labeled definition row: muted label, plain inline items. */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[6.5rem_1fr] items-baseline gap-3 py-2">
-      <div className="text-xs text-text-muted">{label}</div>
+    <div className="grid grid-cols-[6.5rem_1fr] items-baseline gap-3 py-2.5">
+      <div className="text-sm text-text-muted">{label}</div>
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">{children}</div>
     </div>
   );
@@ -186,9 +186,9 @@ export function GraphContextCard({ ticker }: Props) {
   if (!ticker) return null;
   if (isLoading) {
     return (
-      <div className="card animate-pulse">
-        <div className="h-4 w-32 rounded bg-text-muted/20 mb-3" />
-        <div className="h-[130px] rounded bg-text-muted/10 mb-3" />
+      <div className="flex flex-col gap-3 animate-pulse">
+        <div className="h-5 w-32 rounded bg-text-muted/20" />
+        <div className="h-[130px] rounded bg-text-muted/10" />
         <div className="h-3 w-full rounded bg-text-muted/10" />
       </div>
     );
@@ -202,22 +202,22 @@ export function GraphContextCard({ ticker }: Props) {
   ];
 
   return (
-    <div className="card flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h3 className="text-sm font-semibold text-text-primary">Graph context</h3>
-          {role && <RoleText role={role.role} reason={role.reason} />}
+    <section className="flex flex-col gap-4" aria-label="Graph context">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="section-title">Graph context</h3>
+          <p className="section-sub">
+            <span className="num">{totalSignals}</span> signals
+            {data.sector && (
+              <span>
+                {" "}· {data.sector}
+                {data.theme ? ` · ${data.theme}` : ""}
+              </span>
+            )}
+            {data.community?.label && <span> · Cluster: {data.community.label}</span>}
+          </p>
         </div>
-        <div className="text-xs text-text-muted text-right">
-          <span className="num">{totalSignals}</span> signals
-          {data.sector && (
-            <span>
-              {" "}· {data.sector}
-              {data.theme ? ` · ${data.theme}` : ""}
-            </span>
-          )}
-          {data.community?.label && <div>Cluster: {data.community.label}</div>}
-        </div>
+        {role && <span className="shrink-0 pt-1.5"><RoleText role={role.role} reason={role.reason} /></span>}
       </div>
 
       <MiniGraphSvg ticker={ticker} groups={svgGroups} />
@@ -225,9 +225,9 @@ export function GraphContextCard({ ticker }: Props) {
       {keyFacts.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <div className="text-sm font-semibold text-text-primary">Key facts</div>
-          <ul className="flex flex-col gap-1.5 max-w-[72ch]">
+          <ul className="flex flex-col gap-2 max-w-[72ch]">
             {keyFacts.map((f, i) => (
-              <li key={i} className="flex gap-2 text-sm leading-relaxed text-text-secondary">
+              <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-text-secondary">
                 <span aria-hidden className="mt-2 h-1 w-1 shrink-0 rounded-full bg-text-muted" />
                 {f}
               </li>
@@ -283,6 +283,6 @@ export function GraphContextCard({ ticker }: Props) {
           </Row>
         )}
       </div>
-    </div>
+    </section>
   );
 }

@@ -212,14 +212,14 @@ export function ConvergenceGraph({
   const convergence = data?.summary.convergence;
 
   return (
-    <section className="card">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-text-primary">Convergence graph</h3>
-        <div className="text-xs text-text-muted">
+    <section aria-label="Convergence graph">
+      <div className="mb-5">
+        <h3 className="section-title">Convergence graph</h3>
+        <p className="section-sub">
           Last <span className="num">{data?.window_hours ?? hours}h</span> ·{" "}
           <span className="num">{data?.summary.node_count ?? data?.nodes.length ?? 0}</span> nodes ·{" "}
           <span className="num">{data?.summary.edge_count ?? data?.edges.length ?? 0}</span> edges
-        </div>
+        </p>
       </div>
 
       {isLoading ? (
@@ -229,13 +229,13 @@ export function ConvergenceGraph({
           <div className="h-4 w-2/3 rounded bg-text-muted/15" />
         </div>
       ) : isError ? (
-        <div className="flex items-start gap-2 text-sm text-text-secondary">
-          <Info size={14} className="mt-0.5 shrink-0 text-accent-orange" />
+        <div role="alert" className="callout flex items-start gap-2">
+          <Info size={14} className="mt-0.5 shrink-0" />
           Convergence graph is unavailable for {ticker}. Overview and narrative tabs are unchanged.
         </div>
       ) : !data || data.nodes.length === 0 ? (
         <div className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">
-          <p className="font-medium text-text-primary">No graph nodes in this window.</p>
+          <p className="text-base font-semibold text-text-primary">No graph nodes in this window.</p>
           <p className="mt-1">
             The endpoint returned no source, event, or structural graph evidence for {ticker} over
             the last {data?.window_hours ?? hours} hours.
@@ -243,13 +243,13 @@ export function ConvergenceGraph({
         </div>
       ) : (
         <>
-          <div className="mb-4 grid grid-cols-3 gap-4">
+          <div className="mb-5 grid grid-cols-3 gap-4">
             <Stat label="Score" value={scoreLabel(convergence?.score) ?? "n/a"} />
             <Stat label="Alignment" value={<span className="font-sans">{convergence?.alignment ?? "unknown"}</span>} />
             <Stat label="Events" value={data.summary.event_count ?? 0} />
           </div>
 
-          <div className="relative h-72 overflow-hidden border-t border-border">
+          <div className="relative h-80 overflow-hidden border-y border-border">
             <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full">
               {layout.edges.map((edge, idx) => {
                 const a = nodeById.get(edge.source);
@@ -307,7 +307,7 @@ export function ConvergenceGraph({
             })}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text-secondary">
             {sources.length > 0
               ? sources.map((source) => {
                   const color = SOURCE_COLOR[norm(source)] ?? "var(--text-secondary)";

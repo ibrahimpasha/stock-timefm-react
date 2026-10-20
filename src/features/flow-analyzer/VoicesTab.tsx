@@ -139,8 +139,8 @@ function TickerChip({
       onClick={onClick}
       aria-pressed={active}
       aria-label={`Filter by ${ticker}`}
-      className={`num inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium transition-colors hover:bg-bg-card-hover ${
-        active ? "border-accent-blue text-text-primary" : "border-border text-text-secondary"
+      className={`ticker inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-1.5 py-0.5 text-sm transition-colors hover:bg-bg-card-hover hover:text-accent-blue ${
+        active ? "bg-bg-card-hover text-accent-blue" : ""
       }`}
     >
       {sentiment && <SentimentDot s={sentiment} size={6} />}
@@ -167,9 +167,9 @@ function ThemeChip({
       aria-pressed={active}
       aria-label={`Filter by ${kind ?? "theme"} ${label}`}
       title={kind === "sector" ? "Sector" : "Theme"}
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs transition-colors hover:bg-bg-card-hover ${
-        active ? "border-accent-blue text-text-primary" : "border-border text-text-secondary"
-      } ${kind === "sector" ? "font-medium" : ""}`}
+      className={`inline-flex items-center rounded-[var(--radius-control)] px-1.5 py-0.5 text-xs transition-colors hover:bg-bg-card-hover hover:text-accent-blue ${
+        active ? "bg-bg-card-hover text-accent-blue" : "text-text-muted"
+      } ${kind === "sector" ? "font-medium text-text-secondary" : ""}`}
     >
       {label}
     </button>
@@ -199,7 +199,7 @@ function HeaderBar({
 }) {
   const voiceSelectId = useId();
   return (
-    <div className="flex items-center gap-3 flex-wrap pb-2">
+    <div className="flex flex-1 flex-wrap items-center gap-3">
       {/* Voice selector */}
       <div className="flex items-center gap-1.5">
         <label htmlFor={voiceSelectId} className="sr-only">
@@ -288,10 +288,14 @@ function TrendingStrip({
   const activeTicker = activeFilter.kind === "ticker" ? activeFilter.value : null;
   const activeTheme = activeFilter.kind === "theme" ? activeFilter.value : null;
   return (
-    <div className="flex flex-col gap-1.5 py-2">
+    <section className="space-y-3">
+      <div>
+        <h3 className="section-title">What the voices are talking about</h3>
+        <p className="section-sub">Most-mentioned names and themes in the window; dot = net lean. Click to filter the feed.</p>
+      </div>
       {tickers.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex w-16 items-center gap-1 text-xs text-text-muted">
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
+          <span className="inline-flex w-20 items-center gap-1 text-xs text-text-muted">
             <TrendingUp size={12} />
             Tickers
           </span>
@@ -311,8 +315,8 @@ function TrendingStrip({
         </div>
       )}
       {themes.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex w-16 items-center gap-1 text-xs text-text-muted">
+        <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
+          <span className="inline-flex w-20 items-center gap-1 text-xs text-text-muted">
             <Sparkles size={12} />
             Themes
           </span>
@@ -327,7 +331,7 @@ function TrendingStrip({
           ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -352,15 +356,15 @@ function TweetRow({
   return (
     <div
       onClick={onSelect}
-      className={`cursor-pointer px-3 py-3 border-b border-border transition-colors ${
+      className={`cursor-pointer border-b border-border px-4 py-4 transition-colors ${
         selected ? "bg-bg-card-hover" : "hover:bg-bg-card-hover"
       }`}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-3">
         <VoiceInitials name={tweet.voice_display_name || tweet.voice_username} />
         <div className="flex-1 min-w-0">
           {/* Header row */}
-          <div className="flex items-center gap-2 mb-1">
+          <div className="mb-1.5 flex items-center gap-2">
             <span className="text-sm font-medium text-text-primary truncate">
               {tweet.voice_display_name}
             </span>
@@ -406,7 +410,7 @@ function TweetRow({
             }}
             aria-pressed={selected}
             aria-controls="voice-tweet-detail"
-            className="text-sm text-text-primary leading-snug whitespace-pre-wrap"
+            className="prose-read whitespace-pre-wrap text-text-primary"
             style={{
               width: "100%",
               textAlign: "left",
@@ -421,7 +425,7 @@ function TweetRow({
 
           {/* Ticker chips */}
           {tweet.tickers.length > 0 && (
-            <div className="flex items-center gap-1 flex-wrap mt-2">
+            <div className="-ml-1.5 mt-2 flex flex-wrap items-center gap-x-0.5">
               {tweet.tickers.map((t) => (
                 <TickerChip
                   key={t.ticker}
@@ -438,7 +442,7 @@ function TweetRow({
 
           {/* Theme chips */}
           {(tweet.sectors.length > 0 || tweet.themes.length > 0) && (
-            <div className="flex items-center gap-1 flex-wrap mt-1">
+            <div className="-ml-1.5 mt-0.5 flex flex-wrap items-center gap-x-0.5">
               {tweet.sectors.map((s) => (
                 <ThemeChip
                   key={`s:${s}`}
@@ -465,7 +469,7 @@ function TweetRow({
           )}
 
           {/* Engagement */}
-          <div className="flex items-center gap-3 mt-1.5 text-xs text-text-muted num">
+          <div className="mt-2 flex items-center gap-4 text-xs text-text-muted num">
             <span className="inline-flex items-center gap-1">
               <Heart size={10} /> {tweet.like_count.toLocaleString()}
             </span>
@@ -504,13 +508,13 @@ function TweetDetail({
   const xUrl = `https://x.com/${tweet.voice_username}/status/${tweet.tweet_id}`;
   const pending = tweet.analysis_status === "pending";
   return (
-    <div className="space-y-4 text-sm leading-snug">
+    <div className="space-y-6 text-sm leading-snug">
       {/* Header */}
       <div className="flex items-start gap-2">
         <VoiceInitials name={tweet.voice_display_name || tweet.voice_username} />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-text-primary">
+          <div className="flex items-baseline gap-2">
+            <span className="font-display text-lg font-medium text-text-primary">
               {tweet.voice_display_name}
             </span>
             <a
@@ -540,62 +544,59 @@ function TweetDetail({
       </div>
 
       {/* Full text */}
-      <p className="max-w-[72ch] whitespace-pre-wrap text-sm leading-relaxed text-text-primary">
+      <p className="prose-read max-w-[68ch] whitespace-pre-wrap text-text-primary">
         {tweet.text}
       </p>
 
       {pending && (
-        <div className="text-sm text-text-muted">
+        <div className="callout" style={{ "--callout": "var(--text-muted)" } as React.CSSProperties}>
           Analysis pending — will appear shortly after the next cron pass.
         </div>
       )}
 
       {/* Sentiment + summary */}
       {!pending && (
-        <>
-          <div className="flex items-center gap-2 border-t border-border pt-3">
-            <SentimentDot s={tweet.overall_sentiment} size={8} />
-            <span className="text-xs text-text-muted">
-              Overall sentiment
-            </span>
+        <section className="space-y-2 border-t border-border pt-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="section-title">Read</h4>
             <span
-              className="text-xs font-semibold"
-              style={{ color: sentimentColor(tweet.overall_sentiment) }}
+              className="tag"
+              style={{ "--tag": sentimentColor(tweet.overall_sentiment) } as React.CSSProperties}
+              title="Overall sentiment"
             >
+              <SentimentDot s={tweet.overall_sentiment} size={6} />
               {sentimentLabel(tweet.overall_sentiment)}
             </span>
-            {tweet.is_market_related === 0 && (
-              <Chip className="ml-2">Non-market</Chip>
-            )}
+            {tweet.is_market_related === 0 && <Chip>Non-market</Chip>}
           </div>
 
           {tweet.summary && (
-            <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">
+            <p className="prose-read max-w-[68ch]">
               {tweet.summary}
             </p>
           )}
-        </>
+        </section>
       )}
 
       {/* Tickers with confidence */}
       {tweet.tickers.length > 0 && (
         <div>
-          <h4 className="mb-1.5 text-sm font-semibold text-text-primary">
-            Tickers <span className="num font-normal text-text-muted">{tweet.tickers.length}</span>
+          <h4 className="mb-2 font-display text-lg font-medium text-text-primary">
+            Tickers <span className="num ml-1 align-middle text-xs font-normal text-text-muted">{tweet.tickers.length}</span>
           </h4>
-          <div className="space-y-1">
+          <div className="divide-y divide-border">
             {tweet.tickers.map((t) => (
               <button
                 type="button"
                 key={t.ticker}
-                className="flex min-h-7 w-full items-center gap-2 p-1.5 rounded text-left hover:bg-bg-card-hover cursor-pointer"
+                className="data-row flex min-h-7 w-full cursor-pointer items-center gap-3 px-2 py-2.5 text-left"
                 onClick={() => {
                   setActiveTicker(t.ticker);
                   onPickTicker(t.ticker);
                 }}
               >
                 <SentimentDot s={t.sentiment} />
-                <span className="num font-semibold text-xs text-text-primary w-16">
+                <span className="ticker w-16 text-sm">
                   {t.ticker}
                 </span>
                 <span
@@ -604,7 +605,7 @@ function TweetDetail({
                 >
                   {sentimentLabel(t.sentiment)}
                 </span>
-                <div className="flex-1 h-1 bg-bg-card rounded-full overflow-hidden">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border">
                   <div
                     className="h-full rounded-full"
                     style={{
@@ -613,7 +614,7 @@ function TweetDetail({
                     }}
                   />
                 </div>
-                <span className="text-xs num text-text-muted w-8 text-right">
+                <span className="w-10 text-right text-sm num text-text-secondary" title="Confidence">
                   {Math.round(t.confidence * 100)}%
                 </span>
               </button>
@@ -625,10 +626,10 @@ function TweetDetail({
       {/* Sectors + themes */}
       {(tweet.sectors.length > 0 || tweet.themes.length > 0) && (
         <div>
-          <h4 className="mb-1.5 text-sm font-semibold text-text-primary">
+          <h4 className="mb-2 font-display text-lg font-medium text-text-primary">
             Tags
           </h4>
-          <div className="flex items-center gap-1 flex-wrap">
+          <div className="-ml-1.5 flex flex-wrap items-center gap-x-0.5">
             {tweet.sectors.map((s) => (
               <ThemeChip key={`s:${s}`} label={s} kind="sector" onClick={() => onPickTheme(s)} />
             ))}
@@ -640,7 +641,7 @@ function TweetDetail({
       )}
 
       {/* Engagement */}
-      <div className="flex items-center gap-4 pt-2 border-t border-border text-xs text-text-muted num">
+      <div className="flex items-center gap-4 border-t border-border pt-3 text-xs text-text-muted num">
         <span className="inline-flex items-center gap-1">
           <Heart size={12} /> {tweet.like_count.toLocaleString()}
         </span>
@@ -720,22 +721,8 @@ export function VoicesTab() {
         : feedAll.isLoading;
 
   return (
-    <div className="space-y-3">
-      <HeaderBar
-        voiceUsername={voiceUsername}
-        voices={voices ?? []}
-        onVoiceChange={setVoiceUsername}
-        windowDays={windowDays}
-        onWindowChange={setWindowDays}
-        activeFilter={activeFilter}
-        onClearFilter={() => setActiveFilter({ kind: "all" })}
-        stats={{
-          total: stats?.total_tweets ?? 0,
-          analyzed: stats?.analyzed ?? 0,
-          latest: stats?.latest_tweet_at ?? null,
-        }}
-      />
-
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-center gap-3">
       {/* Mode switcher — Feed / Patterns / Synthesis */}
       <Segmented<VoicesMode>
         ariaLabel="Voices view"
@@ -754,6 +741,21 @@ export function VoicesTab() {
           };
         })}
       />
+      <HeaderBar
+        voiceUsername={voiceUsername}
+        voices={voices ?? []}
+        onVoiceChange={setVoiceUsername}
+        windowDays={windowDays}
+        onWindowChange={setWindowDays}
+        activeFilter={activeFilter}
+        onClearFilter={() => setActiveFilter({ kind: "all" })}
+        stats={{
+          total: stats?.total_tweets ?? 0,
+          analyzed: stats?.analyzed ?? 0,
+          latest: stats?.latest_tweet_at ?? null,
+        }}
+      />
+      </div>
 
       {mode === "feed" && (
         <>
@@ -778,7 +780,7 @@ export function VoicesTab() {
           />
 
           <div
-            className="grid grid-cols-12 gap-3 items-start"
+            className="grid grid-cols-12 items-start gap-6"
             style={{ height: "calc(100vh - 460px)", minHeight: 420 }}
           >
             {/* Feed */}
@@ -814,7 +816,7 @@ export function VoicesTab() {
             </div>
 
             {/* Detail */}
-            <div id="voice-tweet-detail" className="card col-span-12 lg:col-span-5 h-full overflow-y-auto">
+            <div id="voice-tweet-detail" className="card col-span-12 h-full overflow-y-auto lg:col-span-5" style={{ padding: "1.5rem" }}>
               <TweetDetail
                 tweet={selectedTweet}
                 onPickTicker={(t) => {

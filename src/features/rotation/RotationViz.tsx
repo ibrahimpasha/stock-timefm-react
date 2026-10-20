@@ -6,7 +6,7 @@
  * backend returns an identical payload for both, so they render through one
  * set of components rather than two that drift apart.
  */
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import { Play, Pause } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Sparkline } from "../../components/CCPrimitives";
@@ -57,19 +57,20 @@ export const pct = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 export function SectorStrip({ sectors }: { sectors: SectorRow[] }) {
   return (
     <div className="overflow-x-auto">
-      <div className="flex gap-6 min-w-max pb-1">
+      <div className="flex gap-8 min-w-max pb-1">
         {sectors.map((s) => {
           const up = s.change_pct >= 0;
-          const tint = up ? "var(--accent-green)" : "var(--accent-red)";
           return (
-            <div key={s.ticker} className="min-w-[96px] flex-1">
-              <div className="text-sm font-semibold num text-text-primary">{s.ticker}</div>
-              <div className="text-xs text-text-muted mb-1 truncate">{s.short}</div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="num text-sm font-semibold" style={{ color: tint }}>
+            <div key={s.ticker} className="min-w-[104px] flex-1">
+              <div className="flex items-baseline gap-1.5">
+                <span className="ticker text-sm">{s.ticker}</span>
+                <span className="text-xs text-text-muted truncate">{s.short}</span>
+              </div>
+              <div className="mt-1 flex items-end justify-between gap-2">
+                <span className={`${up ? "delta-up" : "delta-down"} text-2xl font-semibold tracking-tight`}>
                   {pct(s.change_pct)}
                 </span>
-                <Sparkline points={s.spark} width={44} height={18} color={seriesColor(s.ticker)} />
+                <Sparkline points={s.spark} width={48} height={20} color={seriesColor(s.ticker)} />
               </div>
             </div>
           );
@@ -212,13 +213,13 @@ export function RotationMap({
 
         {/* quadrant captions */}
         <text x="22" y="30" fontSize="13" fill="var(--accent-cyan)" fontWeight="600">Improving</text>
-        <text x="22" y="43" fontSize="11" fill="var(--text-muted)">momentum accelerating</text>
+        <text x="22" y="43" fontSize="11.5" fill="var(--text-secondary)">momentum accelerating</text>
         <text x={SIZE - 22} y="30" textAnchor="end" fontSize="13" fill="var(--accent-green)" fontWeight="600">Leading</text>
-        <text x={SIZE - 22} y="43" textAnchor="end" fontSize="11" fill="var(--text-muted)">strong momentum</text>
+        <text x={SIZE - 22} y="43" textAnchor="end" fontSize="11.5" fill="var(--text-secondary)">strong momentum</text>
         <text x="22" y={SIZE - 26} fontSize="13" fill="var(--accent-red)" fontWeight="600">Lagging</text>
-        <text x="22" y={SIZE - 13} fontSize="11" fill="var(--text-muted)">weak momentum</text>
+        <text x="22" y={SIZE - 13} fontSize="11.5" fill="var(--text-secondary)">weak momentum</text>
         <text x={SIZE - 22} y={SIZE - 26} textAnchor="end" fontSize="13" fill="var(--accent-orange)" fontWeight="600">Weakening</text>
-        <text x={SIZE - 22} y={SIZE - 13} textAnchor="end" fontSize="11" fill="var(--text-muted)">momentum fading</text>
+        <text x={SIZE - 22} y={SIZE - 13} textAnchor="end" fontSize="11.5" fill="var(--text-secondary)">momentum fading</text>
 
         {/* trails first, so bubbles always sit on top of every line */}
         <g clipPath="url(#rrg-clip)">
@@ -264,10 +265,10 @@ export function RotationMap({
                  transform: `translate(${head.x}px, ${labelY}px)`,
                  transition: animate ? "transform 260ms ease-out" : "none",
                }}>
-              <text x="15" y="0" fontSize="12" fontWeight="600" fill={seriesColor(s.ticker)}>
+              <text x="15" y="0" fontSize="12.5" fontWeight="600" fill="var(--text-primary)">
                 {s.ticker.length > 12 ? s.ticker.slice(0, 12) : s.ticker}
               </text>
-              <text x="15" y="11" fontSize="10" fill="var(--text-muted)">
+              <text x="15" y="12" fontSize="11" fill="var(--text-secondary)">
                 {pct(s.change_pct)}
               </text>
             </g>
@@ -275,7 +276,7 @@ export function RotationMap({
         ))}
       </svg>
 
-      <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-xs text-text-muted">
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs text-text-secondary">
         <span>Weak</span>
         <div className="h-1.5 w-32 rounded-full"
              style={{ background: "linear-gradient(90deg, var(--accent-red), var(--accent-orange), var(--accent-green))" }} />
@@ -327,15 +328,15 @@ export function RotationScrubber({
 
   if (dates.length < 2) return null;
   return (
-    <div className="flex items-center gap-2 mt-1">
+    <div className="flex items-center gap-3 mt-3 border-t border-border pt-3">
       <button
         type="button"
         onClick={() => setPlaying((p) => (index >= last ? (onChange(0), true) : !p))}
         aria-label={playing ? "Pause rotation replay" : "Play rotation replay"}
-        className="shrink-0 size-6 rounded-full flex items-center justify-center transition-colors
+        className="shrink-0 size-8 rounded-full flex items-center justify-center transition-colors
                    bg-accent-blue/15 text-accent-blue hover:bg-accent-blue/25"
       >
-        {playing ? <Pause size={11} /> : <Play size={11} />}
+        {playing ? <Pause size={13} /> : <Play size={13} />}
       </button>
       <input
         type="range"
@@ -346,7 +347,7 @@ export function RotationScrubber({
         aria-label="Scrub rotation history"
         className="flex-1 accent-accent-blue h-1 cursor-pointer"
       />
-      <span className="num text-xs text-text-muted w-[80px] text-right">
+      <span className="num text-sm text-text-secondary w-[88px] text-right">
         {dates[index] ?? ""}
       </span>
     </div>
@@ -376,7 +377,7 @@ export function RotationTimeline({ sectors }: { sectors: SectorRow[] }) {
         <LineChart data={data} margin={{ top: 8, right: 56, bottom: 4, left: 0 }}>
           {/* NB: do NOT pass `ticks` here — recharts narrows the category domain
               to just those entries and every line collapses to the left edge. */}
-          <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+          <XAxis dataKey="date" tick={{ fontSize: 12, fill: "var(--text-secondary)" }}
                  tickLine={false} axisLine={{ stroke: "var(--border)" }}
                  interval="preserveStartEnd" minTickGap={80} />
           <YAxis hide domain={["dataMin - 0.3", "dataMax + 0.3"]} />
@@ -386,6 +387,7 @@ export function RotationTimeline({ sectors }: { sectors: SectorRow[] }) {
               borderRadius: 8, fontSize: 12,
             }}
             labelStyle={{ color: "var(--text-secondary)" }}
+            itemStyle={{ color: "var(--text-primary)" }}
             formatter={(v, name) => [Number(v).toFixed(2), String(name)]}
           />
           {sectors.map((s) => (
@@ -395,7 +397,7 @@ export function RotationTimeline({ sectors }: { sectors: SectorRow[] }) {
           ))}
         </LineChart>
       </ResponsiveContainer>
-      <p className="text-xs text-text-muted mt-1">
+      <p className="text-xs text-text-muted mt-2">
         Relative strength vs SPY (100 = in line with its own trend). Leaders and laggards highlighted.
       </p>
     </div>
@@ -415,7 +417,7 @@ export function MomentumRanking({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-xs">
+      <table className="w-full text-sm">
         <thead>
           <tr className="text-xs font-medium text-text-muted">
             <th className="text-left font-medium py-2 pr-2">#</th>
@@ -431,27 +433,27 @@ export function MomentumRanking({
             return (
               <tr key={s.ticker}
                   onClick={onSelect ? () => onSelect(s.ticker) : undefined}
-                  className={onSelect ? "cursor-pointer hover:bg-bg-card-hover" : "hover:bg-bg-card-hover"}
+                  className={onSelect ? "data-row cursor-pointer" : "data-row"}
                   style={selected === s.ticker
                     ? { background: "color-mix(in srgb, var(--accent-blue) 10%, transparent)" }
                     : undefined}>
-                <td className="py-2 pr-2 num text-text-muted">{s.rank}</td>
-                <td className="py-2 whitespace-nowrap">
-                  <span className="num font-semibold" style={{ color: seriesColor(s.ticker) }}>{s.ticker}</span>
-                  <span className="text-text-muted ml-1.5">{s.label}</span>
+                <td className="py-2.5 pr-2 num text-xs text-text-muted">{s.rank}</td>
+                <td className="py-2.5 whitespace-nowrap">
+                  <span className="mr-1.5 inline-block size-2 rounded-full align-middle" style={{ background: seriesColor(s.ticker) }} aria-hidden="true" />
+                  <span className="ticker">{s.ticker}</span>
+                  <span className="text-xs text-text-muted ml-1.5">{s.label}</span>
                 </td>
-                <td className="py-2 px-2 w-[38%]">
+                <td className="py-2.5 px-2 w-[34%]">
                   <div className="h-1.5 rounded-full bg-bg-card-hover overflow-hidden">
                     <div className="h-full rounded-full"
                          style={{ width: `${width}%`, background: scoreColor(s.score) }} />
                   </div>
                 </td>
-                <td className="py-2 px-2 text-right num font-semibold"
+                <td className="py-2.5 px-2 text-right num font-semibold"
                     style={{ color: scoreColor(s.score) }}>
                   {s.score.toFixed(1)}
                 </td>
-                <td className="py-2 pl-2 text-right num"
-                    style={{ color: s.change_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
+                <td className={`py-2.5 pl-2 text-right ${s.change_pct >= 0 ? "delta-up" : "delta-down"}`}>
                   {pct(s.change_pct)}
                 </td>
               </tr>
@@ -467,7 +469,12 @@ export function MomentumRanking({
 
 export function InsightLine({ ins }: { ins: RotationInsight }) {
   const name = (t: string, l: string) => (
-    <span style={{ color: seriesColor(t) }} className="font-medium">{l}</span>
+    <span
+      style={{ textDecorationColor: seriesColor(t) }}
+      className="font-medium text-text-primary underline decoration-2 underline-offset-4"
+    >
+      {l}
+    </span>
   );
   if (ins.kind === "rotation") {
     return (
@@ -496,25 +503,25 @@ export function InsightLine({ ins }: { ins: RotationInsight }) {
 export function AlertFeed({ alerts }: { alerts: { kind: string; ticker: string; label: string; date: string; text: string }[] }) {
   if (!alerts.length) return <p className="text-sm text-text-muted">No quadrant changes in the window.</p>;
   return (
-    <div className="flex flex-col divide-y divide-border max-h-[420px] overflow-y-auto">
+    <div className="flex flex-col divide-y divide-border border-y border-border max-h-[420px] overflow-y-auto">
       {alerts.map((a, i) => {
         const tone = a.kind === "NEW LEADER" ? "var(--accent-green)"
           : a.kind === "IMPROVING" ? "var(--accent-cyan)" : "var(--accent-orange)";
         return (
-          <div key={`${a.ticker}-${a.date}-${i}`} className="flex gap-2 py-2">
-            <span className="mt-1.5 size-1.5 shrink-0 rounded-full" style={{ background: tone }} />
+          <div key={`${a.ticker}-${a.date}-${i}`} className="data-row flex gap-3 px-2 py-2.5">
+            <span className="mt-2 size-2 shrink-0 rounded-full" style={{ background: tone }} />
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2 text-sm">
                 <span className="min-w-0 truncate">
-                  <span className="num font-semibold" style={{ color: seriesColor(a.ticker) }}>{a.ticker}</span>
+                  <span className="ticker">{a.ticker}</span>
                   <span className="text-text-muted ml-1.5">{a.label}</span>
+                  <span className="tag ml-2" style={{ "--tag": tone } as CSSProperties}>
+                    {a.kind.charAt(0) + a.kind.slice(1).toLowerCase()}
+                  </span>
                 </span>
                 <span className="shrink-0 text-xs text-text-muted num">{a.date}</span>
               </div>
-              <div className="text-xs font-medium" style={{ color: tone }}>
-                {a.kind.charAt(0) + a.kind.slice(1).toLowerCase()}
-              </div>
-              <div className="text-sm text-text-secondary leading-relaxed">{a.text}</div>
+              <div className="mt-0.5 text-sm text-text-secondary leading-relaxed">{a.text}</div>
             </div>
           </div>
         );

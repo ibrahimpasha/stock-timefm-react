@@ -11,7 +11,7 @@
 import { useMemo, useRef, useState } from "react";
 import { QueryNotice } from "../../components/QueryNotice";
 import { RefreshCw, TrendingUp, TrendingDown } from "lucide-react";
-import { GlassPanel, Segmented } from "../../components/Glass";
+import { Segmented } from "../../components/Glass";
 import { useAppStore } from "../../store/useAppStore";
 import {
   useResilience,
@@ -29,18 +29,24 @@ function fmtPct(v: number | null | undefined, dp = 0): string {
   return `${(v * 100).toFixed(dp)}%`;
 }
 
-/** Inline 0-100 meter — green above 60, red below 25, blue between. */
+function scoreTone(score: number) {
+  return score >= 60
+    ? "var(--accent-green)"
+    : score < 25
+      ? "var(--accent-red)"
+      : "var(--accent-blue)";
+}
+
+/** Big 0-100 score with a thin meter underneath — green above 60, red below 25, blue between. */
 function ScoreMeter({ score }: { score: number }) {
-  const tone =
-    score >= 60
-      ? "var(--accent-green)"
-      : score < 25
-        ? "var(--accent-red)"
-        : "var(--accent-blue)";
+  const tone = scoreTone(score);
   return (
-    <div className="flex items-center gap-2 min-w-[90px]">
+    <div className="flex w-16 shrink-0 flex-col items-end gap-1">
+      <span className="num text-2xl font-semibold leading-none tracking-tight" style={{ color: tone }}>
+        {score.toFixed(0)}
+      </span>
       <div
-        className="h-1.5 flex-1 rounded-full overflow-hidden"
+        className="h-1 w-full overflow-hidden rounded-full"
         style={{ background: "color-mix(in srgb, var(--border) 60%, transparent)" }}
       >
         <div
@@ -48,53 +54,47 @@ function ScoreMeter({ score }: { score: number }) {
           style={{ width: `${Math.min(100, score)}%`, background: tone }}
         />
       </div>
-      <span className="num text-xs w-8 text-right" style={{ color: tone }}>
-        {score.toFixed(0)}
-      </span>
     </div>
   );
 }
 
-function TickerRow({ r }: { r: ResilienceTicker }) {
+/** Small labelled figure used in the secondary columns of a ranked row. */
+function Fig({ label, value, title, className = "" }: { label: string; value: React.ReactNode; title?: string; className?: string }) {
+  return (
+    <div className="flex w-16 flex-col items-end" title={title}>
+      <span className={`num text-sm ${className || "text-text-primary"}`}>{value}</span>
+      <span className="text-xs text-text-muted">{label}</span>
+    </div>
+  );
+}
+
+function TickerRow({ r, rank }: { r: ResilienceTicker; rank: number }) {
   const setActiveTicker = useAppStore((s) => s.setActiveTicker);
   return (
     <div
-      className="grid items-center gap-2 px-2 py-2 cursor-pointer hover:bg-bg-card-hover text-xs"
-      style={{ gridTemplateColumns: "64px 110px 1fr 64px 64px 56px" }}
+      className="data-row flex cursor-pointer items-center gap-3 px-2 py-2.5"
       onClick={() => setActiveTicker(r.ticker)}
       title={`${r.n_events} events · avg own drawdown ${r.avg_own_dd_pct}%`}
     >
-      <span className="num font-semibold text-text-primary">{r.ticker}</span>
+      <span className="num w-6 shrink-0 text-right text-xs text-text-muted">{rank}</span>
+      <div className="min-w-0 flex-1">
+        <div className="ticker text-sm">{r.ticker}</div>
+        <div className="truncate text-xs text-text-muted">{r.theme || r.category || "—"}</div>
+      </div>
+      <div className="hidden items-center gap-2 sm:flex">
+        <Fig label="Bounce 5d" value={fmtPct(r.avg_bounce_5d)} title="Share of its own drawdown recovered 5 sessions after its trough" />
+        <Fig label="Recovered" value={fmtPct(r.recovery_rate)} title="Share of events where it fully recovered its pre-crash price within 20 sessions" />
+        <Fig
+          label="vs SPY"
+          value={r.avg_rel_dd != null ? `${r.avg_rel_dd.toFixed(1)}x` : "—"}
+          title="Its drawdown vs SPY's — under 1x fell less than the market"
+          className="text-text-secondary"
+        />
+      </div>
       <ScoreMeter score={r.score} />
-      <span className="text-text-muted truncate">{r.theme || r.category || "—"}</span>
-      <span className="num text-right">{fmtPct(r.avg_bounce_5d)}</span>
-      <span className="num text-right">{fmtPct(r.recovery_rate)}</span>
-      <span className="num text-right text-text-muted">
-        {r.avg_rel_dd != null ? `${r.avg_rel_dd.toFixed(1)}x` : "—"}
-      </span>
     </div>
   );
 }
-
-const COLS = (
-  <div
-    className="grid gap-2 px-2 pb-2 border-b border-border text-xs font-medium text-text-muted"
-    style={{ gridTemplateColumns: "64px 110px 1fr 64px 64px 56px" }}
-  >
-    <span>Ticker</span>
-    <span>Resilience</span>
-    <span>Theme</span>
-    <span className="text-right" title="Share of its own drawdown recovered 5 sessions after its trough">
-      Bounce 5d
-    </span>
-    <span className="text-right" title="Share of events where it fully recovered its pre-crash price within 20 sessions">
-      Recovered
-    </span>
-    <span className="text-right" title="Its drawdown vs SPY's — under 1x fell less than the market">
-      vs SPY
-    </span>
-  </div>
-);
 
 /* ── Intraday overlay ─────────────────────────────────────── */
 
@@ -379,13 +379,13 @@ function InsightChips({
   showBounce?: boolean;
 }) {
   return (
-    <span className="inline-flex flex-wrap gap-1 align-middle">
+    <span className="flex flex-wrap gap-1">
       {chips.map((c) => (
         <button
           key={c.ticker}
           type="button"
           onClick={() => onPick(c.ticker)}
-          className="rounded px-1.5 py-0.5 text-xs hover:bg-bg-card-hover num"
+          className="num rounded-full border border-border px-2 py-0.5 text-xs hover:bg-bg-card-hover"
           title={`${c.theme || ""} · dip ${c.trough_pct}% · ${
             c.bounce_close != null ? Math.round(Math.min(c.bounce_close, 1.5) * 100) : "—"
           }% recovered by close · click to overlay`}
@@ -409,66 +409,74 @@ function DayRead({ days, onPick }: { days: string; onPick: (t: string) => void }
   const c = data.counts;
   const multi = (data.dates?.length ?? 1) > 1;
   return (
-    <GlassPanel className="p-4 space-y-2 text-sm leading-relaxed">
-      <div className="text-text-secondary max-w-[72ch]">
-        <span className="font-semibold text-text-primary">
+    <section className="space-y-4">
+      <div>
+        <h3 className="section-title">
           {multi
             ? `Across ${data.dates.length} stress days (${data.dates
                 .map((d) => d.slice(5))
-                .join(", ")}).`
-            : `${data.dates[0]} read.`}
-        </span>{" "}
+                .join(", ")})`
+            : `${data.dates[0]} read`}
+        </h3>
+      </div>
+      <p className="prose-read max-w-[68ch] text-text-secondary">
         SPY {multi ? "averaged a dip of" : "dipped"}{" "}
-        <span className="num text-accent-red">{data.spy.spy_trough_pct}%</span> vs the
+        <span className="delta-down">{data.spy.spy_trough_pct}%</span> vs the
         prior close and recovered{" "}
-        <span className="num">
+        <span className="num text-text-primary">
           {data.spy.spy_bounce_close != null
             ? `${Math.round(data.spy.spy_bounce_close * 100)}%`
             : "—"}
         </span>{" "}
-        of it by the bell. Of {data.n_tracked} tracked names: {c?.dropped} fell with
-        it, {c?.held_up} barely reacted, {c?.recovered} already V-shaped,{" "}
-        {c?.still_down} still down{multi ? ` as of ${data.latest}` : " at the close"}.
+        of it by the bell. Of <span className="num">{data.n_tracked}</span> tracked names:{" "}
+        <span className="num">{c?.dropped}</span> fell with it,{" "}
+        <span className="num">{c?.held_up}</span> barely reacted,{" "}
+        <span className="num">{c?.recovered}</span> already V-shaped,{" "}
+        <span className="num">{c?.still_down}</span> still down{multi ? ` as of ${data.latest}` : " at the close"}.
+      </p>
+      <div className="grid gap-3 text-sm sm:grid-cols-[10rem_1fr]">
+        {!!data.dropped?.length && (
+          <>
+            <span className="pt-0.5 text-text-secondary">Dropped with the market</span>
+            <InsightChips chips={data.dropped.slice(0, 10)} onPick={onPick} />
+          </>
+        )}
+        {!!data.held_up?.length && (
+          <>
+            <span className="pt-0.5 text-text-secondary">Barely reacted</span>
+            <InsightChips chips={data.held_up.slice(0, 8)} onPick={onPick} />
+          </>
+        )}
+        {!!data.recovered?.length && (
+          <>
+            <span className="pt-0.5 text-text-secondary">Already recovered</span>
+            <InsightChips chips={data.recovered.slice(0, 8)} onPick={onPick} showBounce />
+          </>
+        )}
       </div>
-      {!!data.dropped?.length && (
-        <div className="text-text-muted">
-          <span className="text-text-secondary">Dropped with the market:</span>{" "}
-          <InsightChips chips={data.dropped.slice(0, 10)} onPick={onPick} />
-        </div>
-      )}
-      {!!data.held_up?.length && (
-        <div className="text-text-muted">
-          <span className="text-text-secondary">Barely reacted:</span>{" "}
-          <InsightChips chips={data.held_up.slice(0, 8)} onPick={onPick} />
-        </div>
-      )}
-      {!!data.recovered?.length && (
-        <div className="text-text-muted">
-          <span className="text-text-secondary">Already recovered:</span>{" "}
-          <InsightChips chips={data.recovered.slice(0, 8)} onPick={onPick} showBounce />
-        </div>
-      )}
       {!!data.watch?.length && (
-        <div className="border-t border-border pt-3 space-y-1">
-          <div className="font-semibold text-text-primary">
+        <div className="space-y-2 border-t border-border pt-4">
+          <h4 className="text-sm font-semibold text-text-primary">
             Watch: still down, but history says they snap back
+          </h4>
+          <div className="divide-y divide-border">
+            {data.watch.map((w) => (
+              <div key={w.ticker} className="flex items-baseline gap-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => onPick(w.ticker)}
+                  className="ticker w-16 shrink-0 rounded px-1 text-left text-sm hover:bg-bg-card-hover"
+                  title="click to overlay"
+                >
+                  {w.ticker}
+                </button>
+                <span className="text-sm text-text-secondary">{w.reason}</span>
+              </div>
+            ))}
           </div>
-          {data.watch.map((w) => (
-            <div key={w.ticker} className="flex items-start gap-2">
-              <button
-                type="button"
-                onClick={() => onPick(w.ticker)}
-                className="rounded px-1.5 py-0.5 num font-semibold text-text-primary hover:bg-bg-card-hover shrink-0"
-                title="click to overlay"
-              >
-                {w.ticker}
-              </button>
-              <span className="text-text-muted">{w.reason}</span>
-            </div>
-          ))}
         </div>
       )}
-    </GlassPanel>
+    </section>
   );
 }
 
@@ -521,7 +529,7 @@ function IntradayView() {
   }, [picked, theme]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-8">
       {/* Filter row — multi-select day chips, quick actions, theme line */}
       <div className="flex items-center gap-2 flex-wrap">
         {days.map((d) => {
@@ -532,7 +540,7 @@ function IntradayView() {
               type="button"
               onClick={() => toggleDay(d.date)}
               aria-pressed={on}
-              className="rounded-md px-2 py-1 text-xs border num"
+              className="num min-h-8 rounded-full border px-3 py-1 text-xs"
               style={{
                 borderColor: on ? "var(--accent-blue)" : "var(--border)",
                 background: on
@@ -565,7 +573,7 @@ function IntradayView() {
         <select
           value={theme}
           onChange={(e) => setTheme(e.target.value)}
-          className="ml-auto rounded border border-border bg-transparent px-2 py-1 text-xs text-text-secondary"
+          className="control-surface ml-auto min-h-8 rounded-full border px-3 py-1 text-xs text-text-secondary"
         >
           <option value="">No theme line</option>
           {themes.map((t) => (
@@ -576,59 +584,55 @@ function IntradayView() {
 
       <DayRead days={datesKey} onPick={toggle} />
 
-      <GlassPanel className="p-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
-          <span className="text-xs text-text-muted">
-            {activeDays.length > 1
-              ? `${activeDays.length} sessions`
-              : activeDays[0] ?? ""}{" "}
-            — % vs previous close, 15m bars · click table rows to overlay (max {MAX_OVERLAY})
-          </span>
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3 className="section-title">Intraday path</h3>
+            <p className="section-sub">
+              {activeDays.length > 1
+                ? `${activeDays.length} sessions`
+                : activeDays[0] ?? ""}{" "}
+              — % vs previous close, 15m bars · click ranked rows to overlay (max {MAX_OVERLAY})
+            </p>
+          </div>
           {/* legend — always present */}
-          <span className="flex items-center gap-3 text-xs text-text-muted">
-            <span className="flex items-center gap-1">
-              <span style={{ width: 12, borderTop: "2px solid var(--text-muted)" }} /> SPY
+          <span className="flex items-center gap-4 text-xs text-text-secondary">
+            <span className="flex items-center gap-1.5">
+              <span style={{ width: 14, borderTop: "2px solid var(--text-muted)" }} /> SPY
             </span>
-            <span className="flex items-center gap-1">
-              <span style={{ width: 12, borderTop: "2px dashed var(--text-muted)" }} /> QQQ
+            <span className="flex items-center gap-1.5">
+              <span style={{ width: 14, borderTop: "2px dashed var(--text-muted)" }} /> QQQ
             </span>
             {theme && (
-              <span className="flex items-center gap-1">
-                <span style={{ width: 12, borderTop: "2px dashed var(--accent-purple)" }} /> theme
+              <span className="flex items-center gap-1.5">
+                <span style={{ width: 14, borderTop: "2px dashed var(--accent-purple)" }} /> theme
               </span>
             )}
           </span>
         </div>
-        <OverlayChart
-          segments={bars.data?.segments ?? []}
-          meta={chartMeta}
-          faded={bars.isFetching && !!bars.data}
-        />
-      </GlassPanel>
+        <div className="card p-4">
+          <OverlayChart
+            segments={bars.data?.segments ?? []}
+            meta={chartMeta}
+            faded={bars.isFetching && !!bars.data}
+          />
+        </div>
+      </section>
 
       {/* Ranked intraday table */}
-      <GlassPanel className="p-4">
-        <div
-          className="grid gap-2 px-2 pb-2 border-b border-border text-xs font-medium text-text-muted"
-          style={{ gridTemplateColumns: "20px 64px 110px 1fr 70px 64px 60px" }}
-        >
-          <span />
-          <span>Ticker</span>
-          <span>V-score</span>
-          <span>Theme</span>
-          <span className="text-right" title="Average intraday dip vs prev close on stress days">Avg dip</span>
-          <span className="text-right" title="Fraction of the dip recovered by the close">Recovered</span>
-          <span className="text-right" title="Bounce vs SPY's bounce the same day">vs SPY</span>
+      <section className="space-y-3">
+        <div>
+          <h3 className="section-title">Fastest V-shapes</h3>
+          <p className="section-sub">Ranked by V-score. Click to overlay, double-click to open the ticker.</p>
         </div>
-        <div className="max-h-[46vh] overflow-y-auto divide-y divide-border">
-          {(data?.tickers ?? []).slice(0, 60).map((r: IntradayTicker) => {
+        <div className="card max-h-[56vh] divide-y divide-border overflow-y-auto p-2">
+          {(data?.tickers ?? []).slice(0, 60).map((r: IntradayTicker, idx: number) => {
             const sel = picked.includes(r.ticker);
             return (
               <div
                 key={r.ticker}
-                className="grid items-center gap-2 px-2 py-2 cursor-pointer hover:bg-bg-card-hover text-xs"
+                className="data-row flex cursor-pointer items-center gap-3 px-2 py-2.5"
                 style={{
-                  gridTemplateColumns: "20px 64px 110px 1fr 70px 64px 60px",
                   background: sel
                     ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)"
                     : undefined,
@@ -637,7 +641,9 @@ function IntradayView() {
                 onDoubleClick={() => setActiveTicker(r.ticker)}
                 title={`${r.n_days} stress days · double-click to open ticker`}
               >
+                <span className="num w-6 shrink-0 text-right text-xs text-text-muted">{idx + 1}</span>
                 <span
+                  className="shrink-0"
                   style={{
                     width: 12, height: 0,
                     borderTop: sel
@@ -645,23 +651,30 @@ function IntradayView() {
                       : "2px solid transparent",
                   }}
                 />
-                <span className="num font-semibold text-text-primary">{r.ticker}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="ticker text-sm">{r.ticker}</div>
+                  <div className="truncate text-xs text-text-muted">{r.theme || r.category || "—"}</div>
+                </div>
+                <div className="hidden items-center gap-2 sm:flex">
+                  <Fig label="Avg dip" value={`${r.avg_trough_pct}%`} title="Average intraday dip vs prev close on stress days" className="text-accent-red" />
+                  <Fig label="Recovered" value={fmtPct(r.avg_bounce_close)} title="Fraction of the dip recovered by the close" />
+                  <Fig
+                    label="vs SPY"
+                    value={`${r.avg_rel_bounce >= 0 ? "+" : ""}${(r.avg_rel_bounce * 100).toFixed(0)}%`}
+                    title="Bounce vs SPY's bounce the same day"
+                    className="text-text-secondary"
+                  />
+                </div>
                 <ScoreMeter score={r.score} />
-                <span className="text-text-muted truncate">{r.theme || r.category || "—"}</span>
-                <span className="num text-right text-accent-red">{r.avg_trough_pct}%</span>
-                <span className="num text-right">{fmtPct(r.avg_bounce_close)}</span>
-                <span className="num text-right text-text-muted">
-                  {r.avg_rel_bounce >= 0 ? "+" : ""}{(r.avg_rel_bounce * 100).toFixed(0)}%
-                </span>
               </div>
             );
           })}
           <QueryNotice queries={[meta0, intradayQuery, bars]} label="Intraday resilience" />
           {!data?.tickers.length && !isFetching && !intradayQuery.isPending && !intradayQuery.isError && intradayQuery.fetchStatus !== "paused" && (
-            <div className="text-xs text-text-muted p-3">No intraday data — refresh from the Daily view.</div>
+            <div className="p-3 text-sm text-text-muted">No intraday data — refresh from the Daily view.</div>
           )}
         </div>
-      </GlassPanel>
+      </section>
     </div>
   );
 }
@@ -678,7 +691,7 @@ export function BounceBoard() {
     view === "resilient" ? tickers.slice(0, 40) : [...tickers].slice(-40).reverse();
 
   return (
-    <div className="space-y-3 p-1">
+    <div className="space-y-6 p-1">
       {mode === "daily" && <QueryNotice queries={[dailyQuery]} label="Daily resilience" />}
       {refresh.isError && <p role="alert" className="text-xs text-accent-red">Resilience refresh failed.</p>}
       {/* Mode toggle (page header already names the view) */}
@@ -693,7 +706,7 @@ export function BounceBoard() {
                 { value: "daily" as const, label: "Multi-day events" },
               ]}
             />
-            <span className="text-xs text-text-muted">
+            <span className="text-sm text-text-muted">
               {mode === "intraday"
                 ? "15m bars — who recovers the day's dip fastest"
                 : `${data?.events.length ?? 0} events, ${data?.n_tickers ?? 0} tickers ranked`}
@@ -703,7 +716,7 @@ export function BounceBoard() {
             type="button"
             onClick={() => refresh.mutate()}
             disabled={refresh.isPending}
-            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
+            className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-text-secondary hover:bg-bg-card-hover hover:text-text-primary"
             title="Re-scan prices and rebuild both layers (~80s in the background)"
           >
             <RefreshCw size={12} className={refresh.isPending ? "animate-spin" : ""} />
@@ -737,19 +750,17 @@ function EventStrip({
   events: { id: number; peak_date: string; trough_date: string; spy_dd_pct: number; spy_bounce_5d: number | null }[];
 }) {
   return (
-    <div className="flex gap-5 overflow-x-auto pb-1">
+    <div className="flex gap-8 overflow-x-auto pb-1">
       {events.map((e) => (
         <div
           key={e.id}
-          className="shrink-0 text-xs"
+          className="shrink-0"
           title={`peak ${e.peak_date} → trough ${e.trough_date}`}
         >
-          <div className="num text-text-primary">{e.trough_date}</div>
-          <div className="flex items-center gap-2">
-            <span className="num text-accent-red">SPY {e.spy_dd_pct}%</span>
-            <span className="num text-text-muted" title="SPY's own 5-session bounce off the trough">
-              ↩ {fmtPct(e.spy_bounce_5d)}
-            </span>
+          <div className="num text-xs text-text-muted">{e.trough_date}</div>
+          <div className="delta-down text-xl font-semibold tracking-tight">{e.spy_dd_pct}%</div>
+          <div className="num text-xs text-text-muted" title="SPY's own 5-session bounce off the trough">
+            SPY · ↩ {fmtPct(e.spy_bounce_5d)}
           </div>
         </div>
       ))}
@@ -773,56 +784,63 @@ function DailyView({
   hasData: boolean;
 }) {
   return (
-    <div className="grid gap-3" style={{ gridTemplateColumns: "3fr 2fr" }}>
+    <div className="grid gap-8 lg:grid-cols-[3fr_2fr]">
       {/* Ranked tickers */}
-      <GlassPanel className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <Segmented
-            value={view}
-            onChange={setView}
-            options={[
-              { value: "resilient" as const, label: "Resilient" },
-              { value: "laggards" as const, label: "Laggards" },
-            ]}
-          />
-          {isFetching && !hasData && (
-            <span className="text-xs text-text-muted animate-pulse">loading…</span>
-          )}
+      <section className="min-w-0 space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3 className="section-title">{view === "resilient" ? "Most resilient" : "Laggards"}</h3>
+            <p className="section-sub">0-100 composite of bounce, recovery and drawdown vs SPY.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {isFetching && !hasData && (
+              <span className="animate-pulse text-xs text-text-muted">loading…</span>
+            )}
+            <Segmented
+              value={view}
+              onChange={setView}
+              options={[
+                { value: "resilient" as const, label: "Resilient" },
+                { value: "laggards" as const, label: "Laggards" },
+              ]}
+            />
+          </div>
         </div>
-        {COLS}
-        <div className="max-h-[60vh] overflow-y-auto divide-y divide-border">
-          {shown.map((r) => (
-            <TickerRow key={r.ticker} r={r} />
+        <div className="card max-h-[64vh] divide-y divide-border overflow-y-auto p-2">
+          {shown.map((r, i) => (
+            <TickerRow key={r.ticker} r={r} rank={i + 1} />
           ))}
           {!shown.length && !isFetching && (
-            <div className="text-xs text-text-muted p-3">
+            <div className="p-3 text-sm text-text-muted">
               No resilience data yet — hit refresh to build the tables.
             </div>
           )}
         </div>
-      </GlassPanel>
+      </section>
 
       {/* Theme rollup */}
-      <GlassPanel className="p-4" title="Themes by average member resilience">
-        <div className="max-h-[64vh] overflow-y-auto divide-y divide-border">
+      <section className="min-w-0 space-y-3">
+        <div>
+          <h3 className="section-title">Themes</h3>
+          <p className="section-sub">By average member resilience.</p>
+        </div>
+        <div className="max-h-[64vh] divide-y divide-border overflow-y-auto">
           {themes.slice(0, 24).map((t) => (
-            <div key={t.theme} className="px-2 py-2 hover:bg-bg-card-hover">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-text-primary truncate flex items-center gap-1">
+            <div key={t.theme} className="data-row flex items-center gap-3 px-2 py-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 truncate text-sm text-text-primary">
                   {t.score >= 55 ? (
-                    <TrendingUp size={11} className="text-accent-green" />
+                    <TrendingUp size={13} className="shrink-0 text-accent-green" />
                   ) : t.score < 35 ? (
-                    <TrendingDown size={11} className="text-accent-red" />
+                    <TrendingDown size={13} className="shrink-0 text-accent-red" />
                   ) : null}
-                  {t.theme}
-                </span>
-                <span className="num text-text-muted">
-                  {t.n_tickers} · {t.score.toFixed(0)}
-                </span>
-              </div>
-              <div className="flex items-center gap-1 mt-1">
+                  <span className="truncate">{t.theme}</span>
+                </div>
+                <div className="num truncate text-xs text-text-muted">
+                  {t.top.slice(0, 3).join(" ")} · <span title="member tickers">{t.n_tickers} names</span>
+                </div>
                 <div
-                  className="h-1 flex-1 rounded-full overflow-hidden"
+                  className="mt-1.5 h-1 overflow-hidden rounded-full"
                   style={{ background: "color-mix(in srgb, var(--border) 60%, transparent)" }}
                 >
                   <div
@@ -834,14 +852,14 @@ function DailyView({
                     }}
                   />
                 </div>
-                <span className="num text-xs text-text-secondary">
-                  {t.top.slice(0, 3).join(" ")}
-                </span>
               </div>
+              <span className="num w-10 text-right text-xl font-semibold text-text-primary">
+                {t.score.toFixed(0)}
+              </span>
             </div>
           ))}
         </div>
-      </GlassPanel>
+      </section>
     </div>
   );
 }

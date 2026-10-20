@@ -37,11 +37,11 @@ import {
   X,
 } from "lucide-react";
 import apiClient from "../../api/client";
-import { Chip, Segmented } from "../../components/Glass";
+import { Chip, Segmented, Stat } from "../../components/Glass";
 import type { ChipTone } from "../../components/Glass";
 import { useAppStore } from "../../store/useAppStore";
 import { useDashboardFilters } from "../../store/useDashboardFilters";
-import { formatPremium } from "../../lib/utils";
+import { formatDate, formatPremium } from "../../lib/utils";
 import { parseLocalDate, daysFromToday } from "../../lib/dateOnly";
 import type { TrackedTicker } from "../../lib/types";
 import { useLeaderboard } from "../../api/alerts";
@@ -547,6 +547,40 @@ export function IFlowTracker() {
 
   const selectedData = tickers.find((t) => t.ticker === selectedTicker);
 
+  // Day-summary figures for the hero strip — derived from the visible
+  // (filtered) tickers so the numbers always match what's on screen.
+  const daySum = filtered.reduce(
+    (a, t) => {
+      a.entries += t.total_entries;
+      a.bull += t.bullish;
+      a.bear += t.bearish;
+      a.prem += t.total_premium ?? 0;
+      return a;
+    },
+    { entries: 0, bull: 0, bear: 0, prem: 0 },
+  );
+  const sideTotal = daySum.bull + daySum.bear;
+  const bullShare = sideTotal > 0 ? Math.round((daySum.bull / sideTotal) * 100) : null;
+  const sentiment =
+    isSingleDate && summary
+      ? summary.net_sentiment
+      : daySum.bull > daySum.bear
+      ? "BULLISH"
+      : daySum.bear > daySum.bull
+      ? "BEARISH"
+      : "NEUTRAL";
+  const sentimentColor =
+    sentiment === "BULLISH"
+      ? "var(--accent-green)"
+      : sentiment === "BEARISH"
+      ? "var(--accent-red)"
+      : "var(--text-secondary)";
+  const scopeLabel = isAllDates
+    ? "All dates"
+    : isSingleDate
+    ? formatDate(singleDate)
+    : `${selectedDates.size} dates selected`;
+
   return (
     /* anchor: clicking a theme in the rotation map scrolls the page here */
     <div
@@ -897,54 +931,75 @@ export function IFlowTracker() {
           </button>
         )}
 
-        {/* Summary line + async status (text, not controls) */}
-        <div className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
-          <span>
-            <span className="num text-text-secondary">{filtered.length}</span> tickers
-            {earningsFilterOn ? (
-              <> with earnings within {earningsWindow.toUpperCase()}</>
+        {/* Async status for the returns sort (text, not controls) */}
+        {sort === "returns" && viewMode !== "tape" && (returnsLoading || flowReturnsMeta?.earliest_date) && (
+          <div className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+            {returnsLoading ? (
+              <span className="animate-pulse text-accent-blue">Loading returns…</span>
             ) : (
-              <>
-                {isSingleDate && summary && (
-                  <>
-                    {" · "}
-                    <span
-                      style={{
-                        color:
-                          summary.net_sentiment === "BULLISH"
-                            ? "var(--accent-green)"
-                            : summary.net_sentiment === "BEARISH"
-                            ? "var(--accent-red)"
-                            : "var(--text-secondary)",
-                      }}
-                    >
-                      {summary.net_sentiment.charAt(0) + summary.net_sentiment.slice(1).toLowerCase()}
-                    </span>{" "}
-                    <span className="num">
-                      {summary.bull_count} bull / {summary.bear_count} bear
-                    </span>
-                  </>
-                )}
-                {selectedDates.size > 1 && <> · {selectedDates.size} dates selected</>}
-              </>
+              <span className="num">
+                flow since {flowReturnsMeta!.earliest_date} · {flowReturnsMeta!.days_covered}d ·{" "}
+                {flowReturnsMeta!.entry_count.toLocaleString()} entries
+              </span>
             )}
-          </span>
-          {sort === "returns" && viewMode !== "tape" && returnsLoading && (
-            <span className="animate-pulse text-accent-blue">Loading returns…</span>
-          )}
-          {sort === "returns" && viewMode !== "tape" && !returnsLoading && flowReturnsMeta?.earliest_date && (
-            <span className="num">
-              flow since {flowReturnsMeta.earliest_date} · {flowReturnsMeta.days_covered}d ·{" "}
-              {flowReturnsMeta.entry_count.toLocaleString()} entries
-            </span>
-          )}
-        </div>
+          </div>
+        )}
         {sort === "returns" && <><QueryNotice queries={[returnsQuery]} label="Flow return estimates" /><FlowCoverageNotice meta={flowReturnsMeta} /></>}
       </div>
 
+      {/* ── Day summary: the focal strip. One hero figure + three stats. ── */}
+      {!loading && !loadError && (
+        <section
+          aria-label="Flow summary"
+          className="mb-8 flex min-w-0 flex-wrap items-end gap-x-12 gap-y-5"
+        >
+          <div className="min-w-0">
+            <p className="text-sm text-text-muted">
+              {scopeLabel}
+              {earningsFilterOn && <> · earnings within {earningsWindow.toUpperCase()}</>}
+            </p>
+            <p className="mt-1 text-4xl font-semibold tracking-tight text-text-primary num max-sm:text-3xl">
+              {/* ponytail: formatPremium tops out at M; the all-dates total runs into billions */}
+              {daySum.prem >= 1e9 ? `$${(daySum.prem / 1e9).toFixed(1)}B` : formatPremium(daySum.prem)}
+            </p>
+            <p className="mt-1 text-sm text-text-secondary">
+              premium ·{" "}
+              <span className="font-medium" style={{ color: sentimentColor }}>
+                {sentiment.charAt(0) + sentiment.slice(1).toLowerCase()}
+              </span>
+              {bullShare != null && (
+                <>
+                  {" "}
+                  <span className="num">{bullShare}%</span> bull entries
+                </>
+              )}
+            </p>
+          </div>
+          <div className="grid min-w-0 grid-cols-3 gap-x-10 gap-y-3 max-sm:gap-x-6">
+            <Stat label="Tickers" value={filtered.length.toLocaleString()} />
+            <Stat label="Entries" value={daySum.entries.toLocaleString()} />
+            <Stat
+              label="Bull / bear"
+              value={
+                <>
+                  <span className="delta-up">{daySum.bull.toLocaleString()}</span>
+                  <span className="text-text-muted"> / </span>
+                  <span className="delta-down">{daySum.bear.toLocaleString()}</span>
+                </>
+              }
+              sub={
+                isSingleDate && summary && !earningsFilterOn
+                  ? `day ${summary.bull_count} / ${summary.bear_count}`
+                  : undefined
+              }
+            />
+          </div>
+        </section>
+      )}
+
       {/* ── Top Picks + Top Signals (single date only) ───────────────── */}
       {isSingleDate && singleDate && (
-        <div className="grid min-w-0 gap-x-4 xl:grid-cols-2 [&>*]:min-w-0">
+        <div className="mb-8 grid min-w-0 gap-x-10 gap-y-8 xl:grid-cols-2 [&>*]:min-w-0">
           <TopPicks date={singleDate} dteFilter={dte} />
           <TopSignals date={singleDate} dteFilter={dte} />
         </div>
@@ -1093,8 +1148,9 @@ export function IFlowTracker() {
 
               if (filtered.length === 0 && watchedShown.length === 0) {
                 return (
-                  <div className="card text-center py-8">
-                    <p className="text-sm text-text-muted">No tickers match your filters</p>
+                  <div className="py-12 text-center">
+                    <p className="section-title">No tickers match your filters</p>
+                    <p className="section-sub">Loosen bias, DTE or earnings in Filters, or pick another date.</p>
                   </div>
                 );
               }
@@ -1102,21 +1158,21 @@ export function IFlowTracker() {
               return (
                 <>
                   {watchlist.length > 0 && (
-                    <div className="mb-3">
-                      <h4 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-text-primary">
-                        <Star size={13} className="text-accent-orange" style={{ fill: "var(--accent-orange)" }} />
+                    <div className="mb-8">
+                      <h3 className="section-title mb-3 flex items-baseline gap-2">
+                        <Star size={14} className="self-center text-accent-orange" style={{ fill: "var(--accent-orange)" }} />
                         Watchlist
-                        <span className="num text-xs font-normal text-text-muted">
+                        <span className="num text-sm font-normal text-text-muted">
                           {watchedShown.length}
                           {watchedShown.length < watchlist.length && <>/{watchlist.length}</>}
                         </span>
-                      </h4>
+                      </h3>
                       {watchedShown.length === 0 ? (
                         <div className="px-1 text-sm text-text-muted">
                           None of your watched tickers have flow on the selected dates.
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                        <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                           {watchedShown.map(renderCard)}
                         </div>
                       )}
@@ -1125,10 +1181,10 @@ export function IFlowTracker() {
                   {othersShown.length > 0 && (
                     <>
                       {watchlist.length > 0 && (
-                        <h4 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-text-primary">
+                        <h3 className="section-title mb-3 flex items-baseline gap-2">
                           All tickers
-                          <span className="num text-xs font-normal text-text-muted">{othersShown.length}</span>
-                        </h4>
+                          <span className="num text-sm font-normal text-text-muted">{othersShown.length}</span>
+                        </h3>
                       )}
                       {groupMode !== "flat" && taxonomy ? (
                         <ThemedGrid
@@ -1139,7 +1195,7 @@ export function IFlowTracker() {
                           escMap={escMap}
                         />
                       ) : (
-                        <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                        <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                           {othersShown.map(renderCard)}
                         </div>
                       )}

@@ -255,3 +255,46 @@ purple = human/trader events, used sparingly.
 props contracts, routes, or behavior. JSX structure, classNames, and inline
 styles may change freely. Tokens only (CSS vars / mapped Tailwind classes);
 no new dependencies; no emojis. `npx --no-install tsc -b` must pass.
+
+## 2026-10 v2 identity (current; layered on the Redesign Rules above)
+
+User verdict on the first pass: "redesign the WHOLE UI" — a restyle inside the
+old look wasn't enough. v2 changes identity, scale and composition.
+
+**Scene.** One trader at a home desk before the 6:30 PT open, room still dim,
+big monitor; later the phone between meetings. Dark default, light supported.
+
+**Palette (index.css, OKLCH).** Ink-blue neutrals (hue 265). One interaction
+accent = indigo, exposed as `--accent-blue` / `text-accent-blue` (name kept
+for compat). Green/red ONLY for signed values. Orange = caution.
+
+**Type, three voices.**
+- Display serif (Newsreader) via `.font-display`: page h1 (DeskPage header),
+  `.headline` (story headline), `.section-title` (section headings inside a
+  page, e.g. "What moved & why", "Open positions"). Never for numbers/labels.
+- `.prose-read`: serif reading prose, 1.0625rem/1.6 — for narrative paragraphs
+  (brief summary, pillar report, theses, trader commentary bodies). Short UI
+  sentences stay sans `text-sm text-text-secondary`.
+- Mono (`num`, `.ticker`, `.delta-up/.delta-down`) for numbers/tickers only.
+
+**Scale & hierarchy.** Every page must have ONE obvious focal element. Key
+numbers are big (`Stat` renders text-xl; hero figures may go `text-3xl
+font-semibold num`). Section rhythm: `gap-8`/`space-y-8` between sections,
+`gap-3` inside. Section = `.section-title` (+ optional `.section-sub`) then
+content — not a bordered card with a tiny title. Use `.card` only to group
+a dense dataset (table, chart, rail list); max one level.
+
+**Recipes (CSS classes in index.css).** `.section-title`, `.section-sub`,
+`.headline`, `.prose-read`, `.ticker`, `.delta-up`, `.delta-down`, `.tag`
+(neutral pill; state tint via `style={{"--tag":"var(--accent-orange)"}}`),
+`.data-row` (hover row), `.callout` (tinted, full-border caveat; set
+`--callout` for other tones). Prefer these over ad-hoc class soup.
+
+**Rows.** Ticker-led rows: `.ticker` (text-sm) left, description middle,
+signed delta right-aligned `.delta-*`. Row padding `py-2.5 px-2`, `.data-row`
+hover, `divide-y divide-border`. Warnings under a row use `.callout`, not
+orange inline text with a ⚠ glyph.
+
+**Hard rules unchanged:** no hook/query/prop/route/behavior changes; no new
+deps; no emojis; no uppercase tracked eyebrows; no side stripes; no nested
+cards; `npx --no-install tsc -b` must pass.

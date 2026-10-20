@@ -128,9 +128,9 @@ function ThemeRotationView({
       <div className="flex flex-col gap-4 min-w-0">
         <div>
           <div className="flex items-baseline justify-between mb-1.5">
-            <span className="text-xs font-medium text-text-muted">
+            <h3 className="font-display text-base font-medium text-text-primary">
               Theme momentum
-            </span>
+            </h3>
             {scrubbed && (
               <span className="text-xs num" style={{ color: "var(--accent-cyan)" }}>
                 map showing {dates[idx]} · ranking is current
@@ -141,9 +141,9 @@ function ThemeRotationView({
                            onSelect={selectTheme} selected={categoryFilter} />
         </div>
         <div>
-          <div className="text-xs font-medium text-text-muted mb-1.5">
+          <h3 className="font-display text-base font-medium text-text-primary mb-1.5">
             Rotation alerts
-          </div>
+          </h3>
           <AlertFeed alerts={data.alerts} />
         </div>
         <p className="text-xs text-text-muted leading-relaxed">
@@ -253,7 +253,7 @@ function ThemePnlView({
         <span className="ml-1">· cell = P(a print that day doubled within 10 trading days)</span>
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {rows.map((r) => {
           const active = categoryFilter === r.cat;
           return (
@@ -266,14 +266,14 @@ function ThemePnlView({
                 if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelectTheme(r.cat); }
               }}
               aria-label={`Filter flow to ${r.cat.replace(/_/g, " ")}`}
-              className="grid items-center gap-2 cursor-pointer rounded px-1 -mx-1 hover:bg-bg-card-hover"
+              className="data-row grid items-center gap-3 cursor-pointer px-1.5 -mx-1.5 py-0.5"
               style={{
-                gridTemplateColumns: "minmax(7rem,13rem) minmax(0,1fr) 84px",
+                gridTemplateColumns: "minmax(8rem,14rem) minmax(0,1fr) 96px",
                 background: active ? "color-mix(in srgb, var(--accent-cyan) 12%, transparent)" : undefined,
                 opacity: categoryFilter && !active ? 0.55 : 1,
               }}
             >
-              <span className="text-xs truncate flex items-center gap-0.5"
+              <span className="text-sm truncate flex items-center gap-1"
                     style={{ color: active ? "var(--accent-cyan)" : "var(--text-secondary)" }}>
                 <button
                   type="button"
@@ -287,7 +287,7 @@ function ThemePnlView({
                 <span className="truncate" title={label(r.cat)}>{label(r.cat)}</span>
               </span>
 
-              <div className="flex gap-px h-4">
+              <div className="flex gap-px h-5">
                 {r.vals.map((v, i) => (
                   <div
                     key={i}
@@ -313,12 +313,12 @@ function ThemePnlView({
               <div className="flex items-center justify-end gap-1">
                 <Sparkline points={r.spark} width={36} height={14}
                            color={color(r.current)} />
-                <span className="num text-xs text-right whitespace-nowrap"
+                <span className="num text-sm font-medium text-right whitespace-nowrap"
                       title={`window aggregate over ${r.n} graded entries (shrunk)`}
                       style={{ color: r.current != null && r.current >= base
                         ? "var(--accent-green)" : "var(--accent-red)" }}>
                   {r.current != null ? `${(r.current * 100).toFixed(0)}%` : "—"}
-                  <span className="text-text-muted ml-1">n={r.n}</span>
+                  <span className="text-xs font-normal text-text-muted ml-1">n={r.n}</span>
                 </span>
               </div>
             </div>
@@ -326,7 +326,7 @@ function ThemePnlView({
             {open === r.cat && (
               /* Sub-themes are aggregated over the WHOLE window, not per day —
                  a (day, sub-theme) cell averages ~2 graded entries. */
-              <div className="ml-4 mb-2 mt-0.5 pl-2 border-l border-border flex flex-col gap-0.5">
+              <div className="ml-5 mb-2 mt-1 pt-1 border-t border-border flex flex-col gap-1">
                 <span className="text-xs text-text-muted pb-0.5">
                   sub-themes are read over the FULL corpus, not the window above —
                   over a short window each holds 1-2 graded entries
@@ -442,11 +442,11 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
   return (
     <div className={embedded ? "" : "card"}>
       <div
-        className="flex items-center justify-between flex-wrap gap-2 mb-3"
+        className="flex items-end justify-between flex-wrap gap-3 mb-4"
       >
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-text-primary">Theme trends</h2>
-          <p className="text-xs text-text-muted">
+          <h2 className="section-title">Theme trends</h2>
+          <p className="section-sub">
             {view === "pnl" ? "What each theme's flow actually did"
               : view === "rotation" ? "Where money is rotating"
               : "Flow heat over time"}
@@ -487,7 +487,7 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
 
           {/* Heat matrix — one row per theme (hottest first), one cell per
               flow-day coloured by EMA-smoothed heat, then current × + trend. */}
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {rows.map((r) => {
               const active = categoryFilter === r.cat;
               return (
@@ -501,9 +501,9 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
                 }}
                 aria-label={`Filter flow to ${label(r.cat)}`}
                 title={`${label(r.cat)} — click to filter the flow tracker`}
-                className="grid items-center gap-2 cursor-pointer rounded px-1 -mx-1 hover:bg-bg-card-hover"
+                className="data-row grid items-center gap-3 cursor-pointer px-1.5 -mx-1.5 py-0.5"
                 style={{
-                  gridTemplateColumns: "minmax(7rem,13rem) minmax(0,1fr) 118px",
+                  gridTemplateColumns: "minmax(8rem,14rem) minmax(0,1fr) 124px",
                   background: active
                     ? "color-mix(in srgb, var(--accent-cyan) 12%, transparent)"
                     : undefined,
@@ -511,13 +511,13 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
                 }}
               >
                 <span
-                  className="text-xs truncate"
+                  className="text-sm truncate"
                   style={{ color: active ? "var(--accent-cyan)" : "var(--text-secondary)" }}
                 >
                   {label(r.cat)}
                 </span>
 
-                <div className="flex gap-px h-4">
+                <div className="flex gap-px h-5">
                   {r.smooth.map((v, i) => (
                     <div
                       key={i}
@@ -531,7 +531,7 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
                 <div className="flex items-center justify-end gap-1">
                   <Sparkline points={r.spark} width={36} height={14} color={heatInk(r.current)} />
                   <span
-                    className="num text-xs w-9 text-right"
+                    className="num text-sm font-medium w-10 text-right"
                     style={{ color: heatInk(r.current) }}
                   >
                     {r.current.toFixed(1)}×

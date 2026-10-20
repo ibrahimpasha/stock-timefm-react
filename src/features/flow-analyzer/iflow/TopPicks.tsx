@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { TrendingUp } from "lucide-react";
 import { formatDate } from "../../../lib/utils";
 import { dteTag, matchesDte, parsePremium, scoreEntry } from "./utils";
 import { optionIntent, canonicalExpiry } from "../../../lib/optionContract";
@@ -35,11 +34,11 @@ export function PnlBadge({ pnl }: { pnl: number | null }) {
   const color = pnl >= 0 ? "var(--accent-green)" : "var(--accent-red)";
   return (
     <span
-      className="num shrink-0 font-semibold"
+      className="num w-14 shrink-0 text-right text-sm font-semibold"
       title="Estimated option P/L since the print (delta+theta model)"
       style={{ color }}
     >
-      Est. {pnl >= 0 ? "+" : ""}{pnl.toFixed(0)}%
+      {pnl >= 0 ? "+" : ""}{pnl.toFixed(0)}%
     </span>
   );
 }
@@ -66,14 +65,14 @@ export function TopPicks({ date, dteFilter }: { date: string; dteFilter: DteFilt
   const priceMap = priceData?.prices ?? {};
   if (!scored.length) return null;
   return (
-    <div className="mb-4">
-      <h4 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-text-primary">
-        <TrendingUp size={13} className="text-text-muted" />
+    <section className="min-w-0">
+      <h3 className="section-title flex items-baseline gap-2">
         Top conviction flow
-        <span className="text-xs font-normal text-text-muted">
-          {formatDate(date)} · <span className="num">{scored.length}</span>
-        </span>
-      </h4>
+        <span className="num text-sm font-normal text-text-muted">{scored.length}</span>
+      </h3>
+      <p className="section-sub mb-3">
+        {formatDate(date)} · ranked by premium, ask% and vol/OI
+      </p>
       <GexWallLegend />
       <div className="divide-y divide-border">
         {scored.map((e: any, i: number) => {
@@ -84,49 +83,52 @@ export function TopPicks({ date, dteFilter }: { date: string; dteFilter: DteFilt
             (e.vol_oi_ratio || 0) >= 10 &&
             (e.ask_pct || 0) >= 95;
           const dl = dteTag(e.dte);
+          const pnl = entryPnl(e, priceMap, date);
           return (
             <div
               key={i}
-              className="flex items-center gap-2 px-2 py-2 text-xs transition-colors hover:bg-bg-card-hover"
+              className="data-row flex items-center gap-3 px-2 py-2.5 text-xs"
             >
-              <span className="num w-7 shrink-0 font-semibold text-text-primary" title="Conviction score">
+              <span className="num w-8 shrink-0 text-right text-text-muted" title="Conviction score">
                 {e._score.toFixed(1)}
               </span>
-              <span className="num w-14 shrink-0 text-sm font-semibold text-text-primary">{e.ticker}</span>
-              <span className="num text-text-primary">
-                ${e.strike} {e.type || e.option_type}
-              </span>
-              <span style={{ color }} className="font-medium">
-                {side}
-              </span>
-              <span className="text-text-muted">{action}</span>
-              <span className="num text-text-muted">{canonicalExpiry(e.expiry, e._date ?? date, e.dte) ?? `${e.expiry} (year unknown)`}</span>
-              {dl && (
-                <span className="text-text-muted">{dl.text.toLowerCase()}</span>
-              )}
-              {e.vol_oi_ratio > 0 && (
-                <span className="num text-text-secondary" title="Volume / open interest">
-                  {Number(e.vol_oi_ratio).toFixed(1)}x
-                </span>
-              )}
-              {e.ask_pct > 0 && (
-                <span className="num text-text-secondary" title="Filled at ask">{e.ask_pct}% ask</span>
-              )}
-              <GexWall ticker={e.ticker} strike={Number(e.strike) || null} showLabel />
-              <span className="text-text-secondary ml-auto num">{e.premium}</span>
-              <PnlBadge pnl={entryPnl(e, priceMap, date)} />
-              {mega && (
-                <span
-                  className="text-xs font-medium text-accent-green"
-                  title="≥$1M premium, vol/OI ≥10, ≥95% at ask"
-                >
-                  mega
-                </span>
-              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 items-baseline gap-2">
+                  <span className="ticker w-14 shrink-0 text-sm">{e.ticker}</span>
+                  <span className="num truncate text-sm" style={{ color }} title={`${side} · ${action}`}>
+                    ${e.strike} {e.type || e.option_type}
+                  </span>
+                  {mega && (
+                    <span
+                      className="tag shrink-0"
+                      style={{ "--tag": "var(--accent-green)" } as React.CSSProperties}
+                      title="≥$1M premium, vol/OI ≥10, ≥95% at ask"
+                    >
+                      mega
+                    </span>
+                  )}
+                </div>
+                <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-text-muted">
+                  <span>{action}</span>
+                  <span className="num">{canonicalExpiry(e.expiry, e._date ?? date, e.dte) ?? `${e.expiry} (year unknown)`}</span>
+                  {dl && <span>{dl.text.toLowerCase()}</span>}
+                  {e.vol_oi_ratio > 0 && (
+                    <span className="num" title="Volume / open interest">
+                      {Number(e.vol_oi_ratio).toFixed(1)}x
+                    </span>
+                  )}
+                  {e.ask_pct > 0 && (
+                    <span className="num" title="Filled at ask">{e.ask_pct}% ask</span>
+                  )}
+                  <GexWall ticker={e.ticker} strike={Number(e.strike) || null} showLabel />
+                </div>
+              </div>
+              <span className="num w-16 shrink-0 text-right text-sm font-semibold text-text-primary">{e.premium}</span>
+              {pnl != null ? <PnlBadge pnl={pnl} /> : <span className="w-14 shrink-0" aria-hidden="true" />}
             </div>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }

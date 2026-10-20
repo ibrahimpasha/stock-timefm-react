@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, type ElementType } from "react";
+import { lazy, Suspense, useEffect, useState, type ElementType } from "react";
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -91,8 +91,10 @@ function Sidebar() {
   return (
     <aside className="app-sidebar" aria-label="Primary navigation">
       <NavLink to="/" className="app-brand" aria-label="Stock-TimeFM brief">
-        <BarChart3 size={18} className="text-accent-blue" aria-hidden="true" />
-        <span>Stock-TimeFM</span>
+        <span className="app-brand__mark" aria-hidden="true">
+          <BarChart3 size={15} />
+        </span>
+        <span className="app-brand__name">Stock-TimeFM</span>
       </NavLink>
       <nav className="app-sidebar__nav">
         {NAV_GROUPS.map((group) => (
@@ -125,6 +127,7 @@ function TopBar() {
   return (
     <>
       <header className="app-topbar hidden lg:flex">
+        <MarketClock />
         <TickerSearch inputWidth="w-72" />
       </header>
       <header className="mobile-app-bar lg:hidden">
@@ -138,6 +141,55 @@ function TopBar() {
         </div>
       </header>
     </>
+  );
+}
+
+const SESSIONS = [
+  { from: 4 * 60, to: 9 * 60 + 30, label: "Pre-market", tone: "pre" },
+  { from: 9 * 60 + 30, to: 16 * 60, label: "Market open", tone: "open" },
+  { from: 16 * 60, to: 20 * 60, label: "After hours", tone: "post" },
+] as const;
+
+/** US equity session from the wall clock in New York.
+ *  ponytail: ignores exchange holidays/half-days; wire a calendar if it matters. */
+function marketSession(now: Date) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(now)
+      .map((p) => [p.type, p.value]),
+  );
+  const minutes = Number(parts.hour) * 60 + Number(parts.minute);
+  const weekend = parts.weekday === "Sat" || parts.weekday === "Sun";
+  const session = weekend ? undefined : SESSIONS.find((s) => minutes >= s.from && minutes < s.to);
+  const left = session ? session.to - minutes : 0;
+  return {
+    label: session?.label ?? "Closed",
+    tone: session?.tone ?? "closed",
+    left: session ? `${Math.floor(left / 60)}h ${String(left % 60).padStart(2, "0")}m left` : "",
+    clock: now.toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }),
+  };
+}
+
+function MarketClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const s = marketSession(now);
+  return (
+    <div className="market-clock" data-tone={s.tone}>
+      <span className="market-clock__dot" aria-hidden="true" />
+      <span className="market-clock__label">{s.label}</span>
+      <span className="num text-text-muted">{s.clock} ET</span>
+      {s.left && <span className="text-text-muted">· {s.left}</span>}
+    </div>
   );
 }
 

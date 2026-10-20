@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, lazy, Suspense, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense, type CSSProperties, type ReactNode } from "react";
 import { NavLink, Navigate, useParams } from "react-router-dom";
 import { useAppStore } from "../store/useAppStore";
 import { runForecastModels, useMarketHistory } from "../api/forecast";
@@ -355,7 +355,10 @@ export function DeskPage({ section }: { section: DeskSection }) {
                   <ArrowLeft size={17} aria-hidden="true" />
                   <span>Back</span>
                 </button>
-                <h2 className="num truncate text-lg font-semibold text-text-primary">{ticker}</h2>
+                <div className="flex min-w-0 flex-1 items-baseline gap-2.5">
+                  <h2 className="ticker truncate text-2xl leading-none tracking-tight">{ticker}</h2>
+                  <span className="hidden truncate text-sm text-text-muted sm:inline">Ticker analysis</span>
+                </div>
                 <button
                   type="button"
                   onClick={closeDetail}
@@ -376,39 +379,41 @@ export function DeskPage({ section }: { section: DeskSection }) {
               />
             </div>
 
-            <div className="command-detail-content">
+            <div className="command-detail-content" style={{ gap: "2.25rem", paddingTop: "0.5rem" }}>
               {activeDetailTab === "overview" ? (
               <>
                 <SignalAnalysisCard ticker={ticker} />
                 <ThemePulseCard ticker={ticker} />
                 <GraphContextCard ticker={ticker} />
-                <ForecastConfig
-                  settings={settings}
-                  onChange={setSettings}
-                  onRunForecast={runForecast}
-                  isLoading={isRunningForecast}
-                  ticker={ticker}
-                />
-                {forecastError && (
-                  <p role="alert" className="text-xs text-accent-red px-1">
-                    {forecastError}
-                  </p>
-                )}
-                <ForecastChart
-                  historicalData={historicalData}
-                  forecasts={customForecasts}
-                  selectedModels={executedSettings.selectedModels}
-                  isLoading={historyLoading || isRunningForecast}
-                  forecastOrigin={executedSettings.forecastOrigin}
-                  intraday={executedSettings.forecastType === "intraday"}
-                  overlays={settings}
-                  height={300}
-                />
-                <QueryNotice queries={[historyQuery]} label="Price history" />
-                <ModelBreakdown
-                  models={customForecasts}
-                  isLoading={isRunningForecast}
-                />
+                <section className="flex flex-col gap-4" aria-label="Forecast">
+                  <ForecastConfig
+                    settings={settings}
+                    onChange={setSettings}
+                    onRunForecast={runForecast}
+                    isLoading={isRunningForecast}
+                    ticker={ticker}
+                  />
+                  {forecastError && (
+                    <p role="alert" className="callout" style={{ "--callout": "var(--accent-red)" } as CSSProperties}>
+                      {forecastError}
+                    </p>
+                  )}
+                  <ForecastChart
+                    historicalData={historicalData}
+                    forecasts={customForecasts}
+                    selectedModels={executedSettings.selectedModels}
+                    isLoading={historyLoading || isRunningForecast}
+                    forecastOrigin={executedSettings.forecastOrigin}
+                    intraday={executedSettings.forecastType === "intraday"}
+                    overlays={settings}
+                    height={300}
+                  />
+                  <QueryNotice queries={[historyQuery]} label="Price history" />
+                  <ModelBreakdown
+                    models={customForecasts}
+                    isLoading={isRunningForecast}
+                  />
+                </section>
                 <IntelligencePanelV3 />
               </>
               ) : activeDetailTab === "narrative" ? (

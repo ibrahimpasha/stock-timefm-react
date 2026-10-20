@@ -440,7 +440,7 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
       <details key={key} className="group">
         <summary className="flex min-h-11 list-none items-center gap-2 py-2 text-xs marker:content-none">
           <ChevronRight size={13} className="shrink-0 text-text-muted transition-transform group-open:rotate-90" aria-hidden="true" />
-          <span className="w-12 shrink-0 num font-semibold text-text-primary">{r.ticker}</span>
+          <span className="w-12 shrink-0 text-sm ticker">{r.ticker}</span>
           <span className="num min-w-0 flex-1 truncate text-text-muted">{contract(r)}</span>
           {gain != null && (
             <span className="num shrink-0 font-semibold" style={{ color: changeColor(gain) }}>{signedPct(gain)}</span>
@@ -470,7 +470,7 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
       <table className="w-full text-left text-xs">
         <thead className="text-text-muted">
           <tr className="border-b border-border">
-            <th className="py-2 pr-3 font-medium">Ticker</th>
+            <th className="py-2 pl-2 pr-3 font-medium">Ticker</th>
             <th className="py-2 pr-3 font-medium">Contract</th>
             <th className="py-2 pr-3 text-right font-medium" title="Modeled gain since added">P/L %</th>
             <th className="py-2 pr-3 text-right font-medium">Peak</th>
@@ -488,10 +488,10 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
           {rows.map((r, i) => {
             const { gain, age, evaluatedAt, state, note, peak } = info(r);
             return (
-              <tr key={r.id ?? `${prefix}${i}`} className="hover:bg-bg-card-hover">
-                <td className="py-2 pr-3 num font-semibold text-text-primary">{r.ticker}</td>
+              <tr key={r.id ?? `${prefix}${i}`} className="data-row">
+                <td className="py-2.5 pl-2 pr-3 text-sm ticker">{r.ticker}</td>
                 <td className="whitespace-nowrap py-2 pr-3 num text-text-secondary">{contract(r)}</td>
-                <td className="py-2 pr-3 text-right num font-semibold" style={gain != null ? { color: changeColor(gain) } : undefined}>
+                <td className="py-2.5 pr-3 text-right text-sm num font-semibold" style={gain != null ? { color: changeColor(gain) } : undefined}>
                   {gain != null ? signedPct(gain) : <span className="text-text-muted">—</span>}
                 </td>
                 <td className="py-2 pr-3 text-right num text-text-muted">{peak != null ? `+${peak.toFixed(0)}%` : "—"}</td>
@@ -514,9 +514,9 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
     const windowRows = windowFor(key, rows).rows;
     return (
       <div className={`${visibleSection === key ? "block" : "hidden"} md:block`}>
-        <h4 className="mb-1 text-sm font-semibold text-text-primary">
-          {title} <span className="num font-normal text-text-muted">{rows.length}</span>
-        </h4>
+        <h3 className="mb-2 text-base font-semibold text-text-primary">
+          {title} <span className="num text-sm font-normal text-text-muted">{rows.length}</span>
+        </h3>
         <div className="divide-y divide-border md:hidden">
           {windowRows.map((r, i) => mobileRow(r, String(r.id ?? `${key}${i}`)))}
         </div>
@@ -527,8 +527,23 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
     );
   };
   return (
-    <GlassPanel title="Watchlist">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+    <section className="space-y-4">
+      <SectionHead
+        title={<>Watchlist <span className="num text-base text-text-muted">{activeCount}</span></>}
+        sub="Contracts this book is screening or monitoring, with modeled P/L since added."
+        actions={<>
+          <button type="button" title="Reload watchlist" aria-label="Reload watchlist" disabled={isFetching}
+            onClick={() => void refetch()} className="flex size-11 items-center justify-center text-text-muted hover:text-text-primary disabled:opacity-50 md:size-8">
+            <RefreshCw size={15} className={isFetching ? "animate-spin" : ""} />
+          </button>
+          <button type="button" disabled={!activeCount || reset.isPending || isError} onClick={() => {
+            if (window.confirm(`Reset the ${persona} watchlist?\n\nArchive ${activeCount} active observations. Positions, cash and history stay unchanged. These contracts can return when a newer flow date is observed. No scan or trade is started.`)) reset.mutate(persona);
+          }} className="flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-border px-3 text-xs text-text-secondary hover:text-text-primary disabled:opacity-50 md:min-h-8">
+            <RotateCcw size={14} />{reset.isPending ? "Resetting..." : "Reset watchlist"}
+          </button>
+        </>}
+      />
+      <div className="flex flex-wrap items-center gap-2">
         <label className="flex min-h-11 items-center gap-2 text-xs text-text-muted">
           Sort
           <select aria-label="Sort watchlist" value={sort} onChange={(e) => { setSort(e.target.value as WatchlistSort); setPages({ wla: 0, wlb: 0 }); }}
@@ -555,23 +570,12 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
             <option value={12}>12</option><option value={24}>24</option><option value={48}>48</option>
           </select>
         </label>
-        <div className="ml-auto flex items-center gap-1">
-          <button type="button" title="Reload watchlist" aria-label="Reload watchlist" disabled={isFetching}
-            onClick={() => void refetch()} className="flex size-11 items-center justify-center text-text-muted disabled:opacity-50">
-            <RefreshCw size={15} className={isFetching ? "animate-spin" : ""} />
-          </button>
-          <button type="button" disabled={!activeCount || reset.isPending || isError} onClick={() => {
-            if (window.confirm(`Reset the ${persona} watchlist?\n\nArchive ${activeCount} active observations. Positions, cash and history stay unchanged. These contracts can return when a newer flow date is observed. No scan or trade is started.`)) reset.mutate(persona);
-          }} className="flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-border px-3 text-xs text-text-secondary disabled:opacity-50">
-            <RotateCcw size={14} />{reset.isPending ? "Resetting..." : "Reset watchlist"}
-          </button>
-        </div>
       </div>
-      {reset.isError && <p role="alert" className="mb-3 text-xs text-accent-red">Reset failed. Reload the list before trying again.</p>}
-      {reset.isSuccess && reset.data.data.persona === persona && <p role="status" className="mb-3 text-xs text-text-secondary">{reset.data.data.archived_count} observations archived at {watchlistTime(reset.data.data.reset_at)}. Positions and cash unchanged.</p>}
+      {reset.isError && <p role="alert" className="callout" style={{ "--callout": "var(--accent-red)" } as React.CSSProperties}>Reset failed. Reload the list before trying again.</p>}
+      {reset.isSuccess && reset.data.data.persona === persona && <p role="status" className="text-xs text-text-secondary">{reset.data.data.archived_count} observations archived at {watchlistTime(reset.data.data.reset_at)}. Positions and cash unchanged.</p>}
       <QueryNotice queries={[watchlistQuery]} label="Watchlist" />
       {isPending && watchlistQuery.fetchStatus !== "paused" && <p role="status" className="py-3 text-xs text-text-muted">Loading watchlist...</p>}
-      {activity && <div className="mb-4 space-y-3 border-b border-border pb-3 text-xs">
+      {activity && <div className="space-y-3 text-xs">
         <div className="md:hidden">
           <button type="button" aria-label="Toggle watchlist activity" title="Watchlist activity"
             aria-expanded={activityExpanded} aria-controls={`watchlist-activity-${persona}`}
@@ -585,17 +589,17 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
         </div>
         <div id={`watchlist-activity-${persona}`} className={`${activityExpanded ? "block" : "hidden"} space-y-3 md:block`}>
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-text-muted lg:grid-cols-4">
-          <div>Added today ({zoneLabel})<div className="num mt-1 font-semibold text-text-primary">{activityDates.todayAdded}</div></div>
-          <div>Added in 7 days<div className="num mt-1 font-semibold text-text-primary">{activityDates.weekAdded}</div></div>
-          <div>Last addition<div className="mt-1 text-text-primary">{watchlistTime(activity.last_added_at ?? activity.last_added_date)}</div></div>
-          <div>Last recorded scan<div className="mt-1 text-text-primary">{watchlistTime(activity.last_scan_at)}</div></div>
+          <div>Added today ({zoneLabel})<div className="num mt-1 text-lg font-semibold text-text-primary">{activityDates.todayAdded}</div></div>
+          <div>Added in 7 days<div className="num mt-1 text-lg font-semibold text-text-primary">{activityDates.weekAdded}</div></div>
+          <div>Last addition<div className="mt-1 text-sm text-text-primary">{watchlistTime(activity.last_added_at ?? activity.last_added_date)}</div></div>
+          <div>Last recorded scan<div className="mt-1 text-sm text-text-primary">{watchlistTime(activity.last_scan_at)}</div></div>
         </div>
         <div className="flex flex-wrap gap-x-5 gap-y-1 text-text-muted">
           <span>Latest observed flow: {activity.latest_source_date ?? "Not recorded"}</span>
           <span>Last mark cycle: {watchlistTime(activity.last_marked_at)}</span>
           <span>Last cleanup: {watchlistTime(activity.last_maintenance_at)}</span>
         </div>
-        {!activity.last_scan_at && <p role="status" className="text-accent-orange">No scan receipt available. Eligibility is unverified.</p>}
+        {!activity.last_scan_at && <p role="status" className="callout">No scan receipt available. Eligibility is unverified.</p>}
         <details>
           <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-text-secondary"><Clock size={14} />Daily activity (14 days, {zoneLabel})</summary>
           <table className="w-full text-left text-xs">
@@ -607,10 +611,10 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
         </details>
         </div>
       </div>}
-      {data && !activeCount && <p className="mb-3 py-3 text-sm text-text-muted">No active observations for {persona}.</p>}
-      {unverifiedCount > 0 && <p className="mb-3 text-xs text-accent-orange">Unverified legacy observations: {unverifiedCount}</p>}
+      {data && !activeCount && <p className="py-3 text-sm text-text-muted">No active observations for {persona}.</p>}
+      {unverifiedCount > 0 && <p className="callout">Unverified legacy observations: <span className="num">{unverifiedCount}</span>. Pick "Needs review" to see them.</p>}
       <Segmented<"wla" | "wlb" | "history">
-        className="mobile-horizontal-strip mb-3 w-full md:hidden"
+        className="mobile-horizontal-strip w-full md:hidden"
         ariaLabel="Choose watchlist section"
         value={visibleSection}
         onChange={setMobileSection}
@@ -620,11 +624,11 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
           { value: "history", label: "Moves", badge: <span className="num">{(data?.history ?? []).length}</span> },
         ]}
       />
-      <div className="space-y-6">
+      <div className="card space-y-8">
         {section("wla", "Screened", wla, "No screened observations in this period.")}
         {section("wlb", "Monitoring / blocked", wlb, "No monitored observations in this period.")}
         <div className={`${visibleSection === "history" ? "block" : "hidden"} ${(data?.history ?? []).length > 0 ? "md:block" : "md:hidden"}`}>
-          <h4 className="mb-1 text-sm font-semibold text-text-primary">Recent moves</h4>
+          <h3 className="mb-2 text-base font-semibold text-text-primary">Recent moves</h3>
           <div className="divide-y divide-border">
             {(data?.history ?? []).slice(0, 8).map((r, i) => (
               <div key={`h${i}`} className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 py-2 text-xs text-text-muted md:min-h-0">
@@ -643,7 +647,7 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
           )}
         </div>
       </div>
-    </GlassPanel>
+    </section>
   );
 }
 
@@ -676,19 +680,21 @@ function RubyDeskLog() {
   const events = data?.events ?? [];
   if (!events.length) {
     return (
-      <GlassPanel title="Desk log">
-        <div className="text-xs text-text-muted">
+      <section className="space-y-2">
+        <SectionHead title="Desk log" sub="Ruby's intraday judge, one entry per eventful 15-min cycle" />
+        <p className="text-sm text-text-muted">
           No cycles logged yet — the log fills as the 15-min intraday loop
           enters, vetoes, trims, or freezes. Quiet cycles are not recorded.
-        </div>
-      </GlassPanel>
+        </p>
+      </section>
     );
   }
   return (
-    <GlassPanel title="Desk log">
+    <section className="space-y-3">
+      <SectionHead title="Desk log" sub="Ruby's intraday judge, one entry per eventful 15-min cycle" />
       <div className="divide-y divide-border">
         {events.map((e, i) => (
-          <div key={`${e.ts}-${i}`} className="space-y-1 py-2">
+          <div key={`${e.ts}-${i}`} className="space-y-2 py-4 first:pt-0">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
               <span className="num">
                 {new Date(e.ts + (e.ts.endsWith("Z") ? "" : "Z")).toLocaleString([], {
@@ -720,7 +726,7 @@ function RubyDeskLog() {
                 <span className="num">{e.candidates ?? 0}</span> flow, <span className="num">{e.passed ?? 0}</span> passed gate
               </span>
             </div>
-            {e.read && <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">{e.read}</p>}
+            {e.read && <p className="prose-read max-w-[72ch] text-text-secondary">{e.read}</p>}
             {(e.vetoes ?? []).length > 0 && (
               <div className="space-y-0.5 text-xs text-text-muted">
                 {(e.vetoes ?? []).map((v, j) => (
@@ -733,7 +739,7 @@ function RubyDeskLog() {
           </div>
         ))}
       </div>
-    </GlassPanel>
+    </section>
   );
 }
 
@@ -1115,11 +1121,11 @@ function WhyPick({ reason, compact = false }: { reason: string | null; compact?:
     );
   }
   return (
-    <div className="mt-2 max-w-[72ch] text-sm leading-relaxed text-text-secondary">
+    <div className="prose-read mt-2 max-w-[72ch] text-text-secondary">
       <span className="font-medium text-text-primary">Why this pick: </span>
       {lead}
       {rest.length > 0 && (
-        <div className="mt-0.5 text-xs text-text-muted">{rest.join(" · ")}</div>
+        <div className="mt-0.5 font-sans text-xs text-text-muted">{rest.join(" · ")}</div>
       )}
     </div>
   );
@@ -1205,14 +1211,14 @@ function PositionCard({
   const unitLabel = isEquity ? "share" : "contract";
   const unitWord = p.contracts === 1 ? unitLabel : `${unitLabel}s`;
   return (
-    <div className="py-3">
+    <div className="py-4">
       <div className="flex items-start justify-between gap-3 max-md:flex-col max-md:items-stretch">
         <div className="min-w-0 space-y-1">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             {!isEquity && <SideIcon side={p.side} />}
             <button
               onClick={() => setActiveTicker(p.ticker)}
-              className="num text-base font-semibold text-text-primary transition-colors hover:text-accent-blue"
+              className="ticker text-base transition-colors hover:text-accent-blue"
               title={`Open ${p.ticker} in the detail panel`}
             >
               {p.ticker}
@@ -1258,7 +1264,7 @@ function PositionCard({
           </div>
           <div className="text-right">
             <div className="text-text-muted">P/L</div>
-            <div className="num text-base font-semibold" style={{ color: pnlColor }}>{signedPercent(p.pnl_pct)}</div>
+            <div className="num text-lg font-semibold" style={{ color: pnlColor }}>{signedPercent(p.pnl_pct)}</div>
             <div className="num" style={{ color: p.pnl_dollars == null ? "var(--text-muted)" : pnlColor }}>
               {p.pnl_dollars == null ? "Unknown" : `${pnlDollars >= 0 ? "+" : ""}$${pnlDollars.toFixed(0)}`}
             </div>
@@ -1362,31 +1368,27 @@ function CategoryTrendPanel() {
   const maxRatio = Math.max(...trend.map((t) => t.hotness_ratio), 1);
 
   return (
-    <GlassPanel
-      title={
-        <span className="inline-flex items-center gap-1.5">
-          <Flame size={14} className="text-text-muted" />
-          Hot categories
-        </span>
-      }
-      actions={
-        <Segmented<CategoryWindow>
-          options={WINDOW_TABS.map((w) => ({ value: w.id, label: w.label }))}
-          value={window}
-          onChange={(w) => {
-            setWindow(w);
-            setExpanded(null);
-          }}
-        />
-      }
-    >
-      <div className="text-xs text-text-muted mb-2">
-        {data
-          ? `${trend.length} categories with activity · ${
+    <section className="space-y-3">
+      <SectionHead
+        title="Hot categories"
+        sub={data
+          ? `${trend.length} categories with option-flow activity · ${
               WINDOW_TABS.find((w) => w.id === window)?.sub
             }`
-          : ""}
-      </div>
+          : "Option-premium heat by category"}
+        actions={
+          <Segmented<CategoryWindow>
+            ariaLabel="Category window"
+            options={WINDOW_TABS.map((w) => ({ value: w.id, label: w.label }))}
+            value={window}
+            onChange={(w) => {
+              setWindow(w);
+              setExpanded(null);
+            }}
+          />
+        }
+      />
+      <div className="card">
       {isLoading && !data && (
         <div className="text-text-muted text-xs flex items-center gap-1 py-2">
           <Loader2 size={12} className="animate-spin" />
@@ -1475,7 +1477,8 @@ function CategoryTrendPanel() {
         comparison unlocks ~March 2027.
         {data?.note && <div className="mt-1">{data.note}</div>}
       </div>
-    </GlassPanel>
+      </div>
+    </section>
   );
 }
 
@@ -1504,12 +1507,12 @@ function ClosedRow({ p, trims = [] }: { p: Position; trims?: Position[] }) {
       : reason;
   const holdDays = p.exit_date ? daysHeld(p.entry_date, p.exit_date) : null;
   return (
-    <div className="space-y-1 py-2 text-xs">
+    <div className="space-y-1 py-3 text-xs">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <button
             onClick={() => setActiveTicker(p.ticker)}
-            className="num text-sm font-semibold text-text-primary transition-colors hover:text-accent-blue"
+            className="ticker text-sm transition-colors hover:text-accent-blue"
             title={`Open ${p.ticker} in the detail panel`}
           >
             {p.ticker}
@@ -1529,7 +1532,7 @@ function ClosedRow({ p, trims = [] }: { p: Position; trims?: Position[] }) {
           {p.theme && <span className="text-text-muted">{p.theme}</span>}
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <span className="num text-sm font-semibold" style={{ color }}>
+          <span className="num text-base font-semibold" style={{ color }}>
             {pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}%
           </span>
           <span className="num w-16 text-right" style={{ color }}>
@@ -1624,23 +1627,34 @@ function EquityCurve({ history }: { history: HistoryPoint[] }) {
   const color =
     last.return_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)";
   return (
-    <GlassPanel
-      title={`Equity curve (${history.length}d)`}
-      actions={
-        <span className="text-xs text-text-muted num">
-          {history[0].date} → {last.date}
-        </span>
-      }
-    >
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-20">
+    <figure className="mt-4">
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-16 w-full" role="img" aria-label={`Equity curve over ${history.length} days`}>
         <polyline
           fill="none"
           stroke={color}
           strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
           points={points}
         />
       </svg>
-    </GlassPanel>
+      <figcaption className="mt-1 flex justify-between text-xs text-text-muted">
+        <span>Equity curve, <span className="num">{history.length}</span>d</span>
+        <span className="num">{history[0].date} → {last.date}</span>
+      </figcaption>
+    </figure>
+  );
+}
+
+/** v2 section heading: serif title, optional sub, actions to the right. */
+function SectionHead({ title, sub, actions }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+      <div className="min-w-0">
+        <h2 className="section-title">{title}</h2>
+        {sub && <p className="section-sub">{sub}</p>}
+      </div>
+      {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>}
+    </div>
   );
 }
 
@@ -1683,29 +1697,30 @@ function TradeDecisionHistory({
   const realizedColor = changeColor(totalRealized);
 
   return (
-    <section className="card">
+    <section className="space-y-3">
       <button
         onClick={onToggle}
-        className="flex min-h-11 w-full flex-col items-stretch justify-between gap-2 transition-colors md:min-h-0 md:flex-row md:items-center"
+        aria-expanded={expanded}
+        className="flex min-h-11 w-full flex-col items-stretch justify-between gap-2 text-left transition-colors md:min-h-0 md:flex-row md:items-end"
       >
-        <div className="flex min-w-0 items-center gap-2 text-left">
-          {expanded ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
-          <span className="text-sm font-semibold text-text-primary">
-            Closed trades <span className="num font-normal text-text-muted">{logical.length}</span>
-          </span>
+        <div className="flex min-w-0 items-center gap-2">
+          {expanded ? <ChevronDown size={16} className="text-text-muted" /> : <ChevronRight size={16} className="text-text-muted" />}
+          <h2 className="section-title">
+            Closed trades <span className="num text-base text-text-muted">{logical.length}</span>
+          </h2>
           {todayExits.length > 0 && (
-            <span className="text-xs text-text-muted"><span className="num">{todayExits.length}</span> closed today</span>
+            <span className="text-sm text-text-muted"><span className="num">{todayExits.length}</span> closed today</span>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-6 text-left text-xs md:justify-end md:pl-0">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 pl-6 text-sm md:justify-end md:pl-0">
           {logical.length > 0 ? (
             <>
               <span className="text-text-muted">
-                <span className="num">{wins}W / {logical.length - wins}L</span>, <span className="num">{winRate.toFixed(0)}%</span> win
+                <span className="num text-text-secondary">{wins}W / {logical.length - wins}L</span>, <span className="num text-text-secondary">{winRate.toFixed(0)}%</span> win
               </span>
               {stopped > 0 && <span className="text-text-muted">stopped <span className="num">{stopped}</span></span>}
               {expired > 0 && <span className="text-text-muted">expired <span className="num">{expired}</span></span>}
-              <span className="num text-sm font-semibold" style={{ color: realizedColor }}>
+              <span className="num text-xl font-semibold" style={{ color: realizedColor }}>
                 {totalRealized >= 0 ? "+" : ""}
                 {formatCurrency(totalRealized)}
               </span>
@@ -1716,7 +1731,7 @@ function TradeDecisionHistory({
         </div>
       </button>
       {expanded && (
-        <div className="mt-3 space-y-4">
+        <div className="card space-y-5">
           {logical.length === 0 && (
             <p className="py-4 text-center text-sm text-text-muted">
               No closed trades yet. Positions exit when they hit the persona's
@@ -1774,7 +1789,7 @@ function PositionSortHeader({
 }) {
   return (
     <th
-      className={`whitespace-nowrap px-2 py-2 font-medium text-text-muted ${right ? "text-right" : "text-left"} ${column ? "cursor-pointer select-none hover:text-text-primary" : ""}`}
+      className={`whitespace-nowrap px-3 py-2.5 text-xs font-medium text-text-muted ${right ? "text-right" : "text-left"} ${column ? "cursor-pointer select-none hover:text-text-primary" : ""}`}
       onClick={column ? () => onSort(column) : undefined}
       title={column ? "Sort" : undefined}
     >
@@ -1879,7 +1894,7 @@ function PositionsTable({
                   className="shrink-0 text-text-muted transition-transform group-open:rotate-90"
                   aria-hidden="true"
                 />
-                <span className="w-12 shrink-0 num text-xs font-semibold text-text-primary">
+                <span className="w-14 shrink-0 text-sm ticker">
                   {p.ticker}
                 </span>
                 <span className="num min-w-0 flex-1 truncate text-xs text-text-secondary">
@@ -1922,7 +1937,7 @@ function PositionsTable({
         })}
       </div>
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full border-collapse text-xs">
+        <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-border">
               <PositionSortHeader column="ticker" activeSort={sortKey} ascending={asc} onSort={toggle} right={false}>Ticker</PositionSortHeader>
@@ -1948,44 +1963,44 @@ function PositionsTable({
               const pnl = p.pnl_pct ?? 0;
               const trimmed = (trimsByParent.get(p.id)?.length ?? 0) > 0;
               return (
-                <tr key={p.id} className="hover:bg-bg-card-hover">
-                  <td className="px-2 py-2">
+                <tr key={p.id} className="data-row">
+                  <td className="px-3 py-2.5">
                     <button
                       onClick={() => setActiveTicker(p.ticker)}
-                      className="font-semibold text-text-primary hover:text-accent-blue"
+                      className="ticker hover:text-accent-blue"
                     >
                       {p.ticker}
                     </button>
                   </td>
-                  <td className="px-2 py-2 whitespace-nowrap text-text-secondary">
+                  <td className="px-3 py-2.5 whitespace-nowrap text-text-secondary">
                     <span className="inline-flex items-center gap-1.5">
                       {isEquity ? "shares" : `$${p.strike} ${p.option_type} ${p.expiry ?? ""}`}
                       {!isEquity && (
                         <GexWall ticker={p.ticker} strike={Number(p.strike) || null} width={40} />
                       )}
-                      {trimmed && <span className="text-accent-green" title="has booked trims">✂</span>}
+                      {trimmed && <span className="text-accent-green" title="has booked trims"><Scissors size={12} aria-label="has booked trims" /></span>}
                     </span>
                   </td>
-                  <td className="px-2 py-2 whitespace-nowrap text-text-secondary">{p.entry_date}</td>
-                  <td className="px-2 py-2 text-right text-text-muted">{held ?? "—"}</td>
-                  <td className="px-2 py-2 text-right text-text-secondary">{p.contracts}</td>
-                  <td className="px-2 py-2 text-right text-text-secondary">${p.premium_at_entry.toFixed(2)}</td>
-                  <td className="px-2 py-2 text-right text-text-secondary">
+                  <td className="px-3 py-2.5 whitespace-nowrap text-text-secondary">{p.entry_date}</td>
+                  <td className="px-3 py-2.5 text-right text-text-muted">{held ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-right text-text-secondary">{p.contracts}</td>
+                  <td className="px-3 py-2.5 text-right text-text-secondary">${p.premium_at_entry.toFixed(2)}</td>
+                  <td className="px-3 py-2.5 text-right text-text-secondary">
                     {p.current_premium != null ? `$${p.current_premium.toFixed(2)}` : "—"}
                     <MarkFreshness at={p.last_marked_at} status={p.mark_status} />
                   </td>
-                  <td className="px-2 py-2 text-right text-text-secondary">{formatCurrency(p.cost_basis)}</td>
-                  <td className="px-2 py-2 text-right text-text-primary">{p.current_value == null ? "Unknown" : formatCurrency(p.current_value)}</td>
-                  <td className="px-2 py-2 text-right font-semibold" style={{ color: changeColor(pnl) }}>
+                  <td className="px-3 py-2.5 text-right text-text-secondary">{formatCurrency(p.cost_basis)}</td>
+                  <td className="px-3 py-2.5 text-right text-text-primary">{p.current_value == null ? "Unknown" : formatCurrency(p.current_value)}</td>
+                  <td className="px-3 py-2.5 text-right font-semibold" style={{ color: changeColor(pnl) }}>
                     {signedPercent(p.pnl_pct)}
                   </td>
-                  <td className="px-2 py-2 text-right" style={{ color: changeColor(p.pnl_dollars ?? 0) }}>
+                  <td className="px-3 py-2.5 text-right" style={{ color: changeColor(p.pnl_dollars ?? 0) }}>
                     {p.pnl_dollars == null ? "Unknown" : `${p.pnl_dollars >= 0 ? "+" : ""}$${p.pnl_dollars.toFixed(0)}`}
                   </td>
-                  <td className="px-2 py-2 text-right text-text-muted">
+                  <td className="px-3 py-2.5 text-right text-text-muted">
                     {p.peak_pnl_pct != null ? `+${p.peak_pnl_pct.toFixed(0)}%` : "—"}
                   </td>
-                  <td className="px-2 py-2 text-right">
+                  <td className="px-3 py-2.5 text-right">
                     {scaled
                       ? <span className="text-accent-green">BE</span>
                       : <span className="text-text-muted">{stopPct}%</span>}
@@ -2043,7 +2058,7 @@ function OpenPositionsGrouped({
   });
 
   return (
-    <GlassPanel title={<>Open positions <span className="num font-normal text-text-muted">{positions.length}</span></>}>
+    <GlassPanel>
       <div className="space-y-4">
       {cats.map(([cat, themeMap]) => {
         const allInCat = Array.from(themeMap.values()).flat();
@@ -2223,7 +2238,6 @@ export function SmartTrader() {
   const retColor = changeColor(ret);
   const pnlTotal = summary.total_value - summary.starting_capital;
   const deployedPct = summary.total_value > 0 ? (summary.positions_value / summary.total_value) * 100 : 0;
-  const big = (v: ReactNode) => <span className="text-xl font-semibold">{v}</span>;
   const signedMoney = (v: number) => `${v >= 0 ? "+" : ""}${formatCurrency(v)}`;
 
   // Group scale-out trim children by their parent runner id so open positions
@@ -2245,11 +2259,20 @@ export function SmartTrader() {
 
   const personas: PersonaName[] = ["smart", "aggressive", "builder", "ruby", "gemfinder", "supercycle", "conviction"];
   const personaRows = personaList?.personas ?? [];
+  const personaRow = personaRows.find((r) => r.name === persona);
+  const viewToggle = (
+    <Segmented
+      ariaLabel="Open positions layout"
+      options={[{ value: "table", label: "Table" }, { value: "grouped", label: "Cards" }]}
+      value={posView}
+      onChange={(v) => setPosView(v as "table" | "grouped")}
+    />
+  );
   return (
-    <div className="max-w-full space-y-4 overflow-x-clip pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <div className="max-w-full space-y-8 overflow-x-clip pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       {/* Persona selector + active book description */}
       <div
-        className="mobile-workspace-controls sticky z-20 space-y-1.5 p-2 md:static md:z-auto md:p-0"
+        className="mobile-workspace-controls sticky z-20 space-y-2 p-2 md:static md:z-auto md:p-0"
         style={{ background: "var(--bg-primary)" }}
       >
         <Segmented<PersonaName>
@@ -2273,149 +2296,149 @@ export function SmartTrader() {
           onChange={setPersona}
         />
         <p className="line-clamp-2 max-w-[72ch] text-sm leading-relaxed text-text-secondary md:line-clamp-none">
-          {personaRows.find(r => r.name === persona)?.description || summary.persona_description || PERSONA_META[persona].tagline}
-          {(() => {
-            const row = personaRows.find((r) => r.name === persona);
-            return row ? (
-              <span className="text-text-muted">
-                {" "}
-                · <span className="num">{row.open_positions}</span> open · <span className="num">${(row.total_value / 1000).toFixed(1)}K</span>
-                {row.ml_serving_mode === "gate_and_rank"
-                  ? <> · ML gate <span className="num">{row.ml_threshold ?? "?"}+</span> active</>
-                  : row.ml_serving_mode === "rank_only"
-                    ? " · ML research rank only; no ML rejection"
-                    : ""}
-              </span>
-            ) : null;
-          })()}
+          {personaRow?.description || summary.persona_description || PERSONA_META[persona].tagline}
+          {personaRow ? (
+            <span className="text-text-muted">
+              {" "}
+              · <span className="num">{personaRow.open_positions}</span> open · <span className="num">${(personaRow.total_value / 1000).toFixed(1)}K</span>
+              {personaRow.ml_serving_mode === "gate_and_rank"
+                ? <> · ML gate <span className="num">{personaRow.ml_threshold ?? "?"}+</span> active</>
+                : personaRow.ml_serving_mode === "rank_only"
+                  ? " · ML research rank only; no ML rejection"
+                  : ""}
+            </span>
+          ) : null}
         </p>
         {personaQuery.isError && !personaList && (
           <QueryErrorState label="Unable to load persona summaries." onRetry={() => void personaQuery.refetch()} />
         )}
       </div>
 
-      {/* Book summary: key numbers in one row, secondary detail below */}
-      <section className="space-y-3">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3 min-[480px]:grid-cols-3 md:grid-cols-5">
-          <Stat label="Equity" value={big(formatCurrency(summary.total_value))} sub={`from ${formatCurrency(summary.starting_capital)}`} />
-          <Stat label="P/L" tone={pnlTotal >= 0 ? "green" : "red"} value={big(signedMoney(pnlTotal))} />
-          <Stat label="Return" value={<span style={{ color: retColor }}>{big(`${ret >= 0 ? "+" : ""}${ret.toFixed(2)}%`)}</span>} />
-          <Stat label="Deployed" value={big(`${deployedPct.toFixed(0)}%`)} sub={`${formatCurrency(summary.positions_value)} in positions`} />
-          <Stat label="Open" value={big(summary.open_positions)} sub={`${summary.closed_positions} closed`} />
-        </div>
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-text-muted">
-          <span>Cash <span className="num text-text-secondary">{formatCurrency(summary.cash)}</span></span>
-          <span>Realized <span className="num" style={{ color: changeColor(summary.realized_pnl) }}>{signedMoney(summary.realized_pnl)}</span></span>
-          {(summary.banked_from_trims ?? 0) > 0 && (
-            <span title="Realized gains banked from AbTrader-style scale-out trims">
-              <Scissors size={12} className="mr-1 inline" />
-              Trims <span className="num" style={{ color: "var(--accent-green)" }}>+{formatCurrency(summary.banked_from_trims ?? 0)}</span>
-            </span>
-          )}
-          <span>Unrealized <span className="num" style={{ color: changeColor(summary.unrealized_pnl) }}>{signedMoney(summary.unrealized_pnl)}</span></span>
-          <span>Win rate <span className="num text-text-secondary">{summary.closed_positions > 0 ? `${summary.win_rate.toFixed(0)}%` : "—"}</span></span>
-          {/* Marking and reset actions do not manually select new entries. */}
-          <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
-            <button
-              onClick={() => markMutation.mutate()}
-              disabled={markMutation.isPending}
-              className="flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-border px-3 text-xs font-medium text-text-primary transition-colors hover:bg-bg-card-hover disabled:opacity-40 md:min-h-8"
-            >
-              {markMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              Mark to market
-            </button>
-            <span className="flex items-center gap-1">
-              <span className="text-text-muted">$</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={1000}
-                step={1000}
-                value={resetCapital}
-                onChange={(e) => setResetCapital(e.target.value)}
-                aria-label="Reset starting capital"
-                className="num min-h-11 w-24 rounded-[var(--radius-control)] border border-border bg-bg-card px-2 text-xs text-text-primary focus:border-accent-blue/50 focus:outline-none md:min-h-8"
-              />
-            </span>
-            <button
-              onClick={() => {
-                const amt = Math.round(Number(resetCapital));
-                if (!Number.isFinite(amt) || amt < 1000) {
-                  alert("Enter a starting balance of at least $1,000.");
-                  return;
-                }
-                if (
-                  confirm(
-                    `Reset ${PERSONA_META[persona].label} book to $${amt.toLocaleString()}? All picks and history will be erased. On weekdays the endpoint may automatically run new picks and enter positions.`,
-                  )
-                )
-                  resetMutation.mutate(amt);
-              }}
-              disabled={resetMutation.isPending}
-              className="flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-border px-3 text-xs text-text-secondary transition-colors hover:border-accent-red/40 hover:text-accent-red disabled:opacity-40 md:min-h-8"
-            >
-              {resetMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
-              Reset
-            </button>
+      {/* Hero: book equity + P/L is the focal point; supporting stats beside it. */}
+      <section className="space-y-4" aria-label={`${PERSONA_META[persona].label} book summary`}>
+        <div className="grid items-start gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+          <div className="min-w-0">
+            <div className="text-sm text-text-muted">{PERSONA_META[persona].label} book equity</div>
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <span className="num text-3xl font-semibold tracking-tight text-text-primary">
+                {formatCurrency(summary.total_value)}
+              </span>
+              <span className="num text-xl font-semibold" style={{ color: changeColor(pnlTotal) }}>
+                {signedMoney(pnlTotal)}
+              </span>
+              <span className="num text-xl font-semibold" style={{ color: retColor }}>
+                {ret >= 0 ? "+" : ""}{ret.toFixed(2)}%
+              </span>
+            </div>
+            <div className="mt-1 text-xs text-text-muted">
+              from <span className="num">{formatCurrency(summary.starting_capital)}</span> starting capital
+            </div>
+            {historyQuery.isError && !history && (
+              <QueryErrorState label="Unable to load equity history." onRetry={() => void historyQuery.refetch()} />
+            )}
+            {history && history.length >= 2 && <EquityCurve history={history} />}
+          </div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4 min-[480px]:grid-cols-3">
+            <Stat label="Deployed" value={`${deployedPct.toFixed(0)}%`} sub={`${formatCurrency(summary.positions_value)} in positions`} />
+            <Stat label="Open" value={summary.open_positions} sub={`${summary.closed_positions} closed`} />
+            <Stat label="Cash" value={formatCurrency(summary.cash)} />
+            <Stat label="Realized" tone={summary.realized_pnl >= 0 ? "green" : "red"} value={signedMoney(summary.realized_pnl)} />
+            <Stat label="Unrealized" tone={summary.unrealized_pnl >= 0 ? "green" : "red"} value={signedMoney(summary.unrealized_pnl)} />
+            <Stat label="Win rate" value={summary.closed_positions > 0 ? `${summary.win_rate.toFixed(0)}%` : "—"} />
+            {(summary.banked_from_trims ?? 0) > 0 && (
+              <div title="Realized gains banked from AbTrader-style scale-out trims">
+                <Stat label="Banked from trims" tone="green" value={`+${formatCurrency(summary.banked_from_trims ?? 0)}`} />
+              </div>
+            )}
           </div>
         </div>
-        {(() => { const exposure = markedExposure(summary.positions); return exposure.count > 0 && <p className="text-xs text-accent-orange">Recorded valuation: {exposure.count} positions ({formatCurrency(exposure.value)} carried exposure) have stale or unknown marks. Portfolio return is not a live quote.</p>; })()}
-        {summary.persona_description && summary.persona_description !== (personaRows.find(r => r.name === persona)?.description || summary.persona_description) && (
-          <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">{summary.persona_description}</p>
+
+        {(() => { const exposure = markedExposure(summary.positions); return exposure.count > 0 && <p className="callout max-w-[72ch]">Recorded valuation: <span className="num">{exposure.count}</span> positions (<span className="num">{formatCurrency(exposure.value)}</span> carried exposure) have stale or unknown marks. Portfolio return is not a live quote.</p>; })()}
+        {summary.persona_description && summary.persona_description !== (personaRow?.description || summary.persona_description) && (
+          <p className="prose-read max-w-[72ch] text-text-secondary">{summary.persona_description}</p>
         )}
-      </section>
 
-      <QueryNotice queries={[summaryQuery, todayQuery, historyQuery, personaQuery]} label="Persona data" />
-      {(markMutation.isError || resetMutation.isError) && <p role="alert" className="text-xs text-accent-red">Trader action failed. Reload the book before retrying; a timed-out action may have completed.</p>}
-      {resetMutation.isSuccess && <p role="status" className="text-xs text-text-secondary">Reset completed. Reloaded positions show any automatic picks returned by the endpoint.</p>}
-
-      {/* Equity Curve */}
-      {historyQuery.isError && !history && (
-        <div className="card">
-          <QueryErrorState label="Unable to load equity history." onRetry={() => void historyQuery.refetch()} />
+        {/* Marking and reset actions do not manually select new entries. */}
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <button
+            onClick={() => markMutation.mutate()}
+            disabled={markMutation.isPending}
+            className="flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-border px-3 text-xs font-medium text-text-primary transition-colors hover:bg-bg-card-hover disabled:opacity-40 md:min-h-8"
+          >
+            {markMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            Mark to market
+          </button>
+          <details className="group">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 text-text-muted marker:content-none hover:text-text-primary md:min-h-8">
+              <ChevronRight size={12} className="transition-transform group-open:rotate-90" aria-hidden="true" />
+              Reset book
+            </summary>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="flex items-center gap-1">
+                <span className="text-text-muted">$</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1000}
+                  step={1000}
+                  value={resetCapital}
+                  onChange={(e) => setResetCapital(e.target.value)}
+                  aria-label="Reset starting capital"
+                  className="num min-h-11 w-24 rounded-[var(--radius-control)] border border-border bg-bg-card px-2 text-xs text-text-primary focus:border-accent-blue/50 focus:outline-none md:min-h-8"
+                />
+              </span>
+              <button
+                onClick={() => {
+                  const amt = Math.round(Number(resetCapital));
+                  if (!Number.isFinite(amt) || amt < 1000) {
+                    alert("Enter a starting balance of at least $1,000.");
+                    return;
+                  }
+                  if (
+                    confirm(
+                      `Reset ${PERSONA_META[persona].label} book to $${amt.toLocaleString()}? All picks and history will be erased. On weekdays the endpoint may automatically run new picks and enter positions.`,
+                    )
+                  )
+                    resetMutation.mutate(amt);
+                }}
+                disabled={resetMutation.isPending}
+                className="flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-border px-3 text-xs text-text-secondary transition-colors hover:border-accent-red/40 hover:text-accent-red disabled:opacity-40 md:min-h-8"
+              >
+                {resetMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                Reset
+              </button>
+            </div>
+          </details>
         </div>
-      )}
-      {history && history.length >= 2 && <EquityCurve history={history} />}
-
-      {/* Hot categories — Today / 7d / 30d windows, self-fetches */}
-      <CategoryTrendPanel />
+        <QueryNotice queries={[summaryQuery, todayQuery, historyQuery, personaQuery]} label="Persona data" />
+        {(markMutation.isError || resetMutation.isError) && <p role="alert" className="callout" style={{ "--callout": "var(--accent-red)" } as React.CSSProperties}>Trader action failed. Reload the book before retrying; a timed-out action may have completed.</p>}
+        {resetMutation.isSuccess && <p role="status" className="text-xs text-text-secondary">Reset completed. Reloaded positions show any automatic picks returned by the endpoint.</p>}
+      </section>
 
       {/* Open Positions — dense table (default) or grouped cards */}
       {summary.positions.length > 0 && (
-        posView === "table" ? (
-          <GlassPanel
-            title={<>Open positions <span className="num font-normal text-text-muted">{summary.positions.length}</span></>}
-            actions={
-              <Segmented
-                options={[{ value: "table", label: "Table" }, { value: "grouped", label: "Cards" }]}
-                value={posView}
-                onChange={(v) => setPosView(v as "table" | "grouped")}
-              />
-            }
-          >
-            <PositionsTable
-              positions={summary.positions}
-              stopPct={PERSONA_META[persona].stopPct}
-              trimsByParent={trimsByParent}
-            />
-          </GlassPanel>
-        ) : (
-          <div>
-            <div className="mb-1 flex justify-end">
-              <Segmented
-                className="mobile-horizontal-strip max-w-full"
-                options={[{ value: "table", label: "Table" }, { value: "grouped", label: "Cards" }]}
-                value={posView}
-                onChange={(v) => setPosView(v as "table" | "grouped")}
+        <section className="space-y-3">
+          <SectionHead
+            title={<>Open positions <span className="num text-base text-text-muted">{summary.positions.length}</span></>}
+            sub="Click a ticker to open its analysis."
+            actions={viewToggle}
+          />
+          {posView === "table" ? (
+            <div className="card">
+              <PositionsTable
+                positions={summary.positions}
+                stopPct={PERSONA_META[persona].stopPct}
+                trimsByParent={trimsByParent}
               />
             </div>
+          ) : (
             <OpenPositionsGrouped
               positions={summary.positions}
               stopPct={PERSONA_META[persona].stopPct}
               trimsByParent={trimsByParent}
             />
-          </div>
-        )
+          )}
+        </section>
       )}
 
       {/* Ruby — the intraday desk log (judge reads, entries, vetoes, freezes) */}
@@ -2423,41 +2446,6 @@ export function SmartTrader() {
 
       {/* iFlow-Trader-style WL-A / WL-B for every persona (options books) */}
       <WatchlistPanel key={persona} persona={persona} />
-
-      {/* Today — what got rejected, grouped by rule */}
-      {todayQuery.isError && !today && (
-        <div className="card">
-          <QueryErrorState label="Unable to load today's decisions." onRetry={() => void todayQuery.refetch()} />
-        </div>
-      )}
-      {today && (
-        <GlassPanel
-          title={<>Today's decisions <span className="num font-normal text-text-muted">{today.date}</span></>}
-          actions={
-            <span className="text-xs text-text-muted">
-              <span className="num text-text-secondary">{today.picked.length}</span> picks, <span className="num text-text-secondary">{today.rejected_count}</span> rejected
-            </span>
-          }
-        >
-          {today.picked.length === 0 && today.rejected_count === 0 ? (
-            <div className="text-sm text-text-muted text-center py-4">
-              No entries or rejections recorded for this market date.
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {rejectedRules.length > 0 ? (
-                rejectedRules.map(([rk, entries]) => (
-                  <RejectionBlock key={rk} ruleKey={rk} entries={entries} />
-                ))
-              ) : (
-                <div className="text-sm text-text-muted text-center py-2">
-                  No rejected entries logged for {today.date}.
-                </div>
-              )}
-            </div>
-          )}
-        </GlassPanel>
-      )}
 
       {/* Trade Decision History — always visible, even when empty */}
       <TradeDecisionHistory
@@ -2467,12 +2455,53 @@ export function SmartTrader() {
         onToggle={() => setShowClosed((v) => !v)}
       />
 
+      {/* Today — what got rejected, grouped by rule */}
+      {todayQuery.isError && !today && (
+        <QueryErrorState label="Unable to load today's decisions." onRetry={() => void todayQuery.refetch()} />
+      )}
+      {today && (
+        <details className="group/today">
+          <summary className="flex cursor-pointer list-none flex-wrap items-end justify-between gap-x-4 gap-y-1 marker:content-none">
+            <span className="flex items-center gap-2">
+              <ChevronRight size={16} className="shrink-0 text-text-muted transition-transform group-open/today:rotate-90" aria-hidden="true" />
+              <span className="section-title">Today's decisions</span>
+              <span className="num text-sm text-text-muted">{today.date}</span>
+            </span>
+            <span className="text-sm text-text-muted">
+              <span className="num text-text-primary">{today.picked.length}</span> picks, <span className="num text-text-primary">{today.rejected_count}</span> rejected
+            </span>
+          </summary>
+          <div className="card mt-3">
+            {today.picked.length === 0 && today.rejected_count === 0 ? (
+              <div className="py-4 text-center text-sm text-text-muted">
+                No entries or rejections recorded for this market date.
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {rejectedRules.length > 0 ? (
+                  rejectedRules.map(([rk, entries]) => (
+                    <RejectionBlock key={rk} ruleKey={rk} entries={entries} />
+                  ))
+                ) : (
+                  <div className="py-2 text-center text-sm text-text-muted">
+                    No rejected entries logged for {today.date}.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+
+      {/* Hot categories — Today / 7d / 30d windows, self-fetches */}
+      <CategoryTrendPanel />
+
       {/* Empty state — only when nothing has ever been picked */}
       {summary.positions.length === 0 && summary.closed.length === 0 && (
-        <div className="text-center py-8 text-text-muted text-sm">
+        <p className="prose-read py-8 text-center text-text-muted">
           Book is empty. The daily cron opens positions automatically at
           06:30 PT — check back after the next run.
-        </div>
+        </p>
       )}
     </div>
   );

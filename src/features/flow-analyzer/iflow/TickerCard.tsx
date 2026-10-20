@@ -59,7 +59,7 @@ export function TickerCard({
   return (
     <div
       title={highlightTitle}
-      className="card card-interactive relative flex min-h-[5.5rem] min-w-0 flex-col overflow-hidden px-3 py-2.5 text-left"
+      className="card card-interactive relative flex min-h-[7rem] min-w-0 flex-col overflow-hidden px-3.5! py-3! text-left"
       style={{
         borderColor: selected ? "var(--accent-blue)" : undefined,
         background: selected ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : undefined,
@@ -96,11 +96,11 @@ export function TickerCard({
         }}
         aria-pressed={selected}
         aria-label={`Select ${t.ticker}, ${net ? "bullish" : "bearish"}, ${t.total_entries} entries`}
-        className="flex min-h-11 w-full min-w-0 flex-1 flex-col gap-1.5 text-left lg:min-h-6"
+        className="flex min-h-11 w-full min-w-0 flex-1 flex-col gap-2 text-left lg:min-h-6"
       >
         <div className="flex items-baseline justify-between gap-2 pl-5">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="num truncate text-sm font-semibold text-text-primary">{t.ticker}</span>
+            <span className="ticker truncate text-base">{t.ticker}</span>
             {lit && (
               <span
                 className="h-1.5 w-1.5 shrink-0 rounded-full"
@@ -109,18 +109,18 @@ export function TickerCard({
               />
             )}
           </span>
-          <span className="num text-xs text-text-muted" title={`${t.total_entries} entries`}>
-            {t.total_entries}
+          <span className="text-xs text-text-muted" title={`${t.total_entries} entries`}>
+            <span className="num text-text-secondary">{t.total_entries}</span> prints
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="num text-xl font-semibold tracking-tight text-text-primary">{t.net_premium}</span>
+          <span className="flex items-center gap-1 text-xs font-medium" style={{ color: sideColor }}>
+            {net ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+            {net ? "Bullish" : "Bearish"}
           </span>
         </div>
         <BullBearBar bull={t.bullish} total={t.bullish + t.bearish} height={4} showLabels={false} />
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="flex items-center gap-1" style={{ color: sideColor }}>
-            {net ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-            {net ? "Bullish" : "Bearish"}
-          </span>
-          <span className="num text-text-secondary">{t.net_premium}</span>
-        </div>
         {(showReturn || hasAccum || esc || intel?.exitSignals || (voicesIntel && voicesIntel.mentions > 0)) && (
           <div className="mt-auto flex items-center justify-between gap-2 text-xs text-text-muted">
             <span className="flex min-w-0 items-center gap-2">

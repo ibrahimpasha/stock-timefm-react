@@ -2,5 +2,7 @@ import { flowCoverage, type PriceCoverage } from "../lib/flowCoverage";
 
 export function FlowCoverageNotice({ meta }: { meta?: PriceCoverage | null }) {
   const coverage = flowCoverage(meta);
-  return <p className={`text-xs ${coverage.reliable ? "text-text-muted" : "text-accent-orange"}`}>{coverage.label}</p>;
+  return coverage.reliable
+    ? <p className="text-xs text-text-muted">{coverage.label}</p>
+    : <p className="callout">{coverage.label}</p>;
 }

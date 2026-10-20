@@ -3,7 +3,7 @@ import { QueryNotice } from "../../components/QueryNotice";
 import { modelMetadataLabel } from "../../lib/modelMetadata";
 import { useSignalAnalysis, useMarketPrice, useMarketHistory } from "../../api/forecast";
 import { Sparkline, RangeBar } from "../../components/CCPrimitives";
-import { GlassPanel } from "../../components/Glass";
+import { Stat } from "../../components/Glass";
 import {
   TrendingUp,
   TrendingDown,
@@ -168,7 +168,6 @@ export function SignalAnalysisCard({ ticker }: Props) {
 
   const livePrice = mp?.price ?? tech?.price ?? null;
   const dayPct = typeof mp?.change_pct === "number" ? mp.change_pct : null;
-  const dc = dayPct != null ? (dayPct >= 0 ? "var(--accent-green)" : "var(--accent-red)") : "var(--text-muted)";
   const tgt = profile?.target_mean ?? null;
   const upsidePct = tgt != null && livePrice ? ((tgt - livePrice) / livePrice) * 100 : null;
   const upCol = upsidePct != null ? (upsidePct >= 0 ? "var(--accent-green)" : "var(--accent-red)") : "var(--text-muted)";
@@ -224,132 +223,163 @@ export function SignalAnalysisCard({ ticker }: Props) {
             : "Research only"
     : "";
   const sectionTitle = "text-sm font-semibold text-text-primary";
+  const techTone = tech ? (tech.tech_score > 15 ? "green" : tech.tech_score < -15 ? "red" : undefined) : undefined;
+  const subline = [profile?.sector, profile?.industry].filter(Boolean).join(" · ");
 
   return (
-    <GlassPanel
-      title="Signal analysis"
-      actions={
-        <span className="text-xs text-text-muted whitespace-nowrap">
-          <span className="num">{ticker}</span>
-          {profile?.sector ? ` · ${profile.sector}` : ""}
-        </span>
-      }
-    >
+    <section className="flex flex-col gap-6" aria-label={`${ticker} signal analysis`}>
       <QueryNotice queries={[signalQuery]} label="Signal analysis" />
 
       {isLoading && !data && !mp && (
-        <div className="text-sm text-text-muted animate-pulse py-4">Loading signals…</div>
+        <div className="flex flex-col gap-3 animate-pulse" role="status">
+          <div className="h-5 w-40 rounded bg-text-muted/20" />
+          <div className="h-10 w-48 rounded bg-text-muted/15" />
+          <span className="sr-only">Loading signals</span>
+        </div>
       )}
 
-      <div className="flex flex-col gap-4">
-        {/* Price hero — name, big price, day change, live sparkline */}
-        {(profile || mp) && (
-          <div>
-            {(profile?.name || profile?.about) && (
-              <div className="mb-1">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  {profile?.name && (
-                    <span className="text-sm text-text-secondary truncate">{profile.name}</span>
-                  )}
-                  {profile?.about && (
-                    <button
-                      type="button"
-                      onClick={() => setAboutOpen((o) => !o)}
-                      className="inline-flex items-center gap-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-xs font-medium text-text-muted hover:text-text-secondary hover:bg-bg-card-hover transition-colors"
-                      title={aboutOpen ? "Hide company description" : "Show company description"}
-                      aria-expanded={aboutOpen}
-                    >
-                      About
-                      <ChevronDown
-                        size={12}
-                        style={{
-                          transform: aboutOpen ? "rotate(180deg)" : "none",
-                          transition: "transform 0.15s",
-                        }}
-                      />
-                    </button>
-                  )}
-                </div>
-                {aboutOpen && profile?.about && (
-                  <p className="mt-1 max-w-[72ch] text-sm leading-relaxed text-text-secondary max-h-48 overflow-y-auto pr-1">
-                    {profile.about}
-                  </p>
+      {/* Hero — company name, big price + day change, live sparkline */}
+      {(profile || mp) && (
+        <div className="flex flex-col gap-4">
+          {(profile?.name || subline || profile?.about) && (
+            <div className="min-w-0">
+              {profile?.name && (
+                <p className="font-display text-xl leading-snug text-text-primary">{profile.name}</p>
+              )}
+              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                {subline && <span className="min-w-0 truncate text-sm text-text-muted">{subline}</span>}
+                {profile?.about && (
+                  <button
+                    type="button"
+                    onClick={() => setAboutOpen((o) => !o)}
+                    className="inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-medium text-accent-blue transition-colors hover:bg-bg-card-hover"
+                    title={aboutOpen ? "Hide company description" : "Show company description"}
+                    aria-expanded={aboutOpen}
+                  >
+                    About
+                    <ChevronDown
+                      size={12}
+                      style={{
+                        transform: aboutOpen ? "rotate(180deg)" : "none",
+                        transition: "transform 0.15s",
+                      }}
+                    />
+                  </button>
                 )}
               </div>
-            )}
-            <div className="flex items-end justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="num text-2xl font-semibold text-text-primary leading-none">
-                    {fmtPrice(livePrice)}
-                  </span>
-                  {dayPct != null && (
-                    <span className="num inline-flex items-center gap-0.5 text-sm font-semibold" style={{ color: dc }}>
-                      {dayPct >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                      {dayPct >= 0 ? "+" : ""}
-                      {dayPct.toFixed(2)}%
-                    </span>
-                  )}
-                </div>
-                <div className="text-xs text-text-muted mt-1.5">
-                  Market cap <span className="num">{fmtMarketCap(profile?.market_cap)}</span>
-                  {profile?.industry ? ` · ${profile.industry}` : ""}
-                </div>
-              </div>
-              {spark.length >= 2 && (
-                <Sparkline points={spark} width={92} height={36} color={sparkColor} fill />
+              {aboutOpen && profile?.about && (
+                <p className="prose-read mt-3 max-h-64 max-w-[72ch] overflow-y-auto pr-1 text-text-secondary">
+                  {profile.about}
+                </p>
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Analyst target — range bar with the live price marker */}
-        {profile?.target_low != null && profile?.target_high != null && livePrice != null && (
+          <div className="flex items-end justify-between gap-4">
+            <div className="min-w-0">
+              <div className="num text-4xl font-semibold leading-none tracking-tight text-text-primary">
+                {fmtPrice(livePrice)}
+              </div>
+              {dayPct != null && (
+                <div
+                  className={`mt-2 inline-flex items-center gap-1 text-lg font-semibold ${dayPct >= 0 ? "delta-up" : "delta-down"}`}
+                >
+                  {dayPct >= 0 ? <ArrowUpRight size={18} aria-hidden /> : <ArrowDownRight size={18} aria-hidden />}
+                  {dayPct >= 0 ? "+" : ""}
+                  {dayPct.toFixed(2)}%
+                  <span className="font-sans text-sm font-normal text-text-muted">today</span>
+                </div>
+              )}
+            </div>
+            {spark.length >= 2 && (
+              <div className="shrink-0" title="Last 40 sessions">
+                <Sparkline points={spark} width={136} height={52} color={sparkColor} fill />
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border pt-4">
+            <Stat label="Market cap" value={fmtMarketCap(profile?.market_cap)} />
+            <Stat
+              label="Analyst target"
+              value={fmtPrice(tgt)}
+              tone={upsidePct != null ? (upsidePct >= 0 ? "green" : "red") : undefined}
+              sub={upsidePct != null ? `${upsidePct >= 0 ? "+" : ""}${upsidePct.toFixed(0)}% vs now` : undefined}
+            />
+            {tech && (
+              <Stat
+                label="Technical"
+                value={
+                  <span className="inline-flex items-center gap-1.5">
+                    <TrendIcon size={16} style={{ color: trendCol }} aria-hidden />
+                    {tech.tech_score > 0 ? "+" : ""}{Math.round(tech.tech_score)}
+                  </span>
+                }
+                tone={techTone}
+                sub={`trend ${tech.trend || "flat"} · -100 to +100`}
+              />
+            )}
+            {conv && (
+              <Stat
+                label="Convergence"
+                value={
+                  <span className="inline-flex items-center gap-2 font-sans">
+                    <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: convCol }} />
+                    {convLabel ? convLabel.charAt(0) + convLabel.slice(1).toLowerCase() : "—"}
+                  </span>
+                }
+                sub="news · flow · voices · traders"
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Analyst target — range bar with the live price marker */}
+      {profile?.target_low != null && profile?.target_high != null && livePrice != null && (
+        <div>
+          <div className="mb-2 flex items-baseline justify-between">
+            <span className={sectionTitle}>Analyst range</span>
+            <span className="num text-sm">
+              {tgt != null && <span className="font-semibold text-text-primary">{fmtPrice(tgt)} mean</span>}
+              {upsidePct != null && (
+                <span style={{ color: upCol }}>
+                  {" "}
+                  {upsidePct >= 0 ? "+" : ""}
+                  {upsidePct.toFixed(0)}%
+                </span>
+              )}
+            </span>
+          </div>
+          <RangeBar low={profile.target_low} high={profile.target_high} last={livePrice} width="100%" />
+          <div className="num mt-1.5 flex justify-between text-xs text-text-muted">
+            <span>{fmtPrice(profile.target_low)}</span>
+            <span>now ${livePrice.toFixed(0)}</span>
+            <span>{fmtPrice(profile.target_high)}</span>
+          </div>
+        </div>
+      )}
+
+      {!signalQuery.isPending && !signalQuery.isError && signalQuery.fetchStatus !== "paused" && !hasAny && (profile || mp) && (
+        <p className="text-sm text-text-muted">
+          No technical, convergence, or ML research signal yet for <span className="num">{ticker}</span>.
+        </p>
+      )}
+
+      {hasAny && (
+        <div className="flex flex-col gap-3">
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className={sectionTitle}>Analyst target</span>
-              <span className="num text-sm">
-                {tgt != null && <span className="text-text-primary font-semibold">{fmtPrice(tgt)}</span>}
-                {upsidePct != null && (
-                  <span style={{ color: upCol }}>
-                    {" "}
-                    {upsidePct >= 0 ? "+" : ""}
-                    {upsidePct.toFixed(0)}%
-                  </span>
-                )}
-              </span>
-            </div>
-            <RangeBar low={profile.target_low} high={profile.target_high} last={livePrice} width="100%" />
-            <div className="num flex justify-between text-xs text-text-muted mt-1">
-              <span>{fmtPrice(profile.target_low)}</span>
-              <span>now ${livePrice.toFixed(0)}</span>
-              <span>{fmtPrice(profile.target_high)}</span>
-            </div>
+            <h3 className="section-title">Signals</h3>
+            <p className="section-sub">Technical setup, cross-source convergence, and contract-level ML research.</p>
           </div>
-        )}
 
-        {!signalQuery.isPending && !signalQuery.isError && signalQuery.fetchStatus !== "paused" && !hasAny && (profile || mp) && (
-          <p className="text-sm text-text-muted border-t border-border pt-3">
-            No technical, convergence, or ML research signal yet for <span className="num">{ticker}</span>.
-          </p>
-        )}
-
-        {hasAny && (
-          <>
+          <div className="flex flex-col divide-y divide-border">
             {/* Technical */}
-            <div className="border-t border-border pt-3">
-              <div className="flex items-center gap-1.5 mb-2">
+            <div className="py-4 first:pt-1">
+              <div className="mb-2 flex items-baseline gap-2">
                 <span className={sectionTitle}>Technical</span>
-                {tech && (
-                  <span className="ml-auto inline-flex items-center gap-1.5">
-                    {sourceStamp(freshness?.technical) && (
-                      <span className="text-xs text-text-muted">{sourceStamp(freshness?.technical)}</span>
-                    )}
-                    <TrendIcon size={14} style={{ color: trendCol }} />
-                    <span className="num text-sm font-semibold" style={{ color: technicalColor(tech.tech_score) }}>
-                      {tech.tech_score > 0 ? "+" : ""}{Math.round(tech.tech_score)}
-                    </span>
-                  </span>
+                {tech && sourceStamp(freshness?.technical) && (
+                  <span className="ml-auto text-xs text-text-muted">{sourceStamp(freshness?.technical)}</span>
                 )}
               </div>
               {tech ? (
@@ -360,7 +390,7 @@ export function SignalAnalysisCard({ ticker }: Props) {
                     <span>0</span>
                     <span>+100</span>
                   </div>
-                  <p className="text-sm text-text-secondary mt-2">
+                  <p className="mt-3 text-sm text-text-secondary">
                     {tech.pattern && (
                       <span style={{ color: dirColor(tech.pattern_dir) }}>
                         {tech.pattern}
@@ -368,13 +398,13 @@ export function SignalAnalysisCard({ ticker }: Props) {
                         {" · "}
                       </span>
                     )}
-                    RSI <span className="num">{Math.round(tech.rsi14)}</span> · MACD{" "}
-                    <span className="num">
+                    RSI <span className="num text-text-primary">{Math.round(tech.rsi14)}</span> · MACD{" "}
+                    <span className="num text-text-primary">
                       {tech.macd_hist >= 0 ? "+" : ""}
                       {tech.macd_hist.toFixed(2)}
                     </span>
                   </p>
-                  <div className="mt-2">
+                  <div className="mt-3">
                     <div className="mb-1 flex items-center justify-between text-xs text-text-muted">
                       <span>Setup strength</span>
                       <span className="num text-text-secondary">{Math.round(tech.setup_strength)}/100</span>
@@ -388,23 +418,15 @@ export function SignalAnalysisCard({ ticker }: Props) {
             </div>
 
             {/* Convergence */}
-            <div className="border-t border-border pt-3">
-              <div className="flex items-center gap-1.5 mb-2">
+            <div className="py-4">
+              <div className="mb-2 flex items-baseline gap-2">
                 <span className={sectionTitle}>Convergence</span>
-                {conv && (
-                  <span className="ml-auto inline-flex items-center gap-2">
-                    {sourceStamp(freshness?.convergence) && (
-                      <span className="text-xs text-text-muted">{sourceStamp(freshness?.convergence)}</span>
-                    )}
-                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-text-primary">
-                      <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: convCol }} />
-                      {convLabel ? convLabel.charAt(0) + convLabel.slice(1).toLowerCase() : "—"}
-                    </span>
-                  </span>
+                {conv && sourceStamp(freshness?.convergence) && (
+                  <span className="ml-auto text-xs text-text-muted">{sourceStamp(freshness?.convergence)}</span>
                 )}
               </div>
               {conv ? (
-                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                <div className="flex flex-wrap gap-x-5 gap-y-1.5">
                   <SrcDot label="News" n={sig.news?.count ?? 0} />
                   <SrcDot label="iFlow" n={sig.iflow?.count ?? 0} />
                   <SrcDot label="Voices" n={sig.voices?.count ?? 0} />
@@ -416,17 +438,17 @@ export function SignalAnalysisCard({ ticker }: Props) {
             </div>
 
             {/* Contract-level ML research */}
-            <div className="border-t border-border pt-3">
-              <div className="flex items-center gap-1.5 mb-2">
+            <div className="py-4 last:pb-0">
+              <div className="mb-2 flex items-baseline gap-2">
                 <span className={sectionTitle}>ML contract research</span>
                 {ml && (
                   <span className="ml-auto text-sm text-text-muted" title="Best within-DTE contract percentile, not ticker confidence">
-                    percentile <span className="num font-semibold text-text-primary">{ml.peak_score}</span>
+                    percentile <span className="num text-base font-semibold text-text-primary">{ml.peak_score}</span>
                   </span>
                 )}
               </div>
               {ml ? (
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2.5">
                   <ScoreBar value={ml.peak_score} color="var(--accent-blue)" />
                   <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">
                     Highest within-DTE percentile across <span className="num">{ml.n_entries}</span> recent{" "}
@@ -435,7 +457,7 @@ export function SignalAnalysisCard({ ticker }: Props) {
                   </p>
                   {bestContract && (
                     <div className="text-sm text-text-secondary">
-                      Highest-ranked contract <span className="num text-text-primary">{bestContract}</span>
+                      Highest-ranked contract <span className="num font-semibold text-text-primary">{bestContract}</span>
                       {ml.best?.flow_date ? <span className="num text-text-muted"> · {ml.best.flow_date}</span> : null}
                     </div>
                   )}
@@ -480,9 +502,9 @@ export function SignalAnalysisCard({ ticker }: Props) {
                 <p className="text-sm text-text-muted">No recent options flow to score.</p>
               )}
             </div>
-          </>
-        )}
-      </div>
-    </GlassPanel>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

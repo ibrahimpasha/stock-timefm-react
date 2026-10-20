@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
+import type { ReactNode } from "react";
 import { SystemRiskStatus } from "./SystemRiskStatus";
 import { TradeDecisionLog } from "./TradeDecisionLog";
 import { MissedOpportunities } from "./MissedOpportunities";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../../api/client";
 import { formatCurrency, changeColor } from "../../lib/utils";
-import { GlassPanel, Chip, Stat } from "../../components/Glass";
+import { Chip, Stat } from "../../components/Glass";
 import { premiumChange, markedExposure, signedPercent } from "../../lib/markFreshness";
 import { MarkFreshness } from "../../components/MarkFreshness";
 import { QueryNotice } from "../../components/QueryNotice";
@@ -23,6 +24,7 @@ import {
   Activity,
   Layers,
   AlertTriangle,
+  ChevronRight,
 } from "lucide-react";
 
 interface Position {
@@ -197,7 +199,7 @@ function SynthesisReport({ report }: { report: string }) {
   const lines = report.split("\n");
 
   return (
-    <div className="space-y-2 text-sm leading-relaxed max-w-[72ch]">
+    <div className="max-w-[72ch] space-y-3">
       {lines.map((line, i) => {
         const trimmed = line.trim();
         if (!trimmed) return <div key={i} className="h-1" />;
@@ -205,7 +207,7 @@ function SynthesisReport({ report }: { report: string }) {
         // # Title
         if (trimmed.startsWith("# ")) {
           return (
-            <h3 key={i} className="text-base font-semibold text-text-primary">
+            <h3 key={i} className="font-display text-xl font-medium text-text-primary">
               {renderLine(trimmed.slice(2))}
             </h3>
           );
@@ -214,7 +216,7 @@ function SynthesisReport({ report }: { report: string }) {
         // ## Section header
         if (trimmed.startsWith("## ")) {
           return (
-            <h4 key={i} className="text-sm font-semibold text-text-primary mt-3">
+            <h4 key={i} className="pt-3 text-base font-semibold text-text-primary">
               {renderLine(trimmed.slice(3))}
             </h4>
           );
@@ -223,7 +225,7 @@ function SynthesisReport({ report }: { report: string }) {
         // Lines starting with medal emojis (priority queue)
         if (/^[🥇🥈🥉]/u.test(trimmed)) {
           return (
-            <div key={i} className="text-sm font-medium text-text-primary">
+            <div key={i} className="prose-read font-medium text-text-primary">
               {renderLine(trimmed)}
             </div>
           );
@@ -235,8 +237,8 @@ function SynthesisReport({ report }: { report: string }) {
           const isRed = trimmed.startsWith("🔴") || trimmed.startsWith("❌") || trimmed.startsWith("⚠️");
           const dotColor = isGreen ? "var(--accent-green)" : isRed ? "var(--accent-red)" : "var(--text-muted)";
           return (
-            <div key={i} className="flex items-start gap-2 text-sm text-text-secondary">
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: dotColor }} />
+            <div key={i} className="prose-read flex items-start gap-2.5 text-text-secondary">
+              <span className="mt-[0.7em] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: dotColor }} />
               <span>{renderLine(trimmed)}</span>
             </div>
           );
@@ -244,11 +246,24 @@ function SynthesisReport({ report }: { report: string }) {
 
         // Regular text with emojis
         return (
-          <div key={i} className="text-text-secondary text-sm">
+          <div key={i} className="prose-read text-text-secondary">
             {renderLine(trimmed)}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** v2 section heading: serif title, optional sub, actions to the right. */
+function SectionHead({ title, sub, actions }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+      <div className="min-w-0">
+        <h2 className="section-title">{title}</h2>
+        {sub && <p className="section-sub">{sub}</p>}
+      </div>
+      {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
@@ -355,37 +370,49 @@ export function FlowPaperTrading() {
   const ret = summary.return_pct;
   const retColor = changeColor(ret);
   const positions = summary.positions || [];
+  const signedMoney = (v: number) => `${v >= 0 ? "+" : ""}${formatCurrency(v)}`;
+  const exposure = markedExposure(positions);
+
+  const watchRow = (w: IFlowWatchlistItem, idx: number, analysisOnly: boolean) => {
+    const optColor =
+      w.option_type === "CALL" || w.option_type === "C"
+        ? "var(--accent-green)"
+        : "var(--accent-red)";
+    const pnl = premiumChange(w.current_premium, w.ref_premium, w.last_marked_at);
+    const ref = typeof w.ref_premium === "number" ? w.ref_premium.toFixed(2) : w.ref_premium;
+    return (
+      <div
+        key={w.id ?? idx}
+        className="data-row flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-2 py-2.5"
+      >
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+          <ScoreBadge score={w.score} />
+          <SideIcon side={w.side} />
+          <span className="ticker text-sm">{w.ticker}</span>
+          <span className="num text-sm text-text-primary">${w.strike}</span>
+          <span className="text-xs" style={{ color: optColor }}>{w.option_type}</span>
+          <span className="num text-xs text-text-muted">exp {w.expiry}</span>
+          <SourceTag source={w.source} />
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className="num text-xs text-text-muted">ref ${ref}</span>
+          {!analysisOnly && w.gate_price != null && (
+            <span className="num text-xs font-semibold text-text-primary">
+              gate ${typeof w.gate_price === "number" ? w.gate_price.toFixed(2) : w.gate_price}
+            </span>
+          )}
+          {analysisOnly && <span className="text-xs text-text-muted">{w.block_reason ?? "Monitoring"}</span>}
+          <MarkFreshness at={w.last_marked_at} />
+          <PnlBadge pnl={pnl} />
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <QueryNotice queries={[summaryQuery, statusQuery, watchlistQuery, synthesisQuery]} label="Flow trader feeds" />
-      {(scanMutation.isError || resetMutation.isError || synthesisMutation.isError) && <p role="alert" className="text-xs text-accent-red">Trader action failed. Reload before retrying; a timed-out action may have completed.</p>}
-      {/* Action buttons */}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => scanMutation.mutate()}
-          disabled={scanMutation.isPending}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent-blue text-bg-primary font-medium text-sm transition-all hover:brightness-110 disabled:opacity-40"
-        >
-          {scanMutation.isPending ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <RefreshCw size={14} />
-          )}
-          Scan and trade
-        </button>
-        <button
-          onClick={() => {
-            if (confirm("Reset flow paper trader to $10K?"))
-              resetMutation.mutate();
-          }}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-text-secondary text-sm hover:text-accent-red hover:bg-bg-card-hover transition-all"
-        >
-          <RotateCcw size={12} />
-          Reset
-        </button>
-      </div>
+      {(scanMutation.isError || resetMutation.isError || synthesisMutation.isError) && <p role="alert" className="callout" style={{ "--callout": "var(--accent-red)" } as React.CSSProperties}>Trader action failed. Reload before retrying; a timed-out action may have completed.</p>}
 
       {statusQuery.isError && !iflowStatus && (
         <PaperQueryError label="Unable to load trader status." onRetry={() => void statusQuery.refetch()} />
@@ -397,57 +424,84 @@ export function FlowPaperTrading() {
         <PaperQueryError label="Unable to load trader synthesis." onRetry={() => void synthesisQuery.refetch()} />
       )}
 
-      {/* System Risk Status (drawdown, circuit breaker, slots, sector warnings) */}
-      <SystemRiskStatus />
-
-      {/* Portfolio summary, macro and slot usage in one panel */}
-      <GlassPanel title="Portfolio">
-        {(() => { const exposure = markedExposure(positions); return exposure.count > 0 && <p className="mb-3 text-xs text-accent-orange">Recorded valuation: {exposure.count} positions ({formatCurrency(exposure.value)} carried exposure) have stale, incomplete, unverified or unknown marks. Return is not a live quote.</p>; })()}
-        <div className="flex items-end justify-between mb-4 gap-3">
-          <div className="num text-2xl font-semibold text-text-primary">
-            {formatCurrency(summary.total_value)}
-          </div>
-          <div className="text-right">
-            <div className="text-xs text-text-muted">Return</div>
-            <div
-              className="num text-lg font-semibold"
-              style={{ color: retColor }}
-            >
-              {ret >= 0 ? "+" : ""}
-              {ret.toFixed(2)}%
+      {/* Hero: book equity + return is the focal point; supporting stats beside it. */}
+      <section className="space-y-4" aria-label="Flow trader book summary">
+        <div className="grid items-start gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+          <div className="min-w-0">
+            <div className="text-sm text-text-muted">Flow trader equity</div>
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <span className="num text-3xl font-semibold tracking-tight text-text-primary">
+                {formatCurrency(summary.total_value)}
+              </span>
+              <span className="num text-xl font-semibold" style={{ color: retColor }}>
+                {ret >= 0 ? "+" : ""}
+                {ret.toFixed(2)}%
+              </span>
+            </div>
+            <div className="mt-1 text-xs text-text-muted">
+              Unrealized{" "}
+              <span className="num" style={{ color: changeColor(summary.unrealized_pnl) }}>
+                {signedMoney(summary.unrealized_pnl)}
+              </span>
+            </div>
+            {/* Action buttons */}
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => scanMutation.mutate()}
+                disabled={scanMutation.isPending}
+                className="flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] bg-accent-blue px-3 text-sm font-medium text-bg-primary transition-all hover:brightness-110 disabled:opacity-40 md:min-h-8"
+              >
+                {scanMutation.isPending ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={14} />
+                )}
+                Scan and trade
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm("Reset flow paper trader to $10K?"))
+                    resetMutation.mutate();
+                }}
+                className="flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-3 text-sm text-text-secondary transition-all hover:bg-bg-card-hover hover:text-accent-red md:min-h-8"
+              >
+                <RotateCcw size={12} />
+                Reset
+              </button>
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4 min-[480px]:grid-cols-3">
+            <Stat label="Cash" value={formatCurrency(summary.cash)} />
+            <Stat label="In positions" value={formatCurrency(summary.positions_value)} />
+            <Stat
+              label="Realized"
+              tone={summary.realized_pnl >= 0 ? "green" : "red"}
+              value={signedMoney(summary.realized_pnl)}
+            />
+            <Stat label="Win rate" value={`${summary.win_rate.toFixed(0)}%`} sub={`${summary.closed_positions} closed`} />
+            <Stat label="Open" value={summary.open_positions} />
+            <Stat label="Watching" value={summary.watching} />
+          </div>
         </div>
 
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-          <Stat label="Cash" value={formatCurrency(summary.cash)} />
-          <Stat
-            label="Positions"
-            value={formatCurrency(summary.positions_value)}
-          />
-          <Stat
-            label="Realized"
-            tone={summary.realized_pnl >= 0 ? "green" : "red"}
-            value={`${summary.realized_pnl >= 0 ? "+" : ""}${formatCurrency(summary.realized_pnl)}`}
-          />
-          <Stat label="Win rate" value={`${summary.win_rate.toFixed(0)}%`} />
-          <Stat label="Watching" value={summary.watching} />
-          <Stat label="Open" value={summary.open_positions} />
-        </div>
+        {exposure.count > 0 && (
+          <p className="callout max-w-[72ch]">
+            Recorded valuation: <span className="num">{exposure.count}</span> positions (<span className="num">{formatCurrency(exposure.value)}</span> carried exposure) have stale, incomplete, unverified or unknown marks. Return is not a live quote.
+          </p>
+        )}
 
         {(macro || slots) && (
-          <div className="mt-4 border-t border-border pt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-text-muted">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border pt-3 text-sm text-text-muted">
             {macro && (
               <>
-                <span className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-1 text-xs">
                   <Activity size={12} /> Macro
                 </span>
                 <span>
                   SPY <span className="num text-text-primary">${macro.spy_price.toFixed(2)}</span>{" "}
-                  <span
-                    className="num"
-                    style={{ color: macro.spy_change_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}
-                  >
+                  <span className={macro.spy_change_pct >= 0 ? "delta-up" : "delta-down"}>
                     {macro.spy_change_pct >= 0 ? "+" : ""}
                     {macro.spy_change_pct.toFixed(2)}%
                   </span>
@@ -481,8 +535,8 @@ export function FlowPaperTrading() {
               </>
             )}
             {slots && (
-              <span className="inline-flex items-center gap-4">
-                <span className="inline-flex items-center gap-1">
+              <span className="inline-flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="inline-flex items-center gap-1 text-xs">
                   <Layers size={12} /> Slots
                 </span>
                 {([
@@ -509,12 +563,19 @@ export function FlowPaperTrading() {
             )}
           </div>
         )}
-      </GlassPanel>
+      </section>
 
-      {/* Open Positions — moved to top */}
+      {/* System Risk Status (drawdown, circuit breaker, slots, sector warnings) */}
+      <SystemRiskStatus />
+
+      {/* Open Positions */}
       {positions.length > 0 && (
-        <GlassPanel title={<>Open positions <span className="num font-normal text-text-muted">{positions.length}</span></>}>
-          <div className="divide-y divide-border">
+        <section className="space-y-3">
+          <SectionHead
+            title={<>Open positions <span className="num text-base text-text-muted">{positions.length}</span></>}
+            sub="Select a row for entry, targets and the analysis behind it."
+          />
+          <div className="card divide-y divide-border">
             {positions.map((pos) => {
               const pnlColor = pos.pnl_pct == null ? "var(--text-muted)" : changeColor(pos.pnl_pct);
               const sideColor =
@@ -534,7 +595,7 @@ export function FlowPaperTrading() {
               return (
                 <div
                   key={pos.id}
-                  className="cursor-pointer py-2 px-1 hover:bg-bg-card-hover"
+                  className="data-row cursor-pointer px-2 py-3.5"
                   role="button"
                   tabIndex={0}
                   aria-expanded={isExpanded}
@@ -548,38 +609,33 @@ export function FlowPaperTrading() {
                   }}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2.5">
                       <SideIcon side={pos.side} />
-                      <span className="num text-sm font-semibold text-text-primary">
-                        {pos.ticker}
-                      </span>
+                      <span className="ticker text-base">{pos.ticker}</span>
                       <span className="num text-sm text-text-primary">
                         ${pos.strike} {pos.option_type}
                       </span>
-                      <span className="text-text-muted text-xs">
+                      <span className="text-xs text-text-muted">
                         <span className="num">x{pos.contracts}</span>
                         {pos.scaled_out ? " (scaled)" : ""} · <span title={pos.slot_type === "day_trade" ? "Day trade slot" : "Swing slot"}>{slotLabel}</span>
                       </span>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-end gap-6">
                       <div className="text-right text-xs">
                         <div className="text-text-muted">Cost</div>
-                        <div className="num text-text-primary">
+                        <div className="num text-sm text-text-primary">
                           {formatCurrency(pos.cost_basis)}
                         </div>
                       </div>
                       <div className="text-right text-xs">
                         <div className="text-text-muted">Value</div>
-                        <div className="num text-text-primary">
+                        <div className="num text-sm text-text-primary">
                           {pos.current_value == null ? "Unknown" : formatCurrency(pos.current_value)}
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-text-muted text-xs">P/L</div>
-                        <div
-                          className="num text-sm font-semibold"
-                          style={{ color: pnlColor }}
-                        >
+                        <div className="text-xs text-text-muted">P/L</div>
+                        <div className="num text-lg font-semibold" style={{ color: pnlColor }}>
                           {signedPercent(pos.pnl_pct)}
                         </div>
                       </div>
@@ -588,8 +644,8 @@ export function FlowPaperTrading() {
                   <MarkFreshness at={pos.last_marked_at ?? pos.updated_at} status={pos.mark_status} quality={pos.mark_quality} />
 
                   {isExpanded && (
-                    <div className="mt-3 pt-3 border-t border-border space-y-2">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                    <div className="mt-3 space-y-3 border-t border-border pt-3">
+                      <div className="grid grid-cols-2 gap-3 text-xs md:grid-cols-4">
                         <div>
                           <div className="text-text-muted">Side</div>
                           <div className="font-semibold" style={{ color: sideColor }}>
@@ -598,17 +654,17 @@ export function FlowPaperTrading() {
                         </div>
                         <div>
                           <div className="text-text-muted">Entry</div>
-                          <div className="num text-text-primary">${pos.entry_premium?.toFixed(2)}</div>
+                          <div className="num text-sm text-text-primary">${pos.entry_premium?.toFixed(2)}</div>
                         </div>
                         <div>
                           <div className="text-text-muted">Current</div>
-                          <div className="num" style={{ color: pnlColor }}>
+                          <div className="num text-sm" style={{ color: pnlColor }}>
                             ${pos.current_premium?.toFixed(2)}
                           </div>
                         </div>
                         <div>
                           <div className="text-text-muted">P/L $</div>
-                          <div className="num font-semibold" style={{ color: pnlColor }}>
+                          <div className="num text-sm font-semibold" style={{ color: pnlColor }}>
                             {pnlDollars == null ? "Unknown" : `${pnlDollars >= 0 ? "+" : ""}$${pnlDollars.toFixed(0)}`}
                           </div>
                         </div>
@@ -631,13 +687,13 @@ export function FlowPaperTrading() {
                       </div>
 
                       {pos.analysis && (
-                        <div className="text-sm text-text-secondary leading-relaxed max-w-[72ch]">
+                        <p className="prose-read max-w-[72ch] text-text-secondary">
                           {pos.analysis}
-                        </div>
+                        </p>
                       )}
 
                       {!hasPolicy && <p className="text-xs text-text-muted">Exit policy unavailable</p>}
-                      {hasPolicy && <div className="flex flex-wrap items-center gap-3 text-xs num pt-1">
+                      {hasPolicy && <div className="flex flex-wrap items-center gap-3 pt-1 text-xs num">
                         <span className="text-text-muted">Targets:</span>
                         <span className="text-accent-red">
                           Stop ${stopTarget.toFixed(2)} ({signedPercent(policy.stop_pct, 0)})
@@ -650,7 +706,7 @@ export function FlowPaperTrading() {
                         </span>
                       </div>}
 
-                      {hasPolicy && pos.current_premium != null && <div className="relative h-2 rounded-full bg-border overflow-hidden">
+                      {hasPolicy && pos.current_premium != null && <div className="relative h-2 overflow-hidden rounded-full bg-border">
                         {(() => {
                           const range = tp2Target - stopTarget;
                           const pos_pct = range > 0
@@ -682,163 +738,88 @@ export function FlowPaperTrading() {
               );
             })}
           </div>
-        </GlassPanel>
+        </section>
       )}
-
-      {/* Trade Decision Log — closed positions with full scoring rationale + exit reason */}
-      <details className="text-xs">
-        <summary className="text-sm font-semibold text-text-primary cursor-pointer">
-          Trade decision log
-        </summary>
-        <div className="mt-2"><TradeDecisionLog /></div>
-      </details>
 
       {/* WL-A / WL-B Separated Watchlist */}
       {(wla.length > 0 || wlb.length > 0) && (
-        <div className="space-y-3">
-          {/* WL-A — Auto-Entry */}
-          {wla.length > 0 && (
-            <GlassPanel title={<span className="inline-flex items-center gap-1.5"><Zap size={12} className="text-text-muted" />Watchlist A: auto-entry <span className="num font-normal text-text-muted">{wla.length}</span></span>}>
-              <div className="divide-y divide-border">
-                {wla.map((w, idx) => {
-                  const optColor =
-                    w.option_type === "CALL" || w.option_type === "C"
-                      ? "var(--accent-green)"
-                      : "var(--accent-red)";
-                  const pnl = premiumChange(w.current_premium, w.ref_premium, w.last_marked_at);
-                  return (
-                    <div
-                      key={w.id ?? idx}
-                      className="flex flex-wrap items-center justify-between gap-2 px-1 py-2 hover:bg-bg-card-hover"
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <ScoreBadge score={w.score} />
-                        <SideIcon side={w.side} />
-                        <span className="num text-sm font-semibold text-text-primary">
-                          {w.ticker}
-                        </span>
-                        <span className="num text-xs text-text-primary">
-                          ${w.strike}
-                        </span>
-                        <span className="text-xs" style={{ color: optColor }}>
-                          {w.option_type}
-                        </span>
-                        <span className="text-xs text-text-muted num">
-                          exp {w.expiry}
-                        </span>
-                        <SourceTag source={w.source} />
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-text-muted num">
-                          ref ${typeof w.ref_premium === "number" ? w.ref_premium.toFixed(2) : w.ref_premium}
-                        </span>
-                        {w.gate_price != null && (
-                          <span className="num text-xs text-text-primary font-semibold">
-                            gate ${typeof w.gate_price === "number" ? w.gate_price.toFixed(2) : w.gate_price}
-                          </span>
-                        )}
-                        <PnlBadge pnl={pnl} />
-                        <MarkFreshness at={w.last_marked_at} />
-                      </div>
-                    </div>
-                  );
-                })}
+        <section className="space-y-3">
+          <SectionHead
+            title={<>Watchlist <span className="num text-base text-text-muted">{wla.length + wlb.length}</span></>}
+            sub="List A enters automatically at the gate price; list B is analysis only. P/L is the mark against the reference premium."
+          />
+          <div className="card space-y-6">
+            {/* WL-A — Auto-Entry */}
+            {wla.length > 0 && (
+              <div>
+                <h3 className="mb-1 inline-flex items-center gap-1.5 text-base font-semibold text-text-primary">
+                  <Zap size={14} className="text-text-muted" />List A: auto-entry <span className="num text-sm font-normal text-text-muted">{wla.length}</span>
+                </h3>
+                <div className="divide-y divide-border">
+                  {wla.map((w, idx) => watchRow(w, idx, false))}
+                </div>
               </div>
-            </GlassPanel>
-          )}
+            )}
 
-          {/* WL-B — Analysis Only */}
-          {wlb.length > 0 && (
-            <GlassPanel title={<span className="inline-flex items-center gap-1.5"><Eye size={12} className="text-text-muted" />Watchlist B: analysis only <span className="num font-normal text-text-muted">{wlb.length}</span></span>}>
-              <div className="divide-y divide-border">
-                {wlb.map((w, idx) => {
-                  const optColor =
-                    w.option_type === "CALL" || w.option_type === "C"
-                      ? "var(--accent-green)"
-                      : "var(--accent-red)";
-                  const pnl = premiumChange(w.current_premium, w.ref_premium, w.last_marked_at);
-                  return (
-                    <div
-                      key={w.id ?? idx}
-                      className="flex flex-wrap items-center justify-between gap-2 px-1 py-2 hover:bg-bg-card-hover"
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <ScoreBadge score={w.score} />
-                        <SideIcon side={w.side} />
-                        <span className="num text-sm font-semibold text-text-primary">
-                          {w.ticker}
-                        </span>
-                        <span className="num text-xs text-text-primary">
-                          ${w.strike}
-                        </span>
-                        <span className="text-xs" style={{ color: optColor }}>
-                          {w.option_type}
-                        </span>
-                        <span className="text-xs text-text-muted num">
-                          exp {w.expiry}
-                        </span>
-                        <SourceTag source={w.source} />
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <PnlBadge pnl={pnl} />
-                        <MarkFreshness at={w.last_marked_at} />
-                        <span className="text-xs text-text-muted num">
-                          ref ${typeof w.ref_premium === "number" ? w.ref_premium.toFixed(2) : w.ref_premium}
-                        </span>
-                        <span className="text-xs text-text-muted">
-                          {w.block_reason ?? "Monitoring"}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+            {/* WL-B — Analysis Only */}
+            {wlb.length > 0 && (
+              <div className={wla.length > 0 ? "border-t border-border pt-4" : undefined}>
+                <h3 className="mb-1 inline-flex items-center gap-1.5 text-base font-semibold text-text-primary">
+                  <Eye size={14} className="text-text-muted" />List B: analysis only <span className="num text-sm font-normal text-text-muted">{wlb.length}</span>
+                </h3>
+                <div className="divide-y divide-border">
+                  {wlb.map((w, idx) => watchRow(w, idx, true))}
+                </div>
               </div>
-            </GlassPanel>
-          )}
-        </div>
+            )}
+          </div>
+        </section>
       )}
 
-      {/* Missed Opportunities — WL-A unfilled + WL-B high-score with what-if P/L */}
-      <details className="text-xs">
-        <summary className="text-sm font-semibold text-text-primary cursor-pointer">
-          Missed opportunities
+      {/* Trade Decision Log — closed positions with full scoring rationale + exit reason */}
+      <details className="group/log">
+        <summary className="flex cursor-pointer list-none items-center gap-2 marker:content-none">
+          <ChevronRight size={16} className="shrink-0 text-text-muted transition-transform group-open/log:rotate-90" aria-hidden="true" />
+          <span className="section-title">Closed trades and decision log</span>
         </summary>
-        <div className="mt-2"><MissedOpportunities /></div>
+        <div className="mt-3 text-xs"><TradeDecisionLog /></div>
       </details>
 
-      {/* Synthesis Report Panel + trigger */}
-      <GlassPanel
-        title={
-          <span className="inline-flex items-center gap-1.5">
-            Daily synthesis
-            {synthesis?.date && (
-              <span className="text-text-muted font-normal num">
-                {synthesis.date}
-              </span>
-            )}
-          </span>
-        }
-        actions={
-          <button
-            onClick={() => synthesisMutation.mutate()}
-            disabled={synthesisMutation.isPending}
-            type="button"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors disabled:opacity-40"
-          >
-            {synthesisMutation.isPending ? (
-              <>
-                <Loader2 size={12} className="animate-spin" />
-                Generating with Claude...
-              </>
-            ) : (
-              <>
-                <RefreshCw size={12} />
-                Generate
-              </>
-            )}
-          </button>
-        }
-      >
+      {/* Missed Opportunities — WL-A unfilled + WL-B high-score with what-if P/L */}
+      <details className="group/missed">
+        <summary className="flex cursor-pointer list-none items-center gap-2 marker:content-none">
+          <ChevronRight size={16} className="shrink-0 text-text-muted transition-transform group-open/missed:rotate-90" aria-hidden="true" />
+          <span className="section-title">Missed opportunities</span>
+        </summary>
+        <div className="mt-3 text-xs"><MissedOpportunities /></div>
+      </details>
+
+      {/* Synthesis Report + trigger */}
+      <section className="space-y-3">
+        <SectionHead
+          title={<>Daily synthesis {synthesis?.date && <span className="num text-sm text-text-muted">{synthesis.date}</span>}</>}
+          sub="Claude's read of today's flow, positions and research."
+          actions={
+            <button
+              onClick={() => synthesisMutation.mutate()}
+              disabled={synthesisMutation.isPending}
+              type="button"
+              className="flex min-h-11 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary disabled:opacity-40 md:min-h-8"
+            >
+              {synthesisMutation.isPending ? (
+                <>
+                  <Loader2 size={12} className="animate-spin" />
+                  Generating with Claude...
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={12} />
+                  Generate
+                </>
+              )}
+            </button>
+          }
+        />
         {synthesisMutation.isPending && (
           <div className="flex items-center gap-2 py-3 text-sm text-text-secondary">
             <Loader2 size={14} className="animate-spin" />
@@ -848,18 +829,18 @@ export function FlowPaperTrading() {
         {synthesis?.report ? (
           <SynthesisReport report={synthesis.report} />
         ) : (
-          <p className="text-sm text-text-muted text-center py-3">
+          <p className="py-3 text-sm text-text-muted">
             No synthesis report yet — click Generate to create one
           </p>
         )}
-      </GlassPanel>
+      </section>
 
       {/* Empty state */}
       {positions.length === 0 && wla.length === 0 && wlb.length === 0 && (
-        <div className="text-center py-8 text-text-muted text-sm">
+        <p className="prose-read py-8 text-center text-text-muted">
           Click <strong>Scan and trade</strong> to analyze flow entries and start
           watching for dip-buy opportunities.
-        </div>
+        </p>
       )}
     </div>
   );

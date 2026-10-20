@@ -16,7 +16,6 @@ import { useEntryLifetime } from "./hooks";
 import { parseLocalDate } from "../../../lib/dateOnly";
 import { formatPremium } from "../../../lib/utils";
 import { Segmented } from "../../../components/Glass";
-import { CalendarDays } from "lucide-react";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const SURGE = 3;
@@ -92,11 +91,11 @@ export function WeekdayBehavior({ ticker }: { ticker: string }) {
   const fmtPct = (v: number | null, dp = 1) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(dp)}%`);
 
   return (
-    <div className="card">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
-          <CalendarDays size={13} className="text-text-muted" />
-          Weekday behavior
+    <section>
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="section-title">Weekday behavior</h3>
+          <p className="section-sub">How {ticker} moves on each weekday, with the flow printed that day</p>
         </div>
         <Segmented
           options={[{ value: "3M", label: "3M" }, { value: "6M", label: "6M" }]}
@@ -105,7 +104,8 @@ export function WeekdayBehavior({ ticker }: { ticker: string }) {
           ariaLabel="Weekday behavior window"
         />
       </div>
-      <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+      <div className="card">
+      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
         <span><span className="inline-block w-2 h-2 rounded-sm mr-1" style={{ background: "var(--accent-green)" }} />avg surge day (≥+{SURGE}%)</span>
         <span><span className="inline-block w-2 h-2 rounded-sm mr-1" style={{ background: "var(--accent-red)" }} />avg drop day (≤{DROP}%)</span>
         <span><span className="inline-block w-2 h-0.5 align-middle mr-1" style={{ background: "var(--accent-blue)" }} />avg all days</span>
@@ -224,6 +224,7 @@ export function WeekdayBehavior({ ticker }: { ticker: string }) {
       <div className="mt-2 max-w-[72ch] text-xs leading-relaxed text-text-muted">
         Close-to-close daily returns, last {months === "3M" ? "3" : "6"} months · flow row = prints landed that weekday, median 10d peak P/L from the nightly grading corpus
       </div>
-    </div>
+      </div>
+    </section>
   );
 }

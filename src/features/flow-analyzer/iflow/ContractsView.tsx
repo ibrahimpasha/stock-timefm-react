@@ -164,11 +164,11 @@ export function ContractsView({
 
   if (watchedContracts.length === 0) {
     return (
-      <div className="card text-center py-10 text-text-muted">
-        <Star size={22} className="mx-auto mb-2 opacity-40" />
-        <p className="text-sm">No watched contracts yet.</p>
-        <p className="text-xs mt-1 opacity-70">
-          Click the ★ next to a flow row in the ticker detail to watch its contract.
+      <div className="py-12 text-center">
+        <Star size={22} className="mx-auto mb-3 text-text-muted opacity-60" aria-hidden="true" />
+        <p className="section-title">No watched contracts yet</p>
+        <p className="section-sub">
+          Click the star next to a flow row in the ticker detail to watch its contract.
         </p>
       </div>
     );
@@ -176,12 +176,15 @@ export function ContractsView({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <h4 className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
-          <Star size={13} className="text-accent-orange" style={{ fill: "var(--accent-orange)" }} />
-          Watched contracts
-          <span className="num text-xs font-normal text-text-muted">{watchedContracts.length}</span>
-        </h4>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <div>
+          <h3 className="section-title flex items-baseline gap-2">
+            <Star size={14} className="self-center text-accent-orange" style={{ fill: "var(--accent-orange)" }} />
+            Watched contracts
+            <span className="num text-sm font-normal text-text-muted">{watchedContracts.length}</span>
+          </h3>
+          <p className="section-sub">Hits from the last 30 days of flow, active expiries first</p>
+        </div>
         {anyLoading && (
           <span className="animate-pulse text-xs text-text-muted">Loading flow…</span>
         )}
@@ -199,7 +202,7 @@ export function ContractsView({
           return (
             <div
               key={key}
-              className="flex items-center gap-2 px-2 py-2 text-xs transition-colors hover:bg-bg-card-hover"
+              className="data-row flex items-center gap-2 px-2 py-2.5 text-xs"
               style={{ opacity: expired ? 0.55 : 1 }}
             >
               <button
@@ -224,9 +227,9 @@ export function ContractsView({
                 className="flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-2 rounded text-left"
                 aria-label={`Select ${c.ticker} ${c.strike} ${c.opt_type} contract`}
               >
-              <span className="num w-14 shrink-0 text-sm font-semibold text-text-primary">{c.ticker}</span>
+              <span className="ticker w-16 shrink-0 text-sm">{c.ticker}</span>
               <span
-                className="num shrink-0 font-medium"
+                className="num shrink-0 text-sm font-medium"
                 style={{
                   color: c.opt_type === "CALL" ? "var(--accent-green)" : "var(--accent-red)",
                 }}
@@ -258,12 +261,13 @@ export function ContractsView({
                       {Math.round(stats!.avg_ask)}% ask
                     </span>
                   )}
-                  <span className="num text-text-secondary">
+                  <span className="num text-sm font-semibold text-text-primary">
                     {formatPremium(stats!.total_premium)}
                   </span>
                   {stats!.latest_pnl !== null && (
                     <span
-                      className="num font-semibold"
+                      className="num w-14 text-right font-semibold"
+                      title="Estimated P/L of the latest hit"
                       style={{
                         color:
                           stats!.latest_pnl >= 0
@@ -275,7 +279,7 @@ export function ContractsView({
                       {stats!.latest_pnl.toFixed(1)}%
                     </span>
                   )}
-                  <span className="num ml-auto text-text-muted">
+                  <span className="num ml-auto w-16 text-right text-text-muted">
                     {relDays(stats!.latest_date)}
                   </span>
                 </>

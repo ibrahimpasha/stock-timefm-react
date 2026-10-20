@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { optionIntent } from "../../../lib/optionContract";
-import { Sparkles } from "lucide-react";
 import { useIFlowEntries, useTickerPricesBatch } from "./hooks";
 import {
   canShowMlProbability,
@@ -153,64 +152,66 @@ export function TopSignals({ date, dteFilter }: { date: string; dteFilter: DteFi
 
   if (!signals.length) return null;
   return (
-    <div className="mb-4">
-      <div className="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <h4 className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
-          <Sparkles size={13} className="text-text-muted" />
-          Top signals
-          <span className="num text-xs font-normal text-text-muted">{signals.length}</span>
-        </h4>
-        <span className="text-xs text-text-muted">
-          Ranked by research rank: evidence + directional setup, ML capped at ±3
-        </span>
-      </div>
+    <section className="min-w-0">
+      <h3 className="section-title flex items-baseline gap-2">
+        Top signals
+        <span className="num text-sm font-normal text-text-muted">{signals.length}</span>
+      </h3>
+      <p className="section-sub mb-3">
+        Best contract per ticker by research rank: evidence + directional setup, ML capped at ±3
+      </p>
       <GexWallLegend />
       <div className="divide-y divide-border">
         {signals.map((s) => {
           const e = s.entry;
           const color = s.side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
           const dl = dteTag(e.dte);
+          const pnl = entryPnl(e, priceMap, date);
           return (
             <div
               key={s.ticker}
-              className="px-2 py-2 text-xs transition-colors hover:bg-bg-card-hover"
+              className="data-row px-2 py-2.5 text-xs"
               title={s.reasons.join(" · ")}
             >
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <div className="flex items-center gap-3">
                 <span
-                  className="num w-7 shrink-0 text-sm font-semibold text-text-primary"
+                  className="num w-8 shrink-0 text-right text-base font-semibold text-text-primary"
                   title={`Research Rank ${s.research}: NScore ${s.evidence}, Setup ${s.setup}, ML percentile ${s.ml} (${s.servingMode ?? "unknown"}).`}
                 >
                   {s.research}
                 </span>
-                <span className="num text-sm font-semibold text-text-primary">{s.ticker}</span>
-                <span className="num text-text-primary">
-                  ${e.strike} {e.type || e.option_type}
-                </span>
-                <span style={{ color }} className="font-medium">{s.side}</span>
-                <span className="num text-text-muted">{e.expiry}</span>
-                {dl && (
-                  <span className="text-text-muted">{dl.text.toLowerCase()}</span>
-                )}
-                {s.theme && (
-                  <span className="text-text-secondary">{s.theme}</span>
-                )}
-                {s.pulse != null && (
-                  <span
-                    className="text-text-muted"
-                    title={`Theme Pulse ${s.pulse}/100 is context only and does not change Research Rank.`}
-                  >
-                    context{" "}
-                    <span className={`num ${s.tilt > 0 ? "text-accent-orange" : "text-text-secondary"}`}>
-                      {s.tilt >= 0 ? "+" : ""}{s.tilt.toFixed(1)}
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-baseline gap-2">
+                    <span className="ticker w-14 shrink-0 text-sm">{s.ticker}</span>
+                    <span className="num truncate text-sm" style={{ color }} title={s.side}>
+                      ${e.strike} {e.type || e.option_type}
                     </span>
-                  </span>
-                )}
-                <GexWall ticker={s.ticker} strike={Number(e.strike) || null} showLabel />
-                <span className="text-text-secondary ml-auto num">{formatPremium(parsePremium(e.premium_usd ?? e.premium))}</span>
-                <PnlBadge pnl={entryPnl(e, priceMap, date)} />
+                    {s.theme && (
+                      <span className="truncate text-text-secondary max-sm:hidden">{s.theme}</span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-text-muted">
+                    <span className="num">{e.expiry}</span>
+                    {dl && <span>{dl.text.toLowerCase()}</span>}
+                    {s.pulse != null && (
+                      <span
+                        title={`Theme Pulse ${s.pulse}/100 is context only and does not change Research Rank.`}
+                      >
+                        context{" "}
+                        <span className={`num ${s.tilt > 0 ? "text-accent-orange" : "text-text-secondary"}`}>
+                          {s.tilt >= 0 ? "+" : ""}{s.tilt.toFixed(1)}
+                        </span>
+                      </span>
+                    )}
+                    <GexWall ticker={s.ticker} strike={Number(e.strike) || null} showLabel />
+                  </div>
+                </div>
+                <span className="num w-16 shrink-0 text-right text-sm font-semibold text-text-primary">
+                  {formatPremium(parsePremium(e.premium_usd ?? e.premium))}
+                </span>
+                {pnl != null ? <PnlBadge pnl={pnl} /> : <span className="w-14 shrink-0" aria-hidden="true" />}
               </div>
-              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-text-muted leading-relaxed max-md:flex md:hidden">
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 pl-11 text-text-muted leading-relaxed md:hidden">
                 <span className="num">ML pctl {s.ml}</span>
                 <span className="num">NScore {s.evidence}</span>
                 <span className="num">Setup {s.setup}</span>
@@ -218,13 +219,13 @@ export function TopSignals({ date, dteFilter }: { date: string; dteFilter: DteFi
                   <span className="num">Calibrated P(2x / 10 sessions) {s.mlProbability}%</span>
                 )}
               </div>
-              <div className="mt-1 text-text-muted leading-relaxed md:hidden">
+              <div className="mt-1 pl-11 text-text-muted leading-relaxed md:hidden">
                 {s.reasons.join("  ·  ")}
               </div>
             </div>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }

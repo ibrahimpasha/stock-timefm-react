@@ -38,7 +38,7 @@ function PickTicker({ t }: { t: string }) {
     <button
       type="button"
       onClick={() => setActiveTicker(t)}
-      className="num inline-block font-semibold text-sm text-accent-blue hover:underline"
+      className="ticker inline-block text-sm transition-colors hover:text-accent-blue"
     >
       {t}
     </button>
@@ -55,9 +55,9 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5 border-t border-border pt-3">
+    <div className="space-y-2 border-t border-border pt-4">
       <div className="flex items-baseline gap-1.5">
-        <span className="text-sm font-semibold text-text-primary">{title}</span>
+        <h4 className="text-sm font-semibold text-text-primary">{title}</h4>
         {count !== undefined && (
           <span className="num text-xs text-text-muted">{count}</span>
         )}
@@ -69,14 +69,14 @@ function Section({
 
 function BriefBody({ content }: { content: TraderBriefContent }) {
   return (
-    <div className="space-y-4 max-w-[72ch]">
+    <div className="space-y-5 max-w-[72ch]">
       {/* Hero — current view + trading style */}
       <div>
         <div className="flex items-center gap-2 mb-1.5">
           <span className="text-xs text-text-muted">Style</span>
           <Chip className="capitalize">{content.trading_style}</Chip>
         </div>
-        <p className="text-base text-text-primary leading-relaxed">
+        <p className="prose-read text-text-primary">
           {content.current_view}
         </p>
       </div>
@@ -84,7 +84,7 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
       {/* Open thesis */}
       {content.open_thesis && (
         <Section title="Open thesis">
-          <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
+          <p className="prose-read whitespace-pre-wrap">
             {content.open_thesis}
           </p>
         </Section>
@@ -233,7 +233,7 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
       {/* Style notes */}
       {content.style_notes && (
         <Section title="Style notes">
-          <p className="text-sm text-text-secondary leading-relaxed">
+          <p className="prose-read">
             {content.style_notes}
           </p>
         </Section>
@@ -261,16 +261,18 @@ export function TraderBrief({ author }: { author: string }) {
   const hasContent = !!content;
 
   return (
-    <div className="card">
+    <section className="border-t border-border pt-5">
       {/* Collapsed header */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
         className="w-full flex items-center justify-between gap-2 text-left"
       >
-        <div className="flex items-baseline gap-2">
-          <span className="text-sm font-semibold text-text-primary">
-            Trader brief
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="section-title">Trader brief</span>
+          <span className="text-sm text-text-muted">
+            Style, sectors, open thesis and watchlist
           </span>
           {data?.generated_at && (
             <span
@@ -285,15 +287,15 @@ export function TraderBrief({ author }: { author: string }) {
           )}
         </div>
         {open ? (
-          <ChevronUp size={14} className="text-text-muted" />
+          <ChevronUp size={16} className="text-text-muted" />
         ) : (
-          <ChevronDown size={14} className="text-text-muted" />
+          <ChevronDown size={16} className="text-text-muted" />
         )}
       </button>
 
       {/* Expanded body */}
       {open && (
-        <div className="mt-4 space-y-4">
+        <div className="mt-5 space-y-5">
           {/* Controls */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-text-muted">Window</span>
@@ -341,7 +343,7 @@ export function TraderBrief({ author }: { author: string }) {
           )}
 
           {generate.isError && (
-            <div className="text-xs text-accent-red" role="alert">
+            <div className="callout text-sm" style={{ "--callout": "var(--accent-red)" } as React.CSSProperties} role="alert">
               {generate.error instanceof Error && generate.error.message
                 ? generate.error.message
                 : "The trader brief could not be generated. Try again."}
@@ -376,6 +378,6 @@ export function TraderBrief({ author }: { author: string }) {
           {hasContent && content && <BriefBody content={content} />}
         </div>
       )}
-    </div>
+    </section>
   );
 }

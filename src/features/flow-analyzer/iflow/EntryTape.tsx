@@ -260,12 +260,12 @@ function SortHeaderButton({
     <button
       type="button"
       onClick={() => onSort(sortKey)}
-      className={`${className} flex items-center gap-0.5 select-none cursor-pointer hover:text-text-primary transition-colors`}
+      className={`${className} flex shrink-0 items-center gap-0.5 select-none cursor-pointer whitespace-nowrap hover:text-text-primary transition-colors`}
       style={{ color: active ? "var(--accent-blue)" : undefined }}
       title={`Sort by ${label}`}
     >
       <span>{label}</span>
-      {active && <Arrow size={10} strokeWidth={3} />}
+      {active && <Arrow size={11} strokeWidth={2.5} />}
     </button>
   );
 }
@@ -1003,7 +1003,7 @@ export function EntryTape({
   return (
     <div className="text-xs">
       <QueryNotice queries={dateQueries} label="Flow entries" />
-      <div className="flex items-center justify-between gap-3 px-2 pb-3 max-md:px-1 max-md:flex-wrap max-md:gap-1">
+      <div className="flex items-center justify-between gap-3 pb-4 max-md:flex-wrap max-md:gap-2">
         <div className="flex items-center gap-2 max-md:gap-1 max-md:overflow-x-auto max-md:flex-nowrap max-md:w-full">
           {(() => {
             // Notable button — cycles through:
@@ -1129,7 +1129,7 @@ export function EntryTape({
             </label>
           )}
         </div>
-        <span className="flex items-center gap-3 text-xs text-text-muted">
+        <span className="flex items-center gap-4 text-sm text-text-muted">
           {dayLean != null && (
             <span
               className="whitespace-nowrap"
@@ -1156,35 +1156,36 @@ export function EntryTape({
             </span>
           )}
           <span>
-            <span className="num text-text-secondary">{sortedRows.length}</span> of{" "}
+            <span className="num font-semibold text-text-primary">{sortedRows.length}</span> of{" "}
             <span className="num">{entries.length}</span> entries
           </span>
           {dates.length > 1 ? <span>{dates.length} dates</span> : null}
         </span>
       </div>
+      <div className="card min-w-fit p-0! overflow-clip">
       <div
-        className="iflow-tape-header sticky top-0 z-10 flex items-center gap-2 border-b border-border px-2 py-2 text-xs font-medium text-text-muted max-md:gap-1"
-        style={{ background: "var(--bg-primary)" }}
+        className="iflow-tape-header sticky top-0 z-10 flex items-center gap-3 border-b border-border px-3 py-2.5 text-xs font-medium text-text-muted max-md:gap-1.5 max-md:px-2"
+        style={{ background: "var(--card-bg)" }}
       >
-        {renderHeader("Rank", "avg", "w-12 justify-center")}
-        {renderHeader("NScore", "score", "w-10 justify-center max-md:hidden")}
-        {renderHeader("ML", "ml", "w-10 justify-center max-md:hidden")}
-        {renderHeader("Setup", "setup", "w-10 justify-center max-md:hidden")}
-        {renderHeader("Time", "time", "w-12 justify-start max-md:hidden")}
-        {renderHeader("Ticker", "ticker", "w-14 justify-start")}
-        {renderHeader("Side", "side", "w-12 justify-start max-md:w-10")}
-        {renderHeader("Action", "action", "w-24 justify-start max-md:hidden")}
+        {renderHeader("Rank", "avg", "w-12 justify-end")}
+        {renderHeader("NScore", "score", "w-12 justify-end max-md:hidden")}
+        {renderHeader("ML", "ml", "w-10 justify-end max-md:hidden")}
+        {renderHeader("Setup", "setup", "w-12 justify-end max-md:hidden")}
+        {renderHeader("Time", "time", "w-12 justify-start pl-2 max-md:hidden")}
+        {renderHeader("Ticker", "ticker", "w-16 justify-start")}
+        {renderHeader("Side", "side", "w-10 justify-start")}
+        {renderHeader("Action", "action", "w-28 justify-start max-md:hidden")}
         {renderHeader("Contract", "contract", "flex-1 min-w-[160px] justify-start max-md:min-w-[80px]")}
         {renderHeader("DTE", "dte", "w-20 justify-start max-md:hidden")}
-        {renderHeader("Earn", "ern", "w-10 justify-start max-md:hidden")}
+        {renderHeader("Earn", "ern", "w-10 justify-end max-md:hidden")}
         {renderHeader("Vol/OI", "voi", "w-14 justify-end max-md:hidden")}
-        {renderHeader("Ask%", "ask", "w-14 justify-end max-md:hidden")}
+        {renderHeader("Ask%", "ask", "w-12 justify-end max-md:hidden")}
         {renderHeader("ATM%", "atm", "w-16 justify-end max-md:hidden")}
         {renderHeader("Premium", "premium", "w-20 justify-end max-md:hidden")}
         {renderHeader("Est. P/L", "pnl", "w-16 justify-end")}
-        {renderHeader("Wtd peak", "pred_peak", "w-20 justify-end max-md:hidden")}
+        {renderHeader("Wtd peak", "pred_peak", "w-20 justify-end pr-1 max-md:hidden")}
       </div>
-      <div className="divide-y divide-border">
+      <div className="divide-y divide-border px-1">
       {sortedRows.map((r) => {
         const sideColor =
           r.side === "Unknown" ? "var(--text-muted)" : r.side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
@@ -1236,9 +1237,9 @@ export function EntryTape({
             key={r.msgId}
             type="button"
             onClick={() => onSelectTicker(r.ticker)}
-            className="iflow-tape-row flex w-full items-center gap-2 px-2 py-2 text-left transition-colors hover:bg-bg-card-hover max-md:gap-1"
+            className="iflow-tape-row data-row flex w-full items-center gap-3 px-2 py-2.5 text-left max-md:gap-1.5 max-md:px-1"
             style={{
-              background: isSelected ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : "transparent",
+              background: isSelected ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)" : undefined,
             }}
           >
             {/* Evidence-first ordering score; it is not a probability. */}
@@ -1258,7 +1259,7 @@ export function EntryTape({
                   `Use for ordering only; it is not an outcome probability.`;
               return (
                 <span
-                  className="relative w-12 text-center text-sm font-semibold num"
+                  className="relative w-12 shrink-0 text-right text-sm font-semibold num"
                   style={{ color: researchRankTextColor(rank) }}
                   title={title}
                   aria-label={title}
@@ -1281,7 +1282,7 @@ export function EntryTape({
                 with empirically-recalibrated weights. Component breakdown
                 in the hover tooltip. */}
             <span
-              className={`w-10 text-center num max-md:hidden ${scoreNum != null && scoreNum >= 85 ? "font-bold" : "font-medium"}`}
+              className={`w-12 shrink-0 text-right num max-md:hidden ${scoreNum != null && scoreNum >= 85 ? "font-bold" : "font-medium"}`}
               style={{ color: scoreTextColor(scoreNum) }}
               title={scoreTitle}
             >
@@ -1311,7 +1312,7 @@ export function EntryTape({
                   `${provenance.length ? provenance.join(" · ") : modelMetadataLabel(r.notable?.metadata)}`;
               return (
                 <span
-                  className="w-10 text-center font-semibold num max-md:hidden"
+                  className="w-10 shrink-0 text-right font-semibold num max-md:hidden"
                   style={{ color: mlTextColor(ml) }}
                   title={mlTitle}
                 >
@@ -1337,7 +1338,7 @@ export function EntryTape({
                   `Heuristic context only; it is not an outcome probability.`;
               return (
                 <span
-                  className="w-10 text-center font-semibold num max-md:hidden"
+                  className="w-12 shrink-0 text-right font-semibold num max-md:hidden"
                   style={{ color: setupTextColor(s.score) }}
                   title={title}
                 >
@@ -1345,20 +1346,20 @@ export function EntryTape({
                 </span>
               );
             })()}
-            <span className="w-12 num text-text-secondary max-md:hidden">{r.timeLabel}</span>
-            <span className="w-14 num text-sm font-semibold text-text-primary">{r.ticker}</span>
+            <span className="w-12 shrink-0 pl-2 num text-text-muted max-md:hidden">{r.timeLabel}</span>
+            <span className="ticker w-16 shrink-0 truncate text-sm">{r.ticker}</span>
             <span
-              className="w-12 text-xs font-medium max-md:w-10"
+              className="w-10 shrink-0 text-xs font-medium"
               style={{ color: sideColor }}
             >
               {r.side}
             </span>
-            <span className="w-24 text-text-secondary max-md:hidden flex items-center gap-1">
+            <span className="w-28 shrink-0 text-text-muted max-md:hidden flex items-center gap-1">
               <span className="truncate">{r.action}</span>
               {isDissent(r) && (
                 <span
-                  className="shrink-0 text-xs font-medium"
-                  style={{ color: "var(--accent-purple)" }}
+                  className="tag shrink-0"
+                  style={{ "--tag": "var(--accent-purple)" } as React.CSSProperties}
                   title={
                     `DISSENT — conviction print against a ${Math.round((leanByDate.get(r.flowDate) ?? 0) * 100)}% ` +
                     `${sideOf(leanByDate.get(r.flowDate))?.toLowerCase()} tape: single-name, ask% ${r.askPct}, DTE ${r.dte}, ` +
@@ -1371,7 +1372,7 @@ export function EntryTape({
                 </span>
               )}
             </span>
-            <span className="flex-1 min-w-[160px] num text-text-primary truncate flex items-center gap-1.5 max-md:min-w-[80px]" title={r.contractLabel}>
+            <span className="flex-1 min-w-[160px] num text-text-secondary truncate flex items-center gap-1.5 max-md:min-w-[80px]" title={r.contractLabel}>
               <span className="truncate">{r.contractLabel}</span>
               {r.printCount > 1 && (
                 <span
@@ -1382,7 +1383,7 @@ export function EntryTape({
                 </span>
               )}
             </span>
-            <span className="w-20 flex items-center gap-1.5 text-text-muted max-md:hidden">
+            <span className="w-20 shrink-0 flex items-center gap-1.5 text-text-muted max-md:hidden">
               {r.dte ? <span className="num text-text-secondary">{r.dte}d</span> : null}
               {r.dteCategory ? (
                 <span className="text-xs">{r.dteCategory.text.toLowerCase()}</span>
@@ -1394,7 +1395,7 @@ export function EntryTape({
               const show = n != null && n >= 0;
               return (
                 <span
-                  className={`w-10 num max-md:hidden ${show && n === 0 ? "font-bold" : ""}`}
+                  className={`w-10 shrink-0 text-right num max-md:hidden ${show && n === 0 ? "font-bold" : ""}`}
                   style={{
                     color: !show ? "var(--text-muted)"
                       : n === 0 ? "var(--accent-orange)"
@@ -1408,7 +1409,7 @@ export function EntryTape({
               );
             })()}
             <span
-              className="w-14 text-right num max-md:hidden"
+              className="w-14 shrink-0 text-right num max-md:hidden"
               style={{
                 color: r.voiRatio != null && r.voiRatio >= 2
                   ? "var(--accent-green)"
@@ -1418,7 +1419,7 @@ export function EntryTape({
               {r.voiRatio != null ? `${r.voiRatio.toFixed(1)}×` : "—"}
             </span>
             <span
-              className="w-14 text-right num max-md:hidden"
+              className="w-12 shrink-0 text-right num max-md:hidden"
               style={{
                 color: r.askPct == null
                   ? "var(--text-muted)"
@@ -1431,12 +1432,14 @@ export function EntryTape({
             >
               {r.askPct != null ? `${r.askPct}%` : "—"}
             </span>
-            <span className="w-16 text-right num max-md:hidden" style={{ color: moneyColor }}>
+            <span className="w-16 shrink-0 text-right num max-md:hidden" style={{ color: moneyColor }}>
               {r.moneyness != null
                 ? `${r.moneyness >= 0 ? "+" : ""}${r.moneyness.toFixed(1)}%`
                 : "—"}
             </span>
-            <span className="w-20 text-right num text-text-primary max-md:hidden">
+            <span
+              className={`w-20 shrink-0 text-right num text-sm max-md:hidden ${r.premium >= 1_000_000 ? "font-bold text-text-primary" : "font-semibold text-text-primary"}`}
+            >
               {r.premium > 0 ? formatPremium(r.premium) : "—"}
             </span>
             {(() => {
@@ -1459,7 +1462,7 @@ export function EntryTape({
                   : "var(--text-muted)";
               return (
                 <span
-                  className="w-16 text-right font-semibold num"
+                  className="w-16 shrink-0 text-right font-semibold num"
                   style={{ color }}
                   title={cur > 0 ? `current ${r.ticker} $${cur.toFixed(2)} vs entry $${r.underlyingFill.toFixed(2)}` : "price loading…"}
                 >
@@ -1481,7 +1484,7 @@ export function EntryTape({
                   ? "Weighted peak unavailable: the peak regressor was not served."
                   : "Weighted peak hidden: approved, calibrated probability metadata is required.";
                 return (
-                  <span className="w-20 text-right num text-text-muted max-md:hidden" title={unavailableReason}>
+                  <span className="w-20 shrink-0 pr-1 text-right num text-text-muted max-md:hidden" title={unavailableReason}>
                     —
                   </span>
                 );
@@ -1501,7 +1504,7 @@ export function EntryTape({
                 `Research estimate only; the ML percentile is not used as probability.`;
               return (
                 <span
-                  className="w-20 text-right font-semibold num max-md:hidden"
+                  className="w-20 shrink-0 pr-1 text-right font-semibold num max-md:hidden"
                   style={{ color }}
                   title={title}
                 >
@@ -1512,6 +1515,7 @@ export function EntryTape({
           </button>
         );
       })}
+      </div>
       </div>
     </div>
   );

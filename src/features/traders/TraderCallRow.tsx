@@ -216,7 +216,7 @@ export function TraderCallRow({
     <div style={{ borderBottom: "1px solid var(--border)" }}>
       {/* Main row — clickable */}
       <div
-        className="text-sm py-2 px-3 hover:bg-bg-card-hover transition-colors cursor-pointer flex items-center gap-2.5 flex-wrap"
+        className="data-row text-sm py-2.5 px-3 cursor-pointer flex items-center gap-2.5 flex-wrap"
         onClick={() => onToggle(call.alert_id)}
       >
         {/* Direction badge */}
@@ -235,7 +235,7 @@ export function TraderCallRow({
               e.stopPropagation();
               onTickerClick?.(call.ticker!);
             }}
-            className="num font-semibold shrink-0 text-sm cursor-pointer rounded-[var(--radius-control)]"
+            className="ticker shrink-0 text-sm cursor-pointer rounded-[var(--radius-control)]"
             style={{
               color: tickerHi ? "var(--accent-blue)" : "var(--text-primary)",
               background: tickerHi
@@ -361,26 +361,17 @@ export function TraderCallRow({
       {expanded && (
         <div
           id={detailsId}
-          className="text-xs py-2 pr-3 pb-2.5 pl-14 text-text-secondary flex flex-col gap-1.5 leading-relaxed"
-          style={{
-            background: "color-mix(in srgb, var(--bg-card) 50%, transparent)",
-          }}
+          className="text-sm py-2 pr-3 pb-3 pl-14 text-text-secondary flex flex-col gap-2 leading-relaxed"
         >
           {call.rationale && (
-            <div className="italic text-xs text-text-muted">
+            <div className="font-display text-base leading-relaxed text-text-secondary max-w-[72ch]">
               {call.rationale}
             </div>
           )}
 
           {call.content && (
             <div
-              className="whitespace-pre-wrap text-xs text-text-secondary p-2 max-h-56 overflow-auto"
-              style={{
-                background:
-                  "color-mix(in srgb, var(--bg-card-hover) 50%, transparent)",
-                borderRadius: "var(--radius-control)",
-                border: "1px solid var(--border)",
-              }}
+              className="whitespace-pre-wrap text-sm text-text-secondary border-t border-border pt-2 max-h-56 overflow-auto max-w-[72ch]"
             >
               {call.content}
             </div>

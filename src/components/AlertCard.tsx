@@ -1,7 +1,9 @@
 import type { FlowAlert } from "../lib/types";
 import { ALERT_STATE_COLORS } from "../lib/constants";
 import { formatCurrency, formatPercentRaw } from "../lib/utils";
+import type { CSSProperties } from "react";
 import { Bell, Send, X } from "lucide-react";
+import { Stat } from "./Glass";
 
 interface AlertCardProps {
   alert: FlowAlert;
@@ -15,30 +17,31 @@ export function AlertCard({ alert, onDismiss, onSendDiscord }: AlertCardProps) {
     alert.side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
 
   return (
-    <div className="card flex flex-col gap-2">
+    <div className="card flex flex-col gap-3">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Bell size={14} style={{ color: stateColor }} />
-          <span className="text-xs font-medium capitalize text-text-secondary">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2.5">
+            <span className="ticker text-xl leading-none">{alert.ticker}</span>
+            <span className="text-sm font-semibold" style={{ color: sideColor }}>
+              {alert.side}
+            </span>
+          </div>
+          <div className="num mt-1.5 text-sm text-text-secondary">
+            ${alert.strike} {alert.option_type} &middot; {alert.premium}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <span className="tag mr-1 capitalize" style={{ "--tag": stateColor } as CSSProperties}>
+            <Bell size={12} aria-hidden />
             {String(alert.state).toLowerCase()}
           </span>
-          <span className="num font-bold text-text-primary">
-            {alert.ticker}
-          </span>
-          <span
-            className="text-xs font-semibold"
-            style={{ color: sideColor }}
-          >
-            {alert.side}
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
           {onSendDiscord && (
             <button
               onClick={() => onSendDiscord(alert.id)}
-              className="p-1 text-text-muted hover:text-accent-blue transition-colors"
+              className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-bg-card-hover hover:text-accent-blue"
               title="Send to Discord"
+              aria-label="Send to Discord"
             >
               <Send size={14} />
             </button>
@@ -46,8 +49,9 @@ export function AlertCard({ alert, onDismiss, onSendDiscord }: AlertCardProps) {
           {onDismiss && (
             <button
               onClick={() => onDismiss(alert.id)}
-              className="p-1 text-text-muted hover:text-accent-red transition-colors"
+              className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-bg-card-hover hover:text-accent-red"
               title="Dismiss"
+              aria-label="Dismiss alert"
             >
               <X size={14} />
             </button>
@@ -55,46 +59,25 @@ export function AlertCard({ alert, onDismiss, onSendDiscord }: AlertCardProps) {
         </div>
       </div>
 
-      {/* Contract details */}
-      <div className="num text-sm text-text-secondary">
-        ${alert.strike} {alert.option_type} &middot; {alert.premium}
-      </div>
-
       {/* Price + dip info */}
-      <div className="flex items-center gap-4 text-xs">
-        <div>
-          <span className="text-text-muted">Ref: </span>
-          <span className="num text-text-primary">
-            {formatCurrency(alert.ref_price)}
-          </span>
-        </div>
-        <div>
-          <span className="text-text-muted">Now: </span>
-          <span className="num text-text-primary">
-            {formatCurrency(alert.current_price)}
-          </span>
-        </div>
+      <div className="grid grid-cols-3 gap-3">
+        <Stat label="Ref" value={formatCurrency(alert.ref_price)} />
+        <Stat label="Now" value={formatCurrency(alert.current_price)} />
         {alert.dip_pct !== 0 && (
-          <div>
-            <span className="text-text-muted">Dip: </span>
-            <span
-              className="num font-semibold"
-              style={{
-                color:
-                  alert.dip_pct < 0
-                    ? "var(--accent-green)"
-                    : "var(--accent-red)",
-              }}
-            >
-              {formatPercentRaw(alert.dip_pct)}
-            </span>
-          </div>
+          <Stat
+            label="Dip"
+            value={
+              <span style={{ color: alert.dip_pct < 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
+                {formatPercentRaw(alert.dip_pct)}
+              </span>
+            }
+          />
         )}
       </div>
 
       {/* Reason */}
       {alert.reason && (
-        <p className="text-xs text-text-secondary">{alert.reason}</p>
+        <p className="text-sm leading-relaxed text-text-secondary">{alert.reason}</p>
       )}
     </div>
   );

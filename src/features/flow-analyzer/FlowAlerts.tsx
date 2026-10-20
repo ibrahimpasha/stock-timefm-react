@@ -60,22 +60,23 @@ export function FlowAlerts() {
   return (
     <div>
       {/* Header with action buttons */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Bell size={14} className="text-text-muted" />
-          <span className="text-sm font-semibold text-text-primary">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="section-title flex items-baseline gap-2">
+            <Bell size={16} className="self-center text-text-muted" />
             Flow alerts
-          </span>
-          <span className="text-xs num text-text-muted">
-            {actionableAlerts.length}
-          </span>
+            <span className="num text-base font-normal text-text-muted">
+              {actionableAlerts.length}
+            </span>
+          </h3>
+          <p className="section-sub">Dipping, buy-now, peaked and waiting setups from tracked flow.</p>
         </div>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={handleSendAllToDiscord}
             disabled={sendDiscordMutation.isPending}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-accent-blue hover:bg-accent-blue/10 transition-colors disabled:opacity-50"
+            className="flex min-h-8 items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-accent-blue transition-colors hover:bg-accent-blue/10 disabled:opacity-50"
           >
             {sendDiscordMutation.isPending ? (
               <Loader2 size={12} className="animate-spin" />
@@ -88,7 +89,7 @@ export function FlowAlerts() {
             type="button"
             onClick={handleDismissAll}
             disabled={dismissMutation.isPending}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-text-muted hover:text-accent-red hover:bg-accent-red/10 transition-colors disabled:opacity-50"
+            className="flex min-h-8 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-text-muted transition-colors hover:bg-accent-red/10 hover:text-accent-red disabled:opacity-50"
           >
             {dismissMutation.isPending ? (
               <Loader2 size={12} className="animate-spin" />
@@ -101,7 +102,7 @@ export function FlowAlerts() {
       </div>
 
       {/* Alert list */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {actionableAlerts.map((alert) => (
           <AlertCard
             key={alert.id}

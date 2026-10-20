@@ -211,11 +211,30 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
     <div className="flex flex-col gap-3">
       <style>{MAP_CSS}</style>
 
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <p className="text-sm leading-relaxed text-text-secondary max-w-[72ch]">
-          Every tracked ticker at its building. Size = market cap, color = bull/bear
-          (technical + momentum + flow). Search or filter to zero in.
-        </p>
+      <div className="flex items-end justify-between flex-wrap gap-x-8 gap-y-4">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-end gap-x-10 gap-y-3" aria-live="polite">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-text-muted">On the map</span>
+              <span className="num text-3xl font-semibold tracking-tight text-text-primary">
+                {stats.shown}
+                {stats.shown !== stats.total && <span className="text-lg text-text-muted">/{stats.total}</span>}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-text-muted">Bullish</span>
+              <span className="delta-up text-3xl font-semibold tracking-tight">{stats.bull}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-text-muted">Bearish</span>
+              <span className="delta-down text-3xl font-semibold tracking-tight">{stats.bear}</span>
+            </div>
+          </div>
+          <p className="text-sm leading-relaxed text-text-secondary max-w-[72ch]">
+            Every tracked ticker at its building. Size = market cap, color = bull/bear
+            (technical + momentum + flow). Search or filter to zero in.
+          </p>
+        </div>
         <div className="max-sm:w-full">
           <label htmlFor={searchId} className="sr-only">
             Search mapped companies by ticker or name
@@ -276,6 +295,12 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
             value={region}
             onChange={setRegion}
           />
+          <details className="group min-w-0 [&[open]]:basis-full">
+          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-full border border-border px-3 text-xs font-medium text-text-secondary hover:text-text-primary lg:min-h-8">
+            <SlidersHorizontal size={12} aria-hidden="true" /> Filters
+            <ChevronDown size={12} aria-hidden="true" className="transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
           <Segmented<Signal>
             ariaLabel="Map signal filter"
             options={[
@@ -305,7 +330,9 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
               setFocusTicker(null);
             }}
           />
-          <span className="text-text-muted ml-auto" aria-live="polite">
+          </div>
+          </details>
+          <span className="text-text-muted ml-auto">
             <span className="text-text-secondary num">{stats.shown}</span>
             {stats.shown !== stats.total && <span className="num">/{stats.total}</span>} shown ·{" "}
             <span className="text-accent-green num">{stats.bull}▲</span>{" "}
@@ -400,11 +427,11 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
         aria-labelledby={listHeadingId}
         className="card flex max-h-[calc(100vh-220px)] min-h-0 flex-col overflow-hidden max-lg:max-h-80"
       >
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 id={listHeadingId} className="text-sm font-semibold text-text-primary">
+        <div className="mb-3 flex items-baseline justify-between gap-2">
+          <h2 id={listHeadingId} className="section-title">
             Companies
           </h2>
-          <span className="num text-xs text-text-muted">{filtered.length}</span>
+          <span className="num text-sm text-text-muted">{filtered.length}</span>
         </div>
         <QueryNotice queries={[mapQuery]} label="Company map" />
         {filtered.length === 0 ? (
@@ -421,14 +448,18 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
                     type="button"
                     onClick={() => selectCompany(c)}
                     aria-pressed={selected}
-                    className={`flex min-h-8 w-full items-center gap-2 rounded px-2 py-2 text-left transition-colors max-lg:min-h-11 ${
-                      selected ? "segmented-option-active" : "text-text-secondary hover:bg-bg-card-hover hover:text-text-primary"
+                    title={`${c.name} · ${fmtCap(c.market_cap)}`}
+                    className={`flex min-h-8 w-full items-center gap-2 rounded px-2 py-2.5 text-left transition-colors max-lg:min-h-11 ${
+                      selected ? "segmented-option-active" : "data-row text-text-secondary hover:text-text-primary"
                     }`}
                   >
-                    <span className="num w-14 shrink-0 text-xs font-semibold">{c.ticker}</span>
+                    <span className="ticker w-14 shrink-0 text-sm">{c.ticker}</span>
                     <span className="min-w-0 flex-1 truncate text-sm">{c.name}</span>
                     <span className="sr-only">{signalLabel}, market cap {fmtCap(c.market_cap)}</span>
-                    <span className="num shrink-0 text-xs" aria-hidden="true">
+                    <span
+                      className={`shrink-0 text-sm ${c.score == null ? "num text-text-muted" : c.score > 0 ? "delta-up" : c.score < 0 ? "delta-down" : "num"}`}
+                      aria-hidden="true"
+                    >
                       {c.score == null ? "—" : `${c.score > 0 ? "+" : ""}${c.score}`}
                     </span>
                   </button>
@@ -453,7 +484,7 @@ export function BayAreaMapPage() {
           <p>Tracked companies at their headquarters, colored by bull/bear signal</p>
         </div>
       </header>
-      <CompanyMapView heightOffset={290} />
+      <CompanyMapView heightOffset={370} />
     </div>
   );
 }
