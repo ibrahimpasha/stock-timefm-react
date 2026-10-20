@@ -4,8 +4,6 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
-  Calendar,
-  Settings2,
 } from "lucide-react";
 import { MODEL_LABELS, MODEL_COLORS } from "../../lib/constants";
 import { todayLocalDate } from "../../lib/dateOnly";
@@ -85,6 +83,15 @@ export const DEFAULT_SETTINGS: ForecastSettings = {
   showATR: false,
 };
 
+/** Shared on/off pill for every toggle in this form — one accent, no rainbow. */
+const pill = (on: boolean) =>
+  `px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+    on
+      ? "border border-accent-blue/40 bg-accent-blue/10 text-text-primary"
+      : "border border-border text-text-muted hover:text-text-secondary"
+  }`;
+const fieldLabel = "text-xs text-text-muted mb-1 block";
+
 export function ForecastConfig({
   settings,
   onChange,
@@ -125,32 +132,16 @@ export function ForecastConfig({
 
   const renderChip = (m: string) => {
     const selected = settings.selectedModels.includes(m);
-    const color = MODEL_COLORS[m] || "#8b949e";
+    const color = MODEL_COLORS[m] || "var(--text-muted)";
     return (
       <button
         key={m}
         type="button"
         aria-pressed={selected}
         onClick={() => toggleModel(m)}
-        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all ${
-          selected
-            ? "border-2"
-            : "border border-border text-text-muted opacity-50 hover:opacity-80"
-        }`}
-        style={
-          selected
-            ? {
-                borderColor: `${color}60`,
-                background: `${color}12`,
-                color,
-              }
-            : undefined
-        }
+        className={`flex items-center gap-1.5 ${pill(selected)}`}
       >
-        <span
-          className="w-2 h-2 rounded-full"
-          style={{ background: color }}
-        />
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: color, opacity: selected ? 1 : 0.5 }} />
         {MODEL_LABELS[m] || m}
       </button>
     );
@@ -158,13 +149,12 @@ export function ForecastConfig({
 
   return (
     <div className="card space-y-4">
-      {/* Row 1: Type + Horizon + History */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <h3 className="text-sm font-semibold text-text-primary">Forecast</h3>
+      {/* Row 1: Type + Horizon + History + Origin */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
         {/* Forecast Type */}
         <div>
-          <label className="text-xs uppercase tracking-wider text-text-muted mb-1 block">
-            Type
-          </label>
+          <span className={fieldLabel}>Type</span>
           <div className="flex gap-1">
             {(["daily", "intraday"] as const).map((t) => (
               <button
@@ -180,11 +170,7 @@ export function ForecastConfig({
                         )
                       : settings.selectedModels,
                 })}
-                className={`flex-1 px-2 py-1.5 rounded text-xs font-mono capitalize transition-all ${
-                  settings.forecastType === t
-                    ? "bg-accent-blue/15 border border-accent-blue/40 text-accent-blue"
-                    : "border border-border text-text-muted hover:text-text-secondary"
-                }`}
+                className={`flex-1 capitalize ${pill(settings.forecastType === t)}`}
               >
                 {t}
               </button>
@@ -194,7 +180,7 @@ export function ForecastConfig({
 
         {/* Horizon */}
         <div>
-          <label htmlFor="forecast-horizon" className="text-xs uppercase tracking-wider text-text-muted mb-1 block">
+          <label htmlFor="forecast-horizon" className={fieldLabel}>
             {settings.forecastType === "daily" ? "Horizon (days)" : "Minutes"}
           </label>
           {settings.forecastType === "daily" ? (
@@ -210,7 +196,7 @@ export function ForecastConfig({
                 }
                 className="flex-1 accent-[var(--accent-blue)]"
               />
-              <span className="font-mono text-xs text-text-primary w-6 text-right">
+              <span className="num text-xs text-text-primary w-6 text-right">
                 {settings.forecastDays}
               </span>
             </div>
@@ -228,7 +214,7 @@ export function ForecastConfig({
                 }
                 className="flex-1 accent-[var(--accent-blue)]"
               />
-              <span className="font-mono text-xs text-text-primary w-10 text-right">
+              <span className="num text-xs text-text-primary w-10 text-right">
                 {settings.forecastMinutes}m
               </span>
             </div>
@@ -237,7 +223,7 @@ export function ForecastConfig({
 
         {/* History */}
         <div>
-          <label htmlFor="forecast-history" className="text-xs uppercase tracking-wider text-text-muted mb-1 block">
+          <label htmlFor="forecast-history" className={fieldLabel}>
             {settings.forecastType === "daily" ? "History (days)" : "Interval"}
           </label>
           {settings.forecastType === "daily" ? (
@@ -253,7 +239,7 @@ export function ForecastConfig({
                 }
                 className="flex-1 accent-[var(--accent-blue)]"
               />
-              <span className="font-mono text-xs text-text-primary w-8 text-right">
+              <span className="num text-xs text-text-primary w-8 text-right">
                 {settings.historyDays}
               </span>
             </div>
@@ -262,7 +248,7 @@ export function ForecastConfig({
               id="forecast-history"
               value={settings.interval}
               onChange={(e) => update({ interval: e.target.value })}
-              className="w-full bg-bg-primary border border-border rounded px-2 py-1.5 text-xs font-mono text-text-primary"
+              className="w-full bg-bg-primary border border-border rounded-md px-2 py-1 text-xs num text-text-primary"
             >
               {INTERVALS.map((i) => (
                 <option key={i} value={i}>
@@ -275,8 +261,8 @@ export function ForecastConfig({
 
         {/* Forecast Origin */}
         <div>
-          <label htmlFor="forecast-origin" className="text-xs uppercase tracking-wider text-text-muted mb-1 flex items-center gap-1">
-            <Calendar size={10} /> Origin Date
+          <label htmlFor="forecast-origin" className={fieldLabel}>
+            Origin date
           </label>
           <input
             id="forecast-origin"
@@ -285,7 +271,7 @@ export function ForecastConfig({
             disabled={settings.forecastType === "intraday"}
             max={todayLocalDate()}
             onChange={(e) => update({ forecastOrigin: e.target.value })}
-            className="w-full bg-bg-primary border border-border rounded px-2 py-1.5 text-xs font-mono text-text-primary"
+            className="w-full bg-bg-primary border border-border rounded-md px-2 py-1 text-xs num text-text-primary"
           />
         </div>
       </div>
@@ -293,9 +279,9 @@ export function ForecastConfig({
       {/* Row 2: Models */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs uppercase tracking-wider text-text-muted">
-            Models ({settings.selectedModels.length}/{availableModels.length})
-          </label>
+          <span className="text-xs text-text-muted">
+            Models <span className="num">{settings.selectedModels.length}/{availableModels.length}</span>
+          </span>
           <div className="flex gap-2">
             <button
               type="button"
@@ -313,7 +299,7 @@ export function ForecastConfig({
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {availableModels.filter((m) => PRIMARY_MODELS.includes(m)).map(renderChip)}
         </div>
         <button
@@ -327,11 +313,11 @@ export function ForecastConfig({
         </button>
         {showResearch && (
           <>
-            <p className="text-xs text-text-muted mt-1 mb-2">
+            <p className="max-w-[72ch] text-xs leading-relaxed text-text-muted mt-1 mb-2">
               No directional edge in backtest: none beat the random-walk range or an
               &ldquo;always up&rdquo; call. Overlays for research, not signals.
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {availableModels.filter((m) => !PRIMARY_MODELS.includes(m)).map(renderChip)}
             </div>
           </>
@@ -346,7 +332,6 @@ export function ForecastConfig({
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="flex items-center gap-1 text-xs text-text-muted hover:text-text-secondary transition-colors"
         >
-          <Settings2 size={12} />
           Advanced
           {showAdvanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </button>
@@ -356,30 +341,30 @@ export function ForecastConfig({
           onClick={onRunForecast}
           disabled={runDisabled}
           title={disabledReason || "Run forecast across selected models"}
-          className="flex items-center gap-2 px-5 py-2 rounded-lg bg-accent-blue text-bg-primary font-semibold text-sm transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-4 py-1.5 rounded-md bg-accent-blue text-bg-primary font-semibold text-sm transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isLoading ? (
             <>
-              <Loader2 size={16} className="animate-spin" />
-              Running {settings.selectedModels.length} models...
+              <Loader2 size={14} className="animate-spin" />
+              Running <span className="num">{settings.selectedModels.length}</span> models…
             </>
           ) : (
             <>
-              <Play size={16} />
-              Run Forecast ({settings.selectedModels.length})
+              <Play size={14} />
+              Run forecast <span className="num">({settings.selectedModels.length})</span>
             </>
           )}
         </button>
       </div>
       {disabledReason && !isLoading && (
-        <div className="text-[10px] font-mono text-text-muted text-right -mt-2">
+        <div className="text-xs text-text-muted text-right -mt-2">
           {disabledReason}
         </div>
       )}
 
       {/* Advanced settings panel */}
       {showAdvanced && (
-        <div className="border-t border-border pt-3 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="border-t border-border pt-3 grid grid-cols-2 gap-x-4 gap-y-3">
           {/* Toggles */}
           <div className="flex items-center justify-between">
             <span className="text-xs text-text-secondary">Covariates</span>
@@ -392,7 +377,7 @@ export function ForecastConfig({
                 update({ useCovariates: !settings.useCovariates })
               }
               className={`w-9 h-5 rounded-full transition-all ${
-                settings.useCovariates ? "bg-accent-green" : "bg-border"
+                settings.useCovariates ? "bg-accent-blue" : "bg-border"
               }`}
             >
               <div
@@ -413,7 +398,7 @@ export function ForecastConfig({
                 update({ usePretrained: !settings.usePretrained })
               }
               className={`w-9 h-5 rounded-full transition-all ${
-                settings.usePretrained ? "bg-accent-green" : "bg-border"
+                settings.usePretrained ? "bg-accent-blue" : "bg-border"
               }`}
             >
               <div
@@ -426,9 +411,7 @@ export function ForecastConfig({
 
           {/* Chart Overlays */}
           <div>
-            <span className="text-xs uppercase tracking-wider text-text-muted block mb-1">
-              Overlays
-            </span>
+            <span className={fieldLabel}>Overlays</span>
             <div className="flex flex-wrap gap-1">
               {["MA20", "MA50", "MA100", "MA200"].map((ma) => (
                 <button
@@ -441,11 +424,7 @@ export function ForecastConfig({
                       : [...settings.showMA, ma];
                     update({ showMA });
                   }}
-                  className={`px-1.5 py-0.5 rounded text-xs font-mono ${
-                    settings.showMA.includes(ma)
-                      ? "bg-accent-orange/20 text-accent-orange border border-accent-orange/30"
-                      : "border border-border text-text-muted"
-                  }`}
+                  className={pill(settings.showMA.includes(ma))}
                 >
                   {ma}
                 </button>
@@ -454,11 +433,7 @@ export function ForecastConfig({
                 type="button"
                 aria-pressed={settings.showBB}
                 onClick={() => update({ showBB: !settings.showBB })}
-                className={`px-1.5 py-0.5 rounded text-xs font-mono ${
-                  settings.showBB
-                    ? "bg-accent-purple/20 text-accent-purple border border-accent-purple/30"
-                    : "border border-border text-text-muted"
-                }`}
+                className={pill(settings.showBB)}
               >
                 BB
               </button>
@@ -466,11 +441,7 @@ export function ForecastConfig({
                 type="button"
                 aria-pressed={settings.showVWAP}
                 onClick={() => update({ showVWAP: !settings.showVWAP })}
-                className={`px-1.5 py-0.5 rounded text-xs font-mono ${
-                  settings.showVWAP
-                    ? "bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/30"
-                    : "border border-border text-text-muted"
-                }`}
+                className={pill(settings.showVWAP)}
               >
                 VWAP
               </button>
@@ -479,9 +450,7 @@ export function ForecastConfig({
 
           {/* Indicators */}
           <div>
-            <span className="text-xs uppercase tracking-wider text-text-muted block mb-1">
-              Indicators
-            </span>
+            <span className={fieldLabel}>Indicators</span>
             <div className="flex flex-wrap gap-1">
               {[
                 { key: "showRSI" as const, label: "RSI" },
@@ -493,11 +462,7 @@ export function ForecastConfig({
                   type="button"
                   aria-pressed={settings[key]}
                   onClick={() => update({ [key]: !settings[key] })}
-                  className={`px-1.5 py-0.5 rounded text-xs font-mono ${
-                    settings[key]
-                      ? "bg-accent-blue/20 text-accent-blue border border-accent-blue/30"
-                      : "border border-border text-text-muted"
-                  }`}
+                  className={pill(settings[key])}
                 >
                   {label}
                 </button>

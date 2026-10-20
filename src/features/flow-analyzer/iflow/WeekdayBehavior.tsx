@@ -93,10 +93,10 @@ export function WeekdayBehavior({ ticker }: { ticker: string }) {
 
   return (
     <div className="card">
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-          <CalendarDays size={12} className="text-accent-cyan" />
-          Weekday Behavior
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
+          <CalendarDays size={13} className="text-text-muted" />
+          Weekday behavior
         </div>
         <Segmented
           options={[{ value: "3M", label: "3M" }, { value: "6M", label: "6M" }]}
@@ -105,7 +105,7 @@ export function WeekdayBehavior({ ticker }: { ticker: string }) {
           ariaLabel="Weekday behavior window"
         />
       </div>
-      <div className="flex items-center gap-3 text-[10px] text-text-muted mb-1">
+      <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
         <span><span className="inline-block w-2 h-2 rounded-sm mr-1" style={{ background: "var(--accent-green)" }} />avg surge day (≥+{SURGE}%)</span>
         <span><span className="inline-block w-2 h-2 rounded-sm mr-1" style={{ background: "var(--accent-red)" }} />avg drop day (≤{DROP}%)</span>
         <span><span className="inline-block w-2 h-0.5 align-middle mr-1" style={{ background: "var(--accent-blue)" }} />avg all days</span>
@@ -193,7 +193,7 @@ export function WeekdayBehavior({ ticker }: { ticker: string }) {
                 <div style={{ width: `${100 - pS - pD}%`, background: "var(--border)" }} />
                 <div style={{ width: `${pD}%`, background: "var(--accent-red)" }} />
               </div>
-              <div className="flex justify-between text-[9px] num mt-0.5">
+              <div className="mt-0.5 flex justify-between text-xs num">
                 <span style={{ color: "var(--accent-green)" }}>{pS.toFixed(0)}%</span>
                 <span style={{ color: "var(--accent-red)" }}>{pD.toFixed(0)}%</span>
               </div>
@@ -207,12 +207,13 @@ export function WeekdayBehavior({ ticker }: { ticker: string }) {
         {stats.flow.map((f, i) => {
           const med = median(f.peaks);
           return (
-            <div key={i} className="text-[9px] num leading-tight"
+            <div key={i} className="text-xs leading-snug"
               title={`${WEEKDAYS[i]}: ${f.n} flow prints in window · net premium ${formatPremium(Math.abs(f.prem))} ${f.prem >= 0 ? "bull" : "bear"} · median 10d peak P/L ${fmtPct(med)} (${f.peaks.length} graded)`}>
-              <div className="text-text-muted">{f.n} fl · <span style={{ color: f.prem >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>{formatPremium(Math.abs(f.prem))}</span></div>
+              <div className="text-text-muted"><span className="num">{f.n}</span> prints</div>
+              <div className="num" style={{ color: f.prem >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>{formatPremium(Math.abs(f.prem))}</div>
               <div>
-                <span className="text-text-muted">pk </span>
-                <span style={{ color: med == null ? "var(--text-muted)" : med >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
+                <span className="text-text-muted">peak </span>
+                <span className="num" style={{ color: med == null ? "var(--text-muted)" : med >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
                   {fmtPct(med, 0)}
                 </span>
               </div>
@@ -220,8 +221,8 @@ export function WeekdayBehavior({ ticker }: { ticker: string }) {
           );
         })}
       </div>
-      <div className="text-[9px] text-text-muted mt-1">
-        close-to-close daily returns, last {months === "3M" ? "3" : "6"} months · flow row = prints landed that weekday, median 10d peak P/L from the nightly grading corpus
+      <div className="mt-2 max-w-[72ch] text-xs leading-relaxed text-text-muted">
+        Close-to-close daily returns, last {months === "3M" ? "3" : "6"} months · flow row = prints landed that weekday, median 10d peak P/L from the nightly grading corpus
       </div>
     </div>
   );

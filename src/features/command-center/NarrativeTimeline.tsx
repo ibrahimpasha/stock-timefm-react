@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, GitBranch, Info } from "lucide-react";
+import { ChevronDown, ChevronRight, Info } from "lucide-react";
 
 import { useNarrative } from "../../api/intelV3";
 import type { NarrativeEvent } from "../../api/intelV3";
@@ -78,22 +78,15 @@ function NarrativeEventRow({
           marginLeft: -(nodeSize - 8) / 2,
           background: color,
           borderColor: "color-mix(in srgb, var(--bg-card) 65%, transparent)",
-          boxShadow: `0 0 0 4px color-mix(in srgb, ${color} 13%, transparent)`,
         }}
       />
       <div className="min-w-0">
-        <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-text-muted">
+        <div className="flex items-center gap-1.5 text-xs text-text-muted">
           <span className="num">{fmtTime(event.ts)}</span>
-          <span
-            className="rounded-full px-2 py-0.5 font-medium"
-            style={{
-              color,
-              background: `color-mix(in srgb, ${color} 12%, transparent)`,
-            }}
-          >
-            {fmtSource(event.source)}
-          </span>
-          <span className="truncate">{event.kind}</span>
+          <span>·</span>
+          <span className="font-medium text-text-secondary">{fmtSource(event.source)}</span>
+          <span>·</span>
+          <span className="truncate">{event.kind.replace(/_/g, " ")}</span>
         </div>
 
         <button
@@ -115,33 +108,27 @@ function NarrativeEventRow({
         </button>
 
         {expanded && hasExpansion && (
-          <div
-            className="mt-2 space-y-2 rounded border px-2.5 py-2 text-xs"
-            style={{
-              borderColor: `color-mix(in srgb, ${color} 24%, var(--border))`,
-              background: "color-mix(in srgb, var(--bg-card-hover) 55%, transparent)",
-            }}
-          >
-            {event.detail && <p className="text-text-secondary">{event.detail}</p>}
+          <div className="mt-2 ml-5 space-y-2 text-xs">
+            {event.detail && <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">{event.detail}</p>}
             {(event.sentiment || event.strength != null) && (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-x-3 text-text-muted">
                 {event.sentiment && (
-                  <span className="rounded bg-bg-card px-1.5 py-0.5 font-mono uppercase text-text-secondary">
-                    sentiment {event.sentiment}
+                  <span>
+                    Sentiment <span className="text-text-secondary">{event.sentiment}</span>
                   </span>
                 )}
                 {event.strength != null && (
-                  <span className="rounded bg-bg-card px-1.5 py-0.5 font-mono uppercase text-text-secondary">
-                    strength {Number(event.strength).toFixed(2)}
+                  <span>
+                    Strength <span className="num text-text-secondary">{Number(event.strength).toFixed(2)}</span>
                   </span>
                 )}
               </div>
             )}
             {refs.length > 0 && (
-              <dl className="grid grid-cols-[72px_1fr] gap-x-2 gap-y-1">
+              <dl className="grid grid-cols-[88px_1fr] gap-x-2 gap-y-1">
                 {refs.map(([key, value]) => (
                   <div key={key} className="contents">
-                    <dt className="truncate font-mono uppercase text-text-muted">{key}</dt>
+                    <dt className="truncate text-text-muted">{key.replace(/_/g, " ")}</dt>
                     <dd className="min-w-0 truncate text-text-secondary" title={value}>
                       {value}
                     </dd>
@@ -180,15 +167,10 @@ export function NarrativeTimeline({
   return (
     <section className="card">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <GitBranch size={14} className="text-accent-cyan" />
-          <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-            Narrative Timeline
-          </h3>
-        </div>
-        <div className="num flex items-center gap-2 text-xs uppercase text-text-muted">
-          <span>{data?.summary.event_count ?? events.length} events</span>
-          <span>{data?.window_hours ?? hours}h</span>
+        <h3 className="text-sm font-semibold text-text-primary">Narrative timeline</h3>
+        <div className="text-xs text-text-muted">
+          <span className="num">{data?.summary.event_count ?? events.length}</span> events · last{" "}
+          <span className="num">{data?.window_hours ?? hours}h</span>
         </div>
       </div>
 
@@ -199,12 +181,12 @@ export function NarrativeTimeline({
           <div className="h-4 w-2/3 rounded bg-text-muted/15" />
         </div>
       ) : isError ? (
-        <div className="flex items-start gap-2 rounded border border-border bg-bg-card px-3 py-2 text-xs text-text-secondary">
-          <Info size={13} className="mt-0.5 shrink-0 text-accent-orange" />
+        <div className="flex items-start gap-2 text-sm text-text-secondary">
+          <Info size={14} className="mt-0.5 shrink-0 text-accent-orange" />
           Narrative events are unavailable for {ticker}. The rest of the analysis panel is unchanged.
         </div>
       ) : events.length === 0 ? (
-        <div className="rounded border border-border bg-bg-card px-3 py-3 text-xs text-text-secondary">
+        <div className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">
           <p className="font-medium text-text-primary">No strong narrative events in this window.</p>
           <p className="mt-1">
             Quiet tape is not bearish by itself. It means news, flow, voices, traders, forecasts,
@@ -215,22 +197,13 @@ export function NarrativeTimeline({
       ) : (
         <>
           {data?.summary.sources_seen && data.summary.sources_seen.length > 0 && (
-            <div className="mb-3 flex flex-wrap gap-1.5">
-              {data.summary.sources_seen.map((source) => {
-                const color = colorForSource(source);
-                return (
-                  <span
-                    key={source}
-                    className="rounded-full px-2 py-0.5 text-xs font-medium uppercase tracking-wider"
-                    style={{
-                      color,
-                      background: `color-mix(in srgb, ${color} 10%, transparent)`,
-                    }}
-                  >
-                    {fmtSource(source)}
-                  </span>
-                );
-              })}
+            <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
+              {data.summary.sources_seen.map((source) => (
+                <span key={source} className="inline-flex items-center gap-1.5">
+                  <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: colorForSource(source) }} />
+                  {fmtSource(source)}
+                </span>
+              ))}
             </div>
           )}
           <div className="relative">

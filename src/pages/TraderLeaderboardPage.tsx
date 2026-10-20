@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { QueryNotice } from "../components/QueryNotice";
 import { marketDate } from "../lib/liveFeeds";
-import { Users, TrendingUp, ArrowUpDown } from "lucide-react";
+import { ArrowUpDown } from "lucide-react";
 
 import { useAppStore } from "../store/useAppStore";
 import { useLeaderboard, useAlertsPositions, useTradersToday } from "../api/alerts";
@@ -34,7 +34,7 @@ const SORT_LABELS: Record<SortMode, string> = {
   n_calls: "Calls",
   today: "Today",
   win_rate: "Win %",
-  mean_pl_pct: "Mean Reported Outcome",
+  mean_pl_pct: "Mean reported outcome",
   latest: "Latest",
   author: "Author",
 };
@@ -78,9 +78,6 @@ function EmptyState({ title, body }: { title: string; body: string }) {
   return (
     <div className="flex items-center justify-center min-h-80">
       <div className="card max-w-lg text-center">
-        <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-2">
-          Alerts feed
-        </div>
         <h2 className="text-sm font-semibold text-text-primary mb-2">
           {title}
         </h2>
@@ -96,8 +93,7 @@ function SkeletonCard({ height = 96 }: { height?: number }) {
       className="animate-pulse"
       style={{
         height,
-        background: "var(--glass-bg)",
-        border: "1px solid var(--glass-border)",
+        background: "var(--bg-card-hover)",
         borderRadius: "var(--radius-panel)",
       }}
     />
@@ -136,17 +132,15 @@ function LeaderboardHeader({
   return (
     <th
       aria-sort={active ? (sortDesc ? "descending" : "ascending") : undefined}
-      className={`px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap select-none ${
-        active ? "text-text-secondary" : "text-text-muted"
+      className={`px-3 py-2 text-xs font-medium whitespace-nowrap select-none ${
+        active ? "text-text-primary" : "text-text-muted"
       }`}
       style={{
         textAlign: align,
         position: "sticky",
         top: 0,
         zIndex: 1,
-        background: "var(--glass-bg-strong)",
-        backdropFilter: "blur(var(--glass-blur))",
-        WebkitBackdropFilter: "blur(var(--glass-blur))",
+        background: "var(--card-bg)",
         borderBottom: "1px solid var(--border)",
       }}
     >
@@ -200,8 +194,6 @@ function LeaderboardTable({
     return copy;
   }, [rows, sortMode, sortDesc, todayMap]);
 
-  const tdBorder = { borderBottom: "1px solid var(--border)" } as const;
-
   return (
     <div className="overflow-auto" style={{ maxHeight: "calc(100vh - 240px)" }}>
       <table className="w-full border-collapse text-sm">
@@ -215,8 +207,8 @@ function LeaderboardTable({
             <LeaderboardHeader mode="latest" label="Last" align="right" sortMode={sortMode} onSort={onSort} sortDesc={sortDesc} />
           </tr>
         </thead>
-        <tbody>
-          {sorted.map((r) => {
+        <tbody className="divide-y divide-border">
+          {sorted.map((r, i) => {
             const isSel = selected === r.author;
             const winPct = r.win_rate != null ? r.win_rate * 100 : null;
             return (
@@ -228,12 +220,14 @@ function LeaderboardTable({
                   background: isSel
                     ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)"
                     : undefined,
-                  borderLeft: isSel
-                    ? "2px solid var(--accent-blue)"
-                    : "2px solid transparent",
                 }}
               >
-                <td className="px-2.5 py-2" style={tdBorder}>
+                <td className="px-3 py-2">
+                  <div className="flex min-w-0 items-baseline gap-2">
+                  <span className="num w-5 shrink-0 text-right text-xs text-text-muted">
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -241,22 +235,23 @@ function LeaderboardTable({
                       onSelect(r.author);
                     }}
                     aria-pressed={isSel}
-                    className={`num text-sm text-text-primary max-w-40 truncate ${
-                      isSel ? "font-bold" : "font-semibold"
+                    className={`text-sm text-text-primary max-w-40 truncate ${
+                      isSel ? "font-semibold" : "font-medium"
                     } block min-h-6 w-full rounded text-left`}
                     title={r.author}
                   >
                     {r.author}
                   </button>
                   {r.top_ticker && (
-                    <div className="num text-xs text-text-muted mt-0.5">
-                      top: {r.top_ticker}
+                    <div className="text-xs text-text-muted">
+                      top <span className="num">{r.top_ticker}</span>
                     </div>
                   )}
+                  </div>
+                  </div>
                 </td>
                 <td
-                  className="num px-2.5 py-2 text-right text-sm text-text-secondary"
-                  style={tdBorder}
+                  className="num px-3 py-2 text-right text-sm text-text-secondary"
                 >
                   {r.n_calls}
                   {r.n_realized > 0 && (
@@ -269,21 +264,16 @@ function LeaderboardTable({
                   )}
                 </td>
                 <td
-                  className={`num px-2.5 py-2 text-right text-sm ${
-                    (todayMap[r.author] || 0) > 0 ? "font-semibold" : ""
+                  className={`num px-3 py-2 text-right text-sm ${
+                    (todayMap[r.author] || 0) > 0
+                      ? "font-semibold text-text-primary"
+                      : "text-text-muted"
                   }`}
-                  style={{
-                    ...tdBorder,
-                    color:
-                      (todayMap[r.author] || 0) > 0
-                        ? "var(--accent-orange)"
-                        : "var(--text-muted)",
-                  }}
                   title="Events extracted today (open/add/trim/close/stop/status/recap)"
                 >
                   {todayMap[r.author] || 0}
                 </td>
-                <td className="px-2.5 py-2 min-w-24" style={tdBorder}>
+                <td className="px-3 py-2 min-w-24">
                   {winPct != null ? (
                     <div className="flex items-center gap-1.5">
                       <span
@@ -301,9 +291,8 @@ function LeaderboardTable({
                   )}
                 </td>
                 <td
-                  className="num px-2.5 py-2 text-right text-sm font-semibold"
+                  className="num px-3 py-2 text-right text-sm font-semibold"
                   style={{
-                    ...tdBorder,
                     color:
                       r.mean_pl_pct != null
                         ? changeColor(r.mean_pl_pct)
@@ -315,8 +304,7 @@ function LeaderboardTable({
                     : "—"}
                 </td>
                 <td
-                  className="num px-2.5 py-2 text-right text-xs text-text-muted whitespace-nowrap"
-                  style={tdBorder}
+                  className="num px-3 py-2 text-right text-xs text-text-muted whitespace-nowrap"
                   title={absoluteAge(r.latest_call_ts) || ""}
                 >
                   {relativeAge(r.latest_call_ts) || "—"}
@@ -454,28 +442,23 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
     <div className="flex flex-col gap-3 min-h-0">
       <QueryNotice queries={[positionsQuery]} label="Trader positions" />
       <p className="text-xs text-text-muted">Reported peak/exit outcomes, not fill-weighted realized or portfolio returns.</p>
-      {/* Header card — glass-strong so the detail column reads as the
-          focused layer over the ambient field. */}
-      <section className="glass-strong p-4">
+      <section className="card">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-1">
-              Trader
-            </div>
             <div
-              className="num text-lg font-bold text-text-primary truncate"
+              className="text-lg font-semibold text-text-primary truncate"
               title={author}
             >
               {author}
             </div>
             {leaderboardRow?.top_ticker && (
               <div className="mt-1.5 text-sm text-text-secondary">
-                top ticker:{" "}
+                Top ticker{" "}
                 <button
                   type="button"
                   onClick={() => setActiveTicker(leaderboardRow.top_ticker!)}
                   aria-label={`Select ${leaderboardRow.top_ticker} ticker`}
-                  className="num text-sm font-bold cursor-pointer p-0"
+                  className="num text-sm font-semibold cursor-pointer p-0"
                   style={{
                     color: "var(--accent-blue)",
                     background: "transparent",
@@ -491,8 +474,8 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
           {/* Cumulative P/L sparkline — the hero number of the panel */}
           {sparkPoints.length >= 2 && (
             <div className="text-right">
-              <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-1">
-                Outcome Sum (pp)
+              <div className="text-xs text-text-muted mb-1">
+                Outcome sum (pp)
               </div>
               <Sparkline
                 points={sparkPoints}
@@ -506,7 +489,7 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
                 fill
               />
               <div
-                className="num text-lg font-bold mt-0.5"
+                className="num text-lg font-semibold mt-0.5"
                 style={{
                   color: changeColor(sparkPoints[sparkPoints.length - 1]),
                 }}
@@ -519,17 +502,16 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
 
         {/* Metric strip — summary Stats (derived from positions) */}
         <div
-          className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-3.5 pt-3.5"
-          style={{ borderTop: "1px solid var(--border)" }}
+          className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-4 border-t border-border pt-3"
         >
           <Stat label="Positions" value={String(nPositions)} />
           <Stat
-            label="With Exits"
+            label="With exits"
             value={String(nRealized)}
             sub={nPositions ? `${nRealized}/${nPositions}` : undefined}
           />
           <Stat
-            label="Positive Exits"
+            label="Positive exits"
             value={winPct}
             tone={
               winRate != null
@@ -540,13 +522,13 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
             }
           />
           <Stat
-            label="Mean Outcome"
+            label="Mean outcome"
             value={
               <span style={{ color: meanPlColor }}>{meanPlStr}</span>
             }
           />
           <Stat
-            label="Outcome Sum (pp)"
+            label="Outcome sum (pp)"
             value={
               sparkPoints.length >= 1 ? (
                 <span
@@ -573,21 +555,17 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
       <TraderBrief author={author} />
 
       {/* Positions list */}
-      <section className="glass-strong overflow-hidden">
-        <header
-          className="flex items-center justify-between px-4 py-3"
-          style={{ borderBottom: "1px solid var(--border)" }}
-        >
-          <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-            Positions (<span className="num">{positions.length}</span>)
-          </h3>
+      <section className="card overflow-hidden" style={{ padding: 0 }}>
+        <header className="flex items-baseline gap-2 border-b border-border px-4 py-3">
+          <h3 className="text-sm font-semibold text-text-primary">Positions</h3>
+          <span className="num text-xs text-text-muted">{positions.length}</span>
         </header>
         {positions.length === 0 ? (
           <div className="py-5 text-center text-sm text-text-muted">
             No positions in window.
           </div>
         ) : (
-          <div className="flex flex-col">
+          <div className="flex flex-col divide-y divide-border">
             {positions.map((p) => {
               const k = positionKeyString(p.position_key);
               return (
@@ -663,22 +641,17 @@ export function TraderLeaderboardPage() {
       : `Last ${lookback} days · ${nTraders} trader${nTraders === 1 ? "" : "s"}`;
 
   return (
-    <div className="flex min-w-0 flex-col space-y-4">
+    <div className="desk-page">
+      <header className="desk-header">
+        <div className="desk-header__title">
+          <h1>Traders</h1>
+          <p>{headerSub}</p>
+        </div>
+        <div className="desk-header__actions text-xs text-text-muted">
+          Auto-refresh 60s
+        </div>
+      </header>
       <QueryNotice queries={[leaderboardQuery]} label="Trader leaderboard" />
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2 max-sm:flex-col">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-          <Users size={20} className="text-accent-purple" />
-          <h1 className="m-0 text-lg font-semibold text-text-primary">
-            Trader Leaderboard
-          </h1>
-          <span className="num basis-full pl-8 text-xs text-text-muted sm:basis-auto sm:pl-0">{headerSub}</span>
-        </div>
-        <div className="flex shrink-0 items-center gap-2 pl-8 text-xs text-text-muted sm:pl-0">
-          <TrendingUp size={13} />
-          <span>Auto-refresh 60s</span>
-        </div>
-      </div>
 
       {/* Today's raw chronological activity — what each trader posted today,
           straight from extracted_calls. No state derivation, no stitching. */}
@@ -720,11 +693,10 @@ export function TraderLeaderboardPage() {
             style={{ padding: 0 }}
           >
             <div
-              className="flex flex-col gap-2 px-3 pt-3 pb-2"
-              style={{ borderBottom: "1px solid var(--border)" }}
+              className="flex flex-col gap-2 border-b border-border px-4 pt-3 pb-3"
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
+                <h3 className="text-sm font-semibold text-text-primary">
                   Leaderboard
                 </h3>
                 <span className="text-xs text-text-muted inline-flex items-center gap-1">

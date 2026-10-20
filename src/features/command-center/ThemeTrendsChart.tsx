@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { TrendingUp, ArrowUp, ArrowDown, Minus, ChevronRight, ChevronDown } from "lucide-react";
+import { ArrowUp, ArrowDown, Minus, ChevronRight, ChevronDown } from "lucide-react";
 import { useThemeHeatHistory, useThemePnlHistory, useThemePnlBreakdown } from "../../api/themeHeat";
 import { useThemeRotation, type RotationWindow } from "../../api/rotation";
 import { useDashboardFilters } from "../../store/useDashboardFilters";
@@ -30,17 +30,28 @@ function ema(vals: (number | null)[], span: number): (number | null)[] {
 /** Heat → colour, diverging around the 1.0× baseline: cool blue below, warm red
  * above. Hardcoded data-viz palette (chart colours are exempt from the CSS-var
  * rule). */
+const mix = (c: string, pct: number) => `color-mix(in srgb, ${c} ${pct}%, var(--bg-card-hover))`;
 function heatColor(r: number | null): string {
   if (r == null) return "transparent";
-  if (r >= 3) return "#dc2626";
-  if (r >= 2) return "#ef4444";
-  if (r >= 1.5) return "#f97316";
-  if (r >= 1.15) return "#f59e0b";
-  if (r >= 0.85) return "#4b5563"; // ~baseline neutral
-  if (r >= 0.5) return "#3b82f6";
-  if (r >= 0.25) return "#2563eb";
-  return "#1e3a8a";
+  if (r >= 3) return mix("#dc2626", 90);
+  if (r >= 2) return mix("#ef4444", 72);
+  if (r >= 1.5) return mix("#f97316", 62);
+  if (r >= 1.15) return mix("#f59e0b", 50);
+  if (r >= 0.85) return mix("var(--text-muted)", 14); // ~baseline neutral
+  if (r >= 0.5) return mix("#3b82f6", 40);
+  if (r >= 0.25) return mix("#3b82f6", 62);
+  return mix("#2563eb", 85);
 }
+
+/** Solid ink for text/sparkline next to the matrix (fills are too soft to read). */
+function heatInk(r: number): string {
+  if (r >= 1.5) return "var(--accent-red)";
+  if (r >= 1.15) return "var(--accent-orange)";
+  if (r >= 0.85) return "var(--text-secondary)";
+  return "var(--accent-blue)";
+}
+
+const label = (cat: string) => cat.replace(/_/g, " ");
 
 function TrendArrow({ delta }: { delta: number }) {
   if (delta > 0.15)
@@ -117,11 +128,11 @@ function ThemeRotationView({
       <div className="flex flex-col gap-4 min-w-0">
         <div>
           <div className="flex items-baseline justify-between mb-1.5">
-            <span className="text-[10px] uppercase tracking-wider text-text-muted">
+            <span className="text-xs font-medium text-text-muted">
               Theme momentum
             </span>
             {scrubbed && (
-              <span className="text-[10px] num" style={{ color: "var(--accent-cyan)" }}>
+              <span className="text-xs num" style={{ color: "var(--accent-cyan)" }}>
                 map showing {dates[idx]} · ranking is current
               </span>
             )}
@@ -130,12 +141,12 @@ function ThemeRotationView({
                            onSelect={selectTheme} selected={categoryFilter} />
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-text-muted mb-1.5">
+          <div className="text-xs font-medium text-text-muted mb-1.5">
             Rotation alerts
           </div>
           <AlertFeed alerts={data.alerts} />
         </div>
-        <p className="text-[10px] text-text-muted leading-relaxed">
+        <p className="text-xs text-text-muted leading-relaxed">
           {data.sessions} flow-days · strength = share of total option premium vs {data.benchmark}.
           LEADING = growing share and still accelerating; IMPROVING = small share but gaining;
           WEAKENING = still large but losing ground; LAGGING = small and shrinking.
@@ -257,7 +268,7 @@ function ThemePnlView({
               aria-label={`Filter flow to ${r.cat.replace(/_/g, " ")}`}
               className="grid items-center gap-2 cursor-pointer rounded px-1 -mx-1 hover:bg-bg-card-hover"
               style={{
-                gridTemplateColumns: "108px 1fr 84px",
+                gridTemplateColumns: "minmax(7rem,13rem) minmax(0,1fr) 84px",
                 background: active ? "color-mix(in srgb, var(--accent-cyan) 12%, transparent)" : undefined,
                 opacity: categoryFilter && !active ? 0.55 : 1,
               }}
@@ -273,7 +284,7 @@ function ThemePnlView({
                 >
                   {open === r.cat ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                 </button>
-                <span className="truncate">{r.cat.replace(/_/g, " ")}</span>
+                <span className="truncate" title={label(r.cat)}>{label(r.cat)}</span>
               </span>
 
               <div className="flex gap-px h-4">
@@ -316,22 +327,22 @@ function ThemePnlView({
               /* Sub-themes are aggregated over the WHOLE window, not per day —
                  a (day, sub-theme) cell averages ~2 graded entries. */
               <div className="ml-4 mb-2 mt-0.5 pl-2 border-l border-border flex flex-col gap-0.5">
-                <span className="text-[10px] text-text-muted pb-0.5">
+                <span className="text-xs text-text-muted pb-0.5">
                   sub-themes are read over the FULL corpus, not the window above —
                   over a short window each holds 1-2 graded entries
                 </span>
                 {(byCat.get(r.cat) ?? []).length === 0 && (
-                  <span className="text-[10px] text-text-muted py-1">
+                  <span className="text-xs text-text-muted py-1">
                     no graded sub-theme entries yet
                   </span>
                 )}
                 {(byCat.get(r.cat) ?? []).map((t) => (
-                  <div key={t.theme} className="grid items-center gap-2 text-[10px]"
+                  <div key={t.theme} className="grid items-center gap-2 text-xs"
                        style={{ gridTemplateColumns: "150px 1fr 74px" }}
                        title={`${t.theme}: ${((t.p2x_raw ?? 0) * 100).toFixed(0)}% raw over `
                          + `${t.n_complete} graded ${t.n_complete === 1 ? "entry" : "entries"}`
                          + ` -> ${((t.p2x ?? 0) * 100).toFixed(0)}% after shrinkage`}>
-                    <span className="text-text-muted truncate">
+                    <span className="text-text-muted truncate" title={label(t.theme)}>
                       {t.theme.replace(/_/g, " ").toLowerCase()}
                     </span>
                     <div className="h-2 rounded-full bg-bg-card-hover overflow-hidden">
@@ -429,28 +440,18 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
   );
 
   return (
-    <div className={embedded ? "pt-2" : "card"}>
+    <div className={embedded ? "" : "card"}>
       <div
-        className={`flex items-center justify-between flex-wrap gap-2 ${embedded ? "mb-1.5" : "mb-3"}`}
+        className="flex items-center justify-between flex-wrap gap-2 mb-3"
       >
-        {embedded ? (
-          <div className="flex min-w-0 flex-wrap items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-            <TrendingUp size={11} />
-            Theme trends
-            <span className="normal-case tracking-normal font-normal text-text-muted ml-1">
-              {view === "pnl" ? "what each theme's flow actually did"
-                : view === "rotation" ? "where money is rotating"
-                : "flow heat over time"}
-            </span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <TrendingUp size={14} className="text-accent-blue" />
-            <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-              Theme Trends
-            </h3>
-          </div>
-        )}
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-text-primary">Theme trends</h2>
+          <p className="text-xs text-text-muted">
+            {view === "pnl" ? "What each theme's flow actually did"
+              : view === "rotation" ? "Where money is rotating"
+              : "Flow heat over time"}
+          </p>
+        </div>
         <div className="flex w-full max-w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap">
           <Segmented
             options={[
@@ -498,11 +499,11 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectTheme(r.cat); }
                 }}
-                aria-label={`Filter flow to ${r.cat.replace(/_/g, " ")}`}
-                title={`${r.cat} — click to filter the flow tracker`}
+                aria-label={`Filter flow to ${label(r.cat)}`}
+                title={`${label(r.cat)} — click to filter the flow tracker`}
                 className="grid items-center gap-2 cursor-pointer rounded px-1 -mx-1 hover:bg-bg-card-hover"
                 style={{
-                  gridTemplateColumns: "108px 1fr 118px",
+                  gridTemplateColumns: "minmax(7rem,13rem) minmax(0,1fr) 118px",
                   background: active
                     ? "color-mix(in srgb, var(--accent-cyan) 12%, transparent)"
                     : undefined,
@@ -513,7 +514,7 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
                   className="text-xs truncate"
                   style={{ color: active ? "var(--accent-cyan)" : "var(--text-secondary)" }}
                 >
-                  {r.cat.replace(/_/g, " ")}
+                  {label(r.cat)}
                 </span>
 
                 <div className="flex gap-px h-4">
@@ -528,10 +529,10 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
                 </div>
 
                 <div className="flex items-center justify-end gap-1">
-                  <Sparkline points={r.spark} width={36} height={14} color={heatColor(r.current)} />
+                  <Sparkline points={r.spark} width={36} height={14} color={heatInk(r.current)} />
                   <span
                     className="num text-xs w-9 text-right"
-                    style={{ color: heatColor(r.current) }}
+                    style={{ color: heatInk(r.current) }}
                   >
                     {r.current.toFixed(1)}×
                   </span>

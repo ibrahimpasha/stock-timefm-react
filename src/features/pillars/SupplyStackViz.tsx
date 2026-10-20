@@ -75,7 +75,7 @@ function MemberChip({ m, active, onClick }: {
         <span style={{ color: heatColor(m.play_score) }}>{m.play_score}</span>
       )}
       {m.role === "BOTTLENECK" && (
-        <span className="text-[9px]" style={{ color: "var(--accent-yellow)" }}>
+        <span className="text-xs" style={{ color: "var(--accent-yellow)" }}>
           {ROLE_ABBR.BOTTLENECK}
         </span>
       )}
@@ -104,10 +104,10 @@ function GroupCard({ g, rail, open, onToggle, activeTicker, onPick }: {
         <div className="flex items-center gap-1.5">
           {rail && <span style={{ color: hue }}>{RAIL_ICONS[g.key]}</span>}
           <span className="text-xs font-semibold text-text-primary">{g.title}</span>
-          <span className="num text-[10px] text-text-muted">{n}</span>
+          <span className="num text-xs text-text-muted">{n}</span>
           {n_bottleneck > 0 && (
             <span
-              className="num text-[9px] px-1 rounded-full"
+              className="num text-xs px-1 rounded-full"
               title={`${n_bottleneck} names with a BOTTLENECK structural role`}
               style={{
                 color: "var(--accent-yellow)",
@@ -124,7 +124,7 @@ function GroupCard({ g, rail, open, onToggle, activeTicker, onPick }: {
           </span>
         </div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-text-muted truncate">{g.note}</span>
+          <span className="text-xs text-text-muted truncate">{g.note}</span>
           {split > 0 && (
             <span
               className="ml-auto shrink-0 inline-flex h-1 w-12 rounded-full overflow-hidden"
@@ -145,7 +145,7 @@ function GroupCard({ g, rail, open, onToggle, activeTicker, onPick }: {
             <button
               type="button"
               onClick={() => setShowAll((v) => !v)}
-              className="num text-[10px] text-text-muted hover:text-text-secondary px-1 cursor-pointer"
+              className="num text-xs text-text-muted hover:text-text-secondary px-1 cursor-pointer"
             >
               {showAll ? "less" : `+${g.members.length - 14} more`}
             </button>
@@ -175,7 +175,7 @@ function ThemeBox({ theme, tickers, memberOf, hue, activeTicker, onPick }: {
       className="rounded-[8px] px-2 py-1.5 min-w-0"
       style={{ background: "color-mix(in srgb, var(--bg-card) 55%, transparent)", border: `1px solid ${tint(hue, 30)}` }}
     >
-      <div className="text-[10px] font-semibold text-text-secondary mb-1">{themeLabel(theme)}</div>
+      <div className="text-xs font-medium text-text-secondary mb-1">{themeLabel(theme)}</div>
       <div className="flex flex-wrap gap-1">
         {shown.map((m) => (
           <MemberChip key={m.ticker} m={m} active={m.ticker === activeTicker} onClick={onPick} />
@@ -184,7 +184,7 @@ function ThemeBox({ theme, tickers, memberOf, hue, activeTicker, onPick }: {
           <button
             type="button"
             onClick={() => setShowAll((v) => !v)}
-            className="num text-[10px] text-text-muted hover:text-text-secondary px-1 cursor-pointer"
+            className="num text-xs text-text-muted hover:text-text-secondary px-1 cursor-pointer"
           >
             {showAll ? "less" : `+${members.length - 6}`}
           </button>
@@ -208,9 +208,9 @@ function PosterBand({ g, activeTicker, onPick }: {
     >
       <div className="flex items-baseline gap-2 mb-1.5">
         <span className="text-sm font-semibold text-text-primary">{g.title}</span>
-        <span className="text-[10px] text-text-muted">{g.note}</span>
+        <span className="text-xs text-text-muted">{g.note}</span>
         {g.stats.n_bottleneck > 0 && (
-          <span className="num text-[9px] px-1 rounded-full"
+          <span className="num text-xs px-1 rounded-full"
             style={{ color: "var(--accent-yellow)", background: tint("var(--accent-yellow)", 14),
                      border: `1px solid ${tint("var(--accent-yellow)", 30)}` }}>
             {g.stats.n_bottleneck} bott
@@ -249,7 +249,7 @@ function PosterView({ data, onClose }: { data: SupplyStack; onClose: () => void 
   const physical = rail("physical");
   const railBand = (g?: StackGroup) => g && (
     <div className="space-y-1.5">
-      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em]"
+      <div className="flex items-center gap-1.5 text-sm font-semibold"
         style={{ color: LAYER_HUES[g.key] }}>
         {RAIL_ICONS[g.key]} {g.title}
         <span className="ml-auto num" style={{ color: heatColor(g.stats.median_play) }}>
@@ -268,26 +268,26 @@ function PosterView({ data, onClose }: { data: SupplyStack; onClose: () => void 
     // --bg-primary (NOT the nonexistent --bg-base, whose #0b0e14 fallback
     // painted a dark scrim under light-theme text) keeps the poster legible
     // in both themes.
-    <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: "color-mix(in srgb, var(--bg-primary) 92%, transparent)", backdropFilter: "blur(6px)" }}>
+    <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: "color-mix(in srgb, var(--bg-primary) 97%, transparent)" }}>
       {/* Fixed exit button — survives scrolling anywhere in the poster. */}
       <button
         type="button"
         onClick={onClose}
-        aria-label="close poster"
+        aria-label="Close poster"
         className="fixed top-4 right-5 z-10 inline-flex items-center gap-1 rounded border border-border px-2.5 py-1.5 text-xs text-text-secondary hover:text-text-primary cursor-pointer"
         style={{ background: "var(--bg-card-hover)" }}
       >
-        <X size={13} /> close
+        <X size={13} /> Close
       </button>
       <div className="max-w-[110rem] mx-auto px-4 py-6">
         <div className="flex items-center gap-2 mb-4">
-          <Layers size={16} className="text-accent-cyan" />
+          <Layers size={16} className="text-text-muted" />
           <div>
-            <div className="text-sm font-semibold uppercase tracking-[0.1em] text-text-primary">
-              AI Buildout Supply Chain
-            </div>
-            <div className="text-[10px] text-text-muted">
-              from application layer to critical minerals · live desk data · click any name
+            <h2 className="text-lg font-semibold text-text-primary">
+              AI buildout supply chain
+            </h2>
+            <div className="text-sm text-text-muted">
+              From application layer to critical minerals · live desk data · click any name
             </div>
           </div>
         </div>
@@ -295,7 +295,7 @@ function PosterView({ data, onClose }: { data: SupplyStack; onClose: () => void 
         <div className="grid gap-4 items-start" style={{ gridTemplateColumns: "minmax(200px, 240px) minmax(0, 1fr) minmax(200px, 240px)" }}>
           {/* left rail — POWER (in) */}
           <div className="space-y-2">
-            <div className="text-[10px] uppercase tracking-[0.08em] text-text-muted">power comes in</div>
+            <div className="text-xs font-medium text-text-muted">Power comes in</div>
             {railBand(power)}
           </div>
 
@@ -307,7 +307,7 @@ function PosterView({ data, onClose }: { data: SupplyStack; onClose: () => void 
                 {i < data.layers.length - 1 && (
                   <div className="flex items-center justify-center gap-1 py-1 text-text-muted">
                     <ArrowDown size={11} />
-                    <span className="text-[10px]">{FLOW_LABELS[i] ?? ""}</span>
+                    <span className="text-xs">{FLOW_LABELS[i] ?? ""}</span>
                   </div>
                 )}
               </div>
@@ -317,18 +317,18 @@ function PosterView({ data, onClose }: { data: SupplyStack; onClose: () => void 
           {/* right rail — THERMAL (out) + PHYSICAL AI (edge) */}
           <div className="space-y-4">
             <div className="space-y-2">
-              <div className="text-[10px] uppercase tracking-[0.08em] text-text-muted">heat comes out</div>
+              <div className="text-xs font-medium text-text-muted">Heat comes out</div>
               {railBand(thermal)}
             </div>
             <div className="space-y-2">
-              <div className="text-[10px] uppercase tracking-[0.08em] text-text-muted">atoms at the edge</div>
+              <div className="text-xs font-medium text-text-muted">Atoms at the edge</div>
               {railBand(physical)}
             </div>
           </div>
         </div>
 
-        <div className="text-[10px] text-text-muted mt-4">
-          number = median play score · chip tint = 30d return · BOTT = graph structural bottleneck · Esc to close
+        <div className="text-xs text-text-muted mt-4">
+          Number = median play score · chip tint = 30d return · BOTT = graph structural bottleneck · Esc to close
         </div>
       </div>
     </div>
@@ -361,18 +361,15 @@ export function SupplyStackViz() {
 
   return (
     <div className="card flex flex-col gap-1">
-      <div className="flex items-center gap-2 mb-1">
-        <Layers size={14} className="text-accent-cyan" />
-        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-          AI Buildout Stack
-        </span>
-        <span className="ml-auto text-[10px] text-text-muted">apps → minerals · live</span>
+      <div className="flex items-center gap-2 mb-2">
+        <h2 className="text-sm font-semibold text-text-primary">AI buildout stack</h2>
+        <span className="ml-auto text-xs text-text-muted">Apps → minerals · live</span>
         <button
           type="button"
           onClick={() => setPoster(true)}
           title="Open full-screen poster view"
-          aria-label="open poster view"
-          className="text-text-muted hover:text-accent-cyan transition-colors cursor-pointer"
+          aria-label="Open poster view"
+          className="text-text-muted hover:text-accent-blue transition-colors cursor-pointer"
         >
           <Maximize2 size={13} />
         </button>
@@ -388,14 +385,14 @@ export function SupplyStackViz() {
           {i < data.layers.length - 1 && (
             <div className="flex items-center justify-center gap-1 py-0.5 text-text-muted">
               <ArrowDown size={10} />
-              <span className="text-[9px]">{FLOW_LABELS[i] ?? ""}</span>
+              <span className="text-xs">{FLOW_LABELS[i] ?? ""}</span>
             </div>
           )}
         </div>
       ))}
 
-      <div className="mt-2 pt-2 border-t border-border">
-        <div className="text-[10px] uppercase tracking-[0.08em] text-text-muted mb-1">
+      <div className="mt-2 pt-3 border-t border-border">
+        <div className="text-sm font-semibold text-text-primary mb-1.5">
           Cross-cutting — power in · heat out · atoms at the edge
         </div>
         <div className="flex flex-col gap-1.5">
@@ -408,8 +405,8 @@ export function SupplyStackViz() {
         </div>
       </div>
 
-      <div className="text-[10px] text-text-muted pt-1.5 mt-0.5 border-t border-border leading-relaxed">
-        number = median play score · bar = 30d up/down breadth · chip tint = 30d return ·
+      <div className="text-xs text-text-muted pt-2 mt-1 border-t border-border leading-relaxed">
+        Number = median play score · bar = 30d up/down breadth · chip tint = 30d return ·
         click a name to load it everywhere
       </div>
     </div>

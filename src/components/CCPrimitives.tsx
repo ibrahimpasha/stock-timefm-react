@@ -150,17 +150,13 @@ interface TagProps {
 export function Tag({ children, color = "var(--text-secondary)", bg = "transparent", border }: TagProps) {
   return (
     <span
-      className="font-mono"
+      className="inline-flex items-center whitespace-nowrap text-xs font-medium"
       style={{
-        fontSize: 9.5,
-        letterSpacing: 0.6,
-        textTransform: "uppercase",
         color,
         background: bg,
-        padding: "2px 7px",
+        padding: bg !== "transparent" || border ? "1px 7px" : 0,
         border: border ? `1px solid ${border}` : "none",
         borderRadius: "var(--radius-chip)",
-        fontWeight: 600,
       }}
     >
       {children}
@@ -188,12 +184,10 @@ export function Panel({ title, accent, right, children, padding = 10, className 
     <section
       className={className}
       style={{
-        background: "var(--glass-bg)",
-        border: `1px solid ${borderColor || "var(--glass-border)"}`,
+        background: "var(--bg-card)",
+        border: `1px solid ${borderColor || "var(--border)"}`,
         borderRadius: "var(--radius-panel)",
-        backdropFilter: "blur(var(--glass-blur))",
-        WebkitBackdropFilter: "blur(var(--glass-blur))",
-        boxShadow: boxShadow || "var(--shadow-1), inset 0 1px 0 var(--glass-highlight)",
+        boxShadow: boxShadow || "none",
         display: "flex",
         flexDirection: "column",
         minHeight: 0,
@@ -205,25 +199,13 @@ export function Panel({ title, accent, right, children, padding = 10, className 
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "7px 12px",
-          borderBottom: "1px solid var(--glass-border)",
-          background: "color-mix(in srgb, var(--bg-card-hover) 60%, transparent)",
+          padding: "10px 12px 0",
           gap: 12,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {accent && <div style={{ width: 3, height: 11, borderRadius: 2, background: accent }} />}
-          <span
-            style={{
-              fontSize: "0.75rem",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: "var(--text-secondary)",
-              fontWeight: 600,
-            }}
-          >
-            {title}
-          </span>
+          {accent && <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: accent }} />}
+          <span className="text-sm font-semibold text-text-primary">{title}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{right}</div>
       </header>

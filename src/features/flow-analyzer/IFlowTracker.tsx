@@ -107,11 +107,6 @@ function ChipButton({
   );
 }
 
-/** Tiny muted label preceding a control group in the strip. */
-function StripLabel({ children }: { children: ReactNode }) {
-  return <span className="text-xs text-text-muted">{children}</span>;
-}
-
 export function IFlowTracker() {
   // Filter/view state lives in the shared dashboard-filters store so it
   // survives tab switches (the Command Center unmounts the inactive tab,
@@ -558,9 +553,9 @@ export function IFlowTracker() {
       className="min-w-0 max-w-full overflow-x-clip pb-[max(0.75rem,env(safe-area-inset-bottom))]"
       data-iflow-anchor
     >
-      {/* ── Control strip: dates + search + view/group/sort/filters ── */}
+      {/* ── Toolbar: everyday controls in one row; the rest behind Filters ── */}
       <div className="mobile-workspace-controls glass-strong sticky z-20 mb-4 flex min-w-0 flex-wrap items-center gap-2 overflow-y-auto p-2 md:static md:z-auto md:max-h-none md:overflow-visible md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
-        <div className="mobile-horizontal-strip flex w-full min-w-0 items-center gap-1 overflow-x-auto lg:w-auto lg:flex-wrap lg:overflow-visible">
+        <div className="mobile-horizontal-strip flex w-full min-w-0 items-center gap-1 overflow-x-auto lg:w-auto lg:max-w-[46%]">
           <ChipButton
             active={isAllDates}
             tone="blue"
@@ -569,22 +564,22 @@ export function IFlowTracker() {
               setSelectedTicker(null);
             }}
           >
-            All Dates
+            All dates
           </ChipButton>
           {dates.slice(0, 8).map((d) => (
             <ChipButton
               key={d.date}
               active={selectedDates.has(d.date)}
               tone="blue"
+              title={`${d.entries} entries`}
               onClick={() => toggleDate(d.date)}
             >
               <span className="num">{d.date.slice(5)}</span>
-              <span className="num opacity-60">{d.entries}</span>
             </ChipButton>
           ))}
         </div>
         <div
-          className="relative flex min-h-11 w-full min-w-0 items-center gap-2 rounded-full border border-border px-3 py-1.5 transition-colors focus-within:border-accent-blue lg:min-h-0 lg:max-w-xs lg:flex-1"
+          className="relative flex min-h-11 w-full min-w-0 items-center gap-2 rounded-full border border-border px-3 py-1.5 transition-colors focus-within:border-accent-blue lg:min-h-0 lg:w-44"
           style={{ background: "var(--glass-bg)" }}
         >
           <Search size={14} className="text-text-muted" />
@@ -593,8 +588,8 @@ export function IFlowTracker() {
             type="text"
             value={search}
             onChange={(e) => patchIFlow({ search: e.target.value.toUpperCase() })}
-            placeholder="Search ticker..."
-            className="bg-transparent border-none outline-none text-text-primary font-mono text-xs w-full placeholder:text-text-muted pr-5"
+            placeholder="Search ticker"
+            className="w-full border-none bg-transparent pr-5 text-xs text-text-primary outline-none placeholder:text-text-muted"
           />
           {search && (
             <button
@@ -610,67 +605,37 @@ export function IFlowTracker() {
             </button>
           )}
         </div>
-        <span className="min-w-0 flex-1 truncate text-xs text-text-muted md:flex-none md:overflow-visible">
-          {filtered.length} tickers
-          {earningsFilterOn ? (
-            <> — with earnings ≤{earningsWindow.toUpperCase()} out</>
-          ) : (
-            <>
-              {isSingleDate && summary && (
-                <>
-                  {" "}
-                  —{" "}
-                  <span
-                    style={{
-                      color:
-                        summary.net_sentiment === "BULLISH"
-                          ? "var(--accent-green)"
-                          : summary.net_sentiment === "BEARISH"
-                          ? "var(--accent-red)"
-                          : "var(--accent-orange)",
-                    }}
-                  >
-                    {summary.net_sentiment}
-                  </span>{" "}
-                  ({summary.bull_count}B / {summary.bear_count}R)
-                </>
-              )}
-              {selectedDates.size > 1 && <> — {selectedDates.size} dates selected</>}
-            </>
-          )}
-        </span>
-        <DownloadCsvButton
-          filteredTickers={filtered.map((t) => t.ticker)}
-          selectedDates={selectedDates}
-          isAllDates={isAllDates}
-          dte={dte}
+
+        <Segmented<"grid" | "tape">
+          ariaLabel="Layout"
+          className="mobile-horizontal-strip"
+          value={viewMode}
+          onChange={(v) => patchIFlow({ viewMode: v })}
+          options={[
+            {
+              value: "grid",
+              label: (
+                <span className="flex items-center gap-1" title="Per-ticker cards">
+                  <Grid size={12} />
+                  Grid
+                </span>
+              ),
+            },
+            {
+              value: "tape",
+              label: (
+                <span className="flex items-center gap-1" title="Chronological feed of every entry (defaults to today)">
+                  <List size={12} />
+                  Tape
+                </span>
+              ),
+            },
+          ]}
         />
 
-        <button
-          type="button"
-          onClick={() => setMobileFiltersOpen((open) => !open)}
-          aria-expanded={mobileFiltersOpen}
-          aria-controls="iflow-mobile-filters"
-          className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-3 text-xs font-semibold text-text-secondary lg:hidden"
-        >
-          <SlidersHorizontal size={15} aria-hidden="true" />
-          Filters
-          <ChevronDown
-            size={14}
-            aria-hidden="true"
-            className={`transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`}
-          />
-        </button>
-
-        <div
-          id="iflow-mobile-filters"
-          className={`${mobileFiltersOpen ? "flex" : "hidden"} w-full min-w-0 flex-col items-stretch gap-2 md:flex-row md:flex-wrap md:items-center lg:contents`}
-        >
-
-        {/* Watchlist surface(s) to show */}
-        <StripLabel>View</StripLabel>
         <Segmented<WatchView>
-          className="mobile-horizontal-strip w-full md:w-auto"
+          ariaLabel="Watchlist view"
+          className="mobile-horizontal-strip"
           value={watchView}
           onChange={(v) => patchIFlow({ watchView: v })}
           options={[
@@ -678,308 +643,303 @@ export function IFlowTracker() {
               value: "tickers",
               label: "Tickers",
               badge: watchlist.length > 0 ? (
-                <span className="num opacity-70">{watchlist.length}</span>
+                <span className="num text-text-muted">{watchlist.length}</span>
               ) : undefined,
             },
             {
               value: "contracts",
               label: "Contracts",
               badge: watchedContracts.length > 0 ? (
-                <span className="num opacity-70">{watchedContracts.length}</span>
+                <span className="num text-text-muted">{watchedContracts.length}</span>
               ) : undefined,
             },
             {
               value: "both",
               label: "Both",
-              badge: watchlist.length + watchedContracts.length > 0 ? (
-                <span className="num opacity-70">
-                  {watchlist.length + watchedContracts.length}
-                </span>
-              ) : undefined,
             },
           ]}
         />
+
+        <label
+          className="flex min-h-11 items-center gap-1.5 text-xs text-text-muted lg:min-h-0"
+          title={viewMode === "tape" ? "Tape is always sorted by its own columns" : undefined}
+        >
+          Sort
+          <select
+            value={sort}
+            disabled={viewMode === "tape"}
+            onChange={(e) => patchIFlow({ sort: e.target.value as SortMode })}
+            className="min-h-11 rounded-full border border-border bg-bg-card px-3 text-xs text-text-primary outline-none focus:border-accent-blue disabled:opacity-40 lg:min-h-8"
+          >
+            <option value="recent">Most recent</option>
+            <option value="entries">Entries</option>
+            <option value="premium">Premium</option>
+            <option value="score">Conviction</option>
+            <option value="escalating">Escalating</option>
+            <option value="returns">Estimated return</option>
+          </select>
+        </label>
+
+        {(() => {
+          const activeFilters =
+            (bias !== "all" ? 1 : 0) +
+            (dte !== "all" ? 1 : 0) +
+            (earningsWindow !== "all" ? 1 : 0) +
+            (tradersOnly ? 1 : 0) +
+            (groupMode !== "subcat" ? 1 : 0) +
+            (highlightMode !== "escalating" ? 1 : 0);
+          const row = "flex min-w-0 flex-col gap-1.5 md:flex-row md:items-center md:gap-3";
+          const lbl = "w-20 shrink-0 text-xs text-text-muted";
+          return (
+            <details
+              open={mobileFiltersOpen}
+              onToggle={(e) => setMobileFiltersOpen(e.currentTarget.open)}
+              className="group relative max-lg:open:w-full"
+            >
+              <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-full border border-border px-3 text-xs font-medium text-text-secondary transition-colors hover:text-text-primary lg:min-h-8 [&::-webkit-details-marker]:hidden">
+                <SlidersHorizontal size={13} aria-hidden="true" />
+                Filters
+                {activeFilters > 0 && (
+                  <span className="num rounded-full bg-accent-blue/15 px-1.5 text-[10px] font-semibold text-accent-blue">
+                    {activeFilters}
+                  </span>
+                )}
+                <ChevronDown size={13} aria-hidden="true" className="transition-transform group-open:rotate-180" />
+              </summary>
+              <div
+                id="iflow-mobile-filters"
+                className="card mt-2 flex w-full flex-col gap-3 p-4 lg:absolute lg:right-0 lg:top-full lg:z-30 lg:w-[34rem] lg:max-w-[calc(100vw-2rem)]"
+              >
+                <div className={row}>
+                  <span className={lbl}>Bias</span>
+                  <Segmented<BiasFilter>
+                    ariaLabel="Bias"
+                    className="mobile-horizontal-strip"
+                    value={bias}
+                    onChange={(v) => patchIFlow({ bias: v })}
+                    options={[
+                      { value: "all", label: "All" },
+                      { value: "bullish", label: "Bullish" },
+                      { value: "bearish", label: "Bearish" },
+                    ]}
+                  />
+                </div>
+                <div className={row}>
+                  <span className={lbl}>DTE</span>
+                  <Segmented<DteFilter>
+                    ariaLabel="DTE"
+                    className="mobile-horizontal-strip"
+                    value={dte}
+                    onChange={(v) => {
+                      patchIFlow({ dte: v });
+                      setSelectedTicker(null);
+                    }}
+                    options={[
+                      { value: "all", label: "All" },
+                      { value: "lotto", label: "Lotto" },
+                      { value: "swing", label: "Swing" },
+                      { value: "leap", label: "Leap" },
+                    ]}
+                  />
+                </div>
+                <div className={row}>
+                  <span className={lbl}>Earnings</span>
+                  <Segmented<EarningsWindow>
+                    ariaLabel="Earnings window"
+                    className="mobile-horizontal-strip"
+                    value={earningsWindow}
+                    onChange={(v) => patchIFlow({ earningsWindow: v })}
+                    options={[
+                      { value: "all", label: "Any" },
+                      { value: "today", label: "Today" },
+                      { value: "1w", label: "1W" },
+                      { value: "2w", label: "2W" },
+                      { value: "1m", label: "1M" },
+                      { value: "2m", label: "2M" },
+                    ]}
+                  />
+                  {earningsWindow !== "all" && earningsLoading && !earningsMap && (
+                    <span className="animate-pulse text-xs text-text-muted">Loading earnings…</span>
+                  )}
+                </div>
+                <div
+                  className={row}
+                  title={
+                    "Subcat: by sector → broad clustered subcategory (84 buckets, e.g. EUV Litho WFE).\n" +
+                    "Macro: by sector → primary macro driver (M1-M10).\n" +
+                    "Flat: no grouping — flat grid sorted by the chosen sort mode."
+                  }
+                >
+                  <span className={lbl}>Group</span>
+                  <Segmented<GroupMode>
+                    ariaLabel="Group"
+                    className="mobile-horizontal-strip"
+                    value={groupMode}
+                    onChange={(v) => patchIFlow({ groupMode: v })}
+                    options={[
+                      { value: "subcat", label: "Subcategory" },
+                      { value: "macro", label: "Macro" },
+                      { value: "flat", label: "Flat" },
+                    ]}
+                  />
+                </div>
+                {/* Highlight: which signal marks a grid card. Grid-only. */}
+                {viewMode !== "tape" && (
+                  <div className={row}>
+                    <span className={lbl}>Highlight</span>
+                    <Segmented<IfHighlight>
+                      ariaLabel="Highlight"
+                      className="mobile-horizontal-strip"
+                      value={highlightMode}
+                      onChange={(v) => patchIFlow({ highlightMode: v })}
+                      options={[
+                        { value: "off", label: <span title="No highlight">Off</span> },
+                        { value: "escalating", label: <span title="Strikes escalating (original default)">Esc</span> },
+                        { value: "accum", label: <span title="Bullish accumulation (accumulation label / escalating bull side)">Accum</span> },
+                        { value: "play", label: <span title="Theme-Pulse play score ≥ threshold — capital-preservation tuned">Play</span> },
+                        { value: "ml", label: <span title="Best within-DTE ML percentile ≥ threshold on recent flow">ML</span> },
+                      ]}
+                    />
+                    {(highlightMode === "play" || highlightMode === "ml") && (
+                      <label
+                        className="flex items-center gap-1.5 text-xs text-text-muted"
+                        title="Minimum 0–100 score a ticker needs to be highlighted"
+                      >
+                        Min
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={highlightMin}
+                          onChange={(e) =>
+                            patchIFlow({ highlightMin: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })
+                          }
+                          className="num w-14 rounded-full border border-border bg-transparent px-2 py-0.5 text-xs text-text-primary outline-none"
+                        />
+                      </label>
+                    )}
+                  </div>
+                )}
+                <div className={row}>
+                  <span className={lbl}>Traders</span>
+                  <div className="mobile-horizontal-strip flex min-w-0 flex-wrap items-center gap-1">
+                    <ChipButton
+                      active={tradersOnly}
+                      tone="purple"
+                      onClick={() => {
+                        const next = !tradersOnly;
+                        // Clearing Traders also clears any author selection so a stale
+                        // author filter doesn't silently apply next time it's enabled.
+                        patchIFlow(
+                          next
+                            ? { tradersOnly: true }
+                            : { tradersOnly: false, selectedAuthors: new Set() },
+                        );
+                      }}
+                    >
+                      Only trader-called tickers
+                    </ChipButton>
+                    {tradersOnly && traderList.map((t) => (
+                      <ChipButton
+                        key={t.author}
+                        active={selectedAuthors.has(t.author)}
+                        tone="purple"
+                        title={`${t.n_calls} calls · top ${t.top_ticker ?? "—"}`}
+                        onClick={() => {
+                          const next = new Set(selectedAuthors);
+                          if (next.has(t.author)) next.delete(t.author);
+                          else next.add(t.author);
+                          patchIFlow({ selectedAuthors: next });
+                          setSelectedTicker(null);
+                        }}
+                      >
+                        {t.author}
+                        <span className="num text-text-muted">{t.n_calls}</span>
+                      </ChipButton>
+                    ))}
+                    {tradersOnly && selectedAuthors.size > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => patchIFlow({ selectedAuthors: new Set() })}
+                        aria-label="Clear trader selection"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-xs text-text-muted transition-colors hover:text-text-primary lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1"
+                        title="Clear trader selection"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+                  <span className="text-xs text-text-muted">Export the visible tickers with full P/L</span>
+                  <DownloadCsvButton
+                    filteredTickers={filtered.map((t) => t.ticker)}
+                    selectedDates={selectedDates}
+                    isAllDates={isAllDates}
+                    dte={dte}
+                  />
+                </div>
+              </div>
+            </details>
+          );
+        })()}
 
         {categoryFilter && (
           <button
             type="button"
             onClick={() => patchIFlow({ categoryFilter: "" })}
             title="Clear the theme filter"
-            className="inline-flex min-h-11 items-center gap-1 px-2 rounded-full text-xs font-medium lg:min-h-0 lg:py-0.5
-                       transition-colors shrink-0"
-            style={{
-              color: "var(--accent-cyan)",
-              background: "color-mix(in srgb, var(--accent-cyan) 14%, transparent)",
-              border: "1px solid color-mix(in srgb, var(--accent-cyan) 35%, transparent)",
-            }}
+            className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-border px-2.5 text-xs font-medium text-text-primary transition-colors hover:bg-bg-card-hover lg:min-h-8"
           >
-            {categoryFilter.replace(/_/g, " ")}
-            <X size={11} />
+            {categoryFilter.replace(/_/g, " ").toLowerCase()}
+            <X size={11} className="text-text-muted" />
           </button>
         )}
-        <StripLabel>Group</StripLabel>
-        <span
-          className="w-full min-w-0 md:w-auto"
-          title={
-            "Subcat: by sector → broad clustered subcategory (84 buckets, e.g. EUV Litho WFE).\n" +
-            "Macro: by sector → primary macro driver (M1-M10).\n" +
-            "Flat: no grouping — flat grid sorted by the chosen sort mode."
-          }
-        >
-          <Segmented<GroupMode>
-            className="mobile-horizontal-strip w-full md:w-auto"
-            value={groupMode}
-            onChange={(v) => patchIFlow({ groupMode: v })}
-            options={[
-              { value: "subcat", label: "Subcat" },
-              { value: "macro", label: "Macro" },
-              { value: "flat", label: "Flat" },
-            ]}
-          />
-        </span>
 
-        {/* Bias — green/red is the bull/bear encoding, kept via Chip tones */}
-        <StripLabel>Bias</StripLabel>
-        <div className="mobile-horizontal-strip flex w-full items-center gap-1 overflow-x-auto md:w-auto md:overflow-visible">
-          {(
-            [
-              ["All", "all", "blue"],
-              ["Bullish", "bullish", "green"],
-              ["Bearish", "bearish", "red"],
-            ] as const
-          ).map(([l, v, tone]) => (
-            <ChipButton
-              key={v}
-              active={bias === v}
-              tone={tone as ChipTone}
-              onClick={() => patchIFlow({ bias: v as BiasFilter })}
-            >
-              {l}
-            </ChipButton>
-          ))}
-        </div>
-
-        {/* DTE — orange/blue/cyan mirror the lotto/swing/leap tag colors */}
-        <StripLabel>DTE</StripLabel>
-        <div className="mobile-horizontal-strip flex w-full items-center gap-1 overflow-x-auto md:w-auto md:overflow-visible">
-          {(
-            [
-              ["All DTE", "all", "blue"],
-              ["Lotto", "lotto", "orange"],
-              ["Swing", "swing", "blue"],
-              ["Leap", "leap", "cyan"],
-            ] as const
-          ).map(([l, v, tone]) => (
-            <ChipButton
-              key={v}
-              active={dte === v}
-              tone={tone as ChipTone}
-              onClick={() => {
-                patchIFlow({ dte: v as DteFilter });
-                setSelectedTicker(null);
-              }}
-            >
-              {l}
-            </ChipButton>
-          ))}
-        </div>
-
-        <StripLabel>Layout</StripLabel>
-        <span
-          className="w-full min-w-0 md:w-auto"
-          title="Grid: per-ticker cards. Tape: chronological feed of every entry — single, multi-date, or defaults to today if you haven't picked dates."
-        >
-          <Segmented<"grid" | "tape">
-            className="mobile-horizontal-strip w-full md:w-auto"
-            value={viewMode}
-            onChange={(v) => {
-              patchIFlow({ viewMode: v });
-              // Tape now supports multi-date. We no longer force a snap
-              // to a single date; the Tape itself defaults to today when
-              // no dates are selected.
-            }}
-            options={[
-              {
-                value: "grid",
-                label: (
-                  <span className="flex items-center gap-1">
-                    <Grid size={12} />
-                    Grid
-                  </span>
-                ),
-              },
-              {
-                value: "tape",
-                label: (
-                  <span className="flex items-center gap-1">
-                    <List size={12} />
-                    Tape
-                  </span>
-                ),
-              },
-            ]}
-          />
-        </span>
-
-        <span
-          className="text-text-muted text-xs"
-          style={{ opacity: viewMode === "tape" ? 0.4 : 1 }}
-        >
-          Sort
-        </span>
-        <span
-          className="w-full min-w-0 md:w-auto"
-          style={{
-            opacity: viewMode === "tape" ? 0.4 : 1,
-            pointerEvents: viewMode === "tape" ? "none" : "auto",
-          }}
-        >
-          <Segmented<SortMode>
-            className="mobile-horizontal-strip w-full md:w-auto"
-            value={sort}
-            onChange={(v) => patchIFlow({ sort: v })}
-            options={[
-              { value: "recent", label: "Most Recent" },
-              { value: "entries", label: "Entries" },
-              { value: "premium", label: "Premium" },
-              { value: "score", label: "Conviction" },
-              { value: "escalating", label: "Escalating" },
-              { value: "returns", label: "Estimated Return Rank" },
-            ]}
-          />
-        </span>
-        {sort === "returns" && returnsLoading && (
-          <span className="text-xs text-accent-blue animate-pulse">loading returns…</span>
-        )}
-        {sort === "returns" && <><QueryNotice queries={[returnsQuery]} label="Flow return estimates" /><FlowCoverageNotice meta={flowReturnsMeta} /></>}
-        {sort === "returns" && !returnsLoading && flowReturnsMeta?.earliest_date && (
-          <span className="text-xs text-text-muted num">
-            flow since {flowReturnsMeta.earliest_date} · {flowReturnsMeta.days_covered}d ·{" "}
-            {flowReturnsMeta.entry_count.toLocaleString()} entries
+        {/* Summary line + async status (text, not controls) */}
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+          <span>
+            <span className="num text-text-secondary">{filtered.length}</span> tickers
+            {earningsFilterOn ? (
+              <> with earnings within {earningsWindow.toUpperCase()}</>
+            ) : (
+              <>
+                {isSingleDate && summary && (
+                  <>
+                    {" · "}
+                    <span
+                      style={{
+                        color:
+                          summary.net_sentiment === "BULLISH"
+                            ? "var(--accent-green)"
+                            : summary.net_sentiment === "BEARISH"
+                            ? "var(--accent-red)"
+                            : "var(--text-secondary)",
+                      }}
+                    >
+                      {summary.net_sentiment.charAt(0) + summary.net_sentiment.slice(1).toLowerCase()}
+                    </span>{" "}
+                    <span className="num">
+                      {summary.bull_count} bull / {summary.bear_count} bear
+                    </span>
+                  </>
+                )}
+                {selectedDates.size > 1 && <> · {selectedDates.size} dates selected</>}
+              </>
+            )}
           </span>
-        )}
-        {/* Highlight: which signal lights a grid card's green border. Grid-only —
-            irrelevant in the chronological Tape view. */}
-        {viewMode !== "tape" && (
-          <>
-            <StripLabel>Highlight</StripLabel>
-            <div className="mobile-horizontal-strip flex w-full items-center gap-1 overflow-x-auto md:w-auto md:overflow-visible">
-              {(
-                [
-                  ["Off", "off", "No green border"],
-                  ["Esc", "escalating", "Strikes escalating (original default)"],
-                  ["Accum", "accum", "Bullish accumulation (accumulation label / escalating bull side)"],
-                  ["Play", "play", "Theme-Pulse play score ≥ threshold — capital-preservation tuned (accumulation + catalyst + technicals, penalizes stretched names)"],
-                  ["ML", "ml", "Best within-DTE ML percentile ≥ threshold on recent flow"],
-                ] as const
-              ).map(([l, v, tip]) => (
-                <ChipButton
-                  key={v}
-                  active={highlightMode === v}
-                  tone="green"
-                  title={tip}
-                  onClick={() => patchIFlow({ highlightMode: v as IfHighlight })}
-                >
-                  {l}
-                </ChipButton>
-              ))}
-            </div>
-            {(highlightMode === "play" || highlightMode === "ml") && (
-              <label
-                className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1"
-                style={{ background: "var(--glass-bg)" }}
-                title="Minimum 0–100 score a ticker needs to get the green border"
-              >
-                <span className="text-xs text-text-muted">≥</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={5}
-                  value={highlightMin}
-                  onChange={(e) =>
-                    patchIFlow({ highlightMin: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })
-                  }
-                  className="w-12 bg-transparent text-xs text-text-primary outline-none num"
-                />
-              </label>
-            )}
-          </>
-        )}
-        <StripLabel>Earnings</StripLabel>
-        <div className="mobile-horizontal-strip flex w-full items-center gap-1 overflow-x-auto md:w-auto md:overflow-visible">
-          {(
-            [
-              ["Any", "all"],
-              ["Today", "today"],
-              ["1W", "1w"],
-              ["2W", "2w"],
-              ["1M", "1m"],
-              ["2M", "2m"],
-            ] as const
-          ).map(([l, v]) => (
-            <ChipButton
-              key={v}
-              active={earningsWindow === v}
-              tone="orange"
-              onClick={() => patchIFlow({ earningsWindow: v as EarningsWindow })}
-            >
-              {l}
-            </ChipButton>
-          ))}
+          {sort === "returns" && viewMode !== "tape" && returnsLoading && (
+            <span className="animate-pulse text-accent-blue">Loading returns…</span>
+          )}
+          {sort === "returns" && viewMode !== "tape" && !returnsLoading && flowReturnsMeta?.earliest_date && (
+            <span className="num">
+              flow since {flowReturnsMeta.earliest_date} · {flowReturnsMeta.days_covered}d ·{" "}
+              {flowReturnsMeta.entry_count.toLocaleString()} entries
+            </span>
+          )}
         </div>
-        {earningsWindow !== "all" && earningsLoading && !earningsMap && (
-          <span className="text-xs text-accent-orange animate-pulse">loading earnings…</span>
-        )}
-        <ChipButton
-          active={tradersOnly}
-          tone="purple"
-          onClick={() => {
-            const next = !tradersOnly;
-            // Clearing Traders also clears any author selection so a stale
-            // author filter doesn't silently apply next time it's enabled.
-            patchIFlow(
-              next
-                ? { tradersOnly: true }
-                : { tradersOnly: false, selectedAuthors: new Set() },
-            );
-          }}
-        >
-          Traders
-        </ChipButton>
-        {tradersOnly && traderList.length > 0 && (
-          <div className="mobile-horizontal-strip flex w-full items-center gap-1 overflow-x-auto md:w-auto md:flex-wrap md:overflow-visible">
-            {traderList.map((t) => (
-              <ChipButton
-                key={t.author}
-                active={selectedAuthors.has(t.author)}
-                tone="purple"
-                title={`${t.n_calls} calls · top ${t.top_ticker ?? "—"}`}
-                onClick={() => {
-                  const next = new Set(selectedAuthors);
-                  if (next.has(t.author)) next.delete(t.author);
-                  else next.add(t.author);
-                  patchIFlow({ selectedAuthors: next });
-                  setSelectedTicker(null);
-                }}
-              >
-                {t.author}
-                <span className="num opacity-60">{t.n_calls}</span>
-              </ChipButton>
-            ))}
-            {selectedAuthors.size > 0 && (
-              <button
-                onClick={() => patchIFlow({ selectedAuthors: new Set() })}
-                aria-label="Clear trader selection"
-                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-xs font-semibold text-text-muted transition-colors hover:text-text-primary lg:min-h-0 lg:min-w-0 lg:px-2 lg:py-1"
-                title="Clear trader selection"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-        )}
-        </div>
+        {sort === "returns" && <><QueryNotice queries={[returnsQuery]} label="Flow return estimates" /><FlowCoverageNotice meta={flowReturnsMeta} /></>}
       </div>
 
       {/* ── Top Picks + Top Signals (single date only) ───────────────── */}
@@ -1143,16 +1103,16 @@ export function IFlowTracker() {
                 <>
                   {watchlist.length > 0 && (
                     <div className="mb-3">
-                      <h4 className="text-xs font-semibold uppercase tracking-[0.08em] mb-2 flex items-center gap-1.5 text-accent-orange">
-                        <Star size={12} style={{ fill: "var(--accent-orange)" }} />
-                        Watchlist ({watchedShown.length}
-                        {watchedShown.length < watchlist.length && (
-                          <span className="opacity-60">/{watchlist.length}</span>
-                        )}
-                        )
+                      <h4 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-text-primary">
+                        <Star size={13} className="text-accent-orange" style={{ fill: "var(--accent-orange)" }} />
+                        Watchlist
+                        <span className="num text-xs font-normal text-text-muted">
+                          {watchedShown.length}
+                          {watchedShown.length < watchlist.length && <>/{watchlist.length}</>}
+                        </span>
                       </h4>
                       {watchedShown.length === 0 ? (
-                        <div className="text-xs text-text-muted italic px-1">
+                        <div className="px-1 text-sm text-text-muted">
                           None of your watched tickers have flow on the selected dates.
                         </div>
                       ) : (
@@ -1165,8 +1125,9 @@ export function IFlowTracker() {
                   {othersShown.length > 0 && (
                     <>
                       {watchlist.length > 0 && (
-                        <h4 className="text-xs font-semibold uppercase tracking-[0.08em] mb-2 text-text-secondary">
-                          All Tickers ({othersShown.length})
+                        <h4 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-text-primary">
+                          All tickers
+                          <span className="num text-xs font-normal text-text-muted">{othersShown.length}</span>
                         </h4>
                       )}
                       {groupMode !== "flat" && taxonomy ? (
@@ -1382,10 +1343,10 @@ function DownloadCsvButton({
           ? "No tickers match the current filters"
           : `Download CSV of ${filteredTickers.length} ticker(s) with full P/L`
       }
-      className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-accent-blue hover:bg-accent-blue/15 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border px-3 text-xs font-medium text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 lg:min-h-8"
     >
       <Download size={12} />
-      {busy ? "exporting…" : "CSV"}
+      {busy ? "Exporting…" : "Download CSV"}
     </button>
   );
 }

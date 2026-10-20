@@ -54,19 +54,21 @@ export function TickerCard({
   const watched = useAppStore((s) => s.watchlist.includes(t.ticker));
   const toggleWatchlist = useAppStore((s) => s.toggleWatchlist);
 
+  const sideColor = net ? "var(--accent-green)" : "var(--accent-red)";
+
   return (
     <div
       title={highlightTitle}
-      className="card card-interactive relative min-w-0 overflow-hidden px-3 py-2 text-left"
+      className="card card-interactive relative flex min-h-[5.5rem] min-w-0 flex-col overflow-hidden px-3 py-2.5 text-left"
       style={{
-        borderColor: selected ? "var(--accent-blue)" : lit ? "color-mix(in srgb, var(--accent-green) 55%, transparent)" : undefined,
-        background: selected ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : lit ? "color-mix(in srgb, var(--accent-green) 6%, transparent)" : undefined,
+        borderColor: selected ? "var(--accent-blue)" : undefined,
+        background: selected ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : undefined,
       }}
     >
       <button
         type="button"
         onClick={() => toggleWatchlist(t.ticker)}
-        className="absolute left-1 top-0.5 z-10 min-h-11 min-w-11 rounded transition-colors hover:bg-bg-card-hover lg:left-2.5 lg:top-2 lg:min-h-6 lg:min-w-6"
+        className="absolute left-1 top-1 z-10 min-h-11 min-w-11 rounded transition-colors hover:bg-bg-card-hover lg:left-2 lg:top-2 lg:min-h-6 lg:min-w-6"
         title={watched ? "Remove from watchlist" : "Add to watchlist"}
         aria-label={watched ? `Remove ${t.ticker} from watchlist` : `Add ${t.ticker} to watchlist`}
         aria-pressed={watched}
@@ -78,7 +80,7 @@ export function TickerCard({
           style={{
             color: watched ? "var(--accent-orange)" : "var(--text-muted)",
             fill: watched ? "var(--accent-orange)" : "none",
-            opacity: watched ? 1 : 0.55,
+            opacity: watched ? 1 : 0.5,
           }}
         />
       </button>
@@ -94,91 +96,91 @@ export function TickerCard({
         }}
         aria-pressed={selected}
         aria-label={`Select ${t.ticker}, ${net ? "bullish" : "bearish"}, ${t.total_entries} entries`}
-        className="block min-h-11 w-full min-w-0 text-left lg:min-h-6"
+        className="flex min-h-11 w-full min-w-0 flex-1 flex-col gap-1.5 text-left lg:min-h-6"
       >
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-1.5 pl-5">
-          <span className="font-mono font-bold text-sm text-text-primary">{t.ticker}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          {voicesIntel && voicesIntel.mentions > 0 && (
-            <span
-              className="inline-flex items-center gap-0.5 px-1 py-px rounded text-[9px] font-mono font-semibold"
-              style={{
-                background: "color-mix(in srgb, var(--accent-purple) 12%, transparent)",
-                color:
-                  voicesIntel.bullish > voicesIntel.bearish
-                    ? "var(--accent-green)"
-                    : voicesIntel.bearish > voicesIntel.bullish
-                    ? "var(--accent-red)"
-                    : "var(--accent-purple)",
-                border: "1px solid color-mix(in srgb, var(--accent-purple) 30%, transparent)",
-              }}
-              title={`Tracked voices: ${voicesIntel.mentions} mention${voicesIntel.mentions === 1 ? "" : "s"} in last 7d (${voicesIntel.bullish}↑ ${voicesIntel.bearish}↓)`}
-            >
-              <Mic2 size={9} />
-              {voicesIntel.mentions}
-            </span>
-          )}
-          {esc && <TrendingUp size={10} style={{ color: "var(--accent-green)" }} />}
-          {intel?.exitSignals ? (
-            <span className="text-[9px] num" style={{ color: "var(--accent-orange)" }}>
-              {intel.exitSignals}x
-            </span>
-          ) : null}
-          <span className="text-xs num text-text-muted">{t.total_entries}</span>
-        </div>
-      </div>
-      <BullBearBar bull={t.bullish} total={t.bullish + t.bearish} height={6} showLabels={false} />
-      <div className="flex items-center justify-between mt-1 text-xs">
-        <span
-          className="flex items-center gap-0.5"
-          style={{ color: net ? "var(--accent-green)" : "var(--accent-red)" }}
-        >
-          {net ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-          {net ? "Bullish" : "Bearish"}
-        </span>
-        <span className="text-text-muted num">{t.net_premium}</span>
-      </div>
-      {showReturn && (
-        <div
-          className="mt-1 text-xs num flex items-center justify-between"
-          title="Premium-weighted P/L across this ticker's flow entries across all available history (delta-estimated). Ranking uses %P/L × entry count — frequency multiplies score, so a ticker with many strong entries outranks single-shot outliers."
-        >
-          <span className="text-text-muted">
-            Flow P/L
-            {retEntries !== undefined && retEntries > 0 && (
-              <span className="ml-1 text-text-muted opacity-70">n={retEntries}</span>
+        <div className="flex items-baseline justify-between gap-2 pl-5">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="num truncate text-sm font-semibold text-text-primary">{t.ticker}</span>
+            {lit && (
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ background: "var(--accent-green)" }}
+                aria-label={highlightTitle || "highlighted"}
+              />
             )}
           </span>
-          <span
-            style={{
-              color:
-                retPct === null
-                  ? "var(--text-muted)"
-                  : retPct >= 0
-                  ? "var(--accent-green)"
-                  : "var(--accent-red)",
-            }}
-          >
-            {retPct === null ? "—" : `${retPct >= 0 ? "+" : ""}${retPct.toFixed(1)}%`}
+          <span className="num text-xs text-text-muted" title={`${t.total_entries} entries`}>
+            {t.total_entries}
           </span>
         </div>
-      )}
-      {hasAccum && (
-        <div
-          className="mt-1 text-[9px] num uppercase tracking-wide"
-          style={{
-            color: accum.includes("BULL")
-              ? "var(--accent-green)"
-              : accum.includes("BEAR")
-              ? "var(--accent-red)"
-              : "var(--text-muted)",
-          }}
-        >
-          {accum.replace(/_/g, " ")}
+        <BullBearBar bull={t.bullish} total={t.bullish + t.bearish} height={4} showLabels={false} />
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <span className="flex items-center gap-1" style={{ color: sideColor }}>
+            {net ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+            {net ? "Bullish" : "Bearish"}
+          </span>
+          <span className="num text-text-secondary">{t.net_premium}</span>
         </div>
-      )}
+        {(showReturn || hasAccum || esc || intel?.exitSignals || (voicesIntel && voicesIntel.mentions > 0)) && (
+          <div className="mt-auto flex items-center justify-between gap-2 text-xs text-text-muted">
+            <span className="flex min-w-0 items-center gap-2">
+              {showReturn ? (
+                <span
+                  className="num"
+                  title="Premium-weighted P/L across this ticker's flow entries across all available history (delta-estimated). Ranking uses %P/L × entry count — frequency multiplies score, so a ticker with many strong entries outranks single-shot outliers."
+                >
+                  P/L{" "}
+                  <span
+                    style={{
+                      color:
+                        retPct === null
+                          ? "var(--text-muted)"
+                          : retPct >= 0
+                          ? "var(--accent-green)"
+                          : "var(--accent-red)",
+                    }}
+                  >
+                    {retPct === null ? "—" : `${retPct >= 0 ? "+" : ""}${retPct.toFixed(1)}%`}
+                  </span>
+                  {retEntries !== undefined && retEntries > 0 && <span> · n={retEntries}</span>}
+                </span>
+              ) : hasAccum ? (
+                <span className="truncate" title={accum.replace(/_/g, " ")}>
+                  {accum.replace(/_/g, " ").toLowerCase()}
+                </span>
+              ) : null}
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5">
+              {voicesIntel && voicesIntel.mentions > 0 && (
+                <span
+                  className="num inline-flex items-center gap-0.5"
+                  style={{
+                    color:
+                      voicesIntel.bullish > voicesIntel.bearish
+                        ? "var(--accent-green)"
+                        : voicesIntel.bearish > voicesIntel.bullish
+                        ? "var(--accent-red)"
+                        : "var(--text-muted)",
+                  }}
+                  title={`Tracked voices: ${voicesIntel.mentions} mention${voicesIntel.mentions === 1 ? "" : "s"} in last 7d (${voicesIntel.bullish}↑ ${voicesIntel.bearish}↓)`}
+                >
+                  <Mic2 size={11} />
+                  {voicesIntel.mentions}
+                </span>
+              )}
+              {esc && (
+                <span title="Strikes escalating">
+                  <TrendingUp size={11} style={{ color: "var(--accent-green)" }} />
+                </span>
+              )}
+              {intel?.exitSignals ? (
+                <span className="num" style={{ color: "var(--accent-orange)" }} title="Exit signals">
+                  {intel.exitSignals}x
+                </span>
+              ) : null}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -196,7 +198,7 @@ export function EarningsBadge({
   session?: string | null;
 }) {
   if (!isoDate) {
-    return <span className="text-text-muted italic">No earnings date</span>;
+    return <span className="text-xs text-text-muted">No earnings date</span>;
   }
   // Parse the date part as a LOCAL calendar date. `new Date("2026-06-18")`
   // parses as UTC midnight, which renders as the PREVIOUS day in negative-UTC
@@ -218,14 +220,6 @@ export function EarningsBadge({
       : days <= 30
       ? "var(--accent-blue)"
       : "var(--text-secondary)";
-  const bg =
-    days < 0
-      ? "transparent"
-      : days <= 7
-      ? "color-mix(in srgb, var(--accent-orange) 12%, transparent)"
-      : days <= 30
-      ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)"
-      : "var(--border)";
   // Trading session: 'bmo' = before market open (pre-market), 'amc' = after
   // market close (after-hours). Drives a small label + tooltip.
   const sessLabel = session === "bmo" ? "BMO" : session === "amc" ? "AMC" : null;
@@ -237,16 +231,12 @@ export function EarningsBadge({
       : "";
   return (
     <span
-      className="num px-2 py-0.5 rounded-full text-xs"
-      style={{
-        color,
-        background: bg,
-        border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
-      }}
+      className="num text-xs"
+      style={{ color }}
       title={`Next earnings: ${fmt}${sessLabel ? ` · ${sessTitle}` : ""}`}
     >
-      EPS {rel} · {fmt}
-      {sessLabel && <span className="opacity-75"> · {sessLabel}</span>}
+      Earnings {rel} · {fmt}
+      {sessLabel && <span className="text-text-muted"> · {sessLabel}</span>}
     </span>
   );
 }

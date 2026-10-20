@@ -177,15 +177,16 @@ export function ContractsView({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 text-accent-orange">
-          <Star size={12} style={{ fill: "var(--accent-orange)" }} />
-          Watched Contracts ({watchedContracts.length})
+        <h4 className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
+          <Star size={13} className="text-accent-orange" style={{ fill: "var(--accent-orange)" }} />
+          Watched contracts
+          <span className="num text-xs font-normal text-text-muted">{watchedContracts.length}</span>
         </h4>
         {anyLoading && (
-          <span className="text-[10px] text-text-muted animate-pulse">loading flow…</span>
+          <span className="animate-pulse text-xs text-text-muted">Loading flow…</span>
         )}
       </div>
-      <div className="space-y-1">
+      <div className="divide-y divide-border">
         {sortedContracts.map((c) => {
           const key = contractKey(c);
           const stats = statsByKey[key];
@@ -198,7 +199,7 @@ export function ContractsView({
           return (
             <div
               key={key}
-              className="flex items-center gap-2 text-xs px-2 py-1.5 rounded border border-border bg-bg-card hover:border-accent-blue/40 transition-colors"
+              className="flex items-center gap-2 px-2 py-2 text-xs transition-colors hover:bg-bg-card-hover"
               style={{ opacity: expired ? 0.55 : 1 }}
             >
               <button
@@ -223,49 +224,46 @@ export function ContractsView({
                 className="flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-2 rounded text-left"
                 aria-label={`Select ${c.ticker} ${c.strike} ${c.opt_type} contract`}
               >
-              <span className="font-mono font-bold text-text-primary w-14 shrink-0">{c.ticker}</span>
+              <span className="num w-14 shrink-0 text-sm font-semibold text-text-primary">{c.ticker}</span>
               <span
-                className="font-mono shrink-0"
+                className="num shrink-0 font-medium"
                 style={{
                   color: c.opt_type === "CALL" ? "var(--accent-green)" : "var(--accent-red)",
                 }}
               >
                 ${c.strike} {c.opt_type === "CALL" ? "C" : "P"}
               </span>
-              <span className="text-text-muted font-mono shrink-0">{unknownYear ? `${c.expiry_norm?.slice(13)} (year unknown)` : c.expiry_norm}</span>
+              <span className="num shrink-0 text-text-muted">{unknownYear ? `${c.expiry_norm?.slice(13)} (year unknown)` : c.expiry_norm}</span>
               {dl && (
-                <span
-                  className="font-mono px-1 rounded shrink-0"
-                  style={{ color: dl.color, background: dl.bg }}
-                >
-                  {expired ? "EXP" : dl.text}
+                <span className="shrink-0 text-text-muted">
+                  {expired ? "expired" : dl.text.toLowerCase()}
                 </span>
               )}
               {noFlow ? (
-                <span className="text-text-muted italic ml-2">
+                <span className="ml-2 text-text-muted">
                   {anyLoading ? "…" : "no hits in 30d"}
                 </span>
               ) : (
                 <>
-                  <span className="text-accent-cyan font-mono ml-2">
-                    {hits} hit{hits === 1 ? "" : "s"}
+                  <span className="ml-2 text-text-secondary"><span className="num">
+                    {hits}</span> hit{hits === 1 ? "" : "s"}
                   </span>
                   {stats!.days_seen > 1 && (
-                    <span className="text-text-muted font-mono">
+                    <span className="num text-text-muted">
                       · {stats!.days_seen}d
                     </span>
                   )}
                   {stats!.avg_ask !== null && (
-                    <span className="text-accent-orange font-mono">
-                      {Math.round(stats!.avg_ask)}%ask
+                    <span className="num text-text-secondary" title="Average fill at ask">
+                      {Math.round(stats!.avg_ask)}% ask
                     </span>
                   )}
-                  <span className="text-text-secondary font-mono">
+                  <span className="num text-text-secondary">
                     {formatPremium(stats!.total_premium)}
                   </span>
                   {stats!.latest_pnl !== null && (
                     <span
-                      className="font-mono"
+                      className="num font-semibold"
                       style={{
                         color:
                           stats!.latest_pnl >= 0
@@ -277,7 +275,7 @@ export function ContractsView({
                       {stats!.latest_pnl.toFixed(1)}%
                     </span>
                   )}
-                  <span className="text-text-muted font-mono ml-auto">
+                  <span className="num ml-auto text-text-muted">
                     {relDays(stats!.latest_date)}
                   </span>
                 </>

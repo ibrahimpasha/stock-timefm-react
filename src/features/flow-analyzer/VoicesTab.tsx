@@ -133,19 +133,15 @@ function TickerChip({
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   active?: boolean;
 }) {
-  const color = sentiment ? sentimentColor(sentiment) : "var(--accent-blue)";
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
       aria-label={`Filter by ${ticker}`}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold transition-colors hover:brightness-110"
-      style={{
-        background: active ? color : `color-mix(in srgb, ${color} 14%, transparent)`,
-        color: active ? "var(--bg-primary)" : color,
-        border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
-      }}
+      className={`num inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium transition-colors hover:bg-bg-card-hover ${
+        active ? "border-accent-blue text-text-primary" : "border-border text-text-secondary"
+      }`}
     >
       {sentiment && <SentimentDot s={sentiment} size={6} />}
       {ticker}
@@ -170,16 +166,10 @@ function ThemeChip({
       onClick={onClick}
       aria-pressed={active}
       aria-label={`Filter by ${kind ?? "theme"} ${label}`}
-      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-colors hover:brightness-110"
-      style={{
-        background: active ? "var(--accent-purple)" : "var(--glass-bg)",
-        color: active ? "var(--bg-primary)" : "var(--text-secondary)",
-        border: `1px solid ${
-          kind === "sector"
-            ? "color-mix(in srgb, var(--accent-purple) 30%, transparent)"
-            : "var(--border)"
-        }`,
-      }}
+      title={kind === "sector" ? "Sector" : "Theme"}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs transition-colors hover:bg-bg-card-hover ${
+        active ? "border-accent-blue text-text-primary" : "border-border text-text-secondary"
+      } ${kind === "sector" ? "font-medium" : ""}`}
     >
       {label}
     </button>
@@ -212,14 +202,14 @@ function HeaderBar({
     <div className="flex items-center gap-3 flex-wrap pb-2">
       {/* Voice selector */}
       <div className="flex items-center gap-1.5">
-        <label htmlFor={voiceSelectId} className="text-xs uppercase tracking-[0.08em] text-text-secondary font-semibold">
+        <label htmlFor={voiceSelectId} className="sr-only">
           Voice
         </label>
         <select
           id={voiceSelectId}
           value={voiceUsername ?? ""}
           onChange={(e) => onVoiceChange(e.target.value || null)}
-          className="control-surface min-h-7 border px-2 py-1 text-xs text-text-primary font-mono"
+          className="control-surface min-h-7 border px-2 py-1 text-xs text-text-primary"
           style={{ borderRadius: "var(--radius-control)" }}
         >
           <option value="">All voices</option>
@@ -233,7 +223,6 @@ function HeaderBar({
 
       {/* Window selector */}
       <div className="flex items-center gap-1.5">
-        <span className="text-xs uppercase tracking-[0.08em] text-text-secondary font-semibold">Window</span>
         <Segmented
           ariaLabel="Voices time window"
           value={String(windowDays)}
@@ -244,10 +233,10 @@ function HeaderBar({
 
       {/* Active filter chip */}
       {activeFilter.kind !== "all" && (
-        <Chip tone="blue">
+        <Chip>
           <Filter size={11} />
           <span>{activeFilter.kind === "ticker" ? "Ticker" : "Theme"}</span>
-          <span className="font-mono font-semibold">{activeFilter.value}</span>
+          <span className={`font-semibold text-text-primary ${activeFilter.kind === "ticker" ? "num" : ""}`}>{activeFilter.value}</span>
           <button
             type="button"
             onClick={onClearFilter}
@@ -269,7 +258,7 @@ function HeaderBar({
         </span>
         {stats.latest && (
           <span title={absoluteAge(stats.latest) || ""}>
-            latest {relativeAge(stats.latest)}
+            Latest {relativeAge(stats.latest)}
           </span>
         )}
       </div>
@@ -302,8 +291,8 @@ function TrendingStrip({
     <div className="flex flex-col gap-1.5 py-2">
       {tickers.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.08em] text-text-secondary font-semibold">
-            <TrendingUp size={11} />
+          <span className="inline-flex w-16 items-center gap-1 text-xs text-text-muted">
+            <TrendingUp size={12} />
             Tickers
           </span>
           {tickers.map((t) => {
@@ -323,8 +312,8 @@ function TrendingStrip({
       )}
       {themes.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.08em] text-text-secondary font-semibold">
-            <Sparkles size={11} />
+          <span className="inline-flex w-16 items-center gap-1 text-xs text-text-muted">
+            <Sparkles size={12} />
             Themes
           </span>
           {themes.map((t) => (
@@ -363,27 +352,19 @@ function TweetRow({
   return (
     <div
       onClick={onSelect}
-      className={`cursor-pointer p-3 border-b border-border transition-colors ${
-        selected ? "" : "hover:bg-bg-card-hover"
+      className={`cursor-pointer px-3 py-3 border-b border-border transition-colors ${
+        selected ? "bg-bg-card-hover" : "hover:bg-bg-card-hover"
       }`}
-      style={{
-        background: selected
-          ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)"
-          : undefined,
-        borderLeft: selected
-          ? "2px solid var(--accent-blue)"
-          : "2px solid transparent",
-      }}
     >
       <div className="flex items-start gap-2">
         <VoiceInitials name={tweet.voice_display_name || tweet.voice_username} />
         <div className="flex-1 min-w-0">
           {/* Header row */}
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-semibold text-text-primary truncate">
+            <span className="text-sm font-medium text-text-primary truncate">
               {tweet.voice_display_name}
             </span>
-            <span className="text-xs text-text-muted font-mono">
+            <span className="text-xs text-text-muted">
               @{tweet.voice_username}
             </span>
             <span
@@ -394,7 +375,7 @@ function TweetRow({
             </span>
             <span className="flex-1" />
             {pending && (
-              <span className="text-[9px] uppercase text-text-muted">analyzing…</span>
+              <span className="text-xs text-text-muted">Analyzing…</span>
             )}
             {!pending && (
               <>
@@ -440,7 +421,7 @@ function TweetRow({
 
           {/* Ticker chips */}
           {tweet.tickers.length > 0 && (
-            <div className="flex items-center gap-1 flex-wrap mt-1.5">
+            <div className="flex items-center gap-1 flex-wrap mt-2">
               {tweet.tickers.map((t) => (
                 <TickerChip
                   key={t.ticker}
@@ -523,7 +504,7 @@ function TweetDetail({
   const xUrl = `https://x.com/${tweet.voice_username}/status/${tweet.tweet_id}`;
   const pending = tweet.analysis_status === "pending";
   return (
-    <div className="space-y-3 text-sm leading-snug">
+    <div className="space-y-4 text-sm leading-snug">
       {/* Header */}
       <div className="flex items-start gap-2">
         <VoiceInitials name={tweet.voice_display_name || tweet.voice_username} />
@@ -536,7 +517,7 @@ function TweetDetail({
               href={`https://x.com/${tweet.voice_username}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-mono text-text-muted hover:text-accent-blue"
+              className="text-xs text-text-muted hover:text-accent-blue"
             >
               @{tweet.voice_username}
             </a>
@@ -559,15 +540,12 @@ function TweetDetail({
       </div>
 
       {/* Full text */}
-      <div
-        className="p-3 border border-border whitespace-pre-wrap text-text-primary"
-        style={{ borderRadius: "var(--radius-control)", background: "var(--glass-bg)" }}
-      >
+      <p className="max-w-[72ch] whitespace-pre-wrap text-sm leading-relaxed text-text-primary">
         {tweet.text}
-      </div>
+      </p>
 
       {pending && (
-        <div className="text-xs text-text-muted italic">
+        <div className="text-sm text-text-muted">
           Analysis pending — will appear shortly after the next cron pass.
         </div>
       )}
@@ -575,9 +553,9 @@ function TweetDetail({
       {/* Sentiment + summary */}
       {!pending && (
         <>
-          <div className="flex items-center gap-2">
-            <SentimentDot s={tweet.overall_sentiment} size={10} />
-            <span className="text-xs uppercase text-text-muted">
+          <div className="flex items-center gap-2 border-t border-border pt-3">
+            <SentimentDot s={tweet.overall_sentiment} size={8} />
+            <span className="text-xs text-text-muted">
               Overall sentiment
             </span>
             <span
@@ -587,16 +565,14 @@ function TweetDetail({
               {sentimentLabel(tweet.overall_sentiment)}
             </span>
             {tweet.is_market_related === 0 && (
-              <span className="text-xs uppercase text-text-muted ml-2 px-1 py-0.5 rounded border border-border">
-                non-market
-              </span>
+              <Chip className="ml-2">Non-market</Chip>
             )}
           </div>
 
           {tweet.summary && (
-            <div className="text-sm text-text-secondary italic border-l-2 border-accent-purple pl-3 leading-relaxed">
+            <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">
               {tweet.summary}
-            </div>
+            </p>
           )}
         </>
       )}
@@ -604,9 +580,9 @@ function TweetDetail({
       {/* Tickers with confidence */}
       {tweet.tickers.length > 0 && (
         <div>
-          <div className="text-xs uppercase text-text-muted font-semibold mb-1.5">
-            Tickers ({tweet.tickers.length})
-          </div>
+          <h4 className="mb-1.5 text-sm font-semibold text-text-primary">
+            Tickers <span className="num font-normal text-text-muted">{tweet.tickers.length}</span>
+          </h4>
           <div className="space-y-1">
             {tweet.tickers.map((t) => (
               <button
@@ -619,14 +595,14 @@ function TweetDetail({
                 }}
               >
                 <SentimentDot s={t.sentiment} />
-                <span className="font-mono font-semibold text-xs text-text-primary w-16">
+                <span className="num font-semibold text-xs text-text-primary w-16">
                   {t.ticker}
                 </span>
                 <span
-                  className="text-xs font-semibold uppercase"
+                  className="w-14 text-xs font-medium"
                   style={{ color: sentimentColor(t.sentiment) }}
                 >
-                  {t.sentiment}
+                  {sentimentLabel(t.sentiment)}
                 </span>
                 <div className="flex-1 h-1 bg-bg-card rounded-full overflow-hidden">
                   <div
@@ -649,9 +625,9 @@ function TweetDetail({
       {/* Sectors + themes */}
       {(tweet.sectors.length > 0 || tweet.themes.length > 0) && (
         <div>
-          <div className="text-xs uppercase text-text-muted font-semibold mb-1.5">
+          <h4 className="mb-1.5 text-sm font-semibold text-text-primary">
             Tags
-          </div>
+          </h4>
           <div className="flex items-center gap-1 flex-wrap">
             {tweet.sectors.map((s) => (
               <ThemeChip key={`s:${s}`} label={s} kind="sector" onClick={() => onPickTheme(s)} />
@@ -744,7 +720,7 @@ export function VoicesTab() {
         : feedAll.isLoading;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <HeaderBar
         voiceUsername={voiceUsername}
         voices={voices ?? []}

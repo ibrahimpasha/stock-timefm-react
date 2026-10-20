@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { GitBranch, Info, Network } from "lucide-react";
+import { Info } from "lucide-react";
+import { Stat } from "../../components/Glass";
 
 import { useConvergenceGraph } from "../../api/intelV3";
 import type {
@@ -213,16 +214,11 @@ export function ConvergenceGraph({
   return (
     <section className="card">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Network size={14} className="text-accent-purple" />
-          <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-            Convergence Graph
-          </h3>
-        </div>
-        <div className="num flex items-center gap-2 text-xs uppercase text-text-muted">
-          <span>{data?.window_hours ?? hours}h</span>
-          <span>{data?.summary.node_count ?? data?.nodes.length ?? 0} nodes</span>
-          <span>{data?.summary.edge_count ?? data?.edges.length ?? 0} edges</span>
+        <h3 className="text-sm font-semibold text-text-primary">Convergence graph</h3>
+        <div className="text-xs text-text-muted">
+          Last <span className="num">{data?.window_hours ?? hours}h</span> ·{" "}
+          <span className="num">{data?.summary.node_count ?? data?.nodes.length ?? 0}</span> nodes ·{" "}
+          <span className="num">{data?.summary.edge_count ?? data?.edges.length ?? 0}</span> edges
         </div>
       </div>
 
@@ -233,12 +229,12 @@ export function ConvergenceGraph({
           <div className="h-4 w-2/3 rounded bg-text-muted/15" />
         </div>
       ) : isError ? (
-        <div className="flex items-start gap-2 rounded border border-border bg-bg-card px-3 py-2 text-xs text-text-secondary">
-          <Info size={13} className="mt-0.5 shrink-0 text-accent-orange" />
+        <div className="flex items-start gap-2 text-sm text-text-secondary">
+          <Info size={14} className="mt-0.5 shrink-0 text-accent-orange" />
           Convergence graph is unavailable for {ticker}. Overview and narrative tabs are unchanged.
         </div>
       ) : !data || data.nodes.length === 0 ? (
-        <div className="rounded border border-border bg-bg-card px-3 py-3 text-xs text-text-secondary">
+        <div className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">
           <p className="font-medium text-text-primary">No graph nodes in this window.</p>
           <p className="mt-1">
             The endpoint returned no source, event, or structural graph evidence for {ticker} over
@@ -247,34 +243,13 @@ export function ConvergenceGraph({
         </div>
       ) : (
         <>
-          <div className="mb-3 grid grid-cols-3 gap-2 text-xs">
-            <div className="rounded-lg border border-border bg-bg-card px-2.5 py-1.5">
-              <div className="uppercase tracking-[0.08em] text-text-muted">Score</div>
-              <div className="num mt-0.5 text-sm font-semibold text-text-primary">
-                {scoreLabel(convergence?.score) ?? "n/a"}
-              </div>
-            </div>
-            <div className="rounded-lg border border-border bg-bg-card px-2.5 py-1.5">
-              <div className="uppercase tracking-[0.08em] text-text-muted">Alignment</div>
-              <div className="mt-0.5 truncate text-sm font-semibold text-text-primary">
-                {convergence?.alignment ?? "unknown"}
-              </div>
-            </div>
-            <div className="rounded-lg border border-border bg-bg-card px-2.5 py-1.5">
-              <div className="uppercase tracking-[0.08em] text-text-muted">Events</div>
-              <div className="num mt-0.5 text-sm font-semibold text-text-primary">
-                {data.summary.event_count ?? 0}
-              </div>
-            </div>
+          <div className="mb-4 grid grid-cols-3 gap-4">
+            <Stat label="Score" value={scoreLabel(convergence?.score) ?? "n/a"} />
+            <Stat label="Alignment" value={<span className="font-sans">{convergence?.alignment ?? "unknown"}</span>} />
+            <Stat label="Events" value={data.summary.event_count ?? 0} />
           </div>
 
-          <div
-            className="relative h-72 overflow-hidden rounded-lg border border-border bg-bg-card"
-            style={{
-              background:
-                "linear-gradient(180deg, color-mix(in srgb, var(--text-primary) 3%, transparent), transparent)",
-            }}
-          >
+          <div className="relative h-72 overflow-hidden border-t border-border">
             <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full">
               {layout.edges.map((edge, idx) => {
                 const a = nodeById.get(edge.source);
@@ -309,20 +284,17 @@ export function ConvergenceGraph({
                   <div
                     className={
                       isCenter
-                        ? "max-w-28 rounded px-2.5 py-1.5 text-center text-sm font-semibold shadow"
-                        : "max-w-24 rounded px-2 py-1 text-center text-xs shadow"
+                        ? "max-w-28 rounded-md px-2.5 py-1.5 text-center text-sm font-semibold"
+                        : "max-w-24 rounded-md px-2 py-1 text-center text-xs"
                     }
                     title={`${node.type}${node.source ? ` · ${node.source}` : ""}`}
                     style={{
-                      color: isCenter ? "var(--bg-primary)" : node.color,
-                      background: isCenter
-                        ? node.color
-                        : `color-mix(in srgb, ${node.color} 14%, var(--bg-card))`,
-                      border: `1px solid color-mix(in srgb, ${node.color} 48%, var(--border))`,
-                      boxShadow: `0 0 0 3px color-mix(in srgb, ${node.color} 10%, transparent)`,
+                      color: isCenter ? "var(--bg-primary)" : "var(--text-primary)",
+                      background: isCenter ? node.color : "var(--bg-card)",
+                      border: `1px solid color-mix(in srgb, ${node.color} 55%, var(--border))`,
                     }}
                   >
-                    <div className="truncate font-mono uppercase">{node.label}</div>
+                    <div className={`truncate ${isCenter ? "num" : ""}`}>{node.label}</div>
                     {!isCenter && (
                       <div className="mt-0.5 truncate text-text-muted">
                         {fmtLabel(node.source || node.type)}
@@ -335,17 +307,13 @@ export function ConvergenceGraph({
             })}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-text-secondary">
-            <span className="inline-flex items-center gap-1 font-mono uppercase tracking-wider text-text-muted">
-              <GitBranch size={12} />
-              Legend
-            </span>
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
             {sources.length > 0
               ? sources.map((source) => {
                   const color = SOURCE_COLOR[norm(source)] ?? "var(--text-secondary)";
                   return (
                     <span key={source} className="inline-flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+                      <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
                       {fmtLabel(source)}
                     </span>
                   );
@@ -353,16 +321,15 @@ export function ConvergenceGraph({
               : ["source", "event", "structural"].map((kind) => (
                   <span key={kind} className="inline-flex items-center gap-1">
                     <span
-                      className="h-2 w-2 rounded-full"
+                      aria-hidden
+                      className="h-1.5 w-1.5 rounded-full"
                       style={{ background: TYPE_COLOR[kind] }}
                     />
                     {kind}
                   </span>
                 ))}
             {data.summary.structural_context && (
-              <span className="rounded bg-bg-card px-1.5 py-0.5 font-mono uppercase tracking-wider text-accent-orange">
-                structural context
-              </span>
+              <span className="text-text-muted">Includes structural context</span>
             )}
             {layout.hiddenCount > 0 && (
               <span className="text-text-muted">+{layout.hiddenCount} more hidden locally</span>

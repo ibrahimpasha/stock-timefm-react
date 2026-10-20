@@ -7,15 +7,32 @@
  * entry, status chip, n-events badge, and P/L; click to expand into a vertical
  * event timeline.
  *
- * Glass remodel: status/outcome + event-type pills are `Chip` primitives
- * (green closed-profit, red stopped/closed-loss, yellow partial), all numeric
- * data carries the `num` class, and the expanded timeline reads as a quiet
- * sub-layer of the row. Behavior and data flow are unchanged.
+ * 2026-10 redesign: status is a leading dot + sentence-case word (tone on
+ * the dot only), event types / DTE / counts are plain text, color is kept
+ * for signed P/L. The expanded timeline is an indented divided list.
  */
 import { useId, useMemo, useState } from "react";
 
 import { dteTag } from "../flow-analyzer/iflow/utils";
 import { Chip, type ChipTone } from "../../components/Glass";
+
+const TONE_VAR: Record<Exclude<ChipTone, "neutral">, string> = {
+  green: "var(--accent-green)",
+  red: "var(--accent-red)",
+  blue: "var(--accent-blue)",
+  purple: "var(--accent-purple)",
+  orange: "var(--accent-orange)",
+  yellow: "var(--accent-yellow)",
+  cyan: "var(--accent-cyan)",
+};
+
+function toneColor(t: ChipTone): string {
+  return t === "neutral" ? "var(--text-muted)" : TONE_VAR[t];
+}
+
+function sentence(s: string): string {
+  return s ? s.charAt(0) + s.slice(1).toLowerCase() : s;
+}
 import {
   absoluteAge,
   changeColor,
@@ -80,14 +97,6 @@ function eventTypeChip(t: string | null | undefined): {
   if (e === "status") return { label: "STATUS", tone: "neutral" };
   if (e === "recap") return { label: "RECAP", tone: "neutral" };
   return { label: (t || "EVENT").toUpperCase(), tone: "neutral" };
-}
-
-/** DTE bucket → Chip tone (mirrors the iflow color language). */
-function dteTone(text: string): ChipTone {
-  if (text === "LOTTO") return "orange";
-  if (text === "SWING") return "blue";
-  if (text === "LEAP") return "cyan";
-  return "neutral";
 }
 
 /** First open/add event = where the trader entered. */
@@ -236,10 +245,10 @@ export function TraderPositionRow({
   const hasStrike = strike != null;
 
   return (
-    <div style={{ borderBottom: "1px solid var(--border)" }}>
+    <div>
       {/* Main row — clickable */}
       <div
-        className="text-sm py-2 px-3 hover:bg-bg-card-hover transition-colors cursor-pointer flex items-center gap-2.5 flex-wrap"
+        className="text-sm py-2 px-4 hover:bg-bg-card-hover transition-colors cursor-pointer flex items-center gap-2.5 flex-wrap"
         onClick={() => onToggle(key)}
       >
         {/* Latest-activity date — leftmost so the eye sees recency at a glance.
@@ -260,13 +269,8 @@ export function TraderPositionRow({
           return (
             <span
               className={`num shrink-0 text-sm min-w-12 ${
-                isToday ? "font-bold" : "font-semibold"
+                isToday ? "font-semibold text-text-primary" : "text-text-muted"
               }`}
-              style={{
-                color: isToday
-                  ? "var(--accent-orange)"
-                  : "var(--text-primary)",
-              }}
               title={title}
             >
               {shortDate(latestTs)}
@@ -275,13 +279,17 @@ export function TraderPositionRow({
         })()}
 
         {/* Status / outcome chip (carries cumulative P/L context via tone) */}
-        <Chip
-          tone={status.tone}
-          className="shrink-0 min-w-16 justify-center"
+        <span
+          className="inline-flex shrink-0 min-w-18 items-center gap-1.5 text-xs text-text-secondary"
           title={`status: ${status.label.toLowerCase()}`}
         >
-          {status.label}
-        </Chip>
+          <span
+            aria-hidden="true"
+            className="h-1.5 w-1.5 shrink-0 rounded-full"
+            style={{ background: toneColor(status.tone) }}
+          />
+          {sentence(status.label)}
+        </span>
 
         {/* Ticker */}
         {ticker ? (
@@ -291,7 +299,7 @@ export function TraderPositionRow({
               e.stopPropagation();
               onTickerClick?.(ticker);
             }}
-            className="num font-bold shrink-0 text-sm cursor-pointer rounded-[var(--radius-control)]"
+            className="num font-semibold shrink-0 text-sm cursor-pointer rounded-[var(--radius-control)]"
             style={{
               color: tickerHi
                 ? "var(--accent-blue)"
@@ -310,7 +318,7 @@ export function TraderPositionRow({
         )}
 
         {/* Strike + opt type, or SHARES fallback */}
-        <span className="num font-bold shrink-0 text-sm text-text-primary">
+        <span className="num shrink-0 text-sm text-text-primary">
           {hasStrike ? (
             <>
               ${strike}
@@ -330,12 +338,10 @@ export function TraderPositionRow({
 
         {/* DTE chip */}
         {dl && (
-          <Chip tone={dteTone(dl.text)} className="shrink-0">
-            {dl.text}
-            <span className="num opacity-85">
-              {dte != null ? `${dte}d` : ""}
-            </span>
-          </Chip>
+          <span className="shrink-0 text-xs text-text-muted">
+            {sentence(dl.text)}
+            {dte != null && <span className="num ml-1">{dte}d</span>}
+          </span>
         )}
 
         {/* Entry premium */}
@@ -360,24 +366,23 @@ export function TraderPositionRow({
 
         {/* n_events badge — only when >1, otherwise noisy. */}
         {position.n_events > 1 && (
-          <Chip tone="purple" className="shrink-0">
-            <span className="num">+{position.n_events}</span> events
-          </Chip>
+          <span className="shrink-0 text-xs text-text-muted">
+            <span className="num">{position.n_events}</span> events
+          </span>
         )}
 
         {/* "Today" pulse — visible when any events landed today (local TZ).
             Tells the user the position was active TODAY without expanding. */}
         {todayEventCount > 0 && (
           <Chip
-            tone="orange"
-            className="shrink-0"
+            className="shrink-0 text-text-primary"
             title={
               lastTodayEvent
                 ? `${todayEventCount} event${todayEventCount === 1 ? "" : "s"} today, latest at ${new Date(lastTodayEvent.ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
                 : `${todayEventCount} events today`
             }
           >
-            <span className="num">{todayEventCount}</span> TODAY
+            <span className="num">{todayEventCount}</span> today
           </Chip>
         )}
 
@@ -394,7 +399,7 @@ export function TraderPositionRow({
             </span>
           )}
           <span
-            className="num font-bold shrink-0 text-sm min-w-14 text-right"
+            className="num font-semibold shrink-0 text-sm min-w-14 text-right"
             style={{ color: pnlColor }}
             title={pnlTitle}
           >
@@ -420,28 +425,24 @@ export function TraderPositionRow({
       {expanded && (
         <div
           id={detailsId}
-          className="text-xs py-2 pr-3 pb-3 pl-14 text-text-secondary flex flex-col gap-2 leading-relaxed"
-          style={{
-            background: "color-mix(in srgb, var(--bg-card) 50%, transparent)",
-          }}
+          className="text-sm pt-1 pr-4 pb-3 pl-16 text-text-secondary flex flex-col gap-2 leading-relaxed"
         >
-          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-muted">
-            Timeline (<span className="num">{position.events.length}</span>)
+          <div className="text-xs font-medium text-text-muted">
+            Timeline · <span className="num">{position.events.length}</span>
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col divide-y divide-border max-w-[72ch]">
             {position.events.map((ev) => {
               const chip = eventTypeChip(ev.event_type);
               const sizing = parseSizing(ev.sizing);
               return (
                 <div
                   key={`${ev.alert_id}-${ev.ts}`}
-                  className="flex flex-wrap items-center gap-2 pb-1"
-                  style={{ borderBottom: "1px dotted var(--border)" }}
+                  className="flex flex-wrap items-center gap-x-2.5 gap-y-1 py-1.5"
                 >
-                  <Chip tone={chip.tone} className="shrink-0 min-w-14 justify-center">
-                    {chip.label}
-                  </Chip>
+                  <span className="w-12 shrink-0 text-xs font-medium text-text-primary">
+                    {sentence(chip.label)}
+                  </span>
                   <span
                     className="num text-xs text-text-muted"
                     title={absoluteAge(ev.ts) || ""}
@@ -451,7 +452,7 @@ export function TraderPositionRow({
 
                   {ev.exit_pct != null && (
                     <span
-                      className="num font-bold text-sm"
+                      className="num font-semibold text-sm"
                       style={{ color: changeColor(ev.exit_pct) }}
                     >
                       {ev.exit_pct >= 0 ? "+" : ""}
@@ -488,13 +489,13 @@ export function TraderPositionRow({
                   )}
 
                   {sizing.length > 0 && (
-                    <span className="num text-xs tracking-wide text-text-muted">
+                    <span className="num text-xs text-text-muted">
                       [{sizing.join(", ")}]
                     </span>
                   )}
 
                   {ev.rationale && (
-                    <span className="text-sm italic text-text-secondary basis-full ml-16">
+                    <span className="text-sm text-text-secondary basis-full pl-[3.625rem]">
                       {ev.rationale}
                     </span>
                   )}
@@ -511,12 +512,7 @@ export function TraderPositionRow({
               onClick={() => setShowMessages((s) => !s)}
               aria-expanded={showMessages}
               aria-controls={messagesId}
-              className="self-start text-xs font-medium uppercase tracking-wide text-text-muted cursor-pointer px-2 py-1 transition-colors hover:text-text-primary"
-              style={{
-                background: "transparent",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-control)",
-              }}
+              className="self-start text-xs font-medium text-accent-blue cursor-pointer py-1 transition-colors hover:underline"
             >
               {showMessages
                 ? "Hide messages"
@@ -525,7 +521,7 @@ export function TraderPositionRow({
           )}
 
           {showMessages && (
-            <div id={messagesId} className="flex flex-col gap-1.5">
+            <div id={messagesId} className="flex flex-col gap-3 border-t border-border pt-2 max-w-[72ch]">
               {position.events
                 .filter((e) => e.content)
                 .map((ev) => (
@@ -533,19 +529,11 @@ export function TraderPositionRow({
                     key={`msg-${ev.alert_id}`}
                     className="flex flex-col gap-1"
                   >
-                    <div className="num text-xs text-text-muted">
-                      {shortDate(ev.ts)} ·{" "}
-                      {(ev.event_type || "event").toUpperCase()}
+                    <div className="text-xs text-text-muted">
+                      <span className="num">{shortDate(ev.ts)}</span> ·{" "}
+                      {sentence(ev.event_type || "event")}
                     </div>
-                    <div
-                      className="whitespace-pre-wrap text-sm text-text-secondary p-2 max-h-56 overflow-auto"
-                      style={{
-                        background:
-                          "color-mix(in srgb, var(--bg-card-hover) 50%, transparent)",
-                        borderRadius: "var(--radius-control)",
-                        border: "1px solid var(--border)",
-                      }}
-                    >
+                    <div className="whitespace-pre-wrap text-sm leading-relaxed text-text-secondary max-h-56 overflow-auto">
                       {ev.content}
                     </div>
                   </div>
@@ -554,10 +542,10 @@ export function TraderPositionRow({
           )}
 
           {/* Footer: opened/last-update timestamps */}
-          <div className="num text-xs text-text-muted">
+          <div className="text-xs text-text-muted">
             {position.opened_at && (
               <span title={absoluteAge(position.opened_at) || ""}>
-                opened {relativeAge(position.opened_at)}
+                Opened {relativeAge(position.opened_at)}
               </span>
             )}
             {lastEvent && (
@@ -567,7 +555,7 @@ export function TraderPositionRow({
             )}
             {hasRealized && (
               <span className="ml-2">
-                · realized {formatPercentRaw(realized!, 1)}
+                · realized <span className="num">{formatPercentRaw(realized!, 1)}</span>
               </span>
             )}
           </div>

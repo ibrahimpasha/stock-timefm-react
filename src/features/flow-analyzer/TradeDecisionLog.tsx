@@ -3,8 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import apiClient from "../../api/client";
 import {
   TrendingUp, TrendingDown, ChevronDown, ChevronRight, Target,
-  AlertOctagon, Activity, History, RefreshCw,
+  AlertOctagon, Activity, RefreshCw,
 } from "lucide-react";
+import { Segmented } from "../../components/Glass";
 
 interface ClosedPosition {
   ticker: string;
@@ -42,19 +43,22 @@ function useClosedTrades(limit: number = 50) {
   });
 }
 
-function exitReasonLabel(reason: string): { label: string; color: string; bg: string; Icon: React.ElementType } {
+/* Color only where the exit is a state worth noticing (stops red, forced
+ * exits orange); profit exits stay neutral — the P/L number carries the sign. */
+function exitReasonLabel(reason: string): { label: string; color: string; Icon: React.ElementType } {
   const r = (reason || "").toUpperCase();
-  if (r.includes("TRIM1")) return { label: "TRIM 1 (+25%)", color: "var(--accent-cyan)", bg: "color-mix(in srgb, var(--accent-blue) 12%, transparent)", Icon: Target };
-  if (r.includes("TRIM2")) return { label: "TRIM 2 (RISK-FREE)", color: "var(--accent-green)", bg: "color-mix(in srgb, var(--accent-green) 15%, transparent)", Icon: Target };
-  if (r.includes("TRIM3")) return { label: "TRIM 3 (+100%)", color: "var(--accent-green)", bg: "color-mix(in srgb, var(--accent-green) 15%, transparent)", Icon: Target };
-  if (r.includes("RUNNER") || r.includes("TRAIL")) return { label: "RUNNER TRAIL", color: "var(--accent-green)", bg: "color-mix(in srgb, var(--accent-green) 15%, transparent)", Icon: TrendingUp };
-  if (r.includes("STOP") && !r.includes("UNDERLYING")) return { label: "STOP LOSS", color: "var(--accent-red)", bg: "color-mix(in srgb, var(--accent-red) 12%, transparent)", Icon: AlertOctagon };
-  if (r.includes("UNDERLYING")) return { label: "UNDERLYING STOP", color: "var(--accent-red)", bg: "color-mix(in srgb, var(--accent-red) 12%, transparent)", Icon: AlertOctagon };
-  if (r.includes("CIRCUIT")) return { label: "CIRCUIT BREAKER", color: "var(--accent-orange)", bg: "color-mix(in srgb, var(--accent-orange) 15%, transparent)", Icon: AlertOctagon };
-  if (r.includes("EVICT")) return { label: "EVICTED", color: "var(--accent-orange)", bg: "color-mix(in srgb, var(--accent-orange) 15%, transparent)", Icon: AlertOctagon };
-  if (r.includes("LOTTO_TP")) return { label: r, color: "var(--accent-orange)", bg: "color-mix(in srgb, var(--accent-orange) 15%, transparent)", Icon: Target };
-  if (r.includes("TP")) return { label: r, color: "var(--accent-green)", bg: "color-mix(in srgb, var(--accent-green) 15%, transparent)", Icon: Target };
-  return { label: reason || "CLOSED", color: "var(--text-muted)", bg: "color-mix(in srgb, var(--border) 15%, transparent)", Icon: Activity };
+  const neutral = "var(--text-secondary)";
+  if (r.includes("TRIM1")) return { label: "Trim 1 (+25%)", color: neutral, Icon: Target };
+  if (r.includes("TRIM2")) return { label: "Trim 2 (risk-free)", color: neutral, Icon: Target };
+  if (r.includes("TRIM3")) return { label: "Trim 3 (+100%)", color: neutral, Icon: Target };
+  if (r.includes("RUNNER") || r.includes("TRAIL")) return { label: "Runner trail", color: neutral, Icon: TrendingUp };
+  if (r.includes("STOP") && !r.includes("UNDERLYING")) return { label: "Stop loss", color: "var(--accent-red)", Icon: AlertOctagon };
+  if (r.includes("UNDERLYING")) return { label: "Underlying stop", color: "var(--accent-red)", Icon: AlertOctagon };
+  if (r.includes("CIRCUIT")) return { label: "Circuit breaker", color: "var(--accent-orange)", Icon: AlertOctagon };
+  if (r.includes("EVICT")) return { label: "Evicted", color: "var(--accent-orange)", Icon: AlertOctagon };
+  if (r.includes("LOTTO_TP")) return { label: r, color: neutral, Icon: Target };
+  if (r.includes("TP")) return { label: r, color: neutral, Icon: Target };
+  return { label: reason || "Closed", color: "var(--text-muted)", Icon: Activity };
 }
 
 function fmtDate(iso: string): string {
@@ -77,26 +81,18 @@ function holdDuration(entryIso: string, exitIso: string): string {
 }
 
 function ReasonChips({ reasons, flags }: { reasons?: string[]; flags?: string[] }) {
+  // Plain text list; only blocking/rejecting flags get color (red).
   const items: { text: string; color: string }[] = [];
-  for (const r of reasons || []) {
-    let color = "var(--text-muted)";
-    if (r.includes("STRONG") || r.includes("MEGA") || r.includes("ESCALATING")) color = "var(--accent-green)";
-    else if (r.includes("EXTREME_VOI") || r.includes("CONCENTRATED")) color = "var(--accent-cyan)";
-    else if (r.includes("conflict") || r.includes("BATTLE")) color = "var(--accent-orange)";
-    items.push({ text: r, color });
-  }
+  for (const r of reasons || []) items.push({ text: r, color: "var(--text-secondary)" });
   for (const f of flags || []) {
-    let color = "var(--accent-orange)";
-    if (f.includes("BLOCK") || f.includes("REJECT")) color = "var(--accent-red)";
-    if (f.includes("EXTREME_VOI")) color = "var(--accent-green)";
-    items.push({ text: f, color });
+    const blocked = f.includes("BLOCK") || f.includes("REJECT");
+    items.push({ text: f, color: blocked ? "var(--accent-red)" : "var(--text-muted)" });
   }
-  if (items.length === 0) return <span className="text-xs text-text-muted italic">no rationale stored</span>;
+  if (items.length === 0) return <span className="text-xs text-text-muted">No rationale stored</span>;
   return (
-    <div className="flex items-center gap-1 flex-wrap">
+    <div className="flex items-center gap-x-3 gap-y-1 flex-wrap">
       {items.map((it, i) => (
-        <span key={i} className="text-xs px-1.5 py-0.5 rounded font-mono"
-          style={{ color: it.color, background: `color-mix(in srgb, ${it.color} 7%, transparent)`, border: `1px solid color-mix(in srgb, ${it.color} 19%, transparent)` }}>
+        <span key={i} className="text-xs num" style={{ color: it.color }}>
           {it.text}
         </span>
       ))}
@@ -115,77 +111,86 @@ function TradeRow({ pos }: { pos: ClosedPosition }) {
   const pnlColor = isWin ? "var(--accent-green)" : "var(--accent-red)";
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
+    <div>
       <div
-        className="flex items-center gap-2 px-3 py-2 text-xs cursor-pointer hover:bg-bg-card-hover"
+        className="flex items-center gap-2 px-1 py-2 text-xs cursor-pointer hover:bg-bg-card-hover"
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setExpanded(!expanded);
+          }
+        }}
       >
-        {expanded ? <ChevronDown size={11} className="text-text-muted" /> : <ChevronRight size={11} className="text-text-muted" />}
-        <SideIcon size={11} style={{ color: sideColor }} />
-        <span className="font-mono font-bold text-text-primary w-12">{pos.ticker}</span>
-        <span className="font-mono text-text-primary">${pos.strike} {pos.option_type}</span>
-        {pos.is_lotto && <span className="text-[9px] font-mono text-accent-orange">LOTTO</span>}
-        <span className="text-text-muted">×{pos.contracts}</span>
-        <span className="text-text-muted">{pos.expiry}</span>
+        {expanded ? <ChevronDown size={12} className="text-text-muted" /> : <ChevronRight size={12} className="text-text-muted" />}
+        <SideIcon size={12} style={{ color: sideColor }} />
+        <span className="num font-semibold text-text-primary w-12">{pos.ticker}</span>
+        <span className="num text-text-primary">${pos.strike} {pos.option_type}</span>
+        {pos.is_lotto && <span className="text-xs text-text-muted">lotto</span>}
+        <span className="num text-text-muted">×{pos.contracts}</span>
+        <span className="num text-text-muted">{pos.expiry}</span>
         <span
-          className="ml-auto flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold"
-          style={{ color: exitInfo.color, background: exitInfo.bg, border: `1px solid color-mix(in srgb, ${exitInfo.color} 25%, transparent)` }}
+          className="ml-auto flex items-center gap-1 text-xs"
+          style={{ color: exitInfo.color }}
         >
-          <ExitIcon size={10} />
+          <ExitIcon size={12} />
           {exitInfo.label}
         </span>
-        <span className="font-mono font-bold w-16 text-right" style={{ color: pnlColor }}>
+        <span className="num font-semibold w-16 text-right" style={{ color: pnlColor }}>
           {pos.pnl_pct >= 0 ? "+" : ""}{pos.pnl_pct.toFixed(1)}%
         </span>
-        <span className="text-text-muted font-mono text-[10px] w-20 text-right">
+        <span className="text-text-muted num text-xs w-20 text-right">
           {fmtDate(pos.closed_at)}
         </span>
       </div>
       {expanded && (
-        <div className="px-4 py-3 border-t border-border bg-bg-primary/30 space-y-2 text-xs">
+        <div className="pl-6 pr-1 pb-3 pt-1 space-y-3 text-xs">
           {/* Trade lifecycle */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div>
               <div className="text-text-muted">Entry</div>
-              <div className="font-mono text-text-primary">${pos.entry_price?.toFixed(2)}</div>
+              <div className="num text-text-primary">${pos.entry_price?.toFixed(2)}</div>
             </div>
             <div>
               <div className="text-text-muted">Exit</div>
-              <div className="font-mono" style={{ color: pnlColor }}>${pos.exit_price?.toFixed(2)}</div>
+              <div className="num" style={{ color: pnlColor }}>${pos.exit_price?.toFixed(2)}</div>
             </div>
             <div>
               <div className="text-text-muted">Hold</div>
-              <div className="font-mono text-text-primary">{holdDuration(pos.filled_at, pos.closed_at)}</div>
+              <div className="num text-text-primary">{holdDuration(pos.filled_at, pos.closed_at)}</div>
             </div>
             <div>
               <div className="text-text-muted">Score</div>
-              <div className="font-mono text-text-primary">{pos.score?.toFixed(2)}</div>
+              <div className="num text-text-primary">{pos.score?.toFixed(2)}</div>
             </div>
             <div>
               <div className="text-text-muted">DTE at fill</div>
-              <div className="font-mono text-text-primary">{pos.dte}</div>
+              <div className="num text-text-primary">{pos.dte}</div>
             </div>
             <div>
               <div className="text-text-muted">Cost basis</div>
-              <div className="font-mono text-text-primary">${pos.cost?.toFixed(0)}</div>
+              <div className="num text-text-primary">${pos.cost?.toFixed(0)}</div>
             </div>
             <div>
               <div className="text-text-muted">Trim level</div>
-              <div className="font-mono text-text-primary">{pos.trim_level ?? 0}</div>
+              <div className="num text-text-primary">{pos.trim_level ?? 0}</div>
             </div>
             <div>
               <div className="text-text-muted">Filled at</div>
-              <div className="font-mono text-text-primary text-[10px]">{fmtDate(pos.filled_at)}</div>
+              <div className="num text-text-primary">{fmtDate(pos.filled_at)}</div>
             </div>
           </div>
 
           {/* Build fills (Ab-style) */}
           {pos.build_fills && pos.build_fills.length > 1 && (
             <div>
-              <div className="text-text-muted mb-1">Build Fills ({pos.build_fills.length})</div>
-              <div className="flex items-center gap-2 flex-wrap font-mono text-[10px] text-text-secondary">
+              <div className="text-text-muted mb-1">Build fills <span className="num">{pos.build_fills.length}</span></div>
+              <div className="flex items-center gap-x-4 gap-y-1 flex-wrap num text-xs text-text-secondary">
                 {pos.build_fills.map((f, i) => (
-                  <span key={i} className="px-1.5 py-0.5 rounded" style={{ background: "color-mix(in srgb, var(--border) 30%, transparent)" }}>
+                  <span key={i}>
                     {fmtDate(f.at)} {f.contracts}× @ ${f.price?.toFixed(2)}
                   </span>
                 ))}
@@ -195,9 +200,9 @@ function TradeRow({ pos }: { pos: ClosedPosition }) {
 
           {/* Scoring breakdown */}
           <div>
-            <div className="text-text-muted mb-1">Why entered (scoring rationale):</div>
+            <div className="text-text-muted mb-1">Why entered (scoring rationale)</div>
             <ReasonChips reasons={pos.reasons} flags={pos.flags} />
-            <div className="mt-1 flex items-center gap-3 text-[10px] text-text-muted font-mono">
+            <div className="mt-1 flex items-center gap-3 text-xs text-text-muted">
               {pos.ml_label && <span>ML: <span className="text-text-secondary">{pos.ml_label}</span></span>}
               {pos.gex_regime && pos.gex_regime !== "unknown" && (
                 <span>GEX: <span className="text-text-secondary">{pos.gex_regime}</span></span>
@@ -210,8 +215,8 @@ function TradeRow({ pos }: { pos: ClosedPosition }) {
 
           {/* Why exited */}
           <div>
-            <div className="text-text-muted mb-1">Why exited:</div>
-            <span className="text-text-primary font-mono">{pos.exit_reason}</span>
+            <div className="text-text-muted mb-1">Why exited</div>
+            <span className="text-text-primary num">{pos.exit_reason}</span>
           </div>
         </div>
       )}
@@ -240,9 +245,9 @@ export function TradeDecisionLog() {
         <button
           type="button"
           onClick={() => void refetch()}
-          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-secondary hover:text-text-primary"
+          className="inline-flex items-center gap-1 rounded px-2 py-1 text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
         >
-          <RefreshCw size={11} /> Retry
+          <RefreshCw size={12} /> Retry
         </button>
       </div>
     );
@@ -261,47 +266,32 @@ export function TradeDecisionLog() {
 
   return (
     <div className="space-y-3">
-      {/* Header stats */}
+      {/* Filter + stats (the parent disclosure already titles this section) */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h4 className="text-xs font-semibold text-accent-cyan uppercase tracking-wider flex items-center gap-1.5">
-          <History size={12} /> Trade Decision Log ({data.length})
-        </h4>
-        <div className="flex items-center gap-3 text-xs">
+        <Segmented
+          ariaLabel="Filter trades"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: "all", label: <>All <span className="num">{data.length}</span></> },
+            { value: "wins", label: <>Wins <span className="num">{wins}</span></> },
+            { value: "losses", label: <>Losses <span className="num">{losses}</span></> },
+          ]}
+        />
+        <div className="flex items-center gap-4 text-xs">
           <span>
-            <span className="text-text-muted">Win rate:</span>{" "}
-            <span className="font-mono font-bold" style={{ color: winRate >= 50 ? "var(--accent-green)" : "var(--accent-red)" }}>
+            <span className="text-text-muted">Win rate</span>{" "}
+            <span className="num font-semibold" style={{ color: winRate >= 50 ? "var(--accent-green)" : "var(--accent-red)" }}>
               {winRate.toFixed(0)}%
             </span>
           </span>
           <span>
-            <span className="text-text-muted">Avg P/L:</span>{" "}
-            <span className="font-mono font-bold" style={{ color: totalPnlPct >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
+            <span className="text-text-muted">Avg P/L</span>{" "}
+            <span className="num font-semibold" style={{ color: totalPnlPct >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
               {totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(1)}%
             </span>
           </span>
         </div>
-      </div>
-
-      {/* Filter pills */}
-      <div className="flex items-center gap-1.5">
-        {([
-          ["all", `All (${data.length})`, "var(--text-secondary)"],
-          ["wins", `Wins (${wins})`, "var(--accent-green)"],
-          ["losses", `Losses (${losses})`, "var(--accent-red)"],
-        ] as const).map(([id, label, color]) => (
-          <button
-            key={id}
-            onClick={() => setFilter(id as typeof filter)}
-            className="px-2.5 py-1 text-xs font-semibold rounded-md transition-colors"
-            style={{
-              background: filter === id ? `color-mix(in srgb, ${color} 8%, transparent)` : "transparent",
-              color: filter === id ? color : "var(--text-muted)",
-              border: `1px solid ${filter === id ? `color-mix(in srgb, ${color} 25%, transparent)` : "var(--border)"}`,
-            }}
-          >
-            {label}
-          </button>
-        ))}
       </div>
 
       {/* Trade rows */}
@@ -310,7 +300,7 @@ export function TradeDecisionLog() {
           No trades match the filter
         </div>
       ) : (
-        <div className="space-y-1">
+        <div className="divide-y divide-border">
           {filtered.map((pos, i) => (
             <TradeRow key={`${pos.ticker}_${pos.closed_at}_${i}`} pos={pos} />
           ))}

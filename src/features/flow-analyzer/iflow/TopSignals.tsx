@@ -16,7 +16,6 @@ import { useTickerGex } from "../../../api/tickerGex";
 import { GexWall, GexWallLegend } from "../../gex/GexWall";
 import { useTaxonomy } from "../../../api/taxonomy";
 import { useThemePulseScores } from "../../../api/intelGraph";
-import { Chip } from "../../../components/Glass";
 import { formatPremium } from "../../../lib/utils";
 import type { DteFilter, NotableScore } from "./types";
 import { matchesDte } from "./utils";
@@ -156,16 +155,17 @@ export function TopSignals({ date, dteFilter }: { date: string; dteFilter: DteFi
   return (
     <div className="mb-4">
       <div className="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-          <Sparkles size={12} className="text-accent-cyan" />
-          Top Signals · Research Rank ({signals.length})
+        <h4 className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
+          <Sparkles size={13} className="text-text-muted" />
+          Top signals
+          <span className="num text-xs font-normal text-text-muted">{signals.length}</span>
         </h4>
         <span className="text-xs text-text-muted">
-          Evidence + directional setup; quarantined ML is capped at ±3
+          Ranked by research rank: evidence + directional setup, ML capped at ±3
         </span>
       </div>
       <GexWallLegend />
-      <div className="space-y-0.5">
+      <div className="divide-y divide-border">
         {signals.map((s) => {
           const e = s.entry;
           const color = s.side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
@@ -173,40 +173,38 @@ export function TopSignals({ date, dteFilter }: { date: string; dteFilter: DteFi
           return (
             <div
               key={s.ticker}
-              className="text-xs px-2 py-1.5 rounded-md"
-              style={{ background: "color-mix(in srgb, var(--bg-card) 70%, transparent)" }}
+              className="px-2 py-2 text-xs transition-colors hover:bg-bg-card-hover"
               title={s.reasons.join(" · ")}
             >
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <Chip
-                  tone="blue"
+                <span
+                  className="num w-7 shrink-0 text-sm font-semibold text-text-primary"
                   title={`Research Rank ${s.research}: NScore ${s.evidence}, Setup ${s.setup}, ML percentile ${s.ml} (${s.servingMode ?? "unknown"}).`}
                 >
-                  rank <span className="num font-bold">{s.research}</span>
-                </Chip>
-                <span className="font-mono font-bold text-text-primary">{s.ticker}</span>
+                  {s.research}
+                </span>
+                <span className="num text-sm font-semibold text-text-primary">{s.ticker}</span>
                 <span className="num text-text-primary">
                   ${e.strike} {e.type || e.option_type}
                 </span>
-                <span style={{ color }} className="font-semibold">{s.side}</span>
+                <span style={{ color }} className="font-medium">{s.side}</span>
                 <span className="num text-text-muted">{e.expiry}</span>
                 {dl && (
-                  <span className="num px-1 rounded-full" style={{ color: dl.color, background: dl.bg }}>
-                    {dl.text}
-                  </span>
+                  <span className="text-text-muted">{dl.text.toLowerCase()}</span>
                 )}
                 {s.theme && (
-                  <Chip tone="cyan">
-                    {s.theme}
-                  </Chip>
+                  <span className="text-text-secondary">{s.theme}</span>
                 )}
                 {s.pulse != null && (
-                  <Chip
-                    tone={s.tilt > 0 ? "orange" : "neutral"}
+                  <span
+                    className="text-text-muted"
                     title={`Theme Pulse ${s.pulse}/100 is context only and does not change Research Rank.`}
                   >
-                    context <span className="num">{s.tilt >= 0 ? "+" : ""}{s.tilt.toFixed(1)}</span>
-                  </Chip>
+                    context{" "}
+                    <span className={`num ${s.tilt > 0 ? "text-accent-orange" : "text-text-secondary"}`}>
+                      {s.tilt >= 0 ? "+" : ""}{s.tilt.toFixed(1)}
+                    </span>
+                  </span>
                 )}
                 <GexWall ticker={s.ticker} strike={Number(e.strike) || null} showLabel />
                 <span className="text-text-secondary ml-auto num">{formatPremium(parsePremium(e.premium_usd ?? e.premium))}</span>

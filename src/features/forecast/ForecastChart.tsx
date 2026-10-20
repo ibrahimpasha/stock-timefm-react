@@ -456,8 +456,9 @@ export function ForecastChart({
 
   return (
     <div className={`card ${className}`}>
+      <h3 className="text-sm font-semibold text-text-primary mb-2">Price and forecast</h3>
       {/* Chart legend */}
-      <div className="flex items-center gap-4 mb-2 flex-wrap">
+      <div className="flex items-center gap-x-4 gap-y-1 mb-3 flex-wrap">
         {!intraday && showMA.includes("MA20") && <span className="text-xs text-text-muted flex items-center gap-1.5">
           <span className="w-4 h-0.5 inline-block" style={{ backgroundColor: "#ffa500" }} />
           MA20

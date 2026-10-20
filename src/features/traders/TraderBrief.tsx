@@ -9,21 +9,10 @@
  * TraderProfile. Defaults to collapsed; hits cache if generated in last 24h.
  */
 import { useState } from "react";
-import {
-  Brain,
-  RefreshCw,
-  Loader2,
-  Target,
-  Sparkles,
-  Eye,
-  TrendingUp,
-  Calendar,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
+import { RefreshCw, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { relativeAge, absoluteAge } from "../../lib/utils";
-import { Chip, Segmented, type ChipTone } from "../../components/Glass";
+import { Chip, Segmented } from "../../components/Glass";
 import {
   useTraderBrief,
   useGenerateTraderBrief,
@@ -35,14 +24,6 @@ const WINDOW_OPTIONS: { label: string; days: number }[] = [
   { label: "14d", days: 14 },
   { label: "30d", days: 30 },
 ];
-
-const STYLE_TONES: Record<string, ChipTone> = {
-  scalp: "orange",
-  swing: "blue",
-  leap: "purple",
-  mixed: "neutral",
-  defensive: "green",
-};
 
 function sectorLeanColor(lean: string): string {
   if (lean === "bullish") return "var(--accent-green)";
@@ -57,7 +38,7 @@ function PickTicker({ t }: { t: string }) {
     <button
       type="button"
       onClick={() => setActiveTicker(t)}
-      className="inline-block font-mono font-semibold text-xs text-accent-blue hover:underline"
+      className="num inline-block font-semibold text-sm text-accent-blue hover:underline"
     >
       {t}
     </button>
@@ -65,25 +46,20 @@ function PickTicker({ t }: { t: string }) {
 }
 
 function Section({
-  icon: Icon,
   title,
   count,
   children,
 }: {
-  icon: React.ElementType;
   title: string;
   count?: number;
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-1.5">
-        <Icon size={12} className="text-accent-purple" />
-        <span className="text-xs uppercase text-text-muted font-semibold">
-          {title}
-        </span>
+    <div className="space-y-1.5 border-t border-border pt-3">
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-sm font-semibold text-text-primary">{title}</span>
         {count !== undefined && (
-          <span className="text-xs text-text-muted">({count})</span>
+          <span className="num text-xs text-text-muted">{count}</span>
         )}
       </div>
       {children}
@@ -92,28 +68,23 @@ function Section({
 }
 
 function BriefBody({ content }: { content: TraderBriefContent }) {
-  const styleTone = STYLE_TONES[content.trading_style] ?? "neutral";
   return (
-    <div className="space-y-3">
+    <div className="space-y-4 max-w-[72ch]">
       {/* Hero — current view + trading style */}
       <div>
         <div className="flex items-center gap-2 mb-1.5">
-          <span className="text-xs uppercase text-text-muted font-semibold">
-            Style
-          </span>
-          <Chip tone={styleTone} className="uppercase font-semibold">
-            {content.trading_style}
-          </Chip>
+          <span className="text-xs text-text-muted">Style</span>
+          <Chip className="capitalize">{content.trading_style}</Chip>
         </div>
-        <p className="text-sm text-text-primary leading-relaxed">
+        <p className="text-base text-text-primary leading-relaxed">
           {content.current_view}
         </p>
       </div>
 
       {/* Open thesis */}
       {content.open_thesis && (
-        <Section icon={Target} title="Open Thesis">
-          <p className="text-sm text-text-secondary italic leading-relaxed border-l-2 border-accent-purple pl-3 whitespace-pre-wrap">
+        <Section title="Open thesis">
+          <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
             {content.open_thesis}
           </p>
         </Section>
@@ -122,17 +93,16 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
       {/* Sectors */}
       {content.sectors_focus.length > 0 && (
         <Section
-          icon={Sparkles}
-          title="Sectors in Focus"
+          title="Sectors in focus"
           count={content.sectors_focus.length}
         >
           <div className="space-y-1">
             {content.sectors_focus.map((s) => (
               <div key={s.sector} className="flex items-center gap-2">
-                <span className="text-xs text-text-primary capitalize w-40 truncate">
+                <span className="text-sm text-text-primary capitalize w-40 truncate">
                   {s.sector}
                 </span>
-                <div className="flex-1 h-2 rounded-full bg-bg-card overflow-hidden">
+                <div className="flex-1 h-1.5 rounded-full bg-bg-card-hover overflow-hidden">
                   <div
                     className="h-full rounded-full"
                     style={{
@@ -145,20 +115,20 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
                   {s.weight_pct}%
                 </span>
                 <span
-                  className="text-xs uppercase font-semibold"
+                  className="w-14 text-xs capitalize"
                   style={{ color: sectorLeanColor(s.lean) }}
                 >
-                  {s.lean[0]}
+                  {s.lean}
                 </span>
               </div>
             ))}
             {content.sectors_focus.some((s) => s.notes) && (
-              <div className="mt-1.5 space-y-0.5 text-sm text-text-secondary leading-snug">
+              <div className="mt-2 space-y-1 text-sm text-text-secondary leading-relaxed">
                 {content.sectors_focus
                   .filter((s) => s.notes)
                   .map((s) => (
                     <div key={`note-${s.sector}`}>
-                      <span className="font-semibold capitalize">{s.sector}:</span>{" "}
+                      <span className="font-medium text-text-primary capitalize">{s.sector}:</span>{" "}
                       {s.notes}
                     </div>
                   ))}
@@ -171,8 +141,7 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
       {/* Active positions recap */}
       {content.active_positions_recap.length > 0 && (
         <Section
-          icon={Target}
-          title="Active Positions"
+          title="Active positions"
           count={content.active_positions_recap.length}
         >
           <div className="space-y-1.5">
@@ -196,7 +165,6 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
       {/* Watching */}
       {content.watching.length > 0 && (
         <Section
-          icon={Eye}
           title="Watching (no position yet)"
           count={content.watching.length}
         >
@@ -214,8 +182,7 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
       {/* Recent outcomes */}
       {content.recent_outcomes.length > 0 && (
         <Section
-          icon={TrendingUp}
-          title="Recent Outcomes"
+          title="Recent outcomes"
           count={content.recent_outcomes.length}
         >
           <div className="space-y-1">
@@ -234,7 +201,7 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
                 >
                   <PickTicker t={o.ticker} />
                   <span
-                    className="num font-semibold text-xs"
+                    className="num font-semibold text-sm"
                     style={{ color }}
                   >
                     {o.outcome}
@@ -252,13 +219,12 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
       {/* Catalysts */}
       {content.catalysts_flagged.length > 0 && (
         <Section
-          icon={Calendar}
-          title="Catalysts Flagged"
+          title="Catalysts flagged"
           count={content.catalysts_flagged.length}
         >
-          <ul className="space-y-0.5 text-sm text-text-secondary leading-snug">
+          <ul className="list-disc space-y-0.5 pl-4 text-sm text-text-secondary leading-relaxed">
             {content.catalysts_flagged.map((c, idx) => (
-              <li key={idx}>• {c}</li>
+              <li key={idx}>{c}</li>
             ))}
           </ul>
         </Section>
@@ -266,8 +232,8 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
 
       {/* Style notes */}
       {content.style_notes && (
-        <Section icon={Sparkles} title="Style Notes">
-          <p className="text-sm text-text-secondary leading-snug">
+        <Section title="Style notes">
+          <p className="text-sm text-text-secondary leading-relaxed">
             {content.style_notes}
           </p>
         </Section>
@@ -295,24 +261,23 @@ export function TraderBrief({ author }: { author: string }) {
   const hasContent = !!content;
 
   return (
-    <div className="glass-strong p-3">
+    <div className="card">
       {/* Collapsed header */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between gap-2 text-left"
       >
-        <div className="flex items-center gap-2">
-          <Brain size={14} className="text-accent-purple" />
+        <div className="flex items-baseline gap-2">
           <span className="text-sm font-semibold text-text-primary">
-            Trader Brief
+            Trader brief
           </span>
           {data?.generated_at && (
             <span
               className="text-xs text-text-muted"
               title={absoluteAge(data.generated_at) || ""}
             >
-              · {relativeAge(data.generated_at)}
+              {relativeAge(data.generated_at)}
             </span>
           )}
           {!hasContent && !isFetching && !isError && (
@@ -328,12 +293,10 @@ export function TraderBrief({ author }: { author: string }) {
 
       {/* Expanded body */}
       {open && (
-        <div className="mt-3 space-y-3">
+        <div className="mt-4 space-y-4">
           {/* Controls */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs uppercase text-text-muted font-semibold">
-              Window
-            </span>
+            <span className="text-xs text-text-muted">Window</span>
             <Segmented
               options={WINDOW_OPTIONS.map((w) => ({
                 value: String(w.days),
@@ -353,7 +316,7 @@ export function TraderBrief({ author }: { author: string }) {
               type="button"
               disabled={generate.isPending}
               onClick={handleGenerate}
-              className="ml-auto inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold border border-accent-purple/40 text-accent-purple bg-accent-purple/10 hover:bg-accent-purple/20 disabled:opacity-50"
+              className="desk-action ml-auto disabled:opacity-50"
             >
               {generate.isPending ? (
                 <>
@@ -405,7 +368,7 @@ export function TraderBrief({ author }: { author: string }) {
           {!generate.isPending && !isError && !hasContent && (
             <div className="text-center py-4 text-sm text-text-muted">
               No brief cached. Click{" "}
-              <span className="text-accent-purple">Generate</span> above (single
+              <span className="font-medium text-text-primary">Generate</span> above (single
               LLM call, ~30-90s).
             </div>
           )}

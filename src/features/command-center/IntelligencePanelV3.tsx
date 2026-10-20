@@ -18,7 +18,6 @@ import { QueryNotice } from "../../components/QueryNotice";
 import {
   ChevronDown,
   ChevronRight,
-  CalendarDays,
   Star,
 } from "lucide-react";
 
@@ -137,9 +136,7 @@ function SectionHeader({
 }) {
   return (
     <div className="flex items-center justify-between mb-2">
-      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-        {label}
-      </span>
+      <h3 className="text-sm font-semibold text-text-primary">{label}</h3>
       {right ? <div className="flex items-center gap-2">{right}</div> : null}
     </div>
   );
@@ -181,8 +178,8 @@ function ForwardCalendar({
     ? earningsQ.data?.[scopedTicker.toUpperCase()] ?? null
     : null;
 
-  // Lightweight color hint per category — macro = blue, ticker = purple,
-  // geopolitical = red. Helps glanceability when several categories mix.
+  // Leading-dot color per category — macro = blue, ticker = purple,
+  // geopolitical = red, earnings = orange.
   const categoryColor = (cat?: string): string => {
     const c = (cat || "").toLowerCase();
     if (c === "ticker") return "var(--accent-purple, #c084fc)";
@@ -190,20 +187,18 @@ function ForwardCalendar({
     if (c === "earnings") return "var(--accent-orange)";
     return "var(--accent-blue)";
   };
-  const urgencyTone = (days: number | null): string => {
-    if (days == null) return "var(--text-muted)";
-    if (days <= 1) return "var(--accent-red)";
-    if (days <= 3) return "var(--accent-orange)";
-    if (days <= 7) return "var(--accent-blue)";
-    return "var(--text-muted)";
-  };
+  // Only today/tomorrow earn a warning tint; everything else stays muted.
+  const urgencyTone = (days: number | null): string =>
+    days != null && days <= 1 ? "var(--accent-orange)" : "var(--text-muted)";
 
   return (
-    <section className="mb-3 pb-3 border-b border-border">
+    <section className="mb-4 pb-4 border-b border-border">
       <SectionHeader
-        label={scopedTicker ? `Next 14d · ${scopedTicker}` : "Next 14d"}
+        label="Upcoming catalysts"
         right={
-          <CalendarDays size={11} style={{ color: "var(--text-muted)" }} />
+          <span className="text-xs text-text-muted">
+            Next <span className="num">14</span> days{scopedTicker ? <> · <span className="num">{scopedTicker}</span></> : null}
+          </span>
         }
       />
       {isLoading && top.length === 0 ? (
@@ -213,9 +208,9 @@ function ForwardCalendar({
         </div>
       ) : top.length === 0 ? (
         nextEarnings ? (
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            No catalysts in window. Next earnings:{" "}
-            <span className="num" style={{ color: "var(--accent-orange)" }}>
+          <p className="text-sm text-text-muted">
+            No catalysts in window. Next earnings{" "}
+            <span className="num text-text-primary">
               {nextEarnings.slice(0, 10)}
             </span>
             {(() => {
@@ -224,12 +219,12 @@ function ForwardCalendar({
             })()}
           </p>
         ) : (
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          <p className="text-sm text-text-muted">
             No catalysts in window.
           </p>
         )
       ) : (
-        <div className="space-y-1.5">
+        <div className="divide-y divide-border">
           {top.map((ev, i) => {
             const isTickerRow =
               !!scopedTicker && ev.ticker && ev.ticker.toUpperCase() === scopedTicker.toUpperCase();
@@ -246,70 +241,47 @@ function ForwardCalendar({
                       ? `${Math.abs(dn)}d ago`
                       : `in ${dn}d`;
             return (
-              <div
-                key={`${ev.date}-${i}`}
-                className="rounded px-2 py-1.5"
-                style={{
-                  background: "color-mix(in srgb, var(--bg-card) 40%, transparent)",
-                  borderLeft: `2px solid ${categoryColor(ev.category)}`,
-                }}
-              >
-                <div className="grid items-center gap-2 text-xs" style={{ gridTemplateColumns: "78px 1fr auto auto" }}>
-                  <span
-                    className="num"
-                    style={{ color: "var(--text-primary)" }}
-                    title={fmtCalendarDateFull(ev.date)}
-                  >
-                    {fmtCalendarDate(ev.date)}
-                  </span>
-                  <span className="truncate font-semibold" style={{ color: "var(--text-primary)" }}>
-                    {ev.label}
-                    {ev.session && (
-                      <span
-                        className="font-normal opacity-70"
-                        title={
-                          ev.session === "bmo"
-                            ? "Before market open (pre-market)"
-                            : "After market close (after-hours)"
-                        }
-                      >
-                        {" · "}
-                        {ev.session === "bmo" ? "BMO" : "AMC"}
+              <div key={`${ev.date}-${i}`} className="flex gap-2.5 py-2">
+                <span
+                  aria-hidden
+                  className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: categoryColor(ev.category) }}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="min-w-0 flex-1 text-sm font-medium text-text-primary">
+                      {ev.label}
+                      {ev.session && (
+                        <span
+                          className="font-normal text-text-muted"
+                          title={
+                            ev.session === "bmo"
+                              ? "Before market open (pre-market)"
+                              : "After market close (after-hours)"
+                          }
+                        >
+                          {" · "}
+                          {ev.session === "bmo" ? "before open" : "after close"}
+                        </span>
+                      )}
+                      {isTickerRow && (
+                        <Star size={12} fill="currentColor" className="ml-1.5 inline align-[-1px] text-text-secondary" aria-label="this ticker" />
+                      )}
+                    </span>
+                    <span className="shrink-0 text-xs text-text-muted" title={ev.source ? `Source: ${ev.source}` : undefined}>
+                      {ev.category || ev.source || ""}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex items-baseline gap-2 text-xs text-text-muted">
+                    <span className="num" title={fmtCalendarDateFull(ev.date)}>{fmtCalendarDate(ev.date)}</span>
+                    {inLabel && <span className="num" style={{ color: urgencyTone(dn) }}>{inLabel}</span>}
+                    {explainer && (
+                      <span className="min-w-0 flex-1 truncate" title={explainer}>
+                        {explainer}
                       </span>
                     )}
-                  </span>
-                  <span
-                    className="num text-[10px] uppercase whitespace-nowrap"
-                    style={{ color: urgencyTone(dn) }}
-                    title={fmtCalendarDateFull(ev.date)}
-                  >
-                    {inLabel}
-                  </span>
-                  <span
-                    className="text-[9px] font-medium uppercase tracking-wider px-1.5 py-px rounded-full"
-                    style={{
-                      color: categoryColor(ev.category),
-                      background: `color-mix(in srgb, ${categoryColor(ev.category)} 12%, transparent)`,
-                    }}
-                    title={ev.source ? `Source: ${ev.source}` : undefined}
-                  >
-                    {ev.category || ev.source || ""}
-                  </span>
-                  {isTickerRow && (
-                    <span style={{ color: "var(--accent-orange)" }}>
-                      <Star size={11} fill="currentColor" />
-                    </span>
-                  )}
-                </div>
-                {explainer && (
-                  <div
-                    className="text-xs leading-snug mt-0.5 pl-[80px] truncate"
-                    style={{ color: "var(--text-muted)" }}
-                    title={explainer}
-                  >
-                    {explainer}
                   </div>
-                )}
+                </div>
               </div>
             );
           })}
@@ -327,20 +299,17 @@ function IntelDetailCollapsible({ ticker }: { ticker: string | null }) {
   // behind a click was wasted friction.
   const [open, setOpen] = useState(true);
   return (
-    <section className="mt-2">
+    <section>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] py-1 px-1.5 hover:bg-bg-card-hover rounded-full transition-colors"
-        style={{ color: "var(--text-secondary)" }}
+        aria-expanded={open}
+        className="w-full flex items-center gap-1.5 text-sm font-semibold text-text-primary py-1 transition-opacity hover:opacity-90"
       >
-        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        Intel Detail (8 categories)
-        <span
-          className="ml-auto text-xs font-normal normal-case tracking-normal"
-          style={{ color: "var(--text-muted)" }}
-        >
-          {open ? "hide" : "click to expand"}
+        {open ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
+        Intel detail
+        <span className="ml-auto text-xs font-normal text-text-muted">
+          {open ? "Hide" : "8 categories"}
         </span>
       </button>
       {open && (

@@ -8,15 +8,6 @@ import type {
   GraphTiedTo,
   StructuralRole,
 } from "../../lib/types";
-import {
-  Network,
-  Users,
-  Lightbulb,
-  Anchor,
-  Layers,
-  Link2,
-  Zap,
-} from "lucide-react";
 
 interface Props {
   ticker: string;
@@ -91,7 +82,6 @@ function MiniGraphSvg({
     <svg
       viewBox={`0 0 ${W} ${H}`}
       className="w-full h-[130px]"
-      style={{ background: "color-mix(in srgb, var(--text-primary) 2%, transparent)", borderRadius: 6 }}
     >
       {spokes.map((s, i) => (
         <line key={`l-${i}`} x1={CX} y1={CY} x2={s.x} y2={s.y} stroke={s.color} strokeWidth={1} opacity={0.45} />
@@ -112,31 +102,26 @@ function MiniGraphSvg({
   );
 }
 
-/** Role pill — shown in the header and inline on peer chips. */
-function RolePill({ role, reason }: { role: StructuralRole; reason?: string }) {
+/** Structural role as plain text with a leading dot — reason on hover. */
+function RoleText({ role, reason }: { role: StructuralRole; reason?: string }) {
   const color = ROLE_COLOR[role] ?? "var(--text-muted)";
   return (
-    <span
-      title={reason}
-      className="px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider"
-      style={{ background: tint(color, 12), color, border: `1px solid ${tint(color, 28)}` }}
-    >
-      {role}
+    <span title={reason} className="inline-flex items-center gap-1.5 text-xs font-medium text-text-secondary">
+      <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+      {role.charAt(0) + role.slice(1).toLowerCase()}
     </span>
   );
 }
 
-/** Clickable ticker chip with a confidence dot + optional role tag. */
+const NEUTRAL_DOT = "var(--text-muted)";
+
+/** Clickable ticker link with an optional role suffix. */
 function TickerChip({
   ticker,
-  color,
-  confidence,
   role,
   onClick,
 }: {
   ticker: string;
-  color: string;
-  confidence?: string;
   role?: StructuralRole | null;
   onClick: (t: string) => void;
 }) {
@@ -144,61 +129,36 @@ function TickerChip({
     <button
       type="button"
       onClick={() => onClick(ticker)}
-      title={confidence ? `${confidence.toLowerCase()} edge` : undefined}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs num hover:bg-bg-card-hover cursor-pointer transition-colors"
-      style={{ background: tint(color, 12), color, border: `1px solid ${tint(color, 26)}` }}
+      title={role ? role.toLowerCase() : undefined}
+      className="inline-flex items-baseline gap-1 cursor-pointer text-text-primary hover:text-accent-blue"
     >
-      {confidence && (
-        <span className="inline-block w-1.5 h-1.5 rounded-full" style={confidenceDot(confidence, color)} />
-      )}
-      <span>{ticker}</span>
-      {role && (
-        <span className="text-[9px] opacity-60" style={{ color: ROLE_COLOR[role] }}>
-          {role.slice(0, 4)}
-        </span>
-      )}
+      <span className="num font-semibold">{ticker}</span>
+      {role && <span className="text-xs text-text-muted">{role.slice(0, 4).toLowerCase()}</span>}
     </button>
   );
 }
 
-/** Non-clickable concept chip (chokepoint / theme / entity). */
-function ConceptChip({ name, color, confidence }: { name: string; color: string; confidence?: string }) {
+/** Non-clickable concept (chokepoint / theme / entity) with a confidence dot. */
+function ConceptChip({ name, confidence }: { name: string; confidence?: string }) {
   return (
     <span
       title={confidence ? `${confidence.toLowerCase()} edge` : undefined}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs cursor-default"
-      style={{ background: tint(color, 10), color, border: `1px solid ${tint(color, 22)}` }}
+      className="inline-flex items-center gap-1.5 text-text-secondary"
     >
       {confidence && (
-        <span className="inline-block w-1.5 h-1.5 rounded-full" style={confidenceDot(confidence, color)} />
+        <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full" style={confidenceDot(confidence, NEUTRAL_DOT)} />
       )}
       <span>{name}</span>
     </span>
   );
 }
 
-/** A labeled row of chips. `children` is the chip content. */
-function Row({
-  label,
-  icon,
-  color,
-  children,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  color: string;
-  children: React.ReactNode;
-}) {
+/** A labeled definition row: muted label, plain inline items. */
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-2 py-1">
-      <div
-        className="flex items-center gap-1 min-w-[104px] pt-0.5 text-xs font-semibold uppercase tracking-[0.08em]"
-        style={{ color }}
-      >
-        {icon}
-        {label}
-      </div>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
+    <div className="grid grid-cols-[6.5rem_1fr] items-baseline gap-3 py-2">
+      <div className="text-xs text-text-muted">{label}</div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">{children}</div>
     </div>
   );
 }
@@ -242,104 +202,83 @@ export function GraphContextCard({ ticker }: Props) {
   ];
 
   return (
-    <div className="card flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-          <Network size={14} className="text-accent-purple" />
-          Graph context
-          {role && <RolePill role={role.role} reason={role.reason} />}
+    <div className="card flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h3 className="text-sm font-semibold text-text-primary">Graph context</h3>
+          {role && <RoleText role={role.role} reason={role.reason} />}
         </div>
         <div className="text-xs text-text-muted text-right">
           <span className="num">{totalSignals}</span> signals
           {data.sector && (
-            <span className="ml-2">
-              · {data.sector}
+            <span>
+              {" "}· {data.sector}
               {data.theme ? ` · ${data.theme}` : ""}
             </span>
           )}
-          {data.community?.label && (
-            <div className="text-accent-purple/70">cluster: {data.community.label}</div>
-          )}
+          {data.community?.label && <div>Cluster: {data.community.label}</div>}
         </div>
       </div>
 
       <MiniGraphSvg ticker={ticker} groups={svgGroups} />
 
       {keyFacts.length > 0 && (
-        <div className="flex items-start gap-2 py-1">
-          <div
-            className="flex items-center gap-1 min-w-[104px] pt-0.5 text-xs font-semibold uppercase tracking-[0.08em]"
-            style={{ color: "var(--accent-orange, #e37f2e)" }}
-          >
-            <Zap size={11} />
-            Key facts
-          </div>
-          <div className="flex flex-col gap-1 flex-1 min-w-0">
+        <div className="flex flex-col gap-1.5">
+          <div className="text-sm font-semibold text-text-primary">Key facts</div>
+          <ul className="flex flex-col gap-1.5 max-w-[72ch]">
             {keyFacts.map((f, i) => (
-              <div key={i} className="text-xs leading-snug text-text-secondary">
-                <span
-                  className="inline-block w-1 h-1 rounded-full mr-1.5 align-middle"
-                  style={{ background: "var(--accent-orange, #e37f2e)" }}
-                />
+              <li key={i} className="flex gap-2 text-sm leading-relaxed text-text-secondary">
+                <span aria-hidden className="mt-2 h-1 w-1 shrink-0 rounded-full bg-text-muted" />
                 {f}
-              </div>
+              </li>
             ))}
-            {data.intel_as_of && (
-              <div className="num text-xs text-text-muted">intel {data.intel_as_of}</div>
-            )}
-          </div>
+          </ul>
+          {data.intel_as_of && (
+            <div className="text-xs text-text-muted">Intel as of <span className="num">{data.intel_as_of}</span></div>
+          )}
         </div>
       )}
 
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col divide-y divide-border border-t border-border">
         {chokepoints.length > 0 && (
-          <Row label="Chokepoints" icon={<Anchor size={11} />} color={EDGE_COLOR.chokepoint}>
+          <Row label="Chokepoints">
             {chokepoints.map((c) => (
-              <ConceptChip key={c.name} name={c.name} color={EDGE_COLOR.chokepoint} confidence={c.confidence} />
+              <ConceptChip key={c.name} name={c.name} confidence={c.confidence} />
             ))}
           </Row>
         )}
 
         {peers.length > 0 && (
-          <Row label="Peers" icon={<Users size={11} />} color={EDGE_COLOR.peer}>
+          <Row label="Peers">
             {peers.map((p) => (
-              <TickerChip key={p.ticker} ticker={p.ticker} color={EDGE_COLOR.peer} role={p.role} onClick={setActiveTicker} />
+              <TickerChip key={p.ticker} ticker={p.ticker} role={p.role} onClick={setActiveTicker} />
             ))}
           </Row>
         )}
 
         {concepts.length > 0 && (
-          <Row label="Concepts" icon={<Lightbulb size={11} />} color={EDGE_COLOR.concept}>
+          <Row label="Concepts">
             {concepts.map((c) => (
-              <ConceptChip key={c.name} name={c.name} color={EDGE_COLOR.concept} />
+              <ConceptChip key={c.name} name={c.name} />
             ))}
           </Row>
         )}
 
         {groups.length > 0 && (
-          <Row label="Groups" icon={<Layers size={11} />} color={EDGE_COLOR.group}>
+          <Row label="Groups">
             {groups.map((g) => (
-              <span
-                key={g.id}
-                title={g.rationale}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs cursor-default"
-                style={{
-                  background: tint("var(--accent-blue)", 10),
-                  color: "var(--accent-blue)",
-                  border: `1px solid ${tint("var(--accent-blue)", 22)}`,
-                }}
-              >
+              <span key={g.id} title={g.rationale} className="text-text-secondary cursor-default">
                 {g.id.replace(/_members$/, "").replace(/_/g, " ")}
-                <span className="opacity-50">· {g.members.length + 1}</span>
+                <span className="num text-xs text-text-muted"> {g.members.length + 1}</span>
               </span>
             ))}
           </Row>
         )}
 
         {tiedTo.length > 0 && (
-          <Row label="Tied to" icon={<Link2 size={11} />} color={EDGE_COLOR.tied}>
+          <Row label="Tied to">
             {tiedTo.map((t) => (
-              <ConceptChip key={t.name} name={t.name} color={EDGE_COLOR.tied} />
+              <ConceptChip key={t.name} name={t.name} />
             ))}
           </Row>
         )}

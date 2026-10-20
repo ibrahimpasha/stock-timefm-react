@@ -87,7 +87,7 @@ export function GexWall({
       aria-label={describe(g, strike ?? undefined)}
       className="inline-flex items-center gap-1 shrink-0 no-underline"
     >
-      <span className="text-[9px] font-semibold text-text-muted leading-none">P</span>
+      <span className="text-xs font-semibold text-text-muted leading-none">P</span>
       <span
         className="relative inline-block rounded-full"
         style={{ width, height: 6, background: "var(--bg-card-hover)" }}
@@ -113,9 +113,9 @@ export function GexWall({
           />
         )}
       </span>
-      <span className="text-[9px] font-semibold text-text-muted leading-none">C</span>
+      <span className="text-xs font-semibold text-text-muted leading-none">C</span>
       {showLabel && (
-        <span className="text-[10px] leading-none" style={{ color: tone }}>{word}</span>
+        <span className="text-xs leading-none" style={{ color: tone }}>{word}</span>
       )}
     </Link>
   );
@@ -127,9 +127,9 @@ export function GexWall({
  */
 export function GexWallLegend() {
   return (
-    <div className="flex items-center gap-1.5 text-[10px] text-text-muted mb-1.5">
+    <div className="flex items-start gap-1.5 text-xs leading-relaxed text-text-muted mb-2">
       <span className="font-semibold">P</span>
-      <span className="inline-block rounded-full" style={{ width: 28, height: 5, background: "var(--bg-card-hover)" }} />
+      <span className="mt-1.5 inline-block shrink-0 rounded-full" style={{ width: 28, height: 5, background: "var(--bg-card-hover)" }} />
       <span className="font-semibold">C</span>
       <span>
         put wall → call wall · <span style={{ color: "var(--accent-green)" }}>▮</span> spot

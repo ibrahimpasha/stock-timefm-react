@@ -24,19 +24,19 @@ function SummaryMetrics({
 }) {
   const metrics = [
     {
-      label: "Open Picks",
+      label: "Open picks",
       value: openCount.toString(),
       icon: Target,
-      color: "var(--accent-blue)",
+      color: "var(--text-primary)",
     },
     {
       label: "Closed",
       value: closedCount.toString(),
       icon: BarChart3,
-      color: "var(--text-secondary)",
+      color: "var(--text-primary)",
     },
     {
-      label: "Win Rate",
+      label: "Win rate",
       value: `${winRate.toFixed(0)}%`,
       icon: Trophy,
       color: winRate >= 50 ? "var(--accent-green)" : "var(--accent-red)",
@@ -50,21 +50,15 @@ function SummaryMetrics({
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
       {metrics.map((m) => (
-        <div
-          key={m.label}
-          className="card flex items-center gap-3 py-2 px-3"
-        >
-          <m.icon size={16} style={{ color: m.color }} className="shrink-0" />
+        <div key={m.label} className="flex items-center gap-2">
+          <m.icon size={14} className="shrink-0 text-text-muted" />
           <div>
-            <div
-              className="font-mono font-bold text-sm"
-              style={{ color: m.color }}
-            >
+            <div className="text-xs text-text-muted">{m.label}</div>
+            <div className="num font-semibold text-sm" style={{ color: m.color }}>
               {m.value}
             </div>
-            <div className="text-xs text-text-muted">{m.label}</div>
           </div>
         </div>
       ))}
@@ -115,9 +109,8 @@ export function ActivePicks() {
       />
 
       {open.length === 0 ? (
-        <div className="card text-center py-8">
-          <Target size={24} className="mx-auto mb-2 text-text-muted opacity-40" />
-          <p className="text-sm text-text-muted">No active picks</p>
+        <div className="text-center py-8">
+          <p className="text-sm text-text-secondary">No active picks</p>
           <p className="text-xs text-text-muted mt-1">
             Analyze flow data to generate picks
           </p>

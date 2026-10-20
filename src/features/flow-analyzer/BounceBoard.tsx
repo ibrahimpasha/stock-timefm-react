@@ -11,7 +11,7 @@
 import { useMemo, useRef, useState } from "react";
 import { QueryNotice } from "../../components/QueryNotice";
 import { RefreshCw, TrendingUp, TrendingDown } from "lucide-react";
-import { GlassPanel, Chip, Segmented } from "../../components/Glass";
+import { GlassPanel, Segmented } from "../../components/Glass";
 import { useAppStore } from "../../store/useAppStore";
 import {
   useResilience,
@@ -59,12 +59,12 @@ function TickerRow({ r }: { r: ResilienceTicker }) {
   const setActiveTicker = useAppStore((s) => s.setActiveTicker);
   return (
     <div
-      className="grid items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-bg-card text-xs"
+      className="grid items-center gap-2 px-2 py-2 cursor-pointer hover:bg-bg-card-hover text-xs"
       style={{ gridTemplateColumns: "64px 110px 1fr 64px 64px 56px" }}
       onClick={() => setActiveTicker(r.ticker)}
       title={`${r.n_events} events · avg own drawdown ${r.avg_own_dd_pct}%`}
     >
-      <span className="font-mono font-bold text-text-primary">{r.ticker}</span>
+      <span className="num font-semibold text-text-primary">{r.ticker}</span>
       <ScoreMeter score={r.score} />
       <span className="text-text-muted truncate">{r.theme || r.category || "—"}</span>
       <span className="num text-right">{fmtPct(r.avg_bounce_5d)}</span>
@@ -78,7 +78,7 @@ function TickerRow({ r }: { r: ResilienceTicker }) {
 
 const COLS = (
   <div
-    className="grid gap-2 px-2 pb-1 text-[10px] uppercase tracking-wide text-text-muted"
+    className="grid gap-2 px-2 pb-2 border-b border-border text-xs font-medium text-text-muted"
     style={{ gridTemplateColumns: "64px 110px 1fr 64px 64px 56px" }}
   >
     <span>Ticker</span>
@@ -385,12 +385,12 @@ function InsightChips({
           key={c.ticker}
           type="button"
           onClick={() => onPick(c.ticker)}
-          className="rounded border border-border px-1.5 py-0.5 text-xs hover:bg-bg-card num"
+          className="rounded px-1.5 py-0.5 text-xs hover:bg-bg-card-hover num"
           title={`${c.theme || ""} · dip ${c.trough_pct}% · ${
             c.bounce_close != null ? Math.round(Math.min(c.bounce_close, 1.5) * 100) : "—"
           }% recovered by close · click to overlay`}
         >
-          <span className="font-bold text-text-primary">{c.ticker}</span>{" "}
+          <span className="font-semibold text-text-primary">{c.ticker}</span>{" "}
           <span className="text-accent-red">{c.trough_pct}%</span>
           {showBounce && c.bounce_close != null && (
             <span className="text-accent-green">
@@ -409,8 +409,8 @@ function DayRead({ days, onPick }: { days: string; onPick: (t: string) => void }
   const c = data.counts;
   const multi = (data.dates?.length ?? 1) > 1;
   return (
-    <GlassPanel className="p-3 space-y-2 text-xs leading-relaxed">
-      <div className="text-text-secondary">
+    <GlassPanel className="p-4 space-y-2 text-sm leading-relaxed">
+      <div className="text-text-secondary max-w-[72ch]">
         <span className="font-semibold text-text-primary">
           {multi
             ? `Across ${data.dates.length} stress days (${data.dates
@@ -449,19 +449,16 @@ function DayRead({ days, onPick }: { days: string; onPick: (t: string) => void }
         </div>
       )}
       {!!data.watch?.length && (
-        <div
-          className="rounded-md px-2.5 py-2 space-y-1"
-          style={{ background: "color-mix(in srgb, var(--accent-blue) 7%, transparent)" }}
-        >
+        <div className="border-t border-border pt-3 space-y-1">
           <div className="font-semibold text-text-primary">
-            Watch — still down, but history says they snap back:
+            Watch: still down, but history says they snap back
           </div>
           {data.watch.map((w) => (
             <div key={w.ticker} className="flex items-start gap-2">
               <button
                 type="button"
                 onClick={() => onPick(w.ticker)}
-                className="rounded border border-border px-1.5 py-0.5 num font-bold text-text-primary hover:bg-bg-card shrink-0"
+                className="rounded px-1.5 py-0.5 num font-semibold text-text-primary hover:bg-bg-card-hover shrink-0"
                 title="click to overlay"
               >
                 {w.ticker}
@@ -534,12 +531,13 @@ function IntradayView() {
               key={d.date}
               type="button"
               onClick={() => toggleDay(d.date)}
+              aria-pressed={on}
               className="rounded-md px-2 py-1 text-xs border num"
               style={{
                 borderColor: on ? "var(--accent-blue)" : "var(--border)",
                 background: on
                   ? "color-mix(in srgb, var(--accent-blue) 12%, transparent)"
-                  : "color-mix(in srgb, var(--accent-red) 5%, transparent)",
+                  : "transparent",
               }}
               title={`SPY trough ${d.spy_trough_pct}% · bounce by close ${d.spy_bounce_close ?? "—"} · click to toggle`}
             >
@@ -551,17 +549,17 @@ function IntradayView() {
           <button
             type="button"
             onClick={() => setSelDays(days.map((d) => d.date))}
-            className="rounded border border-border px-1.5 py-0.5 text-text-secondary hover:text-text-primary"
+            className="rounded px-1.5 py-0.5 text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
           >
-            all
+            All
           </button>
           <button
             type="button"
             onClick={() => setSelDays([])}
-            className="rounded border border-border px-1.5 py-0.5 text-text-secondary hover:text-text-primary"
+            className="rounded px-1.5 py-0.5 text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
             title="back to latest day only"
           >
-            latest
+            Latest
           </button>
         </span>
         <select
@@ -569,7 +567,7 @@ function IntradayView() {
           onChange={(e) => setTheme(e.target.value)}
           className="ml-auto rounded border border-border bg-transparent px-2 py-1 text-xs text-text-secondary"
         >
-          <option value="">no theme line</option>
+          <option value="">No theme line</option>
           {themes.map((t) => (
             <option key={t} value={t}>{t}</option>
           ))}
@@ -578,8 +576,8 @@ function IntradayView() {
 
       <DayRead days={datesKey} onPick={toggle} />
 
-      <GlassPanel className="p-3">
-        <div className="flex items-center justify-between mb-1">
+      <GlassPanel className="p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
           <span className="text-xs text-text-muted">
             {activeDays.length > 1
               ? `${activeDays.length} sessions`
@@ -609,9 +607,9 @@ function IntradayView() {
       </GlassPanel>
 
       {/* Ranked intraday table */}
-      <GlassPanel className="p-3">
+      <GlassPanel className="p-4">
         <div
-          className="grid gap-2 px-2 pb-1 text-[10px] uppercase tracking-wide text-text-muted"
+          className="grid gap-2 px-2 pb-2 border-b border-border text-xs font-medium text-text-muted"
           style={{ gridTemplateColumns: "20px 64px 110px 1fr 70px 64px 60px" }}
         >
           <span />
@@ -622,13 +620,13 @@ function IntradayView() {
           <span className="text-right" title="Fraction of the dip recovered by the close">Recovered</span>
           <span className="text-right" title="Bounce vs SPY's bounce the same day">vs SPY</span>
         </div>
-        <div className="max-h-[46vh] overflow-y-auto">
+        <div className="max-h-[46vh] overflow-y-auto divide-y divide-border">
           {(data?.tickers ?? []).slice(0, 60).map((r: IntradayTicker) => {
             const sel = picked.includes(r.ticker);
             return (
               <div
                 key={r.ticker}
-                className="grid items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-bg-card text-xs"
+                className="grid items-center gap-2 px-2 py-2 cursor-pointer hover:bg-bg-card-hover text-xs"
                 style={{
                   gridTemplateColumns: "20px 64px 110px 1fr 70px 64px 60px",
                   background: sel
@@ -647,7 +645,7 @@ function IntradayView() {
                       : "2px solid transparent",
                   }}
                 />
-                <span className="font-mono font-bold text-text-primary">{r.ticker}</span>
+                <span className="num font-semibold text-text-primary">{r.ticker}</span>
                 <ScoreMeter score={r.score} />
                 <span className="text-text-muted truncate">{r.theme || r.category || "—"}</span>
                 <span className="num text-right text-accent-red">{r.avg_trough_pct}%</span>
@@ -683,13 +681,10 @@ export function BounceBoard() {
     <div className="space-y-3 p-1">
       {mode === "daily" && <QueryNotice queries={[dailyQuery]} label="Daily resilience" />}
       {refresh.isError && <p role="alert" className="text-xs text-accent-red">Resilience refresh failed.</p>}
-      {/* Header + mode toggle */}
-      <GlassPanel className="p-3">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-text-primary">
-              Crash Bounce
-            </span>
+      {/* Mode toggle (page header already names the view) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
             <Segmented
               value={mode}
               onChange={setMode}
@@ -708,17 +703,17 @@ export function BounceBoard() {
             type="button"
             onClick={() => refresh.mutate()}
             disabled={refresh.isPending}
-            className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-text-secondary hover:text-text-primary"
+            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
             title="Re-scan prices and rebuild both layers (~80s in the background)"
           >
-            <RefreshCw size={11} className={refresh.isPending ? "animate-spin" : ""} />
-            {refresh.isPending ? "rebuilding…" : "refresh"}
+            <RefreshCw size={12} className={refresh.isPending ? "animate-spin" : ""} />
+            {refresh.isPending ? "Rebuilding…" : "Refresh"}
           </button>
         </div>
         {mode === "intraday" ? null : (
           <EventStrip events={data?.events ?? []} />
         )}
-      </GlassPanel>
+      </div>
 
       {mode === "intraday" ? (
         <IntradayView />
@@ -742,12 +737,11 @@ function EventStrip({
   events: { id: number; peak_date: string; trough_date: string; spy_dd_pct: number; spy_bounce_5d: number | null }[];
 }) {
   return (
-    <div className="flex gap-2 overflow-x-auto">
+    <div className="flex gap-5 overflow-x-auto pb-1">
       {events.map((e) => (
         <div
           key={e.id}
-          className="shrink-0 rounded-md px-2.5 py-1.5 text-xs border border-border"
-          style={{ background: "color-mix(in srgb, var(--accent-red) 5%, transparent)" }}
+          className="shrink-0 text-xs"
           title={`peak ${e.peak_date} → trough ${e.trough_date}`}
         >
           <div className="num text-text-primary">{e.trough_date}</div>
@@ -781,8 +775,8 @@ function DailyView({
   return (
     <div className="grid gap-3" style={{ gridTemplateColumns: "3fr 2fr" }}>
       {/* Ranked tickers */}
-      <GlassPanel className="p-3">
-        <div className="flex items-center justify-between mb-2">
+      <GlassPanel className="p-4">
+        <div className="flex items-center justify-between mb-3">
           <Segmented
             value={view}
             onChange={setView}
@@ -796,7 +790,7 @@ function DailyView({
           )}
         </div>
         {COLS}
-        <div className="max-h-[60vh] overflow-y-auto">
+        <div className="max-h-[60vh] overflow-y-auto divide-y divide-border">
           {shown.map((r) => (
             <TickerRow key={r.ticker} r={r} />
           ))}
@@ -809,13 +803,10 @@ function DailyView({
       </GlassPanel>
 
       {/* Theme rollup */}
-      <GlassPanel className="p-3">
-        <div className="text-xs font-semibold text-text-primary mb-2">
-          Themes — avg member resilience
-        </div>
-        <div className="max-h-[64vh] overflow-y-auto space-y-1.5">
+      <GlassPanel className="p-4" title="Themes by average member resilience">
+        <div className="max-h-[64vh] overflow-y-auto divide-y divide-border">
           {themes.slice(0, 24).map((t) => (
-            <div key={t.theme} className="px-2 py-1.5 rounded hover:bg-bg-card">
+            <div key={t.theme} className="px-2 py-2 hover:bg-bg-card-hover">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-text-primary truncate flex items-center gap-1">
                   {t.score >= 55 ? (
@@ -843,12 +834,8 @@ function DailyView({
                     }}
                   />
                 </div>
-                <span className="flex gap-1">
-                  {t.top.slice(0, 3).map((tk) => (
-                    <Chip key={tk} tone="neutral" className="num">
-                      {tk}
-                    </Chip>
-                  ))}
+                <span className="num text-xs text-text-secondary">
+                  {t.top.slice(0, 3).join(" ")}
                 </span>
               </div>
             </div>

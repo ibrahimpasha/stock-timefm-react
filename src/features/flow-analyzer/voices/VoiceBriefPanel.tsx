@@ -24,6 +24,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { useAppStore } from "../../../store/useAppStore";
+import { Segmented } from "../../../components/Glass";
 import { relativeAge, absoluteAge } from "../../../lib/utils";
 import {
   useGenerateSynthesis,
@@ -50,7 +51,7 @@ function PickTicker({ t }: { t: string }) {
     <button
       type="button"
       onClick={() => setActiveTicker(t)}
-      className="inline-block font-mono font-semibold text-xs text-accent-blue hover:underline"
+      className="num inline-block font-semibold text-xs text-text-primary hover:text-accent-blue"
     >
       {t}
     </button>
@@ -69,16 +70,14 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-1.5">
-        <Icon size={12} className="text-accent-purple" />
-        <span className="text-xs uppercase text-text-muted font-semibold">
-          {title}
-        </span>
+    <div className="space-y-1.5 border-t border-border pt-3">
+      <h4 className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
+        <Icon size={13} className="text-text-muted" />
+        {title}
         {count !== undefined && (
-          <span className="text-xs text-text-muted">({count})</span>
+          <span className="num text-xs font-normal text-text-muted">{count}</span>
         )}
-      </div>
+      </h4>
       {children}
     </div>
   );
@@ -86,20 +85,14 @@ function Section({
 
 function BriefBody({ content }: { content: SynthesisContent }) {
   return (
-    <div className="space-y-3">
+    <div className="max-w-[72ch] space-y-3">
       {/* Sentiment + overall view */}
       <div>
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs uppercase text-text-muted font-semibold">
-            Sentiment
-          </span>
+        <div className="flex items-center gap-2 mb-1 text-xs">
+          <span className="text-text-muted">Sentiment</span>
           <span
-            className="inline-flex items-center px-1.5 py-0.5 rounded text-xs uppercase font-bold"
-            style={{
-              background: `color-mix(in srgb, ${sentColor(content.overall_sentiment)} 12%, transparent)`,
-              color: sentColor(content.overall_sentiment),
-              border: `1px solid color-mix(in srgb, ${sentColor(content.overall_sentiment)} 25%, transparent)`,
-            }}
+            className="font-semibold capitalize"
+            style={{ color: sentColor(content.overall_sentiment) }}
           >
             {content.overall_sentiment}
           </span>
@@ -111,8 +104,8 @@ function BriefBody({ content }: { content: SynthesisContent }) {
 
       {/* Top thesis */}
       {content.top_thesis && (
-        <Section icon={Target} title="Top Thesis">
-          <p className="text-sm text-text-secondary italic leading-relaxed border-l-2 border-accent-purple pl-3 whitespace-pre-wrap">
+        <Section icon={Target} title="Top thesis">
+          <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
             {content.top_thesis}
           </p>
         </Section>
@@ -122,7 +115,7 @@ function BriefBody({ content }: { content: SynthesisContent }) {
       {content.sector_focus.length > 0 && (
         <Section
           icon={Sparkles}
-          title="Sector Focus"
+          title="Sector focus"
           count={content.sector_focus.length}
         >
           <div className="space-y-1">
@@ -140,7 +133,7 @@ function BriefBody({ content }: { content: SynthesisContent }) {
                     }}
                   />
                 </div>
-                <span className="text-xs font-mono text-text-muted w-10 text-right">
+                <span className="text-xs num text-text-muted w-10 text-right">
                   {s.weight_pct}%
                 </span>
               </div>
@@ -153,7 +146,7 @@ function BriefBody({ content }: { content: SynthesisContent }) {
       {content.high_conviction.length > 0 && (
         <Section
           icon={Target}
-          title="High Conviction"
+          title="High conviction"
           count={content.high_conviction.length}
         >
           <div className="space-y-1.5">
@@ -161,12 +154,12 @@ function BriefBody({ content }: { content: SynthesisContent }) {
               <div key={h.ticker} className="flex items-start gap-2 text-sm leading-snug">
                 <div className="flex flex-col items-center w-12 shrink-0">
                   <PickTicker t={h.ticker} />
-                  <span className="text-xs uppercase font-semibold" style={{ color: sentColor(h.sentiment) }}>
-                    {h.sentiment[0]}
+                  <span className="text-xs font-medium" style={{ color: sentColor(h.sentiment) }} title={h.sentiment}>
+                    {h.sentiment[0]?.toUpperCase()}
                   </span>
-                  <span className="text-xs text-text-muted">×{h.evidence_count}</span>
+                  <span className="num text-xs text-text-muted" title="Evidence count">×{h.evidence_count}</span>
                 </div>
-                <p className="text-text-secondary">{h.thesis}</p>
+                <p className="text-text-secondary leading-relaxed">{h.thesis}</p>
               </div>
             ))}
           </div>
@@ -205,7 +198,7 @@ function BriefBody({ content }: { content: SynthesisContent }) {
       {content.private_companies.length > 0 && (
         <Section
           icon={Eye}
-          title="Private → Public Proxies"
+          title="Private to public proxies"
           count={content.private_companies.length}
         >
           <div className="space-y-1">
@@ -215,8 +208,8 @@ function BriefBody({ content }: { content: SynthesisContent }) {
                 <span className="text-text-muted"> — {p.rationale}</span>
                 {p.public_proxies.length > 0 && (
                   <div className="mt-0.5 ml-3">
-                    <span className="text-xs uppercase text-text-muted mr-1">
-                      Proxies:
+                    <span className="text-xs text-text-muted mr-1">
+                      Proxies
                     </span>
                     {p.public_proxies.map((t, i) => (
                       <span key={t}>
@@ -236,7 +229,7 @@ function BriefBody({ content }: { content: SynthesisContent }) {
       {content.emerging_themes.length > 0 && (
         <Section
           icon={TrendingUp}
-          title="Emerging Themes"
+          title="Emerging themes"
           count={content.emerging_themes.length}
         >
           <ul className="space-y-1 text-sm text-text-secondary leading-snug">
@@ -254,7 +247,7 @@ function BriefBody({ content }: { content: SynthesisContent }) {
       {content.watch_list.length > 0 && (
         <Section
           icon={Eye}
-          title="Watch List"
+          title="Watch list"
           count={content.watch_list.length}
         >
           <div className="space-y-1">
@@ -313,11 +306,11 @@ export function VoiceBriefPanel({
         className="w-full flex items-center justify-between gap-2 text-left"
       >
         <div className="flex items-center gap-2">
-          <Brain size={14} className="text-accent-purple" />
+          <Brain size={14} className="text-text-muted" />
           <span className="text-sm font-semibold text-text-primary">
-            Voice Brief
+            Voice brief
           </span>
-          <span className="text-xs font-mono text-text-muted">
+          <span className="text-xs text-text-muted">
             @{voiceUsername}
           </span>
           {data?.generated_at && (
@@ -344,34 +337,16 @@ export function VoiceBriefPanel({
         <div className="mt-3 space-y-3">
           {/* Controls */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs uppercase text-text-muted font-semibold">
-              Window
-            </span>
-            <div className="flex items-center rounded border border-border overflow-hidden">
-              {WINDOW_OPTIONS.map((w) => {
-                const active = w.days === windowDays;
-                return (
-                  <button
-                    key={w.label}
-                    type="button"
-                    onClick={() => setWindowDays(w.days)}
-                    className="px-2 py-1 text-xs font-semibold transition-colors"
-                    style={{
-                      background: active ? "var(--accent-blue)" : "transparent",
-                      color: active
-                        ? "var(--bg-primary)"
-                        : "var(--text-secondary)",
-                    }}
-                  >
-                    {w.label}
-                  </button>
-                );
-              })}
-            </div>
+            <Segmented
+              ariaLabel="Voice brief window"
+              value={String(windowDays)}
+              onChange={(v) => setWindowDays(Number(v))}
+              options={WINDOW_OPTIONS.map((w) => ({ value: String(w.days), label: w.label }))}
+            />
 
             {data?.n_tweets != null && (
               <span className="text-xs text-text-muted">
-                {data.n_tweets} tweets
+                <span className="num">{data.n_tweets}</span> tweets
               </span>
             )}
 
@@ -379,7 +354,7 @@ export function VoiceBriefPanel({
               type="button"
               disabled={generate.isPending}
               onClick={handleGenerate}
-              className="ml-auto inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold border border-accent-purple/40 text-accent-purple bg-accent-purple/10 hover:bg-accent-purple/20 disabled:opacity-50"
+              className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-text-secondary hover:bg-bg-card-hover hover:text-text-primary disabled:opacity-50"
             >
               {generate.isPending ? (
                 <>
@@ -434,7 +409,7 @@ export function VoiceBriefPanel({
           {!generate.isPending && !isError && !hasContent && (
             <div className="text-center py-4 text-sm text-text-muted">
               No brief cached for this window. Click{" "}
-              <span className="text-accent-purple">Generate</span>{" "}
+              <span className="font-medium text-text-primary">Generate</span>{" "}
               (single LLM call, ~30-90s).
             </div>
           )}

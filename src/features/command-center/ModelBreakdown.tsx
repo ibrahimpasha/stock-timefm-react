@@ -1,7 +1,6 @@
 import { MODEL_COLORS, MODEL_LABELS } from "../../lib/constants";
 import { forecastReturn } from "../../lib/forecastSeries";
 import { formatCurrency } from "../../lib/utils";
-import { BarChart3 } from "lucide-react";
 import type { ModelForecast } from "../../lib/types";
 
 const signed = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
@@ -33,13 +32,8 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
   if (!models || models.length === 0) {
     return (
       <div className="card">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-[0.08em] flex items-center gap-1.5 mb-3">
-          <BarChart3 size={13} />
-          Model Breakdown
-        </h3>
-        <p className="text-xs text-text-muted text-center py-4">
-          No model data available
-        </p>
+        <h3 className="text-sm font-semibold text-text-primary mb-2">Model breakdown</h3>
+        <p className="text-sm text-text-muted py-2">No model data available.</p>
       </div>
     );
   }
@@ -61,18 +55,15 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
 
   return (
     <div className="card">
-      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-[0.08em] flex items-center gap-1.5 mb-4">
-        <BarChart3 size={13} />
-        Model Breakdown
-      </h3>
+      <h3 className="text-sm font-semibold text-text-primary mb-2">Model breakdown</h3>
 
       {sorted.length > 1 && (
-        <p className="text-xs text-text-muted mb-3">
+        <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary mb-4">
           Models routinely disagree on direction. In backtests none called up/down better
           than simply assuming &ldquo;up&rdquo;, so read the 80% range, not the sign.
         </p>
       )}
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         {sorted.map((model) => {
           const color = MODEL_COLORS[model.model] || "var(--text-secondary)";
           const label = MODEL_LABELS[model.model] || model.model;
@@ -88,11 +79,9 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
             <div key={model.model} className="group">
               <div className="flex items-center gap-2">
                 {/* Model label */}
-                <span
-                  className="text-xs font-mono w-20 shrink-0 truncate"
-                  style={{ color }}
-                >
-                  {label}
+                <span className="flex w-24 shrink-0 items-center gap-1.5 text-sm text-text-primary">
+                  <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
+                  <span className="truncate">{label}</span>
                 </span>
 
                 {/* Bar */}
@@ -101,15 +90,11 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
                     className="h-5 rounded-sm transition-all duration-500 flex items-center px-1.5"
                     style={{
                       width: `${barWidth}%`,
-                      background: `${color}30`,
-                      borderLeft: `2px solid ${color}`,
+                      background: `color-mix(in srgb, ${color} 22%, transparent)`,
                       minWidth: "20px",
                     }}
                   >
-                    <span
-                      className="num text-xs font-semibold whitespace-nowrap"
-                      style={{ color }}
-                    >
+                    <span className="num text-xs font-semibold whitespace-nowrap text-text-primary">
                       {formatCurrency(model.end_price)}
                     </span>
                   </div>
@@ -125,15 +110,15 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
                 </div>
 
                 {/* Median change — neutral ink: no model has a validated directional edge */}
-                <span className="num text-xs w-14 text-right shrink-0 text-text-secondary">
+                <span className="num text-sm w-16 text-right shrink-0 text-text-secondary">
                   {pctChange == null ? "Unknown" : `${pctChange >= 0 ? "+" : ""}${pctChange.toFixed(1)}%`}
                 </span>
               </div>
               {lo != null && hi != null && (
-                <p className="num text-xs text-text-muted mt-0.5 pl-[5.5rem]">
-                  80% range {formatCurrency(lo)} &ndash; {formatCurrency(hi)}
+                <p className="text-xs text-text-muted mt-0.5 pl-[6.5rem]">
+                  80% range <span className="num">{formatCurrency(lo)} &ndash; {formatCurrency(hi)}
                   {loPct != null && hiPct != null &&
-                    ` (${signed(loPct)} / ${signed(hiPct)})`}
+                    ` (${signed(loPct)} / ${signed(hiPct)})`}</span>
                 </p>
               )}
             </div>
@@ -143,10 +128,10 @@ export function ModelBreakdown({ models, currentPrice, isLoading }: ModelBreakdo
 
       {/* Legend */}
       {currentPrice && (
-        <div className="flex items-center gap-2 mt-3 pt-2 border-t border-border">
+        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border">
           <div className="border-l border-dashed border-text-secondary h-3" />
           <span className="text-xs text-text-muted">
-            Current: {formatCurrency(currentPrice)}
+            Current <span className="num">{formatCurrency(currentPrice)}</span>
           </span>
         </div>
       )}

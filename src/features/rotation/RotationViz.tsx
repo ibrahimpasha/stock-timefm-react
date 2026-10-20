@@ -57,21 +57,14 @@ export const pct = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 export function SectorStrip({ sectors }: { sectors: SectorRow[] }) {
   return (
     <div className="overflow-x-auto">
-      <div className="flex gap-2 min-w-max pb-1">
+      <div className="flex gap-6 min-w-max pb-1">
         {sectors.map((s) => {
           const up = s.change_pct >= 0;
           const tint = up ? "var(--accent-green)" : "var(--accent-red)";
           return (
-            <div
-              key={s.ticker}
-              className="card px-3 py-2 min-w-[112px] flex-1"
-              style={{
-                background: `color-mix(in srgb, ${tint} 7%, var(--bg-card))`,
-                borderColor: `color-mix(in srgb, ${tint} 25%, var(--border))`,
-              }}
-            >
-              <div className="text-sm font-bold tracking-wide">{s.ticker}</div>
-              <div className="text-xs text-text-muted mb-1">{s.short}</div>
+            <div key={s.ticker} className="min-w-[96px] flex-1">
+              <div className="text-sm font-semibold num text-text-primary">{s.ticker}</div>
+              <div className="text-xs text-text-muted mb-1 truncate">{s.short}</div>
               <div className="flex items-center justify-between gap-2">
                 <span className="num text-sm font-semibold" style={{ color: tint }}>
                   {pct(s.change_pct)}
@@ -218,14 +211,14 @@ export function RotationMap({
         <line x1={SIZE / 2 - R} y1={SIZE / 2} x2={SIZE / 2 + R} y2={SIZE / 2} stroke="var(--border)" />
 
         {/* quadrant captions */}
-        <text x="22" y="30" className="text-[11px]" fill="var(--accent-cyan)" fontWeight="600">IMPROVING</text>
-        <text x="22" y="43" className="text-[9px]" fill="var(--text-muted)">momentum accelerating</text>
-        <text x={SIZE - 22} y="30" textAnchor="end" className="text-[11px]" fill="var(--accent-green)" fontWeight="600">LEADING</text>
-        <text x={SIZE - 22} y="43" textAnchor="end" className="text-[9px]" fill="var(--text-muted)">strong momentum</text>
-        <text x="22" y={SIZE - 26} className="text-[11px]" fill="var(--accent-red)" fontWeight="600">LAGGING</text>
-        <text x="22" y={SIZE - 13} className="text-[9px]" fill="var(--text-muted)">weak momentum</text>
-        <text x={SIZE - 22} y={SIZE - 26} textAnchor="end" className="text-[11px]" fill="var(--accent-orange)" fontWeight="600">WEAKENING</text>
-        <text x={SIZE - 22} y={SIZE - 13} textAnchor="end" className="text-[9px]" fill="var(--text-muted)">momentum fading</text>
+        <text x="22" y="30" fontSize="13" fill="var(--accent-cyan)" fontWeight="600">Improving</text>
+        <text x="22" y="43" fontSize="11" fill="var(--text-muted)">momentum accelerating</text>
+        <text x={SIZE - 22} y="30" textAnchor="end" fontSize="13" fill="var(--accent-green)" fontWeight="600">Leading</text>
+        <text x={SIZE - 22} y="43" textAnchor="end" fontSize="11" fill="var(--text-muted)">strong momentum</text>
+        <text x="22" y={SIZE - 26} fontSize="13" fill="var(--accent-red)" fontWeight="600">Lagging</text>
+        <text x="22" y={SIZE - 13} fontSize="11" fill="var(--text-muted)">weak momentum</text>
+        <text x={SIZE - 22} y={SIZE - 26} textAnchor="end" fontSize="13" fill="var(--accent-orange)" fontWeight="600">Weakening</text>
+        <text x={SIZE - 22} y={SIZE - 13} textAnchor="end" fontSize="11" fill="var(--text-muted)">momentum fading</text>
 
         {/* trails first, so bubbles always sit on top of every line */}
         <g clipPath="url(#rrg-clip)">
@@ -271,10 +264,10 @@ export function RotationMap({
                  transform: `translate(${head.x}px, ${labelY}px)`,
                  transition: animate ? "transform 260ms ease-out" : "none",
                }}>
-              <text x="15" y="0" className="text-[11px]" fontWeight="700" fill={seriesColor(s.ticker)}>
+              <text x="15" y="0" fontSize="12" fontWeight="600" fill={seriesColor(s.ticker)}>
                 {s.ticker.length > 12 ? s.ticker.slice(0, 12) : s.ticker}
               </text>
-              <text x="15" y="10" className="text-[9px]" fill="var(--text-muted)">
+              <text x="15" y="11" fontSize="10" fill="var(--text-muted)">
                 {pct(s.change_pct)}
               </text>
             </g>
@@ -282,12 +275,12 @@ export function RotationMap({
         ))}
       </svg>
 
-      <div className="mt-2 flex items-center justify-center gap-2">
-        <span className="text-[10px] uppercase tracking-wider text-text-muted">weak</span>
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-xs text-text-muted">
+        <span>Weak</span>
         <div className="h-1.5 w-32 rounded-full"
              style={{ background: "linear-gradient(90deg, var(--accent-red), var(--accent-orange), var(--accent-green))" }} />
-        <span className="text-[10px] uppercase tracking-wider text-text-muted">strong</span>
-        <span className="text-[10px] text-text-muted">· fill = momentum score, ring = identity</span>
+        <span>Strong</span>
+        <span>· fill = momentum score, ring = identity</span>
       </div>
     </div>
   );
@@ -340,7 +333,7 @@ export function RotationScrubber({
         onClick={() => setPlaying((p) => (index >= last ? (onChange(0), true) : !p))}
         aria-label={playing ? "Pause rotation replay" : "Play rotation replay"}
         className="shrink-0 size-6 rounded-full flex items-center justify-center transition-colors
-                   bg-accent-cyan/15 text-accent-cyan hover:bg-accent-cyan/25"
+                   bg-accent-blue/15 text-accent-blue hover:bg-accent-blue/25"
       >
         {playing ? <Pause size={11} /> : <Play size={11} />}
       </button>
@@ -351,9 +344,9 @@ export function RotationScrubber({
         value={index}
         onChange={(e) => { setPlaying(false); onChange(Number(e.target.value)); }}
         aria-label="Scrub rotation history"
-        className="flex-1 accent-accent-cyan h-1 cursor-pointer"
+        className="flex-1 accent-accent-blue h-1 cursor-pointer"
       />
-      <span className="num text-[10px] text-text-muted w-[74px] text-right">
+      <span className="num text-xs text-text-muted w-[80px] text-right">
         {dates[index] ?? ""}
       </span>
     </div>
@@ -375,7 +368,7 @@ export function RotationTimeline({ sectors }: { sectors: SectorRow[] }) {
     return [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
   }, [sectors]);
 
-  if (!data.length) return <p className="text-xs text-text-muted">No history yet.</p>;
+  if (!data.length) return <p className="text-sm text-text-muted">No history yet.</p>;
 
   return (
     <div className="h-[260px]">
@@ -383,14 +376,14 @@ export function RotationTimeline({ sectors }: { sectors: SectorRow[] }) {
         <LineChart data={data} margin={{ top: 8, right: 56, bottom: 4, left: 0 }}>
           {/* NB: do NOT pass `ticks` here — recharts narrows the category domain
               to just those entries and every line collapses to the left edge. */}
-          <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--text-muted)" }}
+          <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--text-muted)" }}
                  tickLine={false} axisLine={{ stroke: "var(--border)" }}
                  interval="preserveStartEnd" minTickGap={80} />
           <YAxis hide domain={["dataMin - 0.3", "dataMax + 0.3"]} />
           <Tooltip
             contentStyle={{
               background: "var(--bg-card-hover)", border: "1px solid var(--border)",
-              borderRadius: 8, fontSize: 11,
+              borderRadius: 8, fontSize: 12,
             }}
             labelStyle={{ color: "var(--text-secondary)" }}
             formatter={(v, name) => [Number(v).toFixed(2), String(name)]}
@@ -402,7 +395,7 @@ export function RotationTimeline({ sectors }: { sectors: SectorRow[] }) {
           ))}
         </LineChart>
       </ResponsiveContainer>
-      <p className="text-[10px] text-text-muted mt-1">
+      <p className="text-xs text-text-muted mt-1">
         Relative strength vs SPY (100 = in line with its own trend). Leaders and laggards highlighted.
       </p>
     </div>
@@ -424,40 +417,40 @@ export function MomentumRanking({
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
-          <tr className="text-text-muted uppercase tracking-wider text-[10px]">
-            <th className="text-left font-medium py-1.5 pr-2">#</th>
-            <th className="text-left font-medium py-1.5">Sector</th>
-            <th className="text-left font-medium py-1.5 px-2">Momentum</th>
-            <th className="text-right font-medium py-1.5 px-2">Score</th>
-            <th className="text-right font-medium py-1.5 pl-2">Chg</th>
+          <tr className="text-xs font-medium text-text-muted">
+            <th className="text-left font-medium py-2 pr-2">#</th>
+            <th className="text-left font-medium py-2">Sector</th>
+            <th className="text-left font-medium py-2 px-2">Momentum</th>
+            <th className="text-right font-medium py-2 px-2">Score</th>
+            <th className="text-right font-medium py-2 pl-2">Chg</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-border border-t border-border">
           {sectors.map((s) => {
             const width = ((s.score + 10) / 20) * 100;
             return (
               <tr key={s.ticker}
                   onClick={onSelect ? () => onSelect(s.ticker) : undefined}
-                  className={`border-t border-border ${onSelect ? "cursor-pointer hover:bg-bg-card-hover" : ""}`}
+                  className={onSelect ? "cursor-pointer hover:bg-bg-card-hover" : "hover:bg-bg-card-hover"}
                   style={selected === s.ticker
-                    ? { background: "color-mix(in srgb, var(--accent-cyan) 10%, transparent)" }
+                    ? { background: "color-mix(in srgb, var(--accent-blue) 10%, transparent)" }
                     : undefined}>
-                <td className="py-1.5 pr-2 num text-text-muted">{s.rank}</td>
-                <td className="py-1.5 whitespace-nowrap">
-                  <span className="font-bold" style={{ color: seriesColor(s.ticker) }}>{s.ticker}</span>
+                <td className="py-2 pr-2 num text-text-muted">{s.rank}</td>
+                <td className="py-2 whitespace-nowrap">
+                  <span className="num font-semibold" style={{ color: seriesColor(s.ticker) }}>{s.ticker}</span>
                   <span className="text-text-muted ml-1.5">{s.label}</span>
                 </td>
-                <td className="py-1.5 px-2 w-[38%]">
+                <td className="py-2 px-2 w-[38%]">
                   <div className="h-1.5 rounded-full bg-bg-card-hover overflow-hidden">
                     <div className="h-full rounded-full"
                          style={{ width: `${width}%`, background: scoreColor(s.score) }} />
                   </div>
                 </td>
-                <td className="py-1.5 px-2 text-right num font-semibold"
+                <td className="py-2 px-2 text-right num font-semibold"
                     style={{ color: scoreColor(s.score) }}>
                   {s.score.toFixed(1)}
                 </td>
-                <td className="py-1.5 pl-2 text-right num"
+                <td className="py-2 pl-2 text-right num"
                     style={{ color: s.change_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
                   {pct(s.change_pct)}
                 </td>
@@ -501,24 +494,28 @@ export function InsightLine({ ins }: { ins: RotationInsight }) {
 }
 
 export function AlertFeed({ alerts }: { alerts: { kind: string; ticker: string; label: string; date: string; text: string }[] }) {
-  if (!alerts.length) return <p className="text-xs text-text-muted">No quadrant changes in the window.</p>;
+  if (!alerts.length) return <p className="text-sm text-text-muted">No quadrant changes in the window.</p>;
   return (
-    <div className="flex flex-col gap-2 max-h-[420px] overflow-y-auto">
+    <div className="flex flex-col divide-y divide-border max-h-[420px] overflow-y-auto">
       {alerts.map((a, i) => {
         const tone = a.kind === "NEW LEADER" ? "var(--accent-green)"
           : a.kind === "IMPROVING" ? "var(--accent-cyan)" : "var(--accent-orange)";
         return (
-          <div key={`${a.ticker}-${a.date}-${i}`} className="pl-2.5 py-1"
-               style={{ borderLeft: `2px solid ${tone}` }}>
-            <div className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: tone }}>
-              {a.kind}
+          <div key={`${a.ticker}-${a.date}-${i}`} className="flex gap-2 py-2">
+            <span className="mt-1.5 size-1.5 shrink-0 rounded-full" style={{ background: tone }} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-2 text-sm">
+                <span className="min-w-0 truncate">
+                  <span className="num font-semibold" style={{ color: seriesColor(a.ticker) }}>{a.ticker}</span>
+                  <span className="text-text-muted ml-1.5">{a.label}</span>
+                </span>
+                <span className="shrink-0 text-xs text-text-muted num">{a.date}</span>
+              </div>
+              <div className="text-xs font-medium" style={{ color: tone }}>
+                {a.kind.charAt(0) + a.kind.slice(1).toLowerCase()}
+              </div>
+              <div className="text-sm text-text-secondary leading-relaxed">{a.text}</div>
             </div>
-            <div className="text-xs">
-              <span className="font-bold" style={{ color: seriesColor(a.ticker) }}>{a.ticker}</span>
-              <span className="text-text-muted ml-1.5">{a.label}</span>
-            </div>
-            <div className="text-[11px] text-text-secondary">{a.text}</div>
-            <div className="text-[10px] text-text-muted num">{a.date}</div>
           </div>
         );
       })}

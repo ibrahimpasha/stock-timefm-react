@@ -78,7 +78,7 @@ export function EntryRow({
   return (
     <div>
       <div
-        className="flex min-w-0 cursor-pointer items-start gap-1 rounded px-0 py-1.5 text-xs transition-colors hover:bg-bg-card-hover lg:items-center lg:gap-2 lg:px-2"
+        className="flex min-w-0 cursor-pointer items-start gap-1 px-0 py-2 text-xs transition-colors hover:bg-bg-card-hover lg:items-center lg:gap-2 lg:px-2"
       >
         <button
           type="button"
@@ -109,29 +109,27 @@ export function EntryRow({
           aria-controls={entry.analysis ? detailsId : undefined}
           className="flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 rounded text-left lg:min-h-6 lg:flex-nowrap"
         >
-          <span className="shrink-0 font-mono font-semibold lg:w-10" style={{ color }}>
+          <span className="shrink-0 font-medium lg:w-10" style={{ color }}>
             {side}
           </span>
-          <span className="italic text-text-muted">{action}</span>
-          <span className="num font-bold text-text-primary">
+          <span className="text-text-muted">{action}</span>
+          <span className="num font-semibold text-text-primary">
             ${entry.strike} {optType}
           </span>
           <span className="num text-text-muted">{expiryNorm.startsWith("unknown-year:") ? `${entry.expiry} (year unknown)` : expiryNorm}</span>
           {dl && (
-            <span className="num px-1 rounded-full" style={{ color: dl.color, background: dl.bg }}>
-              {dl.text}
-            </span>
+            <span className="text-text-muted">{dl.text.toLowerCase()}</span>
           )}
           {entry.vol_oi_ratio > 0 && (
-            <span className="text-accent-cyan num">
+            <span className="num text-text-secondary" title="Volume / open interest">
               {Number(entry.vol_oi_ratio).toFixed(1)}x
             </span>
           )}
           {entry.ask_pct > 0 && (
-            <span className="text-accent-orange num">{entry.ask_pct}%ask</span>
+            <span className="num text-text-secondary" title="Filled at ask">{entry.ask_pct}% ask</span>
           )}
           <span
-            className="num font-bold shrink-0"
+            className="num font-semibold shrink-0"
             style={{ color: pnlColor, minWidth: 48, textAlign: "right" }}
             title={
               pnl !== null
@@ -149,12 +147,12 @@ export function EntryRow({
       {expanded && entry.analysis && (
         <div
           id={detailsId}
-          className="ml-12 mr-2 mb-2 px-2 py-1.5 rounded text-xs text-text-secondary leading-relaxed"
+          className="mb-2 ml-12 mr-2 max-w-[72ch] rounded px-3 py-2 text-sm leading-relaxed text-text-secondary"
           style={{ background: "color-mix(in srgb, var(--bg-card) 50%, transparent)" }}
         >
           {entry.analysis}
           {(entry.underlying_price || entry.avg_price) && (
-            <div className="mt-1 num text-text-muted">
+            <div className="mt-1.5 num text-xs text-text-muted">
               {entry.underlying_price ? `Underlying @ fill: $${entry.underlying_price}` : ""}
               {price > 0 ? ` | Now: $${price.toFixed(2)}` : ""}
               {entry.underlying_price && price > 0

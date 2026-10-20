@@ -22,6 +22,7 @@ import {
   Eye,
 } from "lucide-react";
 import { useAppStore } from "../../../store/useAppStore";
+import { Segmented } from "../../../components/Glass";
 import { relativeAge, absoluteAge } from "../../../lib/utils";
 import {
   useGenerateSynthesis,
@@ -53,10 +54,10 @@ function SentBadge({ s }: { s?: string | null }) {
   const Icon = s === "bullish" ? TrendingUp : s === "bearish" ? TrendingDown : Minus;
   return (
     <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold uppercase"
-      style={{ background: `color-mix(in srgb, ${c} 9%, transparent)`, color: c, border: `1px solid color-mix(in srgb, ${c} 25%, transparent)` }}
+      className="inline-flex items-center gap-1 text-xs font-medium capitalize"
+      style={{ color: c }}
     >
-      <Icon size={10} />
+      <Icon size={11} />
       {s ?? "—"}
     </span>
   );
@@ -74,16 +75,16 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="card p-3 space-y-2">
-      <div className="flex items-center gap-2">
-        <Icon size={13} className="text-accent-purple" />
-        <span className="text-sm font-semibold text-text-primary">{title}</span>
+    <section className="space-y-2 border-t border-border pt-4">
+      <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+        <Icon size={13} className="text-text-muted" />
+        {title}
         {count !== undefined && (
-          <span className="text-xs text-text-muted">({count})</span>
+          <span className="num text-xs font-normal text-text-muted">{count}</span>
         )}
-      </div>
+      </h3>
       {children}
-    </div>
+    </section>
   );
 }
 
@@ -93,7 +94,7 @@ function PickTicker({ t }: { t: string }) {
     <button
       type="button"
       onClick={() => setActiveTicker(t)}
-      className="inline-block font-mono font-semibold text-xs text-accent-blue hover:underline"
+      className="num inline-block font-semibold text-xs text-text-primary hover:text-accent-blue"
     >
       {t}
     </button>
@@ -102,30 +103,30 @@ function PickTicker({ t }: { t: string }) {
 
 function Body({ content }: { content: SynthesisContent }) {
   return (
-    <div className="space-y-3">
+    <div className="card space-y-4">
       {/* Hero */}
-      <div className="card p-3 space-y-2">
+      <div className="max-w-[72ch] space-y-2">
         <div className="flex items-center gap-2">
-          <span className="text-xs uppercase text-text-muted font-semibold">
-            Overall Sentiment
+          <span className="text-xs text-text-muted">
+            Overall sentiment
           </span>
           <SentBadge s={content.overall_sentiment} />
         </div>
-        <p className="text-sm text-text-primary leading-relaxed">
+        <p className="text-base text-text-primary leading-relaxed">
           {content.overall_view || "—"}
         </p>
       </div>
 
       {/* Top thesis */}
-      <Section icon={Target} title="Dominant Thesis">
-        <p className="text-sm text-text-secondary italic leading-relaxed border-l-2 border-accent-purple pl-3 whitespace-pre-wrap">
+      <Section icon={Target} title="Dominant thesis">
+        <p className="max-w-[72ch] text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
           {content.top_thesis || "—"}
         </p>
       </Section>
 
       {/* Sector focus heatmap */}
       {content.sector_focus.length > 0 && (
-        <Section icon={Sparkles} title="Sector Focus" count={content.sector_focus.length}>
+        <Section icon={Sparkles} title="Sector focus" count={content.sector_focus.length}>
           <div className="space-y-1">
             {content.sector_focus.map((s) => (
               <div key={s.sector} className="flex items-center gap-2">
@@ -141,19 +142,19 @@ function Body({ content }: { content: SynthesisContent }) {
                     }}
                   />
                 </div>
-                <span className="text-xs font-mono text-text-muted w-10 text-right">
+                <span className="text-xs num text-text-muted w-10 text-right">
                   {s.weight_pct}%
                 </span>
-                <SentBadge s={s.lean} />
+                <span className="w-20"><SentBadge s={s.lean} /></span>
               </div>
             ))}
             {content.sector_focus.some((s) => s.notes) && (
-              <div className="mt-2 space-y-1 text-sm text-text-secondary leading-relaxed">
+              <div className="mt-2 max-w-[72ch] space-y-1 text-sm text-text-secondary leading-relaxed">
                 {content.sector_focus
                   .filter((s) => s.notes)
                   .map((s) => (
                     <div key={`note-${s.sector}`}>
-                      <span className="font-semibold capitalize">{s.sector}:</span>{" "}
+                      <span className="font-medium text-text-primary capitalize">{s.sector}:</span>{" "}
                       {s.notes}
                     </div>
                   ))}
@@ -167,20 +168,20 @@ function Body({ content }: { content: SynthesisContent }) {
       {content.high_conviction.length > 0 && (
         <Section
           icon={Target}
-          title="High Conviction"
+          title="High conviction"
           count={content.high_conviction.length}
         >
-          <div className="space-y-2">
+          <div className="divide-y divide-border">
             {content.high_conviction.map((h) => (
-              <div key={h.ticker} className="flex items-start gap-2">
-                <div className="flex flex-col items-center w-14 shrink-0">
+              <div key={h.ticker} className="flex items-start gap-3 py-2">
+                <div className="flex w-20 shrink-0 flex-col items-start gap-0.5">
                   <PickTicker t={h.ticker} />
                   <SentBadge s={h.sentiment} />
-                  <span className="text-[9px] text-text-muted mt-0.5">
+                  <span className="num text-xs text-text-muted" title="Evidence count">
                     ×{h.evidence_count}
                   </span>
                 </div>
-                <p className="text-sm text-text-secondary leading-snug">
+                <p className="max-w-[72ch] text-sm text-text-secondary leading-relaxed">
                   {h.thesis}
                 </p>
               </div>
@@ -193,7 +194,7 @@ function Body({ content }: { content: SynthesisContent }) {
       {content.bottlenecks.length > 0 && (
         <Section
           icon={AlertTriangle}
-          title="Bottlenecks / Chokepoints"
+          title="Bottlenecks and chokepoints"
           count={content.bottlenecks.length}
         >
           <div className="space-y-1.5">
@@ -221,7 +222,7 @@ function Body({ content }: { content: SynthesisContent }) {
       {content.private_companies.length > 0 && (
         <Section
           icon={Eye}
-          title="Private Companies (with public proxies)"
+          title="Private companies with public proxies"
           count={content.private_companies.length}
         >
           <div className="space-y-1.5">
@@ -231,8 +232,8 @@ function Body({ content }: { content: SynthesisContent }) {
                 <span className="text-text-muted"> — {p.rationale}</span>
                 {p.public_proxies.length > 0 && (
                   <div className="mt-0.5">
-                    <span className="text-xs uppercase text-text-muted mr-1">
-                      Proxies:
+                    <span className="text-xs text-text-muted mr-1">
+                      Proxies
                     </span>
                     {p.public_proxies.map((t, i) => (
                       <span key={t}>
@@ -252,7 +253,7 @@ function Body({ content }: { content: SynthesisContent }) {
       {content.emerging_themes.length > 0 && (
         <Section
           icon={TrendingUp}
-          title="Emerging Themes"
+          title="Emerging themes"
           count={content.emerging_themes.length}
         >
           <ul className="space-y-1.5 text-sm text-text-secondary leading-snug">
@@ -268,7 +269,7 @@ function Body({ content }: { content: SynthesisContent }) {
 
       {/* Watch list */}
       {content.watch_list.length > 0 && (
-        <Section icon={Eye} title="Watch List" count={content.watch_list.length}>
+        <Section icon={Eye} title="Watch list" count={content.watch_list.length}>
           <div className="space-y-1.5">
             {content.watch_list.map((w, idx) => (
               <div key={idx} className="text-sm leading-snug">
@@ -335,35 +336,19 @@ export function SynthesisView({
     <div className="space-y-3">
       {/* Header: window + refresh */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs uppercase text-text-muted font-semibold">
-          Window
-        </span>
-        <div className="flex items-center rounded border border-border overflow-hidden">
-          {WINDOWS.map((w) => {
-            const active = w.days === windowDays;
-            return (
-              <button
-                key={w.label}
-                type="button"
-                onClick={() => onWindowChange(w.days)}
-                className="px-2 py-1 text-xs font-semibold transition-colors"
-                style={{
-                  background: active ? "var(--accent-blue)" : "transparent",
-                  color: active ? "var(--bg-primary)" : "var(--text-secondary)",
-                }}
-              >
-                {w.label}
-              </button>
-            );
-          })}
-        </div>
+        <Segmented
+          ariaLabel="Synthesis window"
+          value={String(windowDays)}
+          onChange={(v) => onWindowChange(Number(v))}
+          options={WINDOWS.map((w) => ({ value: String(w.days), label: w.label }))}
+        />
 
         {data?.generated_at && (
           <span
             className="text-xs text-text-muted"
             title={absoluteAge(data.generated_at) || ""}
           >
-            generated {relativeAge(data.generated_at)} · {data.n_tweets ?? 0} tweets
+            Generated {relativeAge(data.generated_at)} · <span className="num">{data.n_tweets ?? 0}</span> tweets
           </span>
         )}
 
@@ -371,7 +356,7 @@ export function SynthesisView({
           type="button"
           disabled={generate.isPending}
           onClick={handleGenerate}
-          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold border border-accent-purple/40 text-accent-purple bg-accent-purple/10 hover:bg-accent-purple/20 disabled:opacity-50"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-text-secondary hover:bg-bg-card-hover hover:text-text-primary disabled:opacity-50"
         >
           {generate.isPending ? (
             <>
@@ -390,8 +375,9 @@ export function SynthesisView({
       {/* Error banner — surfaces the real backend reason instead of failing silently */}
       {errMsg && !generate.isPending && (
         <div
-          className="card p-3 flex items-start gap-2 text-sm"
-          style={{ borderColor: "var(--accent-red)", color: "var(--accent-red)" }}
+          role="alert"
+          className="card flex items-start gap-2 text-sm"
+          style={{ color: "var(--accent-red)", background: "color-mix(in srgb, var(--accent-red) 8%, var(--bg-card))" }}
         >
           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
           <div>
@@ -411,7 +397,7 @@ export function SynthesisView({
 
       {!generate.isPending && !hasContent && !isLoading && (
         <div className="card p-6 text-center text-sm text-text-muted">
-          No synthesis cached. Click <span className="text-accent-purple">Generate</span> above to run one (single LLM call, ~2-4 min).
+          No synthesis cached. Click <span className="font-medium text-text-primary">Generate</span> above to run one (single LLM call, ~2-4 min).
         </div>
       )}
 

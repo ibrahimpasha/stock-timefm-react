@@ -22,7 +22,7 @@ export function BullBearBar({
   return (
     <div className="w-full">
       {showLabels && (
-        <div className="flex justify-between text-xs font-mono mb-1">
+        <div className="flex justify-between text-xs num mb-1">
           <span style={{ color: "var(--accent-green)" }}>
             BULL {bullPct.toFixed(0)}%
           </span>

@@ -34,24 +34,19 @@ export function PickCard({ pick, onClose }: PickCardProps) {
       {/* Header: ticker + direction + conviction */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="font-mono font-bold text-text-primary text-base">
+          <span className="num font-bold text-text-primary text-base">
             {pick.ticker}
           </span>
           <span
-            className="flex items-center gap-1 text-xs font-semibold uppercase px-2 py-0.5 rounded-full"
-            style={{ color: dirColor, background: `${dirColor}20` }}
+            className="flex items-center gap-1 text-sm font-medium capitalize"
+            style={{ color: dirColor }}
           >
             {dirIcon}
             {pick.direction}
           </span>
-          <span
-            className="text-xs font-semibold uppercase px-2 py-0.5 rounded-full"
-            style={{
-              color: convictionColor,
-              background: `${convictionColor}20`,
-            }}
-          >
-            {pick.conviction}
+          <span className="inline-flex items-center gap-1.5 text-xs text-text-secondary">
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: convictionColor }} />
+            {String(pick.conviction).toLowerCase()} conviction
           </span>
         </div>
         {pick.status === "open" && onClose && (
@@ -65,7 +60,7 @@ export function PickCard({ pick, onClose }: PickCardProps) {
       </div>
 
       {/* Contract line */}
-      <div className="font-mono text-sm text-text-secondary">
+      <div className="num text-sm text-text-secondary">
         {pick.ticker} ${strike} {pick.option_type} {pick.expiry}
       </div>
 
@@ -73,35 +68,35 @@ export function PickCard({ pick, onClose }: PickCardProps) {
       <div className="grid grid-cols-3 gap-3 text-xs">
         <div>
           <div className="text-text-muted">Entry</div>
-          <div className="font-mono text-text-primary">
+          <div className="num text-text-primary">
             {formatCurrency(optEntry)}
           </div>
         </div>
         <div>
           <div className="text-text-muted">Current</div>
-          <div className="font-mono text-text-primary">
+          <div className="num text-text-primary">
             {formatCurrency(optCurrent)}
           </div>
         </div>
         <div>
           <div className="text-text-muted">P/L</div>
-          <div className="font-mono font-semibold" style={{ color: pnlColor }}>
+          <div className="num font-semibold" style={{ color: pnlColor }}>
             {formatPercentRaw(optPnl)}
           </div>
         </div>
         <div>
           <div className="text-text-muted">Flow Size</div>
-          <div className="font-mono text-text-primary">{pick.flow_size || "—"}</div>
+          <div className="num text-text-primary">{pick.flow_size || "—"}</div>
         </div>
         <div>
           <div className="text-text-muted">Vol/OI</div>
-          <div className="font-mono text-text-primary">
+          <div className="num text-text-primary">
             {volOi > 0 ? `${volOi.toFixed(1)}x` : "—"}
           </div>
         </div>
         <div>
           <div className="text-text-muted">Ask %</div>
-          <div className="font-mono text-text-primary">
+          <div className="num text-text-primary">
             {askPct > 0 ? `${askPct.toFixed(0)}%` : "—"}
           </div>
         </div>

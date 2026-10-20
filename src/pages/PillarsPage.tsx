@@ -31,10 +31,10 @@ const SEV: Record<string, { color: string; bg: string }> = {
   Moderate: { color: "var(--accent-yellow, #d4a72c)", bg: "color-mix(in srgb, var(--accent-yellow) 12%, transparent)" },
 };
 
+// Only Critical is a state worth color; High/Moderate read as plain text.
 const SEV_TONE: Record<string, ChipTone> = {
   Critical: "red",
   High: "orange",
-  Moderate: "yellow",
 };
 
 function accumColor(label?: string): string {
@@ -66,9 +66,13 @@ function TickerChip({
       }`}
       className="cursor-pointer"
     >
-      <Chip tone={tone === "owns" ? "green" : "red"}>
-        <span className="font-mono font-semibold">{b.ticker}</span>
-        {b.play_score != null && <span className="opacity-60 num">{b.play_score}</span>}
+      <Chip>
+        <span className="num font-semibold text-text-primary">{b.ticker}</span>
+        {b.play_score != null && (
+          <span className="num" style={{ color: tone === "owns" ? "var(--accent-green)" : "var(--accent-red)" }}>
+            {b.play_score}
+          </span>
+        )}
       </Chip>
     </button>
   );
@@ -76,7 +80,7 @@ function TickerChip({
 
 function SeverityBadge({ severity }: { severity: string }) {
   return (
-    <Chip tone={SEV_TONE[severity] ?? "neutral"} className="uppercase tracking-[0.08em]">
+    <Chip tone={SEV_TONE[severity] ?? "neutral"}>
       {severity}
     </Chip>
   );
@@ -92,7 +96,7 @@ function BottleneckCard({
   onTicker: (t: string) => void;
 }) {
   return (
-    <div className="card card-interactive flex flex-col gap-2">
+    <div className="flex flex-col gap-2 border-t border-border pt-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-semibold text-text-primary">{b.name}</span>
@@ -102,17 +106,17 @@ function BottleneckCard({
           )}
         </div>
       </div>
-      {b.detail && <p className="text-xs leading-relaxed text-text-secondary">{b.detail}</p>}
+      {b.detail && <p className="text-sm leading-relaxed text-text-secondary max-w-[72ch]">{b.detail}</p>}
       {b.graphify_concept && (
-        <div className="text-xs font-mono text-accent-cyan opacity-80">
-          graph: {b.graphify_concept}
+        <div className="text-xs text-text-muted">
+          Graph concept: <span className="text-text-secondary">{b.graphify_concept}</span>
         </div>
       )}
       <div className="flex flex-col gap-1.5 pt-1">
         {b.beneficiaries.length > 0 && (
           <div className="flex items-start gap-1.5 flex-wrap">
-            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-accent-green pt-0.5">
-              owns
+            <span className="w-12 shrink-0 text-xs font-medium text-text-muted pt-0.5">
+              Owns
             </span>
             {b.beneficiaries.map((t) => (
               <TickerChip key={`o-${t.ticker}`} b={t} tone="owns" onClick={onTicker} />
@@ -121,8 +125,8 @@ function BottleneckCard({
         )}
         {b.gated.length > 0 && (
           <div className="flex items-start gap-1.5 flex-wrap">
-            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-accent-red pt-0.5">
-              gated
+            <span className="w-12 shrink-0 text-xs font-medium text-text-muted pt-0.5">
+              Gated
             </span>
             {b.gated.map((t) => (
               <TickerChip key={`g-${t.ticker}`} b={t} tone="gated" onClick={onTicker} />
@@ -175,17 +179,17 @@ function PurityScatter({
         {/* quadrant guides at PEG=1.0 (fair) and purity=0.6 (pure) */}
         <line x1={x(1)} y1={PAD} x2={x(1)} y2={H - PAD} stroke="var(--border)" strokeDasharray="3 3" />
         <line x1={PAD} y1={y(0.6)} x2={W - PAD} y2={y(0.6)} stroke="var(--border)" strokeDasharray="3 3" />
-        <text x={PAD + 6} y={PAD + 12} className="fill-text-muted" style={{ fontSize: 9 }}>
-          VALUE + PURE
+        <text x={PAD + 6} y={PAD + 12} className="fill-text-muted" style={{ fontSize: 11 }}>
+          Value + pure
         </text>
-        <text x={W - PAD - 96} y={PAD + 12} className="fill-text-muted" style={{ fontSize: 9 }}>
-          PREMIUM + PURE
+        <text x={W - PAD - 6} y={PAD + 12} textAnchor="end" className="fill-text-muted" style={{ fontSize: 11 }}>
+          Premium + pure
         </text>
-        <text x={PAD + 6} y={H - PAD - 6} className="fill-text-muted" style={{ fontSize: 9 }}>
-          VALUE + DIVERSIFIED
+        <text x={PAD + 6} y={H - PAD - 6} className="fill-text-muted" style={{ fontSize: 11 }}>
+          Value + diversified
         </text>
         {/* axis labels */}
-        <text x={W / 2} y={H - 8} textAnchor="middle" className="fill-text-muted" style={{ fontSize: 10 }}>
+        <text x={W / 2} y={H - 8} textAnchor="middle" className="fill-text-muted" style={{ fontSize: 11 }}>
           PEG  ·  cheaper →← richer
         </text>
         <text
@@ -194,9 +198,9 @@ function PurityScatter({
           textAnchor="middle"
           transform={`rotate(-90 12 ${H / 2})`}
           className="fill-text-muted"
-          style={{ fontSize: 10 }}
+          style={{ fontSize: 11 }}
         >
-          PURITY % (revenue in thesis)
+          Purity % (revenue in thesis)
         </text>
         {pts.map((c) => {
           const cx = x(c.peg as number);
@@ -226,7 +230,7 @@ function PurityScatter({
                 stroke={col}
                 strokeOpacity={0.7}
               />
-              <text x={cx} y={cy + 3} textAnchor="middle" className="fill-text-primary font-mono" style={{ fontSize: 9 }}>
+              <text x={cx} y={cy + 3} textAnchor="middle" className="fill-text-primary num" style={{ fontSize: 10 }}>
                 {c.ticker}
               </text>
               <title>
@@ -257,21 +261,21 @@ function CompanyTable({
   const rows = showAll ? companies : companies.slice(0, 24);
   return (
     <div className="flex flex-col">
-      <div className="space-y-1 md:hidden">
+      <div className="divide-y divide-border md:hidden">
         {rows.map((c) => (
           <button
             key={c.ticker}
             type="button"
             onClick={() => onTicker(c.ticker)}
-            className="min-h-11 w-full rounded-[var(--radius-control)] px-2 py-2.5 text-left transition-colors hover:bg-bg-card-hover"
+            className="min-h-11 w-full px-2 py-2.5 text-left transition-colors hover:bg-bg-card-hover"
             style={{ background: c.ticker === active ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : undefined }}
           >
             <span className="flex min-w-0 items-center gap-2">
-              <span className="flex items-center gap-1 font-mono text-sm font-semibold text-text-primary">
+              <span className="flex items-center gap-1 num text-sm font-semibold text-text-primary">
                 {c.ticker}
-                {c.featured && <span className="h-1.5 w-1.5 rounded-full bg-accent-cyan" title="researched name" />}
+                {c.featured && <span className="h-1.5 w-1.5 rounded-full bg-accent-blue" title="Researched name" />}
               </span>
-              <span className="min-w-0 flex-1 truncate text-xs text-text-secondary">
+              <span className="min-w-0 flex-1 truncate text-sm text-text-secondary">
                 {c.one_liner || c.name || ""}
               </span>
               <span className="num text-xs font-semibold" style={{ color: c.play_score != null && c.play_score >= 60 ? "var(--accent-green)" : "var(--text-secondary)" }}>
@@ -294,30 +298,31 @@ function CompanyTable({
       </div>
 
       <div className="hidden md:flex md:flex-col">
-        <div className="grid grid-cols-[64px_1fr_44px_52px_44px_52px_56px_56px] gap-2 px-2 py-1.5 text-xs text-text-muted uppercase tracking-[0.08em]">
-          <span>ticker</span>
-          <span>why / role</span>
-          <span className="text-right">play</span>
-          <span className="text-right">purity</span>
-          <span className="text-right">peg</span>
+        <div className="grid grid-cols-[64px_1fr_44px_52px_44px_52px_56px_56px] gap-2 border-b border-border px-2 py-2 text-xs font-medium text-text-muted">
+          <span>Ticker</span>
+          <span>Why / role</span>
+          <span className="text-right">Play</span>
+          <span className="text-right">Purity</span>
+          <span className="text-right">PEG</span>
           <span className="text-right">30d</span>
-          <span className="text-right">target</span>
-          <span className="text-right">cap</span>
+          <span className="text-right">Target</span>
+          <span className="text-right">Cap</span>
         </div>
+        <div className="flex flex-col divide-y divide-border">
         {rows.map((c) => (
           <button
             key={c.ticker}
             type="button"
             onClick={() => onTicker(c.ticker)}
-            className="grid grid-cols-[64px_1fr_44px_52px_44px_52px_56px_56px] items-center gap-2 rounded-[var(--radius-control)] px-2 py-1.5 text-left text-xs transition-colors hover:bg-bg-card-hover"
+            className="grid grid-cols-[64px_1fr_44px_52px_44px_52px_56px_56px] items-center gap-2 px-2 py-2 text-left text-xs transition-colors hover:bg-bg-card-hover"
             style={{ background: c.ticker === active ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : undefined }}
           >
-            <span className="flex items-center gap-1 font-mono font-semibold text-text-primary">
+            <span className="flex items-center gap-1 num font-semibold text-text-primary">
               {c.ticker}
-              {c.featured && <span className="h-1.5 w-1.5 rounded-full bg-accent-cyan" title="researched name" />}
+              {c.featured && <span className="h-1.5 w-1.5 rounded-full bg-accent-blue" title="Researched name" />}
             </span>
             <span className="min-w-0">
-              <span className="block truncate text-text-secondary">{c.one_liner || c.name || ""}</span>
+              <span className="block truncate text-sm text-text-secondary">{c.one_liner || c.name || ""}</span>
               <span className="text-xs" style={{ color: accumColor(c.accum_label) }}>
                 {c.role || ""}{c.accum_label ? ` · ${c.accum_label.replace(/_/g, " ").toLowerCase()}` : ""}
               </span>
@@ -330,14 +335,15 @@ function CompanyTable({
             <span className="num text-right text-text-muted">{fmtCap(c.market_cap)}</span>
           </button>
         ))}
+        </div>
       </div>
       {companies.length > 24 && (
         <button
           type="button"
           onClick={() => setShowAll((v) => !v)}
-          className="min-h-11 py-1.5 text-left text-xs text-text-muted transition-colors hover:text-text-secondary md:min-h-0"
+          className="min-h-11 px-2 py-2 text-left text-xs text-text-muted transition-colors hover:text-text-secondary md:min-h-0"
         >
-          {showAll ? "show fewer" : `show all ${companies.length} names →`}
+          {showAll ? "Show fewer" : `Show all ${companies.length} names →`}
         </button>
       )}
     </div>
@@ -357,9 +363,11 @@ function PlainTickerChip({ b, onClick }: { b: PillarTickerBrief; onClick: (t: st
       }`}
       className="cursor-pointer"
     >
-      <Chip tone={lit ? "green" : "neutral"}>
-        <span className="font-mono font-semibold">{b.ticker}</span>
-        {b.play_score != null && <span className="opacity-60 num">{b.play_score}</span>}
+      <Chip>
+        <span className="num font-semibold text-text-primary">{b.ticker}</span>
+        {b.play_score != null && (
+          <span className="num" style={{ color: lit ? "var(--accent-green)" : "var(--text-muted)" }}>{b.play_score}</span>
+        )}
       </Chip>
     </button>
   );
@@ -367,19 +375,16 @@ function PlainTickerChip({ b, onClick }: { b: PillarTickerBrief; onClick: (t: st
 
 function SupplyChainMap({ layers, onTicker }: { layers: SupplyChainLayer[]; onTicker: (t: string) => void }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col divide-y divide-border">
       {layers.map((L, i) => (
-        <div key={L.layer} className="card flex items-start gap-3 py-2">
-          <div
-            className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-mono font-bold"
-            style={{ background: "color-mix(in srgb, var(--accent-blue) 14%, transparent)", color: "var(--accent-blue)" }}
-          >
+        <div key={L.layer} className="flex items-start gap-3 py-2">
+          <div className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center bg-bg-card-hover text-xs num font-semibold text-text-muted">
             {i + 1}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-sm font-semibold text-text-primary">{L.layer}</span>
-              {L.role && <span className="text-[11px] text-text-muted">{L.role}</span>}
+              {L.role && <span className="text-xs text-text-muted">{L.role}</span>}
             </div>
             {L.tickers.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1.5">
@@ -399,11 +404,11 @@ function SupplyChainMap({ layers, onTicker }: { layers: SupplyChainLayer[]; onTi
 
 function AllocationCallout({ text, accent }: { text: string; accent: string }) {
   return (
-    <div className="card border-l-2" style={{ borderLeftColor: accent }}>
-      <div className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-1.5 flex items-center gap-1.5">
-        <Compass size={13} /> Where to allocate
-      </div>
-      <p className="text-sm leading-relaxed text-text-secondary">{text}</p>
+    <div className="border-t border-border pt-3">
+      <h3 className="text-sm font-semibold text-text-primary mb-1.5 flex items-center gap-1.5">
+        <Compass size={14} style={{ color: accent }} /> Where to allocate
+      </h3>
+      <p className="text-sm leading-relaxed text-text-secondary max-w-[72ch]">{text}</p>
     </div>
   );
 }
@@ -412,29 +417,29 @@ function AllocationCallout({ text, accent }: { text: string; accent: string }) {
 
 function PreIpoSection({ items, onTicker }: { items: PreIpoCompany[]; onTicker: (t: string) => void }) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-1">
       {items.map((c) => (
-        <div key={c.name} className="card flex flex-col gap-1.5">
+        <div key={c.name} className="flex flex-col gap-1.5 border-t border-border py-3">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold text-text-primary">{c.name}</span>
             {c.category && (
-              <span className="text-[10px] font-mono px-1 rounded bg-bg-card-hover text-text-muted">{c.category}</span>
+              <span className="text-xs text-text-muted">{c.category}</span>
             )}
-            {c.stage && <span className="text-[10px] font-mono text-accent-purple ml-auto">{c.stage}</span>}
+            {c.stage && <span className="text-xs text-text-muted ml-auto">{c.stage}</span>}
           </div>
-          <p className="text-xs leading-relaxed text-text-secondary">{c.what}</p>
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-mono text-text-muted">
-            {c.valuation && <span>val {c.valuation}</span>}
-            {c.funding_raised && <span>raised {c.funding_raised}</span>}
-            {c.relevance && <span className="text-accent-cyan">{c.relevance}</span>}
+          <p className="text-sm leading-relaxed text-text-secondary">{c.what}</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-text-muted">
+            {c.valuation && <span>Valuation <span className="num text-text-secondary">{c.valuation}</span></span>}
+            {c.funding_raised && <span>Raised <span className="num text-text-secondary">{c.funding_raised}</span></span>}
+            {c.relevance && <span className="text-text-secondary">{c.relevance}</span>}
           </div>
           {!!(c.public_proxies && c.public_proxies.length) && (
             <div className="flex items-center gap-1 flex-wrap pt-0.5">
-              <span className="text-[10px] font-mono text-text-muted">proxy:</span>
+              <span className="text-xs text-text-muted">Public proxy</span>
               {c.public_proxies.map((t) => (
                 <button key={t} type="button" onClick={() => onTicker(t)} className="cursor-pointer">
                   <Chip tone="neutral">
-                    <span className="font-mono font-semibold">{t}</span>
+                    <span className="num font-semibold">{t}</span>
                   </Chip>
                 </button>
               ))}
@@ -451,37 +456,37 @@ function PreIpoSection({ items, onTicker }: { items: PreIpoCompany[]; onTicker: 
 function PillarBody({ d, onTicker, active }: { d: PillarDetail; onTicker: (t: string) => void; active: string }) {
   const s = d.stats;
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       {/* stat strip */}
-      <div className="flex items-center gap-4 flex-wrap text-xs">
-        <span className="text-text-secondary">{d.tagline}</span>
-      </div>
-      <div className="flex items-center gap-3 flex-wrap text-xs font-mono">
-        <span className="text-text-muted">{s.n_companies} companies</span>
-        <span className="text-text-muted">·</span>
-        <span style={{ color: "var(--accent-red)" }}>{s.n_critical} critical bottlenecks</span>
-        <span className="text-text-muted">·</span>
-        <span className="text-text-muted">{fmtCap(s.total_market_cap)} aggregate cap</span>
-        {!d.has_research && (
-          <span className="text-accent-cyan animate-pulse">· research generating…</span>
-        )}
+      <div className="flex flex-col gap-1.5">
+        {d.tagline && <p className="text-base font-semibold text-text-primary max-w-[72ch]">{d.tagline}</p>}
+        <div className="flex items-center gap-2 flex-wrap text-sm text-text-muted">
+          <span><span className="num text-text-secondary">{s.n_companies}</span> companies</span>
+          <span>·</span>
+          <span><span className="num" style={{ color: "var(--accent-red)" }}>{s.n_critical}</span> critical bottlenecks</span>
+          <span>·</span>
+          <span><span className="num text-text-secondary">{fmtCap(s.total_market_cap)}</span> aggregate cap</span>
+          {!d.has_research && (
+            <span className="animate-pulse">· Research generating…</span>
+          )}
+        </div>
       </div>
 
       {/* demand thesis */}
       {d.demand_thesis && (
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-1.5 flex items-center gap-1.5">
-            <Activity size={13} /> Demand
+          <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1.5">
+            <Activity size={14} className="text-text-muted" /> Demand
           </h3>
-          <p className="text-sm leading-relaxed text-text-secondary">{d.demand_thesis}</p>
+          <p className="text-sm leading-relaxed text-text-secondary max-w-[72ch]">{d.demand_thesis}</p>
         </section>
       )}
 
       {/* supply-chain map */}
       {d.supply_chain.length > 0 && (
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2 flex items-center gap-1.5">
-            <Network size={13} /> Supply chain — upstream → downstream
+          <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1.5">
+            <Network size={14} className="text-text-muted" /> Supply chain — upstream → downstream
           </h3>
           <SupplyChainMap layers={d.supply_chain} onTicker={onTicker} />
         </section>
@@ -489,15 +494,15 @@ function PillarBody({ d, onTicker, active }: { d: PillarDetail; onTicker: (t: st
 
       {/* bottleneck matrix */}
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2 flex items-center gap-1.5">
-          <AlertTriangle size={13} /> Bottleneck matrix
+        <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1.5">
+          <AlertTriangle size={14} className="text-text-muted" /> Bottleneck matrix
         </h3>
         {d.bottlenecks.length === 0 ? (
-          <div className="text-xs text-text-muted italic">
+          <div className="text-sm text-text-muted">
             {d.has_research ? "No bottlenecks mapped." : "Generating from the graphify chokepoints + intel…"}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
             {d.bottlenecks.map((b) => (
               <BottleneckCard key={b.name} b={b} onTicker={onTicker} />
             ))}
@@ -507,10 +512,10 @@ function PillarBody({ d, onTicker, active }: { d: PillarDetail; onTicker: (t: st
 
       {/* scatter + table */}
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2 flex items-center gap-1.5">
-          <Layers size={13} /> Company universe — value × purity
+        <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1.5">
+          <Layers size={14} className="text-text-muted" /> Company universe — value × purity
         </h3>
-        <div className="card mb-3">
+        <div className="mb-4">
           <PurityScatter companies={d.companies} accent={d.accent} onTicker={onTicker} />
         </div>
         <CompanyTable companies={d.companies} onTicker={onTicker} active={active} />
@@ -519,8 +524,8 @@ function PillarBody({ d, onTicker, active }: { d: PillarDetail; onTicker: (t: st
       {/* pre-IPO / private */}
       {d.pre_ipo.length > 0 && (
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2 flex items-center gap-1.5">
-            <Rocket size={13} /> Pre-IPO &amp; private — the names you can't buy yet
+          <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1.5">
+            <Rocket size={14} className="text-text-muted" /> Pre-IPO &amp; private — the names you can't buy yet
           </h3>
           <PreIpoSection items={d.pre_ipo} onTicker={onTicker} />
         </section>
@@ -536,27 +541,27 @@ function PillarBody({ d, onTicker, active }: { d: PillarDetail; onTicker: (t: st
       {/* emerging tech */}
       {d.emerging_tech.length > 0 && (
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2 flex items-center gap-1.5">
-            <Cpu size={13} /> Emerging tech radar
+          <h3 className="text-sm font-semibold text-text-primary mb-2 flex items-center gap-1.5">
+            <Cpu size={14} className="text-text-muted" /> Emerging tech radar
           </h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-1">
             {d.emerging_tech.map((t) => (
-              <div key={t.name} className="card flex flex-col gap-1.5">
+              <div key={t.name} className="flex flex-col gap-1.5 border-t border-border py-3">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-text-primary">{t.name}</span>
-                  {t.status && <span className="text-[10px] font-mono text-text-muted">{t.status}</span>}
-                  {t.timeline && <span className="text-[10px] font-mono text-accent-cyan ml-auto">{t.timeline}</span>}
+                  {t.status && <span className="text-xs text-text-muted">{t.status}</span>}
+                  {t.timeline && <span className="text-xs num text-text-muted ml-auto">{t.timeline}</span>}
                 </div>
-                <p className="text-xs leading-relaxed text-text-secondary">{t.detail}</p>
+                <p className="text-sm leading-relaxed text-text-secondary">{t.detail}</p>
                 {!!(t.players && t.players.length) && (
-                  <div className="text-[10px] font-mono text-text-muted">players: {t.players.join(", ")}</div>
+                  <div className="text-xs text-text-muted">Players: <span className="text-text-secondary">{t.players.join(", ")}</span></div>
                 )}
-                <div className="flex gap-3 text-[10px] font-mono">
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-text-muted">
                   {!!(t.enables && t.enables.length) && (
-                    <span style={{ color: "var(--accent-green)" }}>enables: {t.enables.join(", ")}</span>
+                    <span>Enables: <span className="text-text-secondary">{t.enables.join(", ")}</span></span>
                   )}
                   {!!(t.disrupts && t.disrupts.length) && (
-                    <span style={{ color: "var(--accent-red)" }}>disrupts: {t.disrupts.join(", ")}</span>
+                    <span>Disrupts: <span className="text-text-secondary">{t.disrupts.join(", ")}</span></span>
                   )}
                 </div>
               </div>
@@ -568,10 +573,10 @@ function PillarBody({ d, onTicker, active }: { d: PillarDetail; onTicker: (t: st
       {/* risks */}
       {d.risks.length > 0 && (
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2">Risks & substitution threats</h3>
-          <div className="flex flex-col gap-1.5">
+          <h3 className="text-sm font-semibold text-text-primary mb-2">Risks &amp; substitution threats</h3>
+          <div className="flex flex-col gap-2 max-w-[72ch]">
             {d.risks.map((r) => (
-              <div key={r.risk} className="text-xs leading-relaxed">
+              <div key={r.risk} className="text-sm leading-relaxed">
                 <span className="font-semibold text-text-primary">{r.risk}.</span>{" "}
                 <span className="text-text-secondary">{r.detail}</span>
               </div>
@@ -604,7 +609,7 @@ function MarkdownLite({ md }: { md: string }) {
   const flush = (k: string) => {
     if (bullets.length) {
       out.push(
-        <ul key={`ul-${k}`} className="list-disc pl-5 my-1.5 space-y-1">{bullets}</ul>,
+        <ul key={`ul-${k}`} className="list-disc pl-5 my-2 space-y-1.5">{bullets}</ul>,
       );
       bullets = [];
     }
@@ -613,21 +618,21 @@ function MarkdownLite({ md }: { md: string }) {
     const line = raw.trimEnd();
     if (line.startsWith("- ")) {
       bullets.push(
-        <li key={i} className="text-xs leading-relaxed text-text-secondary">{mdInline(line.slice(2))}</li>,
+        <li key={i} className="text-sm leading-relaxed text-text-secondary">{mdInline(line.slice(2))}</li>,
       );
       return;
     }
     flush(String(i));
     if (line === "") return;
-    if (line === "---") { out.push(<hr key={i} className="my-3 border-border" />); return; }
-    if (line.startsWith("#### ")) { out.push(<h4 key={i} className="text-sm font-semibold text-text-primary mt-3 mb-1">{mdInline(line.slice(5))}</h4>); return; }
-    if (line.startsWith("### ")) { out.push(<h3 key={i} className="text-sm font-bold text-accent-blue mt-3 mb-1">{mdInline(line.slice(4))}</h3>); return; }
-    if (line.startsWith("## ")) { out.push(<h2 key={i} className="text-base font-bold text-text-primary mt-4 mb-1.5">{mdInline(line.slice(3))}</h2>); return; }
-    if (line.startsWith("# ")) { out.push(<h1 key={i} className="text-lg font-bold text-text-primary mt-2 mb-2">{mdInline(line.slice(2))}</h1>); return; }
-    out.push(<p key={i} className="text-xs leading-relaxed text-text-secondary my-1.5">{mdInline(line)}</p>);
+    if (line === "---") { out.push(<hr key={i} className="my-5 border-border" />); return; }
+    if (line.startsWith("#### ")) { out.push(<h4 key={i} className="text-sm font-semibold text-text-primary mt-4 mb-1">{mdInline(line.slice(5))}</h4>); return; }
+    if (line.startsWith("### ")) { out.push(<h3 key={i} className="text-base font-semibold text-text-primary mt-5 mb-1.5">{mdInline(line.slice(4))}</h3>); return; }
+    if (line.startsWith("## ")) { out.push(<h2 key={i} className="text-lg font-semibold text-text-primary mt-6 mb-2">{mdInline(line.slice(3))}</h2>); return; }
+    if (line.startsWith("# ")) { out.push(<h1 key={i} className="text-xl font-semibold text-text-primary mt-2 mb-3">{mdInline(line.slice(2))}</h1>); return; }
+    out.push(<p key={i} className="text-sm leading-relaxed text-text-secondary my-2">{mdInline(line)}</p>);
   });
   flush("end");
-  return <div>{out}</div>;
+  return <div className="max-w-[72ch]">{out}</div>;
 }
 
 function WeeklyReportSection() {
@@ -637,13 +642,13 @@ function WeeklyReportSection() {
   const archive = data?.available_reports ?? [];
   if (isError && !data) {
     return (
-      <div className="card flex items-center gap-2 text-xs text-accent-red">
+      <div className="card flex items-center gap-2 text-sm text-accent-red">
         <AlertTriangle size={13} />
         <span>Unable to load the weekly AI report.</span>
         <button
           type="button"
           onClick={() => void refetch()}
-          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-secondary hover:text-text-primary"
+          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-text-secondary hover:text-text-primary"
         >
           <RefreshCw size={11} /> Retry
         </button>
@@ -652,19 +657,19 @@ function WeeklyReportSection() {
   }
   if (!data?.available || !data.markdown) return null;
   return (
-    <div className="card border-l-2" style={{ borderLeftColor: "var(--accent-purple)" }}>
+    <section className="card">
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
           className="flex min-h-11 min-w-0 basis-full items-center gap-2 text-left sm:basis-auto sm:flex-1"
         >
-          <BookOpen size={16} className="text-accent-purple shrink-0" />
+          <BookOpen size={16} className="text-text-muted shrink-0" />
           <span className="text-sm font-semibold text-text-primary truncate">
             {data.title || "Weekly AI Report"}
           </span>
           {archive.length <= 1 && data.date && (
-            <span className="text-[10px] font-mono text-text-muted">{data.date}</span>
+            <span className="text-xs num text-text-muted">{data.date}</span>
           )}
         </button>
         {archive.length > 1 && (
@@ -687,9 +692,9 @@ function WeeklyReportSection() {
           type="button"
           onClick={() => setOpen((o) => !o)}
           className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-md sm:min-h-0 sm:min-w-0"
-          aria-label={open ? "hide report" : "show report"}
+          aria-label={open ? "Hide report" : "Show report"}
         >
-          <span className="hidden text-[10px] font-mono text-text-muted sm:inline">{open ? "hide" : "show"}</span>
+          <span className="hidden text-xs text-text-muted sm:inline">{open ? "Hide" : "Show"}</span>
           <ChevronRight
             size={15}
             className="text-text-muted"
@@ -698,11 +703,11 @@ function WeeklyReportSection() {
         </button>
       </div>
       {open && (
-        <div className="mt-2 pt-2 border-t border-border max-h-[72vh] overflow-y-auto pr-1">
+        <div className="mt-3 pt-3 border-t border-border max-h-[72vh] overflow-y-auto pr-1">
           <MarkdownLite md={data.markdown} />
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -719,47 +724,41 @@ export function PillarsPage() {
   const sel = useMemo(() => tabs.find((t) => t.key === selected), [tabs, selected]);
 
   return (
-    <div className="mx-auto max-w-[110rem] px-4 py-4 max-md:px-0 max-md:py-1 xl:flex xl:items-start xl:gap-4">
-      <div className="flex-1 min-w-0 space-y-4">
-      {/* header */}
-      <div>
-        <h1 className="text-lg font-semibold text-text-primary flex items-center gap-2">
-          <Layers size={18} className="text-accent-blue" /> Structural Pillars
-        </h1>
-        <p className="text-xs text-text-muted mt-0.5">
-          Start from what the world physically needs, trace the supply chain, find where it gets stuck.
-        </p>
-        {overview?.intro && (
-          <p className="text-sm text-text-secondary mt-2 leading-relaxed max-w-4xl">{overview.intro}</p>
-        )}
-      </div>
+    <div className="desk-page">
+      <header className="desk-header">
+        <div className="desk-header__title">
+          <h1>Pillars</h1>
+          <p>Start from what the world physically needs, trace the supply chain, find where it gets stuck</p>
+        </div>
+      </header>
+      <div className="xl:flex xl:items-start xl:gap-6">
+      <div className="flex-1 min-w-0 flex flex-col gap-5">
+      {overview?.intro && (
+        <p className="text-sm text-text-secondary leading-relaxed max-w-[72ch]">{overview.intro}</p>
+      )}
 
       {/* Weekly AI Report — the latest cross-layer synthesis (wiki-archived) */}
       <WeeklyReportSection />
 
       {/* cross-pillar chokepoints */}
       {!!overview?.cross_pillar_chokepoints?.length && (
-        <div className="card">
-          <div className="text-[10px] font-mono uppercase tracking-wider text-text-muted mb-2">
+        <section className="card">
+          <h2 className="text-sm font-semibold text-text-primary mb-2">
             Chokepoints that span pillars
-          </div>
+          </h2>
           {/* Each evidence row owns the same responsive column template. */}
-          <div className="space-y-3 text-xs md:space-y-2">
+          <div className="divide-y divide-border text-sm">
             {overview.cross_pillar_chokepoints.map((c) => (
-              <div key={c.name} className="pillar-chokepoint-row grid items-start gap-x-3 gap-y-1 border-b border-border pb-3 last:border-0 last:pb-0 md:gap-y-2 md:border-0 md:pb-0">
+              <div key={c.name} className="pillar-chokepoint-row grid items-start gap-x-3 gap-y-1 py-2">
                 <span className="font-semibold text-text-primary">{c.name}</span>
-                <span className="flex gap-1 flex-wrap">
-                  {c.pillars.map((p) => (
-                    <span key={p} className="text-[9px] font-mono px-1 rounded bg-bg-card-hover text-text-muted whitespace-nowrap">
-                      {p.replace(/_/g, " ")}
-                    </span>
-                  ))}
+                <span className="text-xs text-text-muted pt-0.5">
+                  {c.pillars.map((p) => p.replace(/_/g, " ")).join(" · ")}
                 </span>
                 <span className="text-text-secondary leading-relaxed">{c.why}</span>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       {/* pillar tabs */}
@@ -776,48 +775,60 @@ export function PillarsPage() {
           </button>
         </div>
       )}
-      <div className="flex items-stretch gap-2 flex-wrap">
+      <div className="flex items-stretch gap-2 flex-wrap" role="group" aria-label="Choose a pillar">
         {tabs.map((t) => {
           const on = t.key === selected;
           return (
             <button
               key={t.key}
+              type="button"
+              aria-pressed={on}
               onClick={() => setSelected(t.key)}
-              className="min-h-11 min-w-[220px] flex-1 rounded-lg border px-3 py-2 text-left transition-colors"
+              className="min-h-11 min-w-[220px] flex-1 rounded-lg border px-3 py-2.5 text-left transition-colors hover:bg-bg-card-hover"
               style={{
                 borderColor: on ? t.accent : "var(--border)",
-                background: on ? `${t.accent}14` : "var(--bg-card)",
+                background: on ? `color-mix(in srgb, ${t.accent} 8%, var(--bg-card))` : "var(--bg-card)",
               }}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold" style={{ color: on ? t.accent : "var(--text-primary)" }}>
-                  {t.title}
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-text-primary">
+                  <span className="size-2 shrink-0 rounded-full" style={{ background: t.accent }} />
+                  <span className="truncate">{t.title}</span>
                 </span>
-                <ChevronRight size={14} className="text-text-muted" />
+                <ChevronRight size={14} className="text-text-muted shrink-0" />
               </div>
-              <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-text-muted">
-                <span>{t.stats?.n_companies ?? 0} co</span>
-                <span style={{ color: "var(--accent-red)" }}>{t.stats?.n_critical ?? 0} critical</span>
-                <span>{fmtCap(t.stats?.total_market_cap)}</span>
+              <div className="flex items-center gap-2 mt-1 text-xs text-text-muted">
+                <span><span className="num">{t.stats?.n_companies ?? 0}</span> companies</span>
+                <span>·</span>
+                <span><span className="num" style={{ color: "var(--accent-red)" }}>{t.stats?.n_critical ?? 0}</span> critical</span>
+                <span>·</span>
+                <span className="num">{fmtCap(t.stats?.total_market_cap)}</span>
               </div>
-              <div className="flex gap-1 mt-1.5 flex-wrap">
-                {(t.top_bottlenecks || []).map((b) => (
-                  <span
-                    key={b.name}
-                    className="text-[9px] font-mono px-1 py-0.5 rounded"
-                    style={{ background: (SEV[b.severity] || SEV.Moderate).bg, color: (SEV[b.severity] || SEV.Moderate).color }}
-                  >
-                    {b.name}
-                  </span>
-                ))}
-              </div>
+              {!!t.top_bottlenecks?.length && (
+                <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-text-secondary">
+                  {t.top_bottlenecks.map((b) => (
+                    <span key={b.name} className="inline-flex items-center gap-1" title={`${b.severity} bottleneck`}>
+                      <span
+                        className="size-1.5 shrink-0 rounded-full"
+                        style={{ background: (SEV[b.severity] || SEV.Moderate).color }}
+                      />
+                      {b.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </button>
           );
         })}
       </div>
 
       {/* detail */}
-      <div className="card" style={{ borderTop: `2px solid ${sel?.accent || "var(--accent-blue)"}` }}>
+      <section className="card">
+        {sel && (
+          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-text-primary">
+            <Layers size={16} style={{ color: sel.accent }} /> {sel.title}
+          </h2>
+        )}
         {isLoading ? (
           <div className="animate-pulse space-y-2">
             <div className="h-4 w-1/2 rounded bg-text-muted/20" />
@@ -838,13 +849,14 @@ export function PillarsPage() {
         ) : (
           <PillarBody d={detail} onTicker={setActiveTicker} active={activeTicker} />
         )}
-      </div>
+      </section>
       </div>
 
       {/* AI buildout stack — interactive supply-chain viz, sticky side rail */}
-      <aside className="mt-4 xl:mt-0 xl:w-[380px] shrink-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
+      <aside className="mt-5 xl:mt-0 xl:w-[380px] shrink-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
         <SupplyStackViz />
       </aside>
+      </div>
     </div>
   );
 }

@@ -8,7 +8,7 @@
  * top-down tells you market direction faster than any text summary.
  */
 import { useId, useMemo, useState } from "react";
-import { Filter, X, Globe, Clock } from "lucide-react";
+import { Filter, X, Clock } from "lucide-react";
 import { Chip, Segmented } from "../../components/Glass";
 import { QueryNotice } from "../../components/QueryNotice";
 import { parseLocalDate, daysFromToday } from "../../lib/dateOnly";
@@ -101,39 +101,40 @@ function NewsRow({ item }: { item: NewsItem }) {
   const detailsId = useId();
   return (
     <div
-      className="border pl-3 py-1.5 transition-colors hover:bg-bg-card-hover/40 cursor-pointer rounded"
-      style={{
-        borderColor: sentColor,
-        background: sentimentBgColor(item.sentiment, rowAlpha),
-      }}
+      className="cursor-pointer px-2 py-2 transition-colors hover:bg-bg-card-hover"
+      style={{ background: sentimentBgColor(item.sentiment, rowAlpha * 0.5) }}
       onClick={() => setExpanded((v) => !v)}
     >
-      <div className="flex items-start gap-2 text-xs">
-        <div className="flex flex-col items-center w-12 shrink-0">
-          <span
-            className="num text-text-muted"
-            title={absoluteAge(item.posted_at)}
+      <div className="flex items-start gap-3">
+        <span
+          className="num w-11 shrink-0 pt-0.5 text-xs text-text-muted"
+          title={absoluteAge(item.posted_at)}
+        >
+          {item.posted_at.slice(11, 16)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
+            aria-expanded={expanded}
+            aria-controls={item.sentiment_score !== null ? detailsId : undefined}
+            className="block w-full max-w-[72ch] text-left text-sm leading-snug text-text-primary"
           >
-            {item.posted_at.slice(11, 16)}
-          </span>
-          <span className="text-[10px] text-text-muted/70 mt-0.5">
-            {relativeAge(item.posted_at)}
-          </span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap mb-1">
+            {item.headline}
+          </button>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-text-muted">
             {isAnalyzed && item.sentiment && (
               <span
-                className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded"
-                style={{
-                  color: sentColor,
-                  background: sentimentBgColor(item.sentiment, 0.18),
-                }}
+                className="font-medium"
+                style={{ color: sentColor }}
                 title={`sentiment_score ${score.toFixed(2)} (row tint α=${rowAlpha.toFixed(2)})`}
               >
                 {item.sentiment}
                 {Math.abs(score) > 0 && (
-                  <span className="ml-1 opacity-70">
+                  <span className="num ml-1">
                     {score > 0 ? "+" : ""}
                     {score.toFixed(1)}
                   </span>
@@ -141,10 +142,7 @@ function NewsRow({ item }: { item: NewsItem }) {
               </span>
             )}
             {!isAnalyzed && (
-              <span
-                className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded text-text-muted bg-bg-card animate-pulse"
-                title="awaiting LLM analysis"
-              >
+              <span className="animate-pulse" title="awaiting LLM analysis">
                 pending
               </span>
             )}
@@ -157,30 +155,18 @@ function NewsRow({ item }: { item: NewsItem }) {
                   e.stopPropagation();
                   setActiveTicker(t);
                 }}
-                className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-accent-blue/15 text-accent-blue hover:bg-accent-blue/25 transition-colors"
+                className="num font-semibold text-text-secondary hover:text-accent-blue transition-colors"
               >
                 {t}
               </button>
             ))}
-            <span className="text-[10px] text-text-muted/70 ml-auto">
-              {item.author_username}
+            <span>
+              {item.author_username} · {relativeAge(item.posted_at)}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setExpanded((v) => !v);
-            }}
-            aria-expanded={expanded}
-            aria-controls={item.sentiment_score !== null ? detailsId : undefined}
-            className="block min-h-6 w-full rounded text-left text-text-primary leading-snug"
-          >
-            {item.headline}
-          </button>
           {expanded && item.sentiment_score !== null && (
-            <div id={detailsId} className="mt-2 pt-2 border-t border-border/50 text-[10px] text-text-muted/70 font-mono">
-              tagged by LLM · sentiment_score {item.sentiment_score?.toFixed(2)}
+            <div id={detailsId} className="mt-1 text-xs text-text-muted">
+              Tagged by LLM · sentiment score <span className="num">{item.sentiment_score?.toFixed(2)}</span>
               {item.tickers.length > 0 && ` · ${item.tickers.length} ticker(s) extracted`}
             </div>
           )}
@@ -209,7 +195,7 @@ function StatsStrip() {
       </span>
       {data.pending > 0 && (
         <span>
-          <span className="text-accent-orange num font-semibold">
+          <span className="text-text-primary num font-semibold">
             {data.pending}
           </span>{" "}
           pending
@@ -252,15 +238,10 @@ export function NewsTab() {
     <div className="flex flex-col gap-3" style={{ height: "calc(100vh - 220px)", minHeight: 420 }}>
       {/* Header */}
       <div className="flex flex-wrap items-center gap-3 pb-2">
-        <div className="flex items-center gap-1.5 text-text-secondary">
-          <Globe size={14} />
-          <span className="text-xs font-semibold uppercase tracking-[0.08em]">News</span>
-        </div>
-
         {tickerFilter ? (
-          <Chip tone="blue">
+          <Chip>
             <Filter size={11} />
-            <span className="font-mono font-bold">{tickerFilter}</span>
+            <span className="num font-semibold text-text-primary">{tickerFilter}</span>
             <button
               type="button"
               onClick={() => setTickerFilter(null)}
@@ -273,10 +254,6 @@ export function NewsTab() {
           </Chip>
         ) : (
           <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 text-xs text-text-muted">
-              <Filter size={12} />
-              window
-            </span>
             <Segmented
               ariaLabel="News window"
               value={String(windowDays)}
@@ -293,9 +270,9 @@ export function NewsTab() {
           <button
             type="button"
             onClick={() => setTickerFilter(activeTicker)}
-            className="text-xs text-text-muted hover:text-accent-blue underline"
+            className="text-xs text-text-muted hover:text-accent-blue"
           >
-            filter to {activeTicker}
+            Filter to {activeTicker}
           </button>
         )}
 
@@ -309,25 +286,22 @@ export function NewsTab() {
         <QueryNotice queries={[tickerFilter ? byTicker : feed]} label="News feed" />
         {isLoading ? (
           <div className="text-sm text-text-muted animate-pulse py-4 text-center">Loading...</div>
-        ) : (tickerFilter ? byTicker : feed).data?.ok === false ? <p role="alert" className="py-4 text-xs text-accent-orange">News feed unavailable.</p> : items.length === 0 && !(tickerFilter ? byTicker : feed).isError && (tickerFilter ? byTicker : feed).fetchStatus !== "paused" ? (
+        ) : (tickerFilter ? byTicker : feed).data?.ok === false ? <p role="alert" className="py-4 text-sm text-accent-orange">News feed unavailable.</p> : items.length === 0 && !(tickerFilter ? byTicker : feed).isError && (tickerFilter ? byTicker : feed).fetchStatus !== "paused" ? (
           <div className="text-sm text-text-muted py-4 text-center">
             No news in this window
             {tickerFilter ? ` mentioning ${tickerFilter}` : ""}.
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {groups.map((g) => (
               <div key={g.date}>
-                <div
-                  className="text-xs font-semibold text-accent-blue mb-1.5 sticky top-0 backdrop-blur py-1 rounded-md px-1 -mx-1"
-                  style={{ background: "var(--glass-bg-strong)" }}
-                >
+                <div className="sticky top-0 z-10 bg-bg-card py-1.5 text-sm font-semibold text-text-primary">
                   {formatHeaderDate(g.date)}
-                  <span className="ml-2 text-text-muted/70 font-normal num">
-                    ({g.rows.length})
+                  <span className="ml-2 num text-xs font-normal text-text-muted">
+                    {g.rows.length}
                   </span>
                 </div>
-                <div className="space-y-1">
+                <div className="divide-y divide-border">
                   {g.rows.map((item) => (
                     <NewsRow key={item.msg_id} item={item} />
                   ))}

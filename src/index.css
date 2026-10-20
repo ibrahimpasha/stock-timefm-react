@@ -661,9 +661,11 @@ table td.num {
   min-width: 0;
 }
 
-/* The brief is reading material: cap its measure on wide screens. */
-.desk-page[data-section="brief"] .desk-main {
-  max-width: 76rem;
+/* The brief is reading material: cap and center its measure on wide screens. */
+.desk-page[data-section="brief"] {
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
 }
 
 .analysis-trigger,
@@ -876,7 +878,7 @@ table td.num {
   }
 
   .desk-body--split {
-    grid-template-columns: minmax(0, 1fr) minmax(24rem, 34rem);
+    grid-template-columns: minmax(0, 1fr) minmax(21rem, 26rem);
   }
 
   .command-detail-workspace {
@@ -900,6 +902,12 @@ table td.num {
   .command-detail-close {
     width: 2rem;
     min-height: 2rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .desk-body--split {
+    grid-template-columns: minmax(0, 1fr) minmax(24rem, 34rem);
   }
 }
 

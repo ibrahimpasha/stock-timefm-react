@@ -235,7 +235,7 @@ export function TraderCallRow({
               e.stopPropagation();
               onTickerClick?.(call.ticker!);
             }}
-            className="num font-bold shrink-0 text-sm cursor-pointer rounded-[var(--radius-control)]"
+            className="num font-semibold shrink-0 text-sm cursor-pointer rounded-[var(--radius-control)]"
             style={{
               color: tickerHi ? "var(--accent-blue)" : "var(--text-primary)",
               background: tickerHi
@@ -254,13 +254,13 @@ export function TraderCallRow({
         {/* Sizing chips */}
         {sizing.length > 0 &&
           sizing.map((s) => (
-            <Chip key={s} tone={sizingTone(s)} className="shrink-0 uppercase">
+            <Chip key={s} tone={sizingTone(s)} className="shrink-0">
               {s}
             </Chip>
           ))}
 
         {/* Strike + opt type, or SHARES fallback */}
-        <span className="num font-bold shrink-0 text-sm text-text-primary">
+        <span className="num font-semibold shrink-0 text-sm text-text-primary">
           {hasStrike ? (
             <>
               ${strike}
@@ -327,7 +327,7 @@ export function TraderCallRow({
 
         {/* P/L badge — right aligned (estimated, unrealized) */}
         <span
-          className={`num font-bold shrink-0 text-sm min-w-14 text-right ${
+          className={`num font-semibold shrink-0 text-sm min-w-14 text-right ${
             exitStatus ? "" : "ml-auto"
           } ${exitStatus?.label === "CLOSED" ? "opacity-40 line-through" : ""}`}
           style={{ color: pnlColor }}
@@ -391,7 +391,7 @@ export function TraderCallRow({
               className="flex flex-col gap-1 pt-1"
               style={{ borderTop: "1px solid var(--border)" }}
             >
-              <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-muted">
+              <div className="text-xs font-medium text-text-muted">
                 Exits (<span className="num">{call.exits.length}</span>)
               </div>
               {call.exits.map((ex) => (
@@ -400,7 +400,7 @@ export function TraderCallRow({
                   className="num text-xs flex gap-2 items-baseline"
                 >
                   <span
-                    className="font-bold uppercase min-w-11"
+                    className="font-semibold capitalize min-w-11"
                     style={{
                       color:
                         ex.event_type === "close"
@@ -415,7 +415,7 @@ export function TraderCallRow({
                   <span className="text-text-muted">{ex.ts.slice(5, 10)}</span>
                   {ex.exit_pct != null && (
                     <span
-                      className="font-bold"
+                      className="font-semibold"
                       style={{
                         color:
                           ex.exit_pct >= 0

@@ -5,8 +5,6 @@ import {
   Loader2,
   RefreshCw,
   RotateCcw,
-  Shield,
-  CheckCircle2,
   XCircle,
   ChevronDown,
   ChevronRight,
@@ -15,7 +13,6 @@ import {
   TrendingDown,
   Flame,
   Network,
-  Users,
   Scissors,
   Anchor,
   Clock,
@@ -36,7 +33,6 @@ import { MarkFreshness } from "../../components/MarkFreshness";
 import { QueryNotice } from "../../components/QueryNotice";
 import { useAppStore } from "../../store/useAppStore";
 import { GlassPanel, Chip, Stat, Segmented } from "../../components/Glass";
-import type { ChipTone } from "../../components/Glass";
 import { GexWall } from "../gex/GexWall";
 
 type PersonaName = "smart" | "aggressive" | "builder" | "ruby" | "gemfinder" | "supercycle" | "conviction";
@@ -422,55 +418,43 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
     const dte = expiryDte(r.expiry, activityDates.today);
     return `$${r.strike ?? "?"}${type === "CALL" ? "C" : type === "PUT" ? "P" : "?"} ${r.expiry} · ${dte == null ? "DTE unknown" : `${dte}d`}`;
   };
-  const Row = ({ r }: { r: WatchlistRow }) => {
+  const info = (r: WatchlistRow) => {
     const gain = observationGain(r);
     const age = observationAge(r.added, activityDates.today);
     const evaluatedAt = observationHasEvaluation(r) ? r.last_evaluated_at : null;
     const state = !evaluatedAt
       ? "needs review" : (r.decision_state ?? "blocked").replaceAll("_", " ");
+    const note = `${r.block_reason || r.note || "No decision note recorded."}${!evaluatedAt ? " Eligibility unverified." : ""}`;
+    const peak = gain != null && r.peak_pnl_pct != null && r.peak_pnl_pct >= 30 ? r.peak_pnl_pct : null;
+    return { gain, age, evaluatedAt, state, note, peak };
+  };
+  const signedPct = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(0)}%`;
+  const stateText = (r: WatchlistRow, state: string) => (
+    <span className={r.decision_state === "eligible" ? "text-accent-green" : "text-text-secondary"}>
+      {state}{r.triggered_at ? " · price trigger" : ""}
+    </span>
+  );
+  const mobileRow = (r: WatchlistRow, key: string) => {
+    const { gain, age, evaluatedAt, state, note, peak } = info(r);
     return (
-    <>
-      <details className="group rounded-[var(--radius-control)] border border-border md:hidden">
-        <summary className="flex min-h-11 list-none items-center gap-2 px-3 py-2 text-xs marker:content-none">
-          <ChevronRight
-            size={13}
-            className="shrink-0 text-text-muted transition-transform group-open:rotate-90"
-            aria-hidden="true"
-          />
-          <span className="w-12 shrink-0 font-mono font-semibold text-text-primary">
-            {r.ticker}
-          </span>
-          <span className="num min-w-0 flex-1 truncate text-text-muted">
-            {contract(r)}
-          </span>
+      <details key={key} className="group">
+        <summary className="flex min-h-11 list-none items-center gap-2 py-2 text-xs marker:content-none">
+          <ChevronRight size={13} className="shrink-0 text-text-muted transition-transform group-open:rotate-90" aria-hidden="true" />
+          <span className="w-12 shrink-0 num font-semibold text-text-primary">{r.ticker}</span>
+          <span className="num min-w-0 flex-1 truncate text-text-muted">{contract(r)}</span>
           {gain != null && (
-            <span
-              className="num shrink-0 font-semibold"
-              style={{ color: changeColor(gain) }}
-            >
-              {gain >= 0 ? "+" : ""}{gain.toFixed(0)}%
-            </span>
+            <span className="num shrink-0 font-semibold" style={{ color: changeColor(gain) }}>{signedPct(gain)}</span>
           )}
         </summary>
-        <div className="space-y-2 px-3 pb-3 pl-10 text-xs">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Chip tone={r.decision_state === "eligible" ? "green" : "neutral"}>
-              {state}
-            </Chip>
-            {r.triggered_at && <Chip tone="blue">Price trigger</Chip>}
-            {r.ml_score != null && <Chip tone="blue">ML {r.ml_score}</Chip>}
-            {gain != null && r.peak_pnl_pct != null && r.peak_pnl_pct >= 30 && (
-              <Chip tone="neutral" className="num">
-                peak +{r.peak_pnl_pct.toFixed(0)}%
-              </Chip>
-            )}
-            <span className="text-text-muted">{age == null ? "Age unknown" : `${age}d on list`}</span>
-            <span className="text-text-muted">{gain == null ? "No verified mark" : "Modeled gain"}</span>
+        <div className="space-y-2 pb-3 pl-5 text-xs">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-text-muted">
+            {stateText(r, state)}
+            {r.ml_score != null && <span>ML <span className="num">{r.ml_score}</span></span>}
+            {peak != null && <span className="num">peak +{peak.toFixed(0)}%</span>}
+            <span>{age == null ? "Age unknown" : `${age}d on list`}</span>
+            <span>{gain == null ? "No verified mark" : "Modeled gain"}</span>
           </div>
-          <p className="break-words leading-relaxed text-text-secondary">
-            {r.block_reason || r.note || "No decision note recorded."}
-            {!evaluatedAt && " Eligibility unverified."}
-          </p>
+          <p className="break-words text-sm leading-relaxed text-text-secondary">{note}</p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-text-muted">
             <dt>Added</dt><dd>{watchlistTime(r.added_at ?? r.added)}</dd>
             <dt>Flow date</dt><dd>{r.source_date ?? "Not recorded"}</dd>
@@ -479,34 +463,68 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
           </dl>
         </div>
       </details>
-      <div className="hidden items-center gap-2 text-xs md:flex md:flex-wrap">
-        <span className="w-14 font-mono font-semibold">{r.ticker}</span>
-        <span className="num text-text-muted">{contract(r)}</span>
-        {gain != null && (
-          <span className="num font-semibold" style={{ color: changeColor(gain) }}>
-            Modeled {gain >= 0 ? "+" : ""}{gain.toFixed(0)}%
-          </span>
-        )}
-        {gain != null && r.peak_pnl_pct != null && r.peak_pnl_pct >= 30 && (
-          <span className="num text-text-muted">peak +{r.peak_pnl_pct.toFixed(0)}%</span>
-        )}
-        <Chip tone={r.decision_state === "eligible" ? "green" : "neutral"}>
-          {state}
-        </Chip>
-        {r.triggered_at && <Chip tone="blue">Price trigger</Chip>}
-        {r.ml_score != null && <Chip tone="blue">ML {r.ml_score}</Chip>}
-        <span className="text-text-muted">{age == null ? "Age unknown" : `${age}d on list`}</span>
-        <span className="text-text-secondary">Added {watchlistTime(r.added_at ?? r.added)}</span>
-        <span className="text-text-muted">Flow {r.source_date ?? "unknown"}</span>
-        <span className="text-text-muted">Evaluated {watchlistTime(evaluatedAt)}</span>
-        <MarkFreshness at={r.last_marked_at} quality={r.mark_quality} />
-        <span className="text-text-muted">
-          {r.block_reason || r.note || "No decision note recorded."}
-          {!evaluatedAt && " Eligibility unverified."}
-        </span>
-      </div>
-    </>
+    );
+  };
+  const desktopTable = (rows: WatchlistRow[], prefix: string) => (
+    <div className="hidden overflow-x-auto md:block">
+      <table className="w-full text-left text-xs">
+        <thead className="text-text-muted">
+          <tr className="border-b border-border">
+            <th className="py-2 pr-3 font-medium">Ticker</th>
+            <th className="py-2 pr-3 font-medium">Contract</th>
+            <th className="py-2 pr-3 text-right font-medium" title="Modeled gain since added">P/L %</th>
+            <th className="py-2 pr-3 text-right font-medium">Peak</th>
+            <th className="py-2 pr-3 font-medium">State</th>
+            <th className="py-2 pr-3 text-right font-medium">ML</th>
+            <th className="py-2 pr-3 text-right font-medium">On list</th>
+            <th className="py-2 pr-3 font-medium">Added</th>
+            <th className="py-2 pr-3 font-medium">Flow</th>
+            <th className="py-2 pr-3 font-medium">Evaluated</th>
+            <th className="py-2 pr-3 font-medium">Mark</th>
+            <th className="py-2 font-medium">Note</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {rows.map((r, i) => {
+            const { gain, age, evaluatedAt, state, note, peak } = info(r);
+            return (
+              <tr key={r.id ?? `${prefix}${i}`} className="hover:bg-bg-card-hover">
+                <td className="py-2 pr-3 num font-semibold text-text-primary">{r.ticker}</td>
+                <td className="whitespace-nowrap py-2 pr-3 num text-text-secondary">{contract(r)}</td>
+                <td className="py-2 pr-3 text-right num font-semibold" style={gain != null ? { color: changeColor(gain) } : undefined}>
+                  {gain != null ? signedPct(gain) : <span className="text-text-muted">—</span>}
+                </td>
+                <td className="py-2 pr-3 text-right num text-text-muted">{peak != null ? `+${peak.toFixed(0)}%` : "—"}</td>
+                <td className="whitespace-nowrap py-2 pr-3">{stateText(r, state)}</td>
+                <td className="py-2 pr-3 text-right num text-text-secondary">{r.ml_score ?? "—"}</td>
+                <td className="py-2 pr-3 text-right num text-text-muted">{age == null ? "—" : `${age}d`}</td>
+                <td className="whitespace-nowrap py-2 pr-3 text-text-secondary">{watchlistTime(r.added_at ?? r.added)}</td>
+                <td className="whitespace-nowrap py-2 pr-3 num text-text-muted">{r.source_date ?? "—"}</td>
+                <td className="whitespace-nowrap py-2 pr-3 text-text-muted">{watchlistTime(evaluatedAt)}</td>
+                <td className="whitespace-nowrap py-2 pr-3"><MarkFreshness at={r.last_marked_at} quality={r.mark_quality} /></td>
+                <td className="max-w-[32ch] truncate py-2 text-text-muted" title={note}>{note}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
+  const section = (key: "wla" | "wlb", title: string, rows: WatchlistRow[], empty: string) => {
+    const windowRows = windowFor(key, rows).rows;
+    return (
+      <div className={`${visibleSection === key ? "block" : "hidden"} md:block`}>
+        <h4 className="mb-1 text-sm font-semibold text-text-primary">
+          {title} <span className="num font-normal text-text-muted">{rows.length}</span>
+        </h4>
+        <div className="divide-y divide-border md:hidden">
+          {windowRows.map((r, i) => mobileRow(r, String(r.id ?? `${key}${i}`)))}
+        </div>
+        {rows.length > 0 && desktopTable(windowRows, key)}
+        {!rows.length && <div className="py-3 text-sm text-text-muted">{empty}</div>}
+        {pager(key, rows)}
+      </div>
+    );
   };
   return (
     <GlassPanel title="Watchlist">
@@ -602,46 +620,28 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
           { value: "history", label: "Moves", badge: <span className="num">{(data?.history ?? []).length}</span> },
         ]}
       />
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className={`${visibleSection === "wla" ? "space-y-1.5" : "hidden"} md:block md:space-y-1.5`}>
-          <div className="text-xs font-semibold text-text-muted">
-            Screened observations ({wla.length})
+      <div className="space-y-6">
+        {section("wla", "Screened", wla, "No screened observations in this period.")}
+        {section("wlb", "Monitoring / blocked", wlb, "No monitored observations in this period.")}
+        <div className={`${visibleSection === "history" ? "block" : "hidden"} ${(data?.history ?? []).length > 0 ? "md:block" : "md:hidden"}`}>
+          <h4 className="mb-1 text-sm font-semibold text-text-primary">Recent moves</h4>
+          <div className="divide-y divide-border">
+            {(data?.history ?? []).slice(0, 8).map((r, i) => (
+              <div key={`h${i}`} className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 py-2 text-xs text-text-muted md:min-h-0">
+                <span className={r.status === "entered" ? "text-accent-green" : "text-text-secondary"}>{r.status}</span>
+                <span className="num font-semibold text-text-primary">{r.ticker}</span>
+                <span className="num">{contract(r)}</span>
+                {r.pnl_pct != null && (
+                  <span className="num" style={{ color: changeColor(r.pnl_pct) }}>{signedPct(r.pnl_pct)}</span>
+                )}
+                <span>{r.drop_reason ?? ""}</span>
+              </div>
+            ))}
           </div>
-          <div className="space-y-1.5">
-            {windowFor("wla", wla).rows.map((r, i) => <Row key={r.id ?? `a${i}`} r={r} />)}
-            {!wla.length && <div className="py-3 text-center text-sm text-text-muted">No screened observations in this period.</div>}
-          </div>
-          {pager("wla", wla)}
-        </div>
-        <div className={`${visibleSection === "wlb" ? "space-y-1.5" : "hidden"} md:block md:space-y-1.5`}>
-          <div className="text-xs font-semibold text-text-muted">
-            Monitoring / blocked ({wlb.length})
-          </div>
-          <div className="space-y-1.5">
-            {windowFor("wlb", wlb).rows.map((r, i) => <Row key={r.id ?? `b${i}`} r={r} />)}
-            {!wlb.length && <div className="py-3 text-center text-sm text-text-muted">No monitored observations in this period.</div>}
-          </div>
-          {pager("wlb", wlb)}
-        </div>
-      </div>
-      <div className={`${visibleSection === "history" ? "mt-3 space-y-1.5" : "hidden"} md:mt-3 ${(data?.history ?? []).length > 0 ? "md:block" : "md:hidden"} md:space-y-1`}>
-          <div className="text-xs font-semibold text-text-muted">Recent moves</div>
-          {(data?.history ?? []).slice(0, 8).map((r, i) => (
-            <div key={`h${i}`} className="flex min-h-11 flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-border px-3 py-2 text-xs text-text-muted md:min-h-0 md:rounded-none md:border-0 md:p-0">
-              <Chip tone={r.status === "entered" ? "green" : "neutral"}>
-                {r.status.toUpperCase()}
-              </Chip>
-              <span className="font-mono">{r.ticker}</span>
-              <span className="num">{contract(r)}</span>
-              {r.pnl_pct != null && (
-                <span className="num">{r.pnl_pct >= 0 ? "+" : ""}{r.pnl_pct.toFixed(0)}%</span>
-              )}
-              <span>{r.drop_reason ?? ""}</span>
-            </div>
-          ))}
           {(data?.history ?? []).length === 0 && (
-            <div className="py-3 text-center text-sm text-text-muted">No recent watchlist moves.</div>
+            <div className="py-3 text-sm text-text-muted">No recent watchlist moves.</div>
           )}
+        </div>
       </div>
     </GlassPanel>
   );
@@ -676,7 +676,7 @@ function RubyDeskLog() {
   const events = data?.events ?? [];
   if (!events.length) {
     return (
-      <GlassPanel title="Desk Log">
+      <GlassPanel title="Desk log">
         <div className="text-xs text-text-muted">
           No cycles logged yet — the log fills as the 15-min intraday loop
           enters, vetoes, trims, or freezes. Quiet cycles are not recorded.
@@ -685,47 +685,47 @@ function RubyDeskLog() {
     );
   }
   return (
-    <GlassPanel title="Desk Log">
-      <div className="space-y-3">
+    <GlassPanel title="Desk log">
+      <div className="divide-y divide-border">
         {events.map((e, i) => (
-          <div key={`${e.ts}-${i}`} className="space-y-1">
-            <div className="flex items-center gap-2 flex-wrap text-xs">
-              <span className="num text-text-muted">
+          <div key={`${e.ts}-${i}`} className="space-y-1 py-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+              <span className="num">
                 {new Date(e.ts + (e.ts.endsWith("Z") ? "" : "Z")).toLocaleString([], {
                   month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
                 })}
               </span>
-              {e.regime && <Chip tone="neutral">{e.regime}</Chip>}
-              {e.frozen && <Chip tone="red">FROZEN — daily loss cap</Chip>}
+              {e.regime && <span className="text-text-secondary">{e.regime}</span>}
+              {e.frozen && <Chip tone="red">Frozen: daily loss cap</Chip>}
               {(e.opened ?? []).map((o, j) => (
-                <Chip key={`o${j}`} tone="green">
-                  ENTER {o.ticker} ${o.strike}
-                  {o.option_type === "CALL" ? "C" : "P"} x{o.contracts}
-                </Chip>
+                <span key={`o${j}`} className="text-text-secondary">
+                  Enter <span className="num text-text-primary">{o.ticker} ${o.strike}{o.option_type === "CALL" ? "C" : "P"} x{o.contracts}</span>
+                </span>
               ))}
               {(e.vetoes ?? []).map((v, j) => (
-                <Chip key={`v${j}`} tone="yellow">VETO {v.ticker}</Chip>
+                <span key={`v${j}`}>Veto <span className="num text-text-secondary">{v.ticker}</span></span>
               ))}
               {(e.trims ?? []).map((t, j) => (
-                <Chip key={`t${j}`} tone="neutral">TRIM {t.ticker ?? ""}</Chip>
+                <span key={`t${j}`}>Trim <span className="num text-text-secondary">{t.ticker ?? ""}</span></span>
               ))}
               {(e.exits ?? []).map((x, j) => (
-                <Chip key={`x${j}`} tone={x.pnl_pct >= 0 ? "green" : "red"}>
-                  EXIT {x.ticker} {x.pnl_pct >= 0 ? "+" : ""}
-                  {x.pnl_pct?.toFixed(0)}%
-                </Chip>
+                <span key={`x${j}`} className="text-text-secondary">
+                  Exit <span className="num">{x.ticker}</span>{" "}
+                  <span className="num" style={{ color: changeColor(x.pnl_pct ?? 0) }}>
+                    {x.pnl_pct >= 0 ? "+" : ""}{x.pnl_pct?.toFixed(0)}%
+                  </span>
+                </span>
               ))}
-              <span className="text-text-muted">
-                {e.candidates ?? 0} flow → {e.passed ?? 0} passed gate
+              <span>
+                <span className="num">{e.candidates ?? 0}</span> flow, <span className="num">{e.passed ?? 0}</span> passed gate
               </span>
             </div>
-            {e.read && <div className="text-sm">{e.read}</div>}
+            {e.read && <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">{e.read}</p>}
             {(e.vetoes ?? []).length > 0 && (
-              <div className="text-xs text-text-muted space-y-0.5">
+              <div className="space-y-0.5 text-xs text-text-muted">
                 {(e.vetoes ?? []).map((v, j) => (
                   <div key={j}>
-                    VETO {v.ticker} ${v.strike}
-                    {v.type === "CALL" ? "C" : "P"} — {v.reason}
+                    Veto <span className="num">{v.ticker} ${v.strike}{v.type === "CALL" ? "C" : "P"}</span>: {v.reason}
                   </div>
                 ))}
               </div>
@@ -819,15 +819,6 @@ const RULE_LABELS: Record<string, { id: number; label: string; why: string }> = 
   },
 };
 
-function ScoreChip({ score, label }: { score: number; label: string }) {
-  const tone: ChipTone = score >= 85 ? "green" : score >= 70 ? "blue" : "neutral";
-  return (
-    <Chip tone={tone} className="num">
-      {label} {score}
-    </Chip>
-  );
-}
-
 function SideIcon({ side }: { side: string }) {
   if (side === "Bull") return <TrendingUp size={12} className="text-accent-green" />;
   return <TrendingDown size={12} className="text-accent-red" />;
@@ -903,103 +894,54 @@ function GraphContextPanel({ ticker }: { ticker: string }) {
     data.competitors_text ||
     (data.competitors || []).map((c) => c.name).filter(Boolean).join(", ");
 
+  const label = (t: string) => <span className="mr-1 font-medium text-text-muted">{t}</span>;
   return (
-    <div className="space-y-2.5 pt-2 border-t border-border">
-      {/* taxonomy + community + freshness */}
-      <div className="flex items-center gap-1.5 flex-wrap text-xs">
-        {data.sector && <Chip tone="blue">{data.sector}</Chip>}
-        {data.theme && <Chip tone="cyan">{data.theme}</Chip>}
-        {data.community?.label && (
-          <Chip tone="purple">{data.community.label}</Chip>
-        )}
-        {data.intel_as_of && (
-          <span className="text-text-muted ml-auto num">
-            graph {data.intel_as_of}
-          </span>
-        )}
+    <div className="space-y-2 border-t border-border pt-2 text-xs">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-text-secondary">
+        {data.sector && <span>{data.sector}</span>}
+        {data.theme && <span>{data.theme}</span>}
+        {data.community?.label && <span>{data.community.label}</span>}
+        {data.intel_as_of && <span className="ml-auto text-text-muted">graph <span className="num">{data.intel_as_of}</span></span>}
       </div>
 
-      {/* structural role in the AI build-out + its reasoning */}
       {role && (
-        <div
-          className="rounded-md px-2 py-1.5"
-          style={{ background: tint(roleColor(role), 8), border: `1px solid ${tint(roleColor(role), 22)}` }}
-        >
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <Network size={11} style={{ color: roleColor(role) }} />
-            <span className="text-xs font-bold" style={{ color: roleColor(role) }}>
-              {role}
-            </span>
-            <span className="text-xs text-text-muted">in the AI build-out</span>
-          </div>
-          {roleReason && (
-            <div className="text-xs text-text-secondary leading-snug">{roleReason}</div>
-          )}
-        </div>
+        <p className="leading-relaxed text-text-secondary">
+          <span className="inline-flex items-center gap-1.5 font-semibold text-text-primary">
+            <span className="h-2 w-2 rounded-full" style={{ background: roleColor(role) }} aria-hidden="true" />
+            {role}
+          </span>{" "}
+          <span className="text-text-muted">in the AI build-out.</span>{" "}
+          {roleReason}
+        </p>
       )}
 
-      {/* dated catalysts / key facts */}
       {keyFacts.length > 0 && (
-        <div className="text-xs">
-          <div className="text-text-muted uppercase tracking-wider mb-1 flex items-center gap-1">
-            <Calendar size={10} /> Catalysts &amp; key facts
+        <div>
+          <div className="mb-1 flex items-center gap-1 font-medium text-text-muted">
+            <Calendar size={12} /> Catalysts and key facts
           </div>
-          <ul className="space-y-1">
-            {keyFacts.slice(0, 5).map((f, i) => (
-              <li key={i} className="flex items-start gap-1.5 text-text-secondary leading-snug">
-                <span className="mt-1.5 h-1 w-1 rounded-full shrink-0" style={{ background: "var(--accent-cyan)" }} />
-                <span>{f}</span>
-              </li>
-            ))}
+          <ul className="list-disc space-y-1 pl-4 leading-relaxed text-text-secondary">
+            {keyFacts.slice(0, 5).map((f, i) => <li key={i}>{f}</li>)}
           </ul>
         </div>
       )}
 
-      {/* analyst / market sentiment narrative */}
-      {data.sentiment && (
-        <div
-          className="text-xs text-text-secondary leading-snug rounded px-2 py-1.5"
-          style={{ background: "color-mix(in srgb, var(--bg-card) 50%, transparent)" }}
-        >
-          <span className="text-text-muted uppercase tracking-wider mr-1">Sentiment</span>
-          {data.sentiment}
-        </div>
-      )}
+      {data.sentiment && <p className="leading-relaxed text-text-secondary">{label("Sentiment")}{data.sentiment}</p>}
+      {data.outlook && <p className="leading-relaxed text-text-secondary">{label("Outlook")}{data.outlook}</p>}
+      {competitors && <p className="leading-relaxed text-text-secondary">{label("Competes with")}{competitors}</p>}
 
-      {/* outlook (when present) */}
-      {data.outlook && (
-        <div className="text-xs text-text-secondary leading-snug">
-          <span className="text-text-muted uppercase tracking-wider mr-1">Outlook</span>
-          {data.outlook}
-        </div>
-      )}
-
-      {/* competitors */}
-      {competitors && (
-        <div className="text-xs text-text-secondary leading-snug">
-          <span className="text-text-muted uppercase tracking-wider mr-1">Competes with</span>
-          {competitors}
-        </div>
-      )}
-
-      {/* theme peers — clickable, colored by structural role */}
       {peers.length > 0 && (
-        <div className="text-xs">
-          <div className="text-text-muted uppercase tracking-wider mb-1 flex items-center gap-1">
-            <Layers size={10} /> Theme peers
+        <div>
+          <div className="mb-1 flex items-center gap-1 font-medium text-text-muted">
+            <Layers size={12} /> Theme peers
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
             {peers.map((p, i) => (
               <button
                 key={`${p.ticker}-${i}`}
                 onClick={() => setActiveTicker(p.ticker)}
-                className="font-mono px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity"
-                style={{
-                  color: roleColor(p.role),
-                  background: tint(roleColor(p.role), 10),
-                  border: `1px solid ${tint(roleColor(p.role), 28)}`,
-                }}
-                title={p.role ? `${p.ticker} — ${p.role}` : p.ticker}
+                className="num text-text-secondary hover:text-accent-blue"
+                title={p.role ? `${p.ticker}: ${p.role}` : p.ticker}
               >
                 {p.ticker}
               </button>
@@ -1118,50 +1060,41 @@ function ScaleTimeline({
   if (!trims.length) return null;
   const banked = trims.reduce((s, t) => s + (t.realized_pnl_dollars ?? 0), 0);
   const soldCt = trims.reduce((s, t) => s + (t.contracts ?? 0), 0);
-  const purple = "var(--accent-purple)";
   return (
-    <div
-      className="mt-2 rounded-md px-2 py-1.5 space-y-1"
-      style={{ background: tint(purple, 8), border: `1px solid ${tint(purple, 22)}` }}
-    >
-      <div className="flex items-center justify-between text-xs">
-        <span className="inline-flex items-center gap-1 font-semibold" style={{ color: purple }}>
-          <Scissors size={11} /> Scaled out {trims.length}x
+    <div className="mt-2 space-y-1 text-xs">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-text-muted">
+        <span className="inline-flex items-center gap-1 font-medium text-text-secondary">
+          <Scissors size={12} /> Scaled out <span className="num">{trims.length}x</span>
         </span>
-        <span className="num font-bold" style={{ color: "var(--accent-green)" }}>
-          banked +${banked.toFixed(0)}
-        </span>
-      </div>
-      <div className="flex flex-wrap items-center gap-1.5">
         {trims
           .slice()
           .sort((a, b) => (a.scale_stage ?? 0) - (b.scale_stage ?? 0))
           .map((t) => (
-            <Chip
+            <span
               key={t.id}
-              tone="purple"
               className="num"
-              title={`Sold ${t.contracts} ct at ${rungLabel(t.exit_reason)} on ${t.exit_date} — banked $${(
+              title={`Sold ${t.contracts} ct at ${rungLabel(t.exit_reason)} on ${t.exit_date}, banked $${(
                 t.realized_pnl_dollars ?? 0
               ).toFixed(0)}`}
             >
-              {rungLabel(t.exit_reason)}
-              <span className="text-text-muted">x{t.contracts}</span>
-            </Chip>
+              {rungLabel(t.exit_reason)} x{t.contracts}
+            </span>
           ))}
         {remaining != null && original != null && remaining > 0 && (
-          <Chip
-            tone="cyan"
-            className="num"
-            title="Runner still open — rides with the stop trailed to breakeven (house money)"
+          <span
+            className="inline-flex items-center gap-1 num"
+            title="Runner still open, rides with the stop trailed to breakeven (house money)"
           >
-            <Anchor size={10} /> runner {remaining}/{original}
-          </Chip>
+            <Anchor size={12} /> runner {remaining}/{original}
+          </span>
         )}
+        <span className="ml-auto num font-semibold" style={{ color: "var(--accent-green)" }}>
+          banked +${banked.toFixed(0)}
+        </span>
       </div>
       {remaining != null && remaining > 0 && (
-        <div className="text-xs text-text-muted">
-          {soldCt} of {original} ct booked · breakeven exit threshold armed; execution may differ
+        <div className="text-text-muted">
+          <span className="num">{soldCt}</span> of <span className="num">{original}</span> ct booked; breakeven exit threshold armed, execution may differ
         </div>
       )}
     </div>
@@ -1172,39 +1105,22 @@ function ScaleTimeline({
  *  lead sentence + the scoring/convergence clauses as chips. */
 function WhyPick({ reason, compact = false }: { reason: string | null; compact?: boolean }) {
   if (!reason) return null;
-  const blue = "var(--accent-blue)";
   const [lead, ...rest] = reason.split(" · ");
   if (compact) {
     return (
-      <div className="flex items-start gap-1 text-xs text-text-muted leading-snug pt-0.5">
-        <Lightbulb size={10} style={{ color: blue, marginTop: 1 }} className="shrink-0" />
+      <p className="flex items-start gap-1 pt-0.5 text-xs leading-relaxed text-text-muted">
+        <Lightbulb size={12} className="mt-0.5 shrink-0" />
         <span>{reason}</span>
-      </div>
+      </p>
     );
   }
   return (
-    <div
-      className="mt-2 rounded-md px-2 py-1.5"
-      style={{ background: tint(blue, 7), border: `1px solid ${tint(blue, 18)}` }}
-    >
-      <div className="flex items-start gap-1.5">
-        <Lightbulb size={11} style={{ color: blue, marginTop: 1 }} className="shrink-0" />
-        <div className="min-w-0">
-          <div className="text-xs font-semibold" style={{ color: blue }}>
-            Why this pick
-          </div>
-          <div className="text-xs text-text-secondary leading-snug">{lead}</div>
-          {rest.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {rest.map((c, i) => (
-                <Chip key={i} tone="neutral" className="num">
-                  {c}
-                </Chip>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+    <div className="mt-2 max-w-[72ch] text-sm leading-relaxed text-text-secondary">
+      <span className="font-medium text-text-primary">Why this pick: </span>
+      {lead}
+      {rest.length > 0 && (
+        <div className="mt-0.5 text-xs text-text-muted">{rest.join(" · ")}</div>
+      )}
     </div>
   );
 }
@@ -1217,40 +1133,40 @@ function DecisionAudit({ p }: { p: Position }) {
   const quality = p.decision_receipt?.research_gate;
   if (!rank && !source && !mode && !quote) return null;
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2 text-xs text-text-muted">
-      {rank?.validated === false && <Chip tone="neutral">Experimental policy</Chip>}
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+      {rank?.validated === false && <span>Experimental policy</span>}
       {quote && (
-        <span className="num">
-          {quote.data_delay_seconds ? `${quote.data_delay_seconds / 60}m delayed quote` : "Indicative quote"}
-          {" · simulated ask fill"}
+        <span>
+          {quote.data_delay_seconds ? <><span className="num">{quote.data_delay_seconds / 60}m</span> delayed quote</> : "Indicative quote"}
+          {", simulated ask fill"}
         </span>
       )}
-      {quality && <Chip tone={quality.approved ? "green" : "neutral"}>
-        {quality.approved ? `Evidence checked: ${quality.families.join(", ")}` : "Evidence blocked"}
-      </Chip>}
+      {quality && (
+        <span className={quality.approved ? "text-accent-green" : undefined}>
+          {quality.approved ? `Evidence checked: ${quality.families.join(", ")}` : "Evidence blocked"}
+        </span>
+      )}
       {rank && (
-        <span className="num text-text-secondary">
-          Decision rank <strong className="text-text-primary">{rank.total.toFixed(1)}</strong>
-          {` = ${rank.base_name} ${rank.base_score.toFixed(1)}`}
-          {` ${(rank.model_adjustment ?? 0) >= 0 ? "+" : ""}${(rank.model_adjustment ?? 0).toFixed(1)} model`}
-          {` ${rank.category_adjustment >= 0 ? "+" : ""}${rank.category_adjustment.toFixed(1)} category`}
-          {` ${rank.pulse_adjustment >= 0 ? "+" : ""}${rank.pulse_adjustment.toFixed(1)} pulse`}
+        <span className="text-text-secondary">
+          Decision rank <strong className="num text-text-primary">{rank.total.toFixed(1)}</strong>
+          <span className="num">
+            {` = ${rank.base_name} ${rank.base_score.toFixed(1)}`}
+            {` ${(rank.model_adjustment ?? 0) >= 0 ? "+" : ""}${(rank.model_adjustment ?? 0).toFixed(1)} model`}
+            {` ${rank.category_adjustment >= 0 ? "+" : ""}${rank.category_adjustment.toFixed(1)} category`}
+            {` ${rank.pulse_adjustment >= 0 ? "+" : ""}${rank.pulse_adjustment.toFixed(1)} pulse`}
+          </span>
         </span>
       )}
-      {rank?.components?.map((component) => (
-        <Chip key={component.name} tone="neutral" className="num">
-          {component.name.toLowerCase()} {Math.round(component.weight * 100)}%
-        </Chip>
-      ))}
-      {mode && (
-        <Chip tone={mode === "gate_and_rank" ? "green" : "blue"}>
-          ML {mode === "gate_and_rank" ? "gate + rank" : mode.replaceAll("_", " ")}
-        </Chip>
-      )}
-      {source?.date && (
+      {rank?.components && rank.components.length > 0 && (
         <span className="num">
-          source {source.date}
-          {source.fallback_used ? ` · fallback ${source.age_days ?? "?"}d old` : ""}
+          {rank.components.map((c) => `${c.name.toLowerCase()} ${Math.round(c.weight * 100)}%`).join(" · ")}
+        </span>
+      )}
+      {mode && <span>ML {mode === "gate_and_rank" ? "gate + rank" : mode.replaceAll("_", " ")}</span>}
+      {source?.date && (
+        <span>
+          source <span className="num">{source.date}</span>
+          {source.fallback_used ? <>, fallback <span className="num">{source.age_days ?? "?"}d</span> old</> : ""}
         </span>
       )}
     </div>
@@ -1284,98 +1200,66 @@ function PositionCard({
   const uMove = entryU && curU ? ((curU - entryU) / entryU) * 100 : null;
   // Once the position has been trimmed, its floor is breakeven (house money).
   const effStop = scaled ? 0 : stopPct;
-  const sideColor = isEquity
-    ? "var(--accent-blue)"
-    : p.side === "Bull"
-    ? "var(--accent-green)"
-    : "var(--accent-red)";
   const pnlColor = changeColor(pnl);
   // For equity, "premium" is per-share price. Format accordingly.
   const unitLabel = isEquity ? "share" : "contract";
   const unitWord = p.contracts === 1 ? unitLabel : `${unitLabel}s`;
   return (
-    <div className="card" style={{ borderColor: tint(sideColor, 35) }}>
-      <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-stretch">
-        <div className="flex items-center gap-2 min-w-0 flex-wrap">
-          {!isEquity && <SideIcon side={p.side} />}
-          <button
-            onClick={() => setActiveTicker(p.ticker)}
-            className="font-mono text-base font-extrabold text-text-primary hover:text-accent-blue transition-colors"
-            title={`Open ${p.ticker} in the detail panel`}
-          >
-            {p.ticker}
-          </button>
-          {isEquity ? (
-            <span className="num text-sm text-text-primary">
-              ${p.premium_at_entry.toFixed(2)} entry
-            </span>
-          ) : (
-            <>
-              <span className="num text-sm text-text-primary">
-                ${p.strike} {p.option_type}
-              </span>
-              <span className="text-text-muted text-xs num">
-                exp {p.expiry} ({expiryDte(p.expiry, marketDate()) ?? "?"}d now; {p.dte_at_entry ?? "?"}d entry)
-              </span>
-            </>
-          )}
-          <span className="text-text-muted text-xs num">
-            x{p.contracts} {unitWord}
-          </span>
-          {p.ml_score != null && <ScoreChip score={p.ml_score} label="ML" />}
-          {p.rank_score != null && <Chip tone="blue" className="num">rank {p.rank_score.toFixed(1)}</Chip>}
-          {p.n_score != null && <ScoreChip score={p.n_score} label="N" />}
-          {p.graph_score != null && (
-            <Chip tone="purple" className="num" title="graph composite score">
-              G {p.graph_score.toFixed(0)}
-            </Chip>
-          )}
-          {p.structural_role &&
-            !p.structural_role.startsWith("kw") && (
-              <Chip
-                tone="green"
-                title="structural position in the AI build-out"
-              >
-                {p.structural_role}
-              </Chip>
-            )}
-          {p.theme_accel != null && p.theme_accel > 1 && (
-            <Chip
-              tone="orange"
-              className="num"
-              title="theme option-premium acceleration (window / baseline)"
+    <div className="py-3">
+      <div className="flex items-start justify-between gap-3 max-md:flex-col max-md:items-stretch">
+        <div className="min-w-0 space-y-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            {!isEquity && <SideIcon side={p.side} />}
+            <button
+              onClick={() => setActiveTicker(p.ticker)}
+              className="num text-base font-semibold text-text-primary transition-colors hover:text-accent-blue"
+              title={`Open ${p.ticker} in the detail panel`}
             >
-              {p.theme_accel.toFixed(1)}x
-            </Chip>
-          )}
-          {p.theme && (
-            <Chip tone="cyan" title={p.category || ""}>
-              {p.theme}
-            </Chip>
-          )}
+              {p.ticker}
+            </button>
+            {isEquity ? (
+              <span className="num text-sm text-text-primary">${p.premium_at_entry.toFixed(2)} entry</span>
+            ) : (
+              <>
+                <span className="num text-sm text-text-primary">${p.strike} {p.option_type}</span>
+                <span className="text-xs text-text-muted">
+                  exp <span className="num">{p.expiry}</span> (<span className="num">{expiryDte(p.expiry, marketDate()) ?? "?"}d</span> now, <span className="num">{p.dte_at_entry ?? "?"}d</span> entry)
+                </span>
+              </>
+            )}
+            <span className="text-xs text-text-muted"><span className="num">x{p.contracts}</span> {unitWord}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+            {p.ml_score != null && <span>ML <span className="num text-text-secondary">{p.ml_score}</span></span>}
+            {p.rank_score != null && <span>rank <span className="num text-text-secondary">{p.rank_score.toFixed(1)}</span></span>}
+            {p.n_score != null && <span>N <span className="num text-text-secondary">{p.n_score}</span></span>}
+            {p.graph_score != null && (
+              <span title="graph composite score">G <span className="num text-text-secondary">{p.graph_score.toFixed(0)}</span></span>
+            )}
+            {p.structural_role && !p.structural_role.startsWith("kw") && (
+              <span title="structural position in the AI build-out">{p.structural_role}</span>
+            )}
+            {p.theme_accel != null && p.theme_accel > 1 && (
+              <span title="theme option-premium acceleration (window / baseline)">
+                theme accel <span className="num text-text-secondary">{p.theme_accel.toFixed(1)}x</span>
+              </span>
+            )}
+            {p.theme && <span title={p.category || ""}>{p.theme}</span>}
+          </div>
         </div>
-        <div className="grid shrink-0 grid-cols-3 gap-3 text-xs max-md:w-full md:flex md:items-center">
+        <div className="grid shrink-0 grid-cols-3 gap-4 text-xs max-md:w-full md:flex md:items-start">
           <div className="max-md:text-left md:text-right">
             <div className="text-text-muted">Cost</div>
-            <div className="num text-text-primary">
-              {formatCurrency(p.cost_basis)}
-            </div>
+            <div className="num text-sm text-text-primary">{formatCurrency(p.cost_basis)}</div>
           </div>
           <div className="text-right">
             <div className="text-text-muted">Value</div>
-            <div className="num text-text-primary">
-              {formatCurrency(p.current_value ?? p.cost_basis)}
-            </div>
+            <div className="num text-sm text-text-primary">{formatCurrency(p.current_value ?? p.cost_basis)}</div>
           </div>
           <div className="text-right">
             <div className="text-text-muted">P/L</div>
-            <div
-              className="num text-sm font-extrabold"
-              style={{ color: pnlColor }}
-            >
-              {signedPercent(p.pnl_pct)}
-            </div>
-            <div className="text-text-muted text-xs num">
+            <div className="num text-base font-semibold" style={{ color: pnlColor }}>{signedPercent(p.pnl_pct)}</div>
+            <div className="num" style={{ color: p.pnl_dollars == null ? "var(--text-muted)" : pnlColor }}>
               {p.pnl_dollars == null ? "Unknown" : `${pnlDollars >= 0 ? "+" : ""}$${pnlDollars.toFixed(0)}`}
             </div>
           </div>
@@ -1432,13 +1316,12 @@ function PositionCard({
 
       <div className="mt-2 flex items-center gap-2 text-xs">
         {scaled ? (
-          <Chip
-            tone="green"
-            className="shrink-0"
+          <span
+            className="inline-flex shrink-0 items-center gap-1 text-accent-green"
             title="Stop trailed to breakeven after first scale-out"
           >
-            <Anchor size={10} /> stop BE
-          </Chip>
+            <Anchor size={12} /> stop BE
+          </span>
         ) : (
           <span className="text-text-muted shrink-0 num">stop {stopPct}%</span>
         )}
@@ -1454,9 +1337,9 @@ function PositionCard({
         onClick={() => setOpen((v) => !v)}
         className="mt-2 flex min-h-11 items-center gap-1 text-xs text-text-muted transition-colors hover:text-accent-blue md:min-h-0"
       >
-        {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-        <Network size={10} />
-        {open ? "hide graph context" : "show graph context"}
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <Network size={12} />
+        {open ? "Hide graph context" : "Show graph context"}
       </button>
       {open && <GraphContextPanel ticker={p.ticker} />}
     </div>
@@ -1481,9 +1364,9 @@ function CategoryTrendPanel() {
   return (
     <GlassPanel
       title={
-        <span className="inline-flex items-center gap-1">
-          <Flame size={11} className="text-accent-orange" />
-          Hot Categories
+        <span className="inline-flex items-center gap-1.5">
+          <Flame size={14} className="text-text-muted" />
+          Hot categories
         </span>
       }
       actions={
@@ -1518,7 +1401,7 @@ function CategoryTrendPanel() {
           No category activity for this window.
         </div>
       )}
-      <div className="space-y-1.5">
+      <div className="divide-y divide-border">
         {visible.map((t) => {
           const isExpanded = expanded === t.category;
           const heat =
@@ -1529,81 +1412,47 @@ function CategoryTrendPanel() {
               : "var(--text-muted)";
           const barPct = Math.min(100, (t.hotness_ratio / maxRatio) * 100);
           return (
-            <div
-              key={t.category}
-              className="rounded-md text-xs"
-              style={{
-                background: "color-mix(in srgb, var(--bg-card) 50%, transparent)",
-                border: `1px solid ${tint(heat, 30)}`,
-              }}
-            >
+            <div key={t.category} className="text-xs">
               <button
-                onClick={() =>
-                  setExpanded(isExpanded ? null : t.category)
-                }
-                className="flex min-h-11 w-full flex-col items-stretch justify-between gap-1 px-3 py-2 text-left sm:flex-row sm:items-center"
+                onClick={() => setExpanded(isExpanded ? null : t.category)}
+                className="flex min-h-11 w-full flex-col items-stretch justify-between gap-1 py-2 text-left hover:bg-bg-card-hover sm:flex-row sm:items-center md:min-h-0"
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  {isExpanded ? (
-                    <ChevronDown size={11} />
-                  ) : (
-                    <ChevronRight size={11} />
-                  )}
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: heat }}
-                    aria-hidden="true"
-                  />
-                  <span className="font-mono font-bold text-text-primary">
-                    {t.category}
-                  </span>
-                  <span className="text-text-muted">
-                    {t.ticker_count} tickers
-                  </span>
+                <div className="flex min-w-0 items-center gap-2">
+                  {isExpanded ? <ChevronDown size={12} className="text-text-muted" /> : <ChevronRight size={12} className="text-text-muted" />}
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: heat }} aria-hidden="true" />
+                  <span className="text-sm font-medium text-text-primary">{t.category}</span>
+                  <span className="text-text-muted"><span className="num">{t.ticker_count}</span> tickers</span>
                 </div>
                 <div className="flex w-full shrink-0 items-center justify-between gap-3 pl-5 sm:w-auto sm:justify-start sm:pl-0">
-                  <div className="hidden sm:block w-20 h-1.5 rounded-full bg-border overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${barPct}%`, background: heat }}
-                    />
+                  <div className="hidden h-1.5 w-20 overflow-hidden rounded-full bg-border sm:block">
+                    <div className="h-full rounded-full" style={{ width: `${barPct}%`, background: heat }} />
                   </div>
-                  <span
-                    className="num font-bold"
-                    style={{ color: heat }}
-                  >
-                    {t.hotness_ratio.toFixed(2)}x
-                  </span>
-                  <span className="num text-right text-text-secondary sm:w-24">
-                    ${(t.premium_window / 1e6).toFixed(1)}M
-                  </span>
+                  <span className="num w-12 text-right font-semibold text-text-primary">{t.hotness_ratio.toFixed(2)}x</span>
+                  <span className="num text-right text-text-secondary sm:w-16">${(t.premium_window / 1e6).toFixed(1)}M</span>
                 </div>
               </button>
               {isExpanded && (
-                <div className="px-3 pb-2 pt-1 space-y-1.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-text-muted">top tickers:</span>
-                    {t.top_tickers.map((tt) => (
-                      <Chip key={tt.ticker} tone="blue" className="num">
-                        {tt.ticker}{" "}
-                        <span className="text-text-muted">
-                          ${(tt.premium / 1e6).toFixed(1)}M
-                        </span>
-                      </Chip>
+                <div className="space-y-1 pb-2 pl-5 leading-relaxed text-text-secondary">
+                  <p>
+                    <span className="text-text-muted">Top tickers: </span>
+                    {t.top_tickers.map((tt, i) => (
+                      <span key={tt.ticker}>
+                        {i > 0 && ", "}
+                        <span className="num text-text-primary">{tt.ticker}</span>{" "}
+                        <span className="num text-text-muted">${(tt.premium / 1e6).toFixed(1)}M</span>
+                      </span>
                     ))}
-                  </div>
+                  </p>
                   {t.themes.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-text-muted">themes:</span>
-                      {t.themes.map((th) => (
-                        <Chip key={th.theme} tone="cyan" className="num">
-                          {th.theme}{" "}
-                          <span className="text-text-muted">
-                            ${(th.premium / 1e6).toFixed(1)}M
-                          </span>
-                        </Chip>
+                    <p>
+                      <span className="text-text-muted">Themes: </span>
+                      {t.themes.map((th, i) => (
+                        <span key={th.theme}>
+                          {i > 0 && ", "}
+                          {th.theme} <span className="num text-text-muted">${(th.premium / 1e6).toFixed(1)}M</span>
+                        </span>
                       ))}
-                    </div>
+                    </p>
                   )}
                 </div>
               )}
@@ -1620,9 +1469,7 @@ function CategoryTrendPanel() {
         </button>
       )}
       {/* Honest footer about the historical gap */}
-      <div
-        className="mt-3 pt-2 text-xs text-text-muted border-t border-border italic"
-      >
+      <div className="mt-3 max-w-[72ch] border-t border-border pt-2 text-xs leading-relaxed text-text-muted">
         Year-over-year cyclical view not yet available — iFlow corpus begins
         2026-03-16 (~2.5 months). Full 12-month "last year this time"
         comparison unlocks ~March 2027.
@@ -1643,13 +1490,11 @@ function ClosedRow({ p, trims = [] }: { p: Position; trims?: Position[] }) {
   // Exit reason tones — red for stop-out, neutral for expiration,
   // green for win-trigger / breakeven-after-scale, blue for trail / other.
   const reason = p.exit_reason || "";
-  const reasonTone: ChipTone = (() => {
-    if (reason.startsWith("stop_")) return "red";
-    if (reason === "expiration") return "neutral";
-    if (reason.startsWith("tp_") || reason === "manual_win") return "green";
-    if (reason === "breakeven_after_scale") return "green";
-    return "blue";
-  })();
+  const reasonColor = reason.startsWith("stop_")
+    ? "var(--accent-red)"
+    : reason.startsWith("tp_") || reason === "manual_win" || reason === "breakeven_after_scale"
+    ? "var(--accent-green)"
+    : "var(--text-secondary)";
   const trailPeak = reason.match(/_off_(\d+)pct_peak/);
   const reasonLabel =
     reason === "breakeven_after_scale"
@@ -1659,87 +1504,52 @@ function ClosedRow({ p, trims = [] }: { p: Position; trims?: Position[] }) {
       : reason;
   const holdDays = p.exit_date ? daysHeld(p.entry_date, p.exit_date) : null;
   return (
-    <div
-      className="px-3 py-2 rounded-md text-xs space-y-1"
-      style={{
-        background: "color-mix(in srgb, var(--border) 10%, transparent)",
-        border: `1px solid ${tint(color, 28)}`,
-      }}
-    >
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+    <div className="space-y-1 py-2 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <button
             onClick={() => setActiveTicker(p.ticker)}
-            className="font-mono font-bold text-text-primary hover:text-accent-blue transition-colors"
+            className="num text-sm font-semibold text-text-primary transition-colors hover:text-accent-blue"
             title={`Open ${p.ticker} in the detail panel`}
           >
             {p.ticker}
           </button>
           {!isEquity ? (
-            <span className="num text-text-primary">
-              ${p.strike} {p.option_type}
-            </span>
+            <span className="num text-text-primary">${p.strike} {p.option_type}</span>
           ) : (
-            <span className="font-mono text-text-muted">equity</span>
+            <span className="text-text-muted">equity</span>
           )}
-          <span className="text-text-muted num">
-            x{p.contracts} {isEquity ? "sh" : "ct"}
-          </span>
-          <Chip
-            tone={reasonTone}
-            className="uppercase tracking-wider"
-            title={`Exit reason: ${p.exit_reason}`}
-          >
-            {reasonLabel}
-          </Chip>
+          <span className="text-text-muted"><span className="num">x{p.contracts}</span> {isEquity ? "sh" : "ct"}</span>
+          <span style={{ color: reasonColor }} title={`Exit reason: ${p.exit_reason}`}>{reasonLabel}</span>
           {trims.length > 0 && (
-            <Chip
-              tone="purple"
-              className="num"
-              title={`Scaled out ${trims.length}x before the runner closed`}
-            >
-              <Scissors size={10} /> {trims.length}x
-            </Chip>
+            <span className="inline-flex items-center gap-1 text-text-muted" title={`Scaled out ${trims.length}x before the runner closed`}>
+              <Scissors size={12} /> <span className="num">{trims.length}x</span>
+            </span>
           )}
-          {p.theme && <Chip tone="cyan">{p.theme}</Chip>}
+          {p.theme && <span className="text-text-muted">{p.theme}</span>}
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="num font-bold" style={{ color }}>
-            {pnl >= 0 ? "+" : ""}
-            {pnl.toFixed(1)}%
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="num text-sm font-semibold" style={{ color }}>
+            {pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}%
           </span>
-          <span className="num text-text-muted">
+          <span className="num w-16 text-right" style={{ color }}>
             {pnlDollars >= 0 ? "+" : ""}${pnlDollars.toFixed(0)}
           </span>
         </div>
       </div>
-      <div className="flex items-center gap-3 flex-wrap text-text-muted text-xs num">
-        <span>
-          entry {p.entry_date} @ ${p.premium_at_entry.toFixed(2)}
-        </span>
-        <span>→</span>
-        <span>
-          exit {p.exit_date} @ ${(p.exit_premium ?? 0).toFixed(2)}
-        </span>
-        {holdDays != null && (
-          <span className="text-text-muted">· held {holdDays}d</span>
-        )}
-        {p.ml_score != null && (
-          <span className="text-text-muted">· ML {p.ml_score}</span>
-        )}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-text-muted">
+        <span>entry <span className="num">{p.entry_date}</span> @ <span className="num">${p.premium_at_entry.toFixed(2)}</span></span>
+        <span>exit <span className="num">{p.exit_date}</span> @ <span className="num">${(p.exit_premium ?? 0).toFixed(2)}</span></span>
+        {holdDays != null && <span>held <span className="num">{holdDays}d</span></span>}
+        {p.ml_score != null && <span>ML <span className="num">{p.ml_score}</span></span>}
       </div>
       <WhyPick reason={p.reason} compact />
       {trims.length > 0 && (
         <>
           <ScaleTimeline trims={trims} original={p.original_contracts} />
-          <div className="flex items-center justify-between text-xs pt-1">
-            <span className="text-text-muted uppercase tracking-wider">
-              Trade total (trims + runner)
-            </span>
-            <span
-              className="num font-bold"
-              style={{ color: changeColor(tradeDollars) }}
-            >
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-text-muted">Trade total (trims + runner)</span>
+            <span className="num font-semibold" style={{ color: changeColor(tradeDollars) }}>
               {tradeDollars >= 0 ? "+" : ""}${tradeDollars.toFixed(0)}
             </span>
           </div>
@@ -1756,67 +1566,42 @@ function RejectionBlock({
   ruleKey: string;
   entries: RejectedEntry[];
 }) {
-  const [open, setOpen] = useState(false);
   const meta = RULE_LABELS[ruleKey] ?? {
     id: 0,
     label: ruleKey,
     why: "",
   };
   return (
-    <div
-      className="rounded-md text-xs"
-      style={{ background: "color-mix(in srgb, var(--accent-red) 4%, transparent)", border: "1px solid var(--border)" }}
-    >
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex min-h-11 w-full items-center justify-between px-3 py-2 text-left"
-      >
-        <div className="flex min-w-0 items-center gap-2">
-          {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          <XCircle size={12} className="text-accent-red" />
-          <span className="min-w-0 font-semibold text-text-primary max-md:line-clamp-2">{meta.label}</span>
-          <span className="shrink-0 text-text-muted max-md:hidden">
-            blocked {entries.length} {entries.length === 1 ? "entry" : "entries"}
-          </span>
-        </div>
-        <Chip tone="red" className="num md:hidden">{entries.length}</Chip>
-      </button>
-      {open && (
-        <div className="px-3 pb-2 space-y-1">
-          {meta.why && (
-            <div className="text-text-muted italic mb-2">{meta.why}</div>
-          )}
+    <details className="group text-xs">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 py-2 marker:content-none hover:bg-bg-card-hover md:min-h-0">
+        <span className="flex min-w-0 items-center gap-2">
+          <ChevronRight size={12} className="shrink-0 text-text-muted transition-transform group-open:rotate-90" aria-hidden="true" />
+          <span className="min-w-0 text-sm font-medium text-text-primary max-md:line-clamp-2">{meta.label}</span>
+        </span>
+        <span className="shrink-0 text-text-muted">
+          <span className="num text-text-primary">{entries.length}</span> {entries.length === 1 ? "entry" : "entries"}
+        </span>
+      </summary>
+      <div className="pb-2 pl-5">
+        {meta.why && <p className="mb-1 max-w-[72ch] text-sm leading-relaxed text-text-secondary">{meta.why}</p>}
+        <div className="divide-y divide-border">
           {entries.slice(0, 30).map((e, i) => (
-            <div
-              key={i}
-              className="num flex min-w-0 flex-col items-start gap-1 rounded px-2 py-2 text-xs md:flex-row md:items-center md:justify-between md:py-1"
-              style={{ background: "color-mix(in srgb, var(--bg-card) 40%, transparent)" }}
-            >
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <span className="font-bold text-text-primary">{e.ticker}</span>
-                {e.strike != null && (
-                  <span className="text-text-primary">
-                    ${e.strike} {e.option_type}
-                  </span>
-                )}
-                {e.dte != null && (
-                  <span className="text-text-muted">{e.dte}d</span>
-                )}
-                {e.ml_score != null && (
-                  <span className="text-text-muted">ml={e.ml_score}</span>
-                )}
+            <div key={i} className="flex min-w-0 flex-col items-start gap-1 py-2 md:flex-row md:items-center md:gap-3">
+              <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-x-2 num md:w-56">
+                <span className="font-semibold text-text-primary">{e.ticker}</span>
+                {e.strike != null && <span className="text-text-secondary">${e.strike} {e.option_type}</span>}
+                {e.dte != null && <span className="text-text-muted">{e.dte}d</span>}
+                {e.ml_score != null && <span className="text-text-muted">ml {e.ml_score}</span>}
               </div>
-              <span className="break-words text-text-muted md:ml-2 md:min-w-0 md:flex-1 md:truncate">{e.reason}</span>
+              <span className="min-w-0 break-words text-text-muted md:flex-1 md:truncate" title={e.reason}>{e.reason}</span>
             </div>
           ))}
-          {entries.length > 30 && (
-            <div className="text-text-muted text-center pt-1">
-              {entries.length - 30} more not shown
-            </div>
-          )}
         </div>
-      )}
-    </div>
+        {entries.length > 30 && (
+          <div className="pt-1 text-text-muted"><span className="num">{entries.length - 30}</span> more not shown</div>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -1840,7 +1625,7 @@ function EquityCurve({ history }: { history: HistoryPoint[] }) {
     last.return_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)";
   return (
     <GlassPanel
-      title={`Equity Curve (${history.length}d)`}
+      title={`Equity curve (${history.length}d)`}
       actions={
         <span className="text-xs text-text-muted num">
           {history[0].date} → {last.date}
@@ -1901,32 +1686,26 @@ function TradeDecisionHistory({
     <section className="card">
       <button
         onClick={onToggle}
-        className="flex min-h-11 w-full flex-col items-stretch justify-between gap-2 text-xs font-semibold uppercase tracking-[0.08em] transition-colors hover:text-text-primary md:flex-row md:items-center"
+        className="flex min-h-11 w-full flex-col items-stretch justify-between gap-2 transition-colors md:min-h-0 md:flex-row md:items-center"
       >
         <div className="flex min-w-0 items-center gap-2 text-left">
-          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          <span className="text-text-secondary">
-            Trade Decision History ({logical.length})
+          {expanded ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
+          <span className="text-sm font-semibold text-text-primary">
+            Closed trades <span className="num font-normal text-text-muted">{logical.length}</span>
           </span>
           {todayExits.length > 0 && (
-            <Chip tone="orange" className="num normal-case tracking-normal">
-              {todayExits.length} closed today
-            </Chip>
+            <span className="text-xs text-text-muted"><span className="num">{todayExits.length}</span> closed today</span>
           )}
         </div>
-        <div className="num flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 text-left text-xs normal-case tracking-normal md:justify-end md:pl-0">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-6 text-left text-xs md:justify-end md:pl-0">
           {logical.length > 0 ? (
             <>
               <span className="text-text-muted">
-                {wins}W / {logical.length - wins}L · {winRate.toFixed(0)}% win
+                <span className="num">{wins}W / {logical.length - wins}L</span>, <span className="num">{winRate.toFixed(0)}%</span> win
               </span>
-              {stopped > 0 && (
-                <span className="text-accent-red">stopped {stopped}</span>
-              )}
-              {expired > 0 && (
-                <span className="text-text-muted">expired {expired}</span>
-              )}
-              <span style={{ color: realizedColor }}>
+              {stopped > 0 && <span className="text-text-muted">stopped <span className="num">{stopped}</span></span>}
+              {expired > 0 && <span className="text-text-muted">expired <span className="num">{expired}</span></span>}
+              <span className="num text-sm font-semibold" style={{ color: realizedColor }}>
                 {totalRealized >= 0 ? "+" : ""}
                 {formatCurrency(totalRealized)}
               </span>
@@ -1937,46 +1716,36 @@ function TradeDecisionHistory({
         </div>
       </button>
       {expanded && (
-        <div className="space-y-3 mt-3">
+        <div className="mt-3 space-y-4">
           {logical.length === 0 && (
-            <div
-              className="text-xs text-text-muted text-center py-4 rounded-md"
-              style={{ background: "color-mix(in srgb, var(--bg-card) 50%, transparent)" }}
-            >
-              No closed trades yet — positions exit when they hit the persona's
+            <p className="py-4 text-center text-sm text-text-muted">
+              No closed trades yet. Positions exit when they hit the persona's
               stop (-40% / -60% / -20%) or expire. The cron MTM runs at 06:30 /
               10:30 / 13:30 PT each market day.
-            </div>
+            </p>
           )}
           {todayExits.length > 0 && (
-            <div className="space-y-1">
-              <div
-                className="text-xs font-mono pl-1 flex items-center gap-2 pb-1"
-                style={{ color: "var(--accent-orange)" }}
-              >
-                <span className="uppercase tracking-wider font-semibold">
-                  Today
-                </span>
-                <span className="text-text-muted normal-case tracking-normal">
-                  · {todayExits.length}{" "}
-                  {todayExits.length === 1 ? "exit" : "exits"}
-                </span>
+            <div>
+              <h4 className="text-sm font-semibold text-text-primary">
+                Today <span className="num font-normal text-text-muted">{todayExits.length}</span>
+              </h4>
+              <div className="divide-y divide-border">
+                {todayExits.map((p) => (
+                  <ClosedRow key={p.id} p={p} trims={trimsByParent.get(p.id) || []} />
+                ))}
               </div>
-              {todayExits.map((p) => (
-                <ClosedRow key={p.id} p={p} trims={trimsByParent.get(p.id) || []} />
-              ))}
             </div>
           )}
           {earlier.length > 0 && (
-            <div className="space-y-1">
+            <div>
               {todayExits.length > 0 && (
-                <div className="text-xs font-mono text-text-muted pl-1 pb-1 uppercase tracking-wider">
-                  Earlier
-                </div>
+                <h4 className="text-sm font-semibold text-text-primary">Earlier</h4>
               )}
-              {earlier.map((p) => (
-                <ClosedRow key={p.id} p={p} trims={trimsByParent.get(p.id) || []} />
-              ))}
+              <div className="divide-y divide-border">
+                {earlier.map((p) => (
+                  <ClosedRow key={p.id} p={p} trims={trimsByParent.get(p.id) || []} />
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -2005,7 +1774,7 @@ function PositionSortHeader({
 }) {
   return (
     <th
-      className={`whitespace-nowrap px-2 py-1.5 font-semibold text-text-muted ${right ? "text-right" : "text-left"} ${column ? "cursor-pointer select-none hover:text-text-primary" : ""}`}
+      className={`whitespace-nowrap px-2 py-2 font-medium text-text-muted ${right ? "text-right" : "text-left"} ${column ? "cursor-pointer select-none hover:text-text-primary" : ""}`}
       onClick={column ? () => onSort(column) : undefined}
       title={column ? "Sort" : undefined}
     >
@@ -2070,14 +1839,15 @@ function PositionsTable({
 
   return (
     <div>
-      <div className="mb-2 flex min-h-11 items-center gap-1.5 text-xs md:min-h-0">
-        <span className="text-text-muted">Added:</span>
-        {(["all", "7d", "30d"] as AddedWindow[]).map((w) => (
-          <button key={w} type="button" onClick={() => setAdded(w)} className="inline-flex min-h-11 items-center rounded-full md:min-h-0">
-            <Chip tone={added === w ? "blue" : "neutral"}>{w === "all" ? "All" : `last ${w}`}</Chip>
-          </button>
-        ))}
-        <span className="ml-auto text-text-muted num">{rows.length} of {positions.length}</span>
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-text-muted">Added</span>
+        <Segmented<AddedWindow>
+          ariaLabel="Filter by added date"
+          options={[{ value: "all", label: "All" }, { value: "7d", label: "Last 7d" }, { value: "30d", label: "Last 30d" }]}
+          value={added}
+          onChange={setAdded}
+        />
+        <span className="ml-auto text-text-muted"><span className="num">{rows.length}</span> of <span className="num">{positions.length}</span></span>
       </div>
       <Segmented<PosSortKey>
         className="mobile-horizontal-strip mb-2 w-full md:hidden"
@@ -2094,7 +1864,7 @@ function PositionsTable({
           { value: "peak", label: "Peak" },
         ]}
       />
-      <div className="space-y-1.5 md:hidden">
+      <div className="divide-y divide-border md:hidden">
         {rows.map((p) => {
           const isEquity = p.instrument === "equity";
           const scaled = (p.scale_stage ?? 0) >= 1;
@@ -2102,24 +1872,24 @@ function PositionsTable({
           const pnl = p.pnl_pct ?? 0;
           const trimmed = (trimsByParent.get(p.id)?.length ?? 0) > 0;
           return (
-            <details key={p.id} className="group rounded-[var(--radius-control)] border border-border">
-              <summary className="flex min-h-11 list-none items-center gap-2 px-3 py-2 marker:content-none">
+            <details key={p.id} className="group">
+              <summary className="flex min-h-11 list-none items-center gap-2 py-2 marker:content-none">
                 <ChevronRight
                   size={13}
                   className="shrink-0 text-text-muted transition-transform group-open:rotate-90"
                   aria-hidden="true"
                 />
-                <span className="w-12 shrink-0 font-mono text-xs font-bold text-text-primary">
+                <span className="w-12 shrink-0 num text-xs font-semibold text-text-primary">
                   {p.ticker}
                 </span>
                 <span className="num min-w-0 flex-1 truncate text-xs text-text-secondary">
                   {isEquity ? "shares" : `$${p.strike} ${p.option_type} ${p.expiry ?? ""}`}
                 </span>
-                <span className="num shrink-0 text-sm font-bold" style={{ color: changeColor(pnl) }}>
+                <span className="num shrink-0 text-sm font-semibold" style={{ color: changeColor(pnl) }}>
                   {signedPercent(p.pnl_pct)}
                 </span>
               </summary>
-              <div className="space-y-3 px-3 pb-3 pl-10">
+              <div className="space-y-3 pb-3 pl-5">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                   <Stat label="Added" value={p.entry_date} sub={held != null ? `${held}d held` : undefined} />
                   <Stat label="Quantity" value={p.contracts} sub={isEquity ? "shares" : "contracts"} />
@@ -2131,13 +1901,13 @@ function PositionsTable({
                   <Stat label="Peak" value={p.peak_pnl_pct != null ? `+${p.peak_pnl_pct.toFixed(0)}%` : "—"} />
                 </div>
                 <MarkFreshness at={p.last_marked_at} status={p.mark_status} />
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Chip tone={scaled ? "green" : "neutral"} className="num">
-                    exit threshold {scaled ? "BE" : `${stopPct}%`}
-                  </Chip>
-                  {trimmed && <Chip tone="green">booked trims</Chip>}
-                  {p.ml_score != null && <Chip tone="blue" className="num">ML {p.ml_score}</Chip>}
-                  {p.n_score != null && <Chip tone="neutral" className="num">N {p.n_score}</Chip>}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+                  <span className={scaled ? "text-accent-green" : undefined}>
+                    exit threshold <span className="num">{scaled ? "BE" : `${stopPct}%`}</span>
+                  </span>
+                  {trimmed && <span className="text-accent-green">booked trims</span>}
+                  {p.ml_score != null && <span>ML <span className="num">{p.ml_score}</span></span>}
+                  {p.n_score != null && <span>N <span className="num">{p.n_score}</span></span>}
                 </div>
                 <button
                   type="button"
@@ -2152,7 +1922,7 @@ function PositionsTable({
         })}
       </div>
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full text-xs num border-collapse">
+        <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="border-b border-border">
               <PositionSortHeader column="ticker" activeSort={sortKey} ascending={asc} onSort={toggle} right={false}>Ticker</PositionSortHeader>
@@ -2167,10 +1937,10 @@ function PositionsTable({
               <PositionSortHeader column="pnl" activeSort={sortKey} ascending={asc} onSort={toggle}>P/L%</PositionSortHeader>
               <PositionSortHeader column="pnl_dollars" activeSort={sortKey} ascending={asc} onSort={toggle}>P/L$</PositionSortHeader>
               <PositionSortHeader column="peak" activeSort={sortKey} ascending={asc} onSort={toggle}>Peak</PositionSortHeader>
-              <PositionSortHeader activeSort={sortKey} ascending={asc} onSort={toggle}>Exit Threshold</PositionSortHeader>
+              <PositionSortHeader activeSort={sortKey} ascending={asc} onSort={toggle}>Exit threshold</PositionSortHeader>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="num divide-y divide-border">
             {rows.map((p) => {
               const isEquity = p.instrument === "equity";
               const scaled = (p.scale_stage ?? 0) >= 1;
@@ -2178,16 +1948,16 @@ function PositionsTable({
               const pnl = p.pnl_pct ?? 0;
               const trimmed = (trimsByParent.get(p.id)?.length ?? 0) > 0;
               return (
-                <tr key={p.id} className="border-b border-border/50 hover:bg-bg-card-hover">
-                  <td className="px-2 py-1.5">
+                <tr key={p.id} className="hover:bg-bg-card-hover">
+                  <td className="px-2 py-2">
                     <button
                       onClick={() => setActiveTicker(p.ticker)}
-                      className="font-mono font-bold text-text-primary hover:text-accent-blue"
+                      className="font-semibold text-text-primary hover:text-accent-blue"
                     >
                       {p.ticker}
                     </button>
                   </td>
-                  <td className="px-2 py-1.5 whitespace-nowrap text-text-secondary">
+                  <td className="px-2 py-2 whitespace-nowrap text-text-secondary">
                     <span className="inline-flex items-center gap-1.5">
                       {isEquity ? "shares" : `$${p.strike} ${p.option_type} ${p.expiry ?? ""}`}
                       {!isEquity && (
@@ -2196,26 +1966,26 @@ function PositionsTable({
                       {trimmed && <span className="text-accent-green" title="has booked trims">✂</span>}
                     </span>
                   </td>
-                  <td className="px-2 py-1.5 whitespace-nowrap text-text-secondary">{p.entry_date}</td>
-                  <td className="px-2 py-1.5 text-right text-text-muted">{held ?? "—"}</td>
-                  <td className="px-2 py-1.5 text-right text-text-secondary">{p.contracts}</td>
-                  <td className="px-2 py-1.5 text-right text-text-secondary">${p.premium_at_entry.toFixed(2)}</td>
-                  <td className="px-2 py-1.5 text-right text-text-secondary">
+                  <td className="px-2 py-2 whitespace-nowrap text-text-secondary">{p.entry_date}</td>
+                  <td className="px-2 py-2 text-right text-text-muted">{held ?? "—"}</td>
+                  <td className="px-2 py-2 text-right text-text-secondary">{p.contracts}</td>
+                  <td className="px-2 py-2 text-right text-text-secondary">${p.premium_at_entry.toFixed(2)}</td>
+                  <td className="px-2 py-2 text-right text-text-secondary">
                     {p.current_premium != null ? `$${p.current_premium.toFixed(2)}` : "—"}
                     <MarkFreshness at={p.last_marked_at} status={p.mark_status} />
                   </td>
-                  <td className="px-2 py-1.5 text-right text-text-secondary">{formatCurrency(p.cost_basis)}</td>
-                  <td className="px-2 py-1.5 text-right text-text-primary">{p.current_value == null ? "Unknown" : formatCurrency(p.current_value)}</td>
-                  <td className="px-2 py-1.5 text-right font-bold" style={{ color: changeColor(pnl) }}>
+                  <td className="px-2 py-2 text-right text-text-secondary">{formatCurrency(p.cost_basis)}</td>
+                  <td className="px-2 py-2 text-right text-text-primary">{p.current_value == null ? "Unknown" : formatCurrency(p.current_value)}</td>
+                  <td className="px-2 py-2 text-right font-semibold" style={{ color: changeColor(pnl) }}>
                     {signedPercent(p.pnl_pct)}
                   </td>
-                  <td className="px-2 py-1.5 text-right" style={{ color: changeColor(p.pnl_dollars ?? 0) }}>
+                  <td className="px-2 py-2 text-right" style={{ color: changeColor(p.pnl_dollars ?? 0) }}>
                     {p.pnl_dollars == null ? "Unknown" : `${p.pnl_dollars >= 0 ? "+" : ""}$${p.pnl_dollars.toFixed(0)}`}
                   </td>
-                  <td className="px-2 py-1.5 text-right text-text-muted">
+                  <td className="px-2 py-2 text-right text-text-muted">
                     {p.peak_pnl_pct != null ? `+${p.peak_pnl_pct.toFixed(0)}%` : "—"}
                   </td>
-                  <td className="px-2 py-1.5 text-right">
+                  <td className="px-2 py-2 text-right">
                     {scaled
                       ? <span className="text-accent-green">BE</span>
                       : <span className="text-text-muted">{stopPct}%</span>}
@@ -2273,15 +2043,8 @@ function OpenPositionsGrouped({
   });
 
   return (
-    <GlassPanel
-      title={
-        <span className="inline-flex items-center gap-1 text-accent-blue">
-          <CheckCircle2 size={11} />
-          Open Positions ({positions.length}) — grouped by category
-        </span>
-      }
-    >
-      <div className="space-y-3">
+    <GlassPanel title={<>Open positions <span className="num font-normal text-text-muted">{positions.length}</span></>}>
+      <div className="space-y-4">
       {cats.map(([cat, themeMap]) => {
         const allInCat = Array.from(themeMap.values()).flat();
         const catCount = allInCat.length;
@@ -2295,54 +2058,43 @@ function OpenPositionsGrouped({
         const pnlColor = changeColor(catPnlPct);
         const isCollapsed = collapsed[cat];
         return (
-          <div key={cat} className="space-y-2">
+          <div key={cat} className="border-t border-border pt-2 first:border-t-0 first:pt-0">
             <button
               onClick={() =>
                 setCollapsed((c) => ({ ...c, [cat]: !c[cat] }))
               }
-              className="flex min-h-11 w-full flex-col items-stretch justify-between gap-1 rounded-[var(--radius-control)] px-2 py-1.5 text-xs font-semibold transition-colors hover:bg-bg-card-hover md:flex-row md:items-center"
+              className="flex min-h-11 w-full flex-col items-stretch justify-between gap-1 py-1.5 text-xs transition-colors hover:bg-bg-card-hover md:min-h-0 md:flex-row md:items-center"
             >
               <div className="flex min-w-0 items-center gap-2 text-left">
-                {isCollapsed ? (
-                  <ChevronRight size={12} />
-                ) : (
-                  <ChevronDown size={12} />
-                )}
-                <span className="min-w-0 break-words text-accent-cyan uppercase tracking-wider">
-                  {cat}
-                </span>
-                <span className="text-text-muted normal-case max-md:hidden">
-                  · {catCount} {catCount === 1 ? "position" : "positions"} ·{" "}
-                  {themeMap.size} {themeMap.size === 1 ? "theme" : "themes"}
+                {isCollapsed ? <ChevronRight size={14} className="text-text-muted" /> : <ChevronDown size={14} className="text-text-muted" />}
+                <span className="min-w-0 break-words text-sm font-semibold text-text-primary">{cat}</span>
+                <span className="text-text-muted">
+                  <span className="num">{catCount}</span> {catCount === 1 ? "position" : "positions"},{" "}
+                  <span className="num">{themeMap.size}</span> {themeMap.size === 1 ? "theme" : "themes"}
                 </span>
               </div>
-              <div className="num flex w-full items-center justify-between gap-3 pl-5 text-xs md:w-auto md:justify-start md:pl-0">
-                <span className="text-text-muted md:hidden">
-                  {catCount} {catCount === 1 ? "position" : "positions"} · {themeMap.size} {themeMap.size === 1 ? "theme" : "themes"}
-                </span>
-                <span className="text-text-muted">
-                  {formatCurrency(catValue)}
-                </span>
-                <span style={{ color: pnlColor }}>
+              <div className="flex items-center gap-3 pl-6 md:pl-0">
+                <span className="num text-text-secondary">{formatCurrency(catValue)}</span>
+                <span className="num font-semibold" style={{ color: pnlColor }}>
                   {catPnlPct >= 0 ? "+" : ""}
                   {catPnlPct.toFixed(2)}%
                 </span>
               </div>
             </button>
             {!isCollapsed && (
-              <div className="space-y-3">
+              <div>
                 {Array.from(themeMap.entries())
                   .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
                   .map(([theme, posList]) => (
-                    <div key={theme} className="space-y-1.5">
-                      <div className="flex min-w-0 flex-wrap items-center gap-2 pl-1 font-mono text-xs text-text-muted">
-                        <span className="min-w-0 break-words text-accent-cyan/70">{theme}</span>
-                        <span>· {posList.length}</span>
-                        <span className="min-w-0 break-words text-text-muted/60">
+                    <div key={theme}>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2 pt-2 text-xs text-text-muted">
+                        <span className="min-w-0 break-words font-medium text-text-secondary">{theme}</span>
+                        <span className="num">{posList.length}</span>
+                        <span className="num min-w-0 break-words">
                           {posList.map((p) => p.ticker).join(" · ")}
                         </span>
                       </div>
-                      <div className="space-y-2 md:pl-2 md:border-l md:border-border/40">
+                      <div className="divide-y divide-border">
                         {posList.map((p) => (
                           <PositionCard
                             key={p.id}
@@ -2469,6 +2221,10 @@ export function SmartTrader() {
 
   const ret = summary.return_pct;
   const retColor = changeColor(ret);
+  const pnlTotal = summary.total_value - summary.starting_capital;
+  const deployedPct = summary.total_value > 0 ? (summary.positions_value / summary.total_value) * 100 : 0;
+  const big = (v: ReactNode) => <span className="text-xl font-semibold">{v}</span>;
+  const signedMoney = (v: number) => `${v >= 0 ? "+" : ""}${formatCurrency(v)}`;
 
   // Group scale-out trim children by their parent runner id so open positions
   // can render their banked-gains timeline, and so the closed history can nest
@@ -2491,176 +2247,127 @@ export function SmartTrader() {
   const personaRows = personaList?.personas ?? [];
   return (
     <div className="max-w-full space-y-4 overflow-x-clip pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      {/* Persona selector — five paper books at the same starting capital */}
-      <div className="mobile-workspace-controls glass-strong sticky z-20 space-y-1.5 p-2 md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 text-xs text-text-muted shrink-0">
-            <Users size={11} />
-            Persona
-          </div>
-          <Segmented<PersonaName>
-            className="mobile-horizontal-strip w-full flex-nowrap md:w-auto md:flex-wrap"
-            options={personas.map((p) => {
-              const row = personaRows.find((r) => r.name === p);
-              const pRet = row?.return_pct ?? 0;
-              return {
-                value: p,
-                label: PERSONA_META[p].label,
-                badge: row ? (
-                  <span className="num" style={{ color: changeColor(pRet) }}>
-                    {pRet >= 0 ? "+" : ""}
-                    {pRet.toFixed(2)}%
-                  </span>
-                ) : undefined,
-              };
-            })}
-            value={persona}
-            onChange={setPersona}
-          />
-        </div>
-        {/* Active book at a glance — tagline + size, replaces the old per-button sublines */}
-        <div className="line-clamp-2 text-xs leading-relaxed text-text-muted md:line-clamp-none">
+      {/* Persona selector + active book description */}
+      <div
+        className="mobile-workspace-controls sticky z-20 space-y-1.5 p-2 md:static md:z-auto md:p-0"
+        style={{ background: "var(--bg-primary)" }}
+      >
+        <Segmented<PersonaName>
+          ariaLabel="Choose paper book"
+          className="mobile-horizontal-strip w-full flex-nowrap md:w-auto md:flex-wrap"
+          options={personas.map((p) => {
+            const row = personaRows.find((r) => r.name === p);
+            const pRet = row?.return_pct ?? 0;
+            return {
+              value: p,
+              label: PERSONA_META[p].label,
+              badge: row ? (
+                <span className="num" style={{ color: changeColor(pRet) }}>
+                  {pRet >= 0 ? "+" : ""}
+                  {pRet.toFixed(2)}%
+                </span>
+              ) : undefined,
+            };
+          })}
+          value={persona}
+          onChange={setPersona}
+        />
+        <p className="line-clamp-2 max-w-[72ch] text-sm leading-relaxed text-text-secondary md:line-clamp-none">
           {personaRows.find(r => r.name === persona)?.description || summary.persona_description || PERSONA_META[persona].tagline}
           {(() => {
             const row = personaRows.find((r) => r.name === persona);
             return row ? (
-              <span className="num">
+              <span className="text-text-muted">
                 {" "}
-                · {row.open_positions} open · ${(row.total_value / 1000).toFixed(1)}K
+                · <span className="num">{row.open_positions}</span> open · <span className="num">${(row.total_value / 1000).toFixed(1)}K</span>
                 {row.ml_serving_mode === "gate_and_rank"
-                  ? ` · ML gate ${row.ml_threshold ?? "?"}+ active`
+                  ? <> · ML gate <span className="num">{row.ml_threshold ?? "?"}+</span> active</>
                   : row.ml_serving_mode === "rank_only"
                     ? " · ML research rank only; no ML rejection"
                     : ""}
               </span>
             ) : null;
           })()}
-        </div>
+        </p>
         {personaQuery.isError && !personaList && (
           <QueryErrorState label="Unable to load persona summaries." onRetry={() => void personaQuery.refetch()} />
         )}
       </div>
 
-      {/* Marking and reset actions do not manually select new entries. */}
-      <div className="flex min-w-0 flex-wrap gap-2">
-        <button
-          onClick={() => markMutation.mutate()}
-          disabled={markMutation.isPending}
-          className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-border px-4 py-2 text-sm font-semibold text-text-primary transition-colors hover:bg-bg-card-hover disabled:opacity-40 sm:flex-none"
-        >
-          {markMutation.isPending ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <RefreshCw size={14} />
-          )}
-          Mark to Market
-        </button>
-        <div className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto">
-          <span className="text-text-muted text-sm">$</span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1000}
-            step={1000}
-            value={resetCapital}
-            onChange={(e) => setResetCapital(e.target.value)}
-            aria-label="Reset starting capital"
-            className="num min-h-11 min-w-0 flex-1 rounded-[var(--radius-control)] border border-border bg-bg-card px-2 py-2 text-sm text-text-primary focus:border-accent-blue/50 focus:outline-none sm:w-24 sm:flex-none"
-          />
-          <button
-            onClick={() => {
-              const amt = Math.round(Number(resetCapital));
-              if (!Number.isFinite(amt) || amt < 1000) {
-                alert("Enter a starting balance of at least $1,000.");
-                return;
-              }
-              if (
-                confirm(
-                  `Reset ${PERSONA_META[persona].label} book to $${amt.toLocaleString()}? All picks and history will be erased. On weekdays the endpoint may automatically run new picks and enter positions.`,
-                )
-              )
-                resetMutation.mutate(amt);
-            }}
-            disabled={resetMutation.isPending}
-            className="flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-border px-3 py-2 text-sm text-text-secondary transition-colors hover:border-accent-red/40 hover:text-accent-red disabled:opacity-40"
-          >
-            {resetMutation.isPending ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <RotateCcw size={12} />
-            )}
-            Reset
-          </button>
+      {/* Book summary: key numbers in one row, secondary detail below */}
+      <section className="space-y-3">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3 min-[480px]:grid-cols-3 md:grid-cols-5">
+          <Stat label="Equity" value={big(formatCurrency(summary.total_value))} sub={`from ${formatCurrency(summary.starting_capital)}`} />
+          <Stat label="P/L" tone={pnlTotal >= 0 ? "green" : "red"} value={big(signedMoney(pnlTotal))} />
+          <Stat label="Return" value={<span style={{ color: retColor }}>{big(`${ret >= 0 ? "+" : ""}${ret.toFixed(2)}%`)}</span>} />
+          <Stat label="Deployed" value={big(`${deployedPct.toFixed(0)}%`)} sub={`${formatCurrency(summary.positions_value)} in positions`} />
+          <Stat label="Open" value={big(summary.open_positions)} sub={`${summary.closed_positions} closed`} />
         </div>
-      </div>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-text-muted">
+          <span>Cash <span className="num text-text-secondary">{formatCurrency(summary.cash)}</span></span>
+          <span>Realized <span className="num" style={{ color: changeColor(summary.realized_pnl) }}>{signedMoney(summary.realized_pnl)}</span></span>
+          {(summary.banked_from_trims ?? 0) > 0 && (
+            <span title="Realized gains banked from AbTrader-style scale-out trims">
+              <Scissors size={12} className="mr-1 inline" />
+              Trims <span className="num" style={{ color: "var(--accent-green)" }}>+{formatCurrency(summary.banked_from_trims ?? 0)}</span>
+            </span>
+          )}
+          <span>Unrealized <span className="num" style={{ color: changeColor(summary.unrealized_pnl) }}>{signedMoney(summary.unrealized_pnl)}</span></span>
+          <span>Win rate <span className="num text-text-secondary">{summary.closed_positions > 0 ? `${summary.win_rate.toFixed(0)}%` : "—"}</span></span>
+          {/* Marking and reset actions do not manually select new entries. */}
+          <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
+            <button
+              onClick={() => markMutation.mutate()}
+              disabled={markMutation.isPending}
+              className="flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-border px-3 text-xs font-medium text-text-primary transition-colors hover:bg-bg-card-hover disabled:opacity-40 md:min-h-8"
+            >
+              {markMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              Mark to market
+            </button>
+            <span className="flex items-center gap-1">
+              <span className="text-text-muted">$</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1000}
+                step={1000}
+                value={resetCapital}
+                onChange={(e) => setResetCapital(e.target.value)}
+                aria-label="Reset starting capital"
+                className="num min-h-11 w-24 rounded-[var(--radius-control)] border border-border bg-bg-card px-2 text-xs text-text-primary focus:border-accent-blue/50 focus:outline-none md:min-h-8"
+              />
+            </span>
+            <button
+              onClick={() => {
+                const amt = Math.round(Number(resetCapital));
+                if (!Number.isFinite(amt) || amt < 1000) {
+                  alert("Enter a starting balance of at least $1,000.");
+                  return;
+                }
+                if (
+                  confirm(
+                    `Reset ${PERSONA_META[persona].label} book to $${amt.toLocaleString()}? All picks and history will be erased. On weekdays the endpoint may automatically run new picks and enter positions.`,
+                  )
+                )
+                  resetMutation.mutate(amt);
+              }}
+              disabled={resetMutation.isPending}
+              className="flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-border px-3 text-xs text-text-secondary transition-colors hover:border-accent-red/40 hover:text-accent-red disabled:opacity-40 md:min-h-8"
+            >
+              {resetMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+              Reset
+            </button>
+          </div>
+        </div>
+        {(() => { const exposure = markedExposure(summary.positions); return exposure.count > 0 && <p className="text-xs text-accent-orange">Recorded valuation: {exposure.count} positions ({formatCurrency(exposure.value)} carried exposure) have stale or unknown marks. Portfolio return is not a live quote.</p>; })()}
+        {summary.persona_description && summary.persona_description !== (personaRows.find(r => r.name === persona)?.description || summary.persona_description) && (
+          <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">{summary.persona_description}</p>
+        )}
+      </section>
 
       <QueryNotice queries={[summaryQuery, todayQuery, historyQuery, personaQuery]} label="Persona data" />
       {(markMutation.isError || resetMutation.isError) && <p role="alert" className="text-xs text-accent-red">Trader action failed. Reload the book before retrying; a timed-out action may have completed.</p>}
       {resetMutation.isSuccess && <p role="status" className="text-xs text-text-secondary">Reset completed. Reloaded positions show any automatic picks returned by the endpoint.</p>}
-
-      {/* Portfolio Summary */}
-      <GlassPanel title="TraderJoe Portfolio">
-        <div className="mb-3 flex items-end justify-between gap-3">
-          <div className="num text-2xl font-extrabold text-text-primary">
-            {formatCurrency(summary.total_value)}
-          </div>
-          <div className="text-right">
-            <div className="text-xs text-text-muted">
-              Return vs ${(summary.starting_capital / 1000).toFixed(0)}K
-            </div>
-            <div
-              className="num text-lg font-extrabold"
-              style={{ color: retColor }}
-            >
-              {ret >= 0 ? "+" : ""}
-              {ret.toFixed(2)}%
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 min-[400px]:grid-cols-3 md:grid-cols-6">
-          <Stat label="Cash" value={formatCurrency(summary.cash)} />
-          <Stat label="Positions" value={formatCurrency(summary.positions_value)} />
-          <Stat
-            label="Realized"
-            tone={summary.realized_pnl >= 0 ? "green" : "red"}
-            value={`${summary.realized_pnl >= 0 ? "+" : ""}${formatCurrency(summary.realized_pnl)}`}
-            sub={
-              (summary.banked_from_trims ?? 0) > 0 ? (
-                <span
-                  className="num inline-flex items-center gap-1"
-                  style={{ color: "var(--accent-purple)" }}
-                  title="Realized gains banked from AbTrader-style scale-out trims"
-                >
-                  <Scissors size={9} /> +{formatCurrency(summary.banked_from_trims ?? 0)} trims
-                </span>
-              ) : undefined
-            }
-          />
-          <Stat
-            label="Unrealized"
-            tone={summary.unrealized_pnl >= 0 ? "green" : "red"}
-            value={`${summary.unrealized_pnl >= 0 ? "+" : ""}${formatCurrency(summary.unrealized_pnl)}`}
-          />
-          <Stat label="Open" value={summary.open_positions} />
-          <Stat
-            label="Win Rate"
-            value={
-              summary.closed_positions > 0
-                ? `${summary.win_rate.toFixed(0)}%`
-                : "—"
-            }
-          />
-        </div>
-        {(() => { const exposure = markedExposure(summary.positions); return exposure.count > 0 && <p className="mt-3 text-xs text-accent-orange">Recorded valuation: {exposure.count} positions ({formatCurrency(exposure.value)} carried exposure) have stale or unknown marks. Portfolio return is not a live quote.</p>; })()}
-      </GlassPanel>
-
-      {/* Why this works — explainer adapts to active persona */}
-      <div
-        className="card text-xs text-text-secondary leading-relaxed"
-        style={{ borderColor: "color-mix(in srgb, var(--accent-blue) 30%, var(--glass-border))" }}
-      >
-        {summary.persona_description}
-      </div>
 
       {/* Equity Curve */}
       {historyQuery.isError && !history && (
@@ -2677,19 +2384,13 @@ export function SmartTrader() {
       {summary.positions.length > 0 && (
         posView === "table" ? (
           <GlassPanel
-            title={
-              <span className="flex w-full min-w-0 flex-wrap items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1 text-accent-blue">
-                  <CheckCircle2 size={11} />
-                  Open Positions ({summary.positions.length})
-                </span>
-                <Segmented
-                  className="mobile-horizontal-strip max-w-full"
-                  options={[{ value: "table", label: "Table" }, { value: "grouped", label: "Cards" }]}
-                  value={posView}
-                  onChange={(v) => setPosView(v as "table" | "grouped")}
-                />
-              </span>
+            title={<>Open positions <span className="num font-normal text-text-muted">{summary.positions.length}</span></>}
+            actions={
+              <Segmented
+                options={[{ value: "table", label: "Table" }, { value: "grouped", label: "Cards" }]}
+                value={posView}
+                onChange={(v) => setPosView(v as "table" | "grouped")}
+              />
             }
           >
             <PositionsTable
@@ -2731,11 +2432,10 @@ export function SmartTrader() {
       )}
       {today && (
         <GlassPanel
-          title={
-            <span className="inline-flex items-center gap-1">
-              <Shield size={11} />
-              Today ({today.date}) — picks {today.picked.length} · rejections{" "}
-              {today.rejected_count}
+          title={<>Today's decisions <span className="num font-normal text-text-muted">{today.date}</span></>}
+          actions={
+            <span className="text-xs text-text-muted">
+              <span className="num text-text-secondary">{today.picked.length}</span> picks, <span className="num text-text-secondary">{today.rejected_count}</span> rejected
             </span>
           }
         >
@@ -2744,7 +2444,7 @@ export function SmartTrader() {
               No entries or rejections recorded for this market date.
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="divide-y divide-border">
               {rejectedRules.length > 0 ? (
                 rejectedRules.map(([rk, entries]) => (
                   <RejectionBlock key={rk} ruleKey={rk} entries={entries} />

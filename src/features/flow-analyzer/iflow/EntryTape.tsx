@@ -347,23 +347,15 @@ function researchRankTextColor(score: number | null): string {
   return "var(--text-muted)";
 }
 
-/** Notable score -> full-row inset emphasis without a side-tab accent. */
-function scoreBorderStyle(score: number | null, fallbackColor: string) {
-  if (score == null) {
-    return { boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${fallbackColor} 20%, transparent)` };
-  }
-  if (score >= 85) {
-    return {
-      boxShadow: "inset 0 0 0 1px var(--accent-yellow), 0 0 6px color-mix(in srgb, var(--accent-yellow) 35%, transparent)",
-    };
-  }
-  if (score >= 70) {
-    return { boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--accent-yellow) 70%, transparent)" };
-  }
-  if (score >= 55) {
-    return { boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--accent-yellow) 35%, transparent)" };
-  }
-  return { boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${fallbackColor} 20%, transparent)` };
+/** Neutral filter pill; active = interaction accent (blue). */
+function pillStyle(active: boolean) {
+  return active
+    ? {
+        color: "var(--accent-blue)",
+        background: "color-mix(in srgb, var(--accent-blue) 14%, transparent)",
+        border: "1px solid color-mix(in srgb, var(--accent-blue) 35%, transparent)",
+      }
+    : { color: "var(--text-secondary)", background: "transparent", border: "1px solid var(--border)" };
 }
 
 function scoreTextColor(score: number | null): string {
@@ -1009,9 +1001,9 @@ export function EntryTape({
   );
 
   return (
-    <div className="space-y-0.5 text-xs">
+    <div className="text-xs">
       <QueryNotice queries={dateQueries} label="Flow entries" />
-      <div className="flex items-center justify-between px-2 py-1 max-md:px-1 max-md:flex-wrap max-md:gap-1">
+      <div className="flex items-center justify-between gap-3 px-2 pb-3 max-md:px-1 max-md:flex-wrap max-md:gap-1">
         <div className="flex items-center gap-2 max-md:gap-1 max-md:overflow-x-auto max-md:flex-nowrap max-md:w-full">
           {(() => {
             // Notable button — cycles through:
@@ -1056,12 +1048,12 @@ export function EntryTape({
               <button
                 type="button"
                 onClick={onClick}
-                className="px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5"
-                style={{ background: style.bg, color: style.fg, border: `1px solid ${style.bd}` }}
+                className="flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs font-medium transition-colors"
+                style={pillStyle(currentNotable !== "none")}
                 title={tooltipFor[currentNotable]}
               >
                 {style.label}
-                <span className="opacity-70 num">{count > 0 ? `(${count})` : ""}</span>
+                {count > 0 && <span className="num text-text-muted">{count}</span>}
               </button>
             );
           })()}
@@ -1077,12 +1069,8 @@ export function EntryTape({
                 patchTape({ filterMode: next });
               }
             }}
-            className="px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5"
-            style={{
-              background: filterMode === "kian" ? "color-mix(in srgb, var(--accent-cyan) 18%, transparent)" : "transparent",
-              color: filterMode === "kian" ? "var(--accent-cyan)" : "var(--text-muted)",
-              border: `1px solid ${filterMode === "kian" ? "color-mix(in srgb, var(--accent-cyan) 50%, transparent)" : "var(--border)"}`,
-            }}
+            className="flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs font-medium transition-colors"
+            style={pillStyle(filterMode === "kian")}
             title={
               "Replication of @kiantrades' (Flowseidon) Twitter selection logic: " +
               "premium ≥ $300K · single-leg · not an index/leveraged ETF · DTE 7–400 · " +
@@ -1090,9 +1078,9 @@ export function EntryTape({
               "Rule-based pass/fail — no score, no convergence."
             }
           >
-            <Activity size={11} />
-            {filterMode === "kian" ? "Showing Flowseidon" : "Flowseidon"}
-            <span className="opacity-70 num">{kianCount > 0 ? `(${kianCount})` : ""}</span>
+            <Activity size={12} />
+            Flowseidon
+            {kianCount > 0 && <span className="num text-text-muted">{kianCount}</span>}
           </button>
           {/* "Someone knows something" — deep-OTM convexity bets (strike far
               out of the money). The 40C-on-a-$13-stock kind of print. */}
@@ -1107,12 +1095,8 @@ export function EntryTape({
                 patchTape({ filterMode: next });
               }
             }}
-            className="px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap"
-            style={{
-              background: filterMode === "outliers" ? "color-mix(in srgb, var(--accent-fuchsia) 18%, transparent)" : "transparent",
-              color: filterMode === "outliers" ? "var(--accent-fuchsia)" : "var(--text-muted)",
-              border: `1px solid ${filterMode === "outliers" ? "color-mix(in srgb, var(--accent-fuchsia) 50%, transparent)" : "var(--border)"}`,
-            }}
+            className="flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs font-medium transition-colors"
+            style={pillStyle(filterMode === "outliers")}
             title={
               `Deep out-of-the-money convexity bets — strike at least ${outlierMin}% OTM ` +
               `(e.g. a $40 call on a $13 stock = +208%). The "someone knows something" prints: ` +
@@ -1120,14 +1104,13 @@ export function EntryTape({
               `Tip: add the DTE = Leap filter for the long-dated 2027-style ones. Sorts by ATM% (most extreme first).`
             }
           >
-            <Sparkles size={11} />
-            Someone knows something
-            <span className="opacity-70 num">{outlierCount > 0 ? `(${outlierCount})` : ""}</span>
+            <Sparkles size={12} />
+            Deep OTM
+            {outlierCount > 0 && <span className="num text-text-muted">{outlierCount}</span>}
           </button>
           {filterMode === "outliers" && (
             <label
-              className="flex items-center gap-1 rounded-full px-2 py-0.5 border whitespace-nowrap"
-              style={{ borderColor: "color-mix(in srgb, var(--accent-fuchsia) 40%, transparent)", background: "color-mix(in srgb, var(--accent-fuchsia) 8%, transparent)" }}
+              className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-border px-2 py-0.5"
               title="Minimum % out-of-the-money to qualify"
             >
               <span className="text-xs text-text-muted">≥</span>
@@ -1146,15 +1129,10 @@ export function EntryTape({
             </label>
           )}
         </div>
-        <span className="flex items-center gap-2 text-xs text-text-muted num">
+        <span className="flex items-center gap-3 text-xs text-text-muted">
           {dayLean != null && (
             <span
-              className="px-2 py-0.5 rounded-full font-medium whitespace-nowrap"
-              style={{
-                color: leanSide === "Bull" ? "var(--accent-green)"
-                  : leanSide === "Bear" ? "var(--accent-red)" : "var(--text-muted)",
-                border: "1px solid var(--border)",
-              }}
+              className="whitespace-nowrap"
               title={
                 `Premium-weighted lean of the full loaded tape (inverse ETFs counted as market bets). ` +
                 (leanSide
@@ -1165,35 +1143,48 @@ export function EntryTape({
                   : `Mixed tape — no dissent tags at <70% one-sidedness.`)
               }
             >
-              tape {Math.round(dayLean * 100)}% bull
+              Tape{" "}
+              <span
+                className="num font-medium"
+                style={{
+                  color: leanSide === "Bull" ? "var(--accent-green)"
+                    : leanSide === "Bear" ? "var(--accent-red)" : "var(--text-secondary)",
+                }}
+              >
+                {Math.round(dayLean * 100)}% bull
+              </span>
             </span>
           )}
-          {sortedRows.length} of {entries.length} entries
-          {dates.length > 1 ? ` · ${dates.length} dates` : ""}
+          <span>
+            <span className="num text-text-secondary">{sortedRows.length}</span> of{" "}
+            <span className="num">{entries.length}</span> entries
+          </span>
+          {dates.length > 1 ? <span>{dates.length} dates</span> : null}
         </span>
       </div>
       <div
-        className="iflow-tape-header flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-text-muted px-2 py-1 max-md:gap-1 sticky top-0 z-10 glass-strong"
-        style={{ borderRadius: "var(--radius-control)" }}
+        className="iflow-tape-header sticky top-0 z-10 flex items-center gap-2 border-b border-border px-2 py-2 text-xs font-medium text-text-muted max-md:gap-1"
+        style={{ background: "var(--bg-primary)" }}
       >
-        {renderHeader("rank", "avg", "w-12 justify-center")}
-        {renderHeader("nscore", "score", "w-10 justify-center max-md:hidden")}
-        {renderHeader("ml pctl", "ml", "w-10 justify-center max-md:hidden")}
-        {renderHeader("setup", "setup", "w-10 justify-center max-md:hidden")}
-        {renderHeader("time", "time", "w-12 justify-start max-md:hidden")}
-        {renderHeader("ticker", "ticker", "w-14 justify-start")}
-        {renderHeader("side", "side", "w-12 justify-start max-md:w-10")}
-        {renderHeader("action", "action", "w-24 justify-start max-md:hidden")}
-        {renderHeader("contract", "contract", "flex-1 min-w-[160px] justify-start max-md:min-w-[80px]")}
-        {renderHeader("dte", "dte", "w-14 justify-start max-md:hidden")}
-        {renderHeader("ern", "ern", "w-10 justify-start max-md:hidden")}
-        {renderHeader("vol/oi", "voi", "w-14 justify-end max-md:hidden")}
-        {renderHeader("ask%", "ask", "w-14 justify-end max-md:hidden")}
+        {renderHeader("Rank", "avg", "w-12 justify-center")}
+        {renderHeader("NScore", "score", "w-10 justify-center max-md:hidden")}
+        {renderHeader("ML", "ml", "w-10 justify-center max-md:hidden")}
+        {renderHeader("Setup", "setup", "w-10 justify-center max-md:hidden")}
+        {renderHeader("Time", "time", "w-12 justify-start max-md:hidden")}
+        {renderHeader("Ticker", "ticker", "w-14 justify-start")}
+        {renderHeader("Side", "side", "w-12 justify-start max-md:w-10")}
+        {renderHeader("Action", "action", "w-24 justify-start max-md:hidden")}
+        {renderHeader("Contract", "contract", "flex-1 min-w-[160px] justify-start max-md:min-w-[80px]")}
+        {renderHeader("DTE", "dte", "w-20 justify-start max-md:hidden")}
+        {renderHeader("Earn", "ern", "w-10 justify-start max-md:hidden")}
+        {renderHeader("Vol/OI", "voi", "w-14 justify-end max-md:hidden")}
+        {renderHeader("Ask%", "ask", "w-14 justify-end max-md:hidden")}
         {renderHeader("ATM%", "atm", "w-16 justify-end max-md:hidden")}
-        {renderHeader("premium", "premium", "w-20 justify-end max-md:hidden")}
+        {renderHeader("Premium", "premium", "w-20 justify-end max-md:hidden")}
         {renderHeader("Est. P/L", "pnl", "w-16 justify-end")}
-        {renderHeader("weighted peak", "pred_peak", "w-20 justify-end max-md:hidden")}
+        {renderHeader("Wtd peak", "pred_peak", "w-20 justify-end max-md:hidden")}
       </div>
+      <div className="divide-y divide-border">
       {sortedRows.map((r) => {
         const sideColor =
           r.side === "Unknown" ? "var(--text-muted)" : r.side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
@@ -1205,9 +1196,9 @@ export function EntryTape({
               : "var(--accent-red)";
         const isSelected = selectedTicker === r.ticker;
         const scoreNum = r.notable?.score ?? null;
-        // Border + glow keyed to Notable score. Falls back to the side
-        // color when no score is present (graceful for backend errors).
-        const borderStyle = scoreBorderStyle(scoreNum, sideColor);
+        // Top-pick marker: a small leading dot keyed to Notable score
+        // (replaces the old gold row border).
+        const topPick = scoreNum != null && scoreNum >= 70;
         // Build the hover tooltip: breakdown of the 5 component scores
         // + which convergence signals lit up. Same data that justifies
         // the number — auditable, not editorial.
@@ -1245,10 +1236,9 @@ export function EntryTape({
             key={r.msgId}
             type="button"
             onClick={() => onSelectTicker(r.ticker)}
-            className="iflow-tape-row w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-bg-card-hover transition-colors text-left max-md:gap-1"
+            className="iflow-tape-row flex w-full items-center gap-2 px-2 py-2 text-left transition-colors hover:bg-bg-card-hover max-md:gap-1"
             style={{
               background: isSelected ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : "transparent",
-              ...borderStyle,
             }}
           >
             {/* Evidence-first ordering score; it is not a probability. */}
@@ -1268,11 +1258,21 @@ export function EntryTape({
                   `Use for ordering only; it is not an outcome probability.`;
               return (
                 <span
-                  className="w-12 text-center font-bold text-sm num"
+                  className="relative w-12 text-center text-sm font-semibold num"
                   style={{ color: researchRankTextColor(rank) }}
                   title={title}
                   aria-label={title}
                 >
+                  {topPick && (
+                    <span
+                      className="absolute left-0 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full max-md:hidden"
+                      style={{
+                        background: "var(--accent-yellow)",
+                        opacity: (scoreNum ?? 0) >= 85 ? 1 : 0.55,
+                      }}
+                      title={`Top pick: NScore ${scoreNum}`}
+                    />
+                  )}
                   {rank != null ? rank : "—"}
                 </span>
               );
@@ -1281,7 +1281,7 @@ export function EntryTape({
                 with empirically-recalibrated weights. Component breakdown
                 in the hover tooltip. */}
             <span
-              className="w-10 text-center font-semibold num max-md:hidden"
+              className={`w-10 text-center num max-md:hidden ${scoreNum != null && scoreNum >= 85 ? "font-bold" : "font-medium"}`}
               style={{ color: scoreTextColor(scoreNum) }}
               title={scoreTitle}
             >
@@ -1346,14 +1346,10 @@ export function EntryTape({
               );
             })()}
             <span className="w-12 num text-text-secondary max-md:hidden">{r.timeLabel}</span>
-            <span className="w-14 font-mono font-semibold text-text-primary">{r.ticker}</span>
+            <span className="w-14 num text-sm font-semibold text-text-primary">{r.ticker}</span>
             <span
-              className="w-12 px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase text-center max-md:w-10 max-md:px-1"
-              style={{
-                background: `color-mix(in srgb, ${sideColor} 14%, transparent)`,
-                color: sideColor,
-                border: `1px solid color-mix(in srgb, ${sideColor} 30%, transparent)`,
-              }}
+              className="w-12 text-xs font-medium max-md:w-10"
+              style={{ color: sideColor }}
             >
               {r.side}
             </span>
@@ -1361,12 +1357,8 @@ export function EntryTape({
               <span className="truncate">{r.action}</span>
               {isDissent(r) && (
                 <span
-                  className="px-1 rounded text-[9px] font-bold shrink-0"
-                  style={{
-                    color: "var(--accent-purple)",
-                    background: "color-mix(in srgb, var(--accent-purple) 14%, transparent)",
-                    border: "1px solid color-mix(in srgb, var(--accent-purple) 35%, transparent)",
-                  }}
+                  className="shrink-0 text-xs font-medium"
+                  style={{ color: "var(--accent-purple)" }}
                   title={
                     `DISSENT — conviction print against a ${Math.round((leanByDate.get(r.flowDate) ?? 0) * 100)}% ` +
                     `${sideOf(leanByDate.get(r.flowDate))?.toLowerCase()} tape: single-name, ask% ${r.askPct}, DTE ${r.dte}, ` +
@@ -1375,7 +1367,7 @@ export function EntryTape({
                     `A print-selection screen, NOT a market-crash forecast.`
                   }
                 >
-                  DISSENT
+                  dissent
                 </span>
               )}
             </span>
@@ -1383,30 +1375,17 @@ export function EntryTape({
               <span className="truncate">{r.contractLabel}</span>
               {r.printCount > 1 && (
                 <span
-                  className="px-1 rounded-full text-[9px] num font-bold shrink-0"
-                  style={{
-                    color: "var(--accent-cyan)",
-                    background: "color-mix(in srgb, var(--accent-cyan) 10%, transparent)",
-                    border: "1px solid color-mix(in srgb, var(--accent-cyan) 30%, transparent)",
-                  }}
+                  className="shrink-0 num text-xs text-text-muted"
                   title={`Aggregated from ${r.printCount} prints (same ticker/strike/type/expiry). Premium and score reflect the sum; ask% is the most directional across prints.`}
                 >
                   ×{r.printCount}
                 </span>
               )}
             </span>
-            <span className="w-14 flex items-center gap-1 num text-text-muted max-md:hidden">
-              {r.dte ? <span>{r.dte}d</span> : null}
+            <span className="w-20 flex items-center gap-1.5 text-text-muted max-md:hidden">
+              {r.dte ? <span className="num text-text-secondary">{r.dte}d</span> : null}
               {r.dteCategory ? (
-                <span
-                  className="px-1 rounded text-[9px] font-bold"
-                  style={{
-                    color: r.dteCategory.color,
-                    background: r.dteCategory.bg,
-                  }}
-                >
-                  {r.dteCategory.text}
-                </span>
+                <span className="text-xs">{r.dteCategory.text.toLowerCase()}</span>
               ) : null}
             </span>
             {(() => {
@@ -1533,6 +1512,7 @@ export function EntryTape({
           </button>
         );
       })}
+      </div>
     </div>
   );
 }

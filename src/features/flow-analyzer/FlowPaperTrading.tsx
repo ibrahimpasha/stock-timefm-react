@@ -11,7 +11,6 @@ import { MarkFreshness } from "../../components/MarkFreshness";
 import { QueryNotice } from "../../components/QueryNotice";
 import { expiryDte } from "../../lib/optionContract";
 import { marketDate } from "../../lib/liveFeeds";
-import type { ChipTone } from "../../components/Glass";
 import {
   Loader2,
   RefreshCw,
@@ -150,21 +149,25 @@ function useIFlowSynthesis() {
 function PnlBadge({ pnl }: { pnl: number | null }) {
   if (pnl === null) return <span className="text-xs text-text-muted">Mark unknown</span>;
   return (
-    <Chip tone={pnl >= 0 ? "green" : "red"} className="num">
-      mark {signedPercent(pnl)}
-    </Chip>
+    <span className="text-xs text-text-muted">
+      mark{" "}
+      <span className="num font-semibold" style={{ color: pnl >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
+        {signedPercent(pnl)}
+      </span>
+    </span>
   );
 }
 
 function ScoreBadge({ score }: { score: number }) {
   // Watchlist scores are on the backend's 0-10 prescore scale (capped at 10);
   // >= 7 matches MissedOpportunities' high-conviction cutoff.
-  const tone: ChipTone =
-    score >= 7 ? "green" : score >= 5 ? "orange" : "neutral";
   return (
-    <Chip tone={tone} className="num">
+    <span
+      className={`num text-xs w-5 text-right ${score >= 7 ? "font-semibold text-text-primary" : "text-text-muted"}`}
+      title={`Prescore ${score}/10${score >= 7 ? " (high conviction)" : ""}`}
+    >
       {score}
-    </Chip>
+    </span>
   );
 }
 
@@ -176,13 +179,7 @@ function SideIcon({ side }: { side: string }) {
 
 function SourceTag({ source }: { source?: string }) {
   if (!source) return null;
-  const tone: ChipTone =
-    source === "synthesis" ? "cyan" : source === "flash" ? "orange" : "neutral";
-  return (
-    <Chip tone={tone} className="uppercase tracking-wider">
-      {source}
-    </Chip>
-  );
+  return <Chip>{source}</Chip>;
 }
 
 function SynthesisReport({ report }: { report: string }) {
@@ -200,7 +197,7 @@ function SynthesisReport({ report }: { report: string }) {
   const lines = report.split("\n");
 
   return (
-    <div className="space-y-2 text-sm leading-relaxed">
+    <div className="space-y-2 text-sm leading-relaxed max-w-[72ch]">
       {lines.map((line, i) => {
         const trimmed = line.trim();
         if (!trimmed) return <div key={i} className="h-1" />;
@@ -208,7 +205,7 @@ function SynthesisReport({ report }: { report: string }) {
         // # Title
         if (trimmed.startsWith("# ")) {
           return (
-            <h3 key={i} className="text-lg font-bold text-text-primary pb-1 border-b border-border">
+            <h3 key={i} className="text-base font-semibold text-text-primary">
               {renderLine(trimmed.slice(2))}
             </h3>
           );
@@ -217,7 +214,7 @@ function SynthesisReport({ report }: { report: string }) {
         // ## Section header
         if (trimmed.startsWith("## ")) {
           return (
-            <h4 key={i} className="text-base font-semibold text-text-primary mt-3 mb-1">
+            <h4 key={i} className="text-sm font-semibold text-text-primary mt-3">
               {renderLine(trimmed.slice(3))}
             </h4>
           );
@@ -226,8 +223,7 @@ function SynthesisReport({ report }: { report: string }) {
         // Lines starting with medal emojis (priority queue)
         if (/^[🥇🥈🥉]/u.test(trimmed)) {
           return (
-            <div key={i} className="pl-3 py-1.5 rounded-md text-sm"
-                 style={{ background: "color-mix(in srgb, var(--accent-blue) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--accent-blue) 28%, transparent)" }}>
+            <div key={i} className="text-sm font-medium text-text-primary">
               {renderLine(trimmed)}
             </div>
           );
@@ -237,11 +233,11 @@ function SynthesisReport({ report }: { report: string }) {
         if (["🟢", "🔵", "🟡", "🔴", "🔥", "⚠️", "🎉", "❌", "🚫", "✅"].some((prefix) => trimmed.startsWith(prefix))) {
           const isGreen = trimmed.startsWith("🟢") || trimmed.startsWith("🔵") || trimmed.startsWith("🎉") || trimmed.startsWith("🔥");
           const isRed = trimmed.startsWith("🔴") || trimmed.startsWith("❌") || trimmed.startsWith("⚠️");
-          const borderColor = isGreen ? "var(--accent-green)" : isRed ? "var(--accent-red)" : "var(--border)";
+          const dotColor = isGreen ? "var(--accent-green)" : isRed ? "var(--accent-red)" : "var(--text-muted)";
           return (
-            <div key={i} className="pl-3 py-1 rounded-md text-sm"
-                 style={{ background: "color-mix(in srgb, var(--border) 12%, transparent)", border: `1px solid color-mix(in srgb, ${borderColor} 28%, transparent)` }}>
-              {renderLine(trimmed)}
+            <div key={i} className="flex items-start gap-2 text-sm text-text-secondary">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: dotColor }} />
+              <span>{renderLine(trimmed)}</span>
             </div>
           );
         }
@@ -265,9 +261,9 @@ function PaperQueryError({ label, onRetry }: { label: string; onRetry: () => voi
       <button
         type="button"
         onClick={onRetry}
-        className="ml-auto inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-text-secondary hover:text-text-primary"
+        className="ml-auto inline-flex items-center gap-1 rounded px-2 py-1 text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
       >
-        <RefreshCw size={11} /> Retry
+        <RefreshCw size={12} /> Retry
       </button>
     </div>
   );
@@ -367,23 +363,24 @@ export function FlowPaperTrading() {
       {/* Action buttons */}
       <div className="flex gap-2">
         <button
+          type="button"
           onClick={() => scanMutation.mutate()}
           disabled={scanMutation.isPending}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-blue text-bg-primary font-semibold text-sm transition-all hover:brightness-110 disabled:opacity-40"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent-blue text-bg-primary font-medium text-sm transition-all hover:brightness-110 disabled:opacity-40"
         >
           {scanMutation.isPending ? (
             <Loader2 size={14} className="animate-spin" />
           ) : (
             <RefreshCw size={14} />
           )}
-          Scan & Trade
+          Scan and trade
         </button>
         <button
           onClick={() => {
             if (confirm("Reset flow paper trader to $10K?"))
               resetMutation.mutate();
           }}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-text-secondary text-xs hover:text-accent-red hover:border-accent-red/40 transition-all"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-text-secondary text-sm hover:text-accent-red hover:bg-bg-card-hover transition-all"
         >
           <RotateCcw size={12} />
           Reset
@@ -403,17 +400,17 @@ export function FlowPaperTrading() {
       {/* System Risk Status (drawdown, circuit breaker, slots, sector warnings) */}
       <SystemRiskStatus />
 
-      {/* Portfolio Summary */}
-      <GlassPanel title="Flow Trader Portfolio">
+      {/* Portfolio summary, macro and slot usage in one panel */}
+      <GlassPanel title="Portfolio">
         {(() => { const exposure = markedExposure(positions); return exposure.count > 0 && <p className="mb-3 text-xs text-accent-orange">Recorded valuation: {exposure.count} positions ({formatCurrency(exposure.value)} carried exposure) have stale, incomplete, unverified or unknown marks. Return is not a live quote.</p>; })()}
-        <div className="flex items-center justify-between mb-3 gap-3">
-          <div className="num text-2xl font-extrabold text-text-primary">
+        <div className="flex items-end justify-between mb-4 gap-3">
+          <div className="num text-2xl font-semibold text-text-primary">
             {formatCurrency(summary.total_value)}
           </div>
           <div className="text-right">
             <div className="text-xs text-text-muted">Return</div>
             <div
-              className="num text-lg font-extrabold"
+              className="num text-lg font-semibold"
               style={{ color: retColor }}
             >
               {ret >= 0 ? "+" : ""}
@@ -433,126 +430,91 @@ export function FlowPaperTrading() {
             tone={summary.realized_pnl >= 0 ? "green" : "red"}
             value={`${summary.realized_pnl >= 0 ? "+" : ""}${formatCurrency(summary.realized_pnl)}`}
           />
-          <Stat label="Win Rate" value={`${summary.win_rate.toFixed(0)}%`} />
+          <Stat label="Win rate" value={`${summary.win_rate.toFixed(0)}%`} />
           <Stat label="Watching" value={summary.watching} />
           <Stat label="Open" value={summary.open_positions} />
         </div>
+
+        {(macro || slots) && (
+          <div className="mt-4 border-t border-border pt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-text-muted">
+            {macro && (
+              <>
+                <span className="inline-flex items-center gap-1">
+                  <Activity size={12} /> Macro
+                </span>
+                <span>
+                  SPY <span className="num text-text-primary">${macro.spy_price.toFixed(2)}</span>{" "}
+                  <span
+                    className="num"
+                    style={{ color: macro.spy_change_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}
+                  >
+                    {macro.spy_change_pct >= 0 ? "+" : ""}
+                    {macro.spy_change_pct.toFixed(2)}%
+                  </span>
+                </span>
+                <span>
+                  VIX{" "}
+                  <span
+                    className="num"
+                    style={{
+                      color:
+                        macro.vix >= 35
+                          ? "var(--accent-red)"
+                          : macro.vix >= 25
+                            ? "var(--accent-orange)"
+                            : "var(--text-primary)",
+                    }}
+                  >
+                    {macro.vix.toFixed(1)}
+                  </span>
+                </span>
+                {macro.is_safe ? (
+                  <span className="inline-flex items-center gap-1 text-text-secondary">
+                    <Shield size={12} /> Safe
+                  </span>
+                ) : (
+                  <Chip tone="red">
+                    <Shield size={12} /> Unsafe
+                  </Chip>
+                )}
+                <span>{macro.market_status}</span>
+              </>
+            )}
+            {slots && (
+              <span className="inline-flex items-center gap-4">
+                <span className="inline-flex items-center gap-1">
+                  <Layers size={12} /> Slots
+                </span>
+                {([
+                  ["Day trade", slots.day_trade],
+                  ["Swing", slots.swing],
+                ] as const).map(([label, sl]) => (
+                  <span key={label} className="inline-flex items-center gap-1.5">
+                    {label}
+                    <span className="inline-flex items-center gap-1">
+                      {Array.from({ length: sl.max }, (_, i) => (
+                        <span
+                          key={i}
+                          className="h-2.5 w-2.5 rounded-sm border border-border"
+                          style={{ background: i < sl.used ? "var(--accent-blue)" : "transparent" }}
+                        />
+                      ))}
+                    </span>
+                    <span className="num text-text-primary">
+                      {sl.used}/{sl.max}
+                    </span>
+                  </span>
+                ))}
+              </span>
+            )}
+          </div>
+        )}
       </GlassPanel>
-
-      {/* Macro Status Bar */}
-      {macro && (
-        <div
-          className="card flex items-center justify-between py-2 px-4"
-          style={{ background: "color-mix(in srgb, var(--accent-cyan) 4%, var(--card-bg))" }}
-        >
-          <div className="flex items-center gap-4 text-xs">
-            <div className="flex items-center gap-1 text-text-muted">
-              <Activity size={10} />
-              <span>Macro</span>
-            </div>
-            <span className="num">
-              SPY ${macro.spy_price.toFixed(2)}{" "}
-              <span
-                style={{
-                  color:
-                    macro.spy_change_pct >= 0
-                      ? "var(--accent-green)"
-                      : "var(--accent-red)",
-                }}
-              >
-                {macro.spy_change_pct >= 0 ? "+" : ""}
-                {macro.spy_change_pct.toFixed(2)}%
-              </span>
-            </span>
-            <span className="num">
-              VIX{" "}
-              <span
-                style={{
-                  color:
-                    macro.vix >= 35
-                      ? "var(--accent-red)"
-                      : macro.vix >= 25
-                        ? "var(--accent-orange)"
-                        : "var(--accent-green)",
-                }}
-              >
-                {macro.vix.toFixed(1)}
-              </span>
-            </span>
-            <Chip
-              tone={macro.is_safe ? "green" : "red"}
-              className="uppercase tracking-wider"
-            >
-              <Shield size={9} />
-              {macro.is_safe ? "SAFE" : "UNSAFE"}
-            </Chip>
-          </div>
-          <span className="text-sm text-text-muted">{macro.market_status}</span>
-        </div>
-      )}
-
-      {/* Slot Visualization */}
-      {slots && (
-        <div className="card flex items-center gap-6 py-2 px-4">
-          <div className="flex items-center gap-1 text-xs text-text-muted">
-            <Layers size={10} />
-            <span>Slots</span>
-          </div>
-          {/* Day Trade slots */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-text-muted">DT:</span>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: slots.day_trade.max }, (_, i) => (
-                <div
-                  key={i}
-                  className="w-4 h-4 rounded"
-                  style={{
-                    background:
-                      i < slots.day_trade.used
-                        ? "var(--accent-blue)"
-                        : "transparent",
-                    border: "1px solid var(--border)",
-                  }}
-                />
-              ))}
-            </div>
-            <span className="text-text-muted num text-xs">
-              {slots.day_trade.used}/{slots.day_trade.max}
-            </span>
-          </div>
-          {/* Swing slots */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-text-muted">SW:</span>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: slots.swing.max }, (_, i) => (
-                <div
-                  key={i}
-                  className="w-4 h-4 rounded"
-                  style={{
-                    background:
-                      i < slots.swing.used
-                        ? "var(--accent-purple)"
-                        : "transparent",
-                    border: "1px solid var(--border)",
-                  }}
-                />
-              ))}
-            </div>
-            <span className="text-text-muted num text-xs">
-              {slots.swing.used}/{slots.swing.max}
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Open Positions — moved to top */}
       {positions.length > 0 && (
-        <div>
-          <div className="text-xs uppercase tracking-wider text-accent-blue font-semibold mb-2 flex items-center gap-1">
-            <Zap size={10} />
-            Open Positions ({positions.length})
-          </div>
-          <div className="space-y-2">
+        <GlassPanel title={<>Open positions <span className="num font-normal text-text-muted">{positions.length}</span></>}>
+          <div className="divide-y divide-border">
             {positions.map((pos) => {
               const pnlColor = pos.pnl_pct == null ? "var(--text-muted)" : changeColor(pos.pnl_pct);
               const sideColor =
@@ -572,12 +534,11 @@ export function FlowPaperTrading() {
               return (
                 <div
                   key={pos.id}
-                  className="card card-interactive cursor-pointer"
+                  className="cursor-pointer py-2 px-1 hover:bg-bg-card-hover"
                   role="button"
                   tabIndex={0}
                   aria-expanded={isExpanded}
                   aria-label={`${isExpanded ? "Collapse" : "Expand"} ${pos.ticker} position`}
-                  style={{ borderColor: `color-mix(in srgb, ${sideColor} 35%, var(--border))` }}
                   onClick={() => setExpandedPos(isExpanded ? null : pos.id)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
@@ -588,21 +549,16 @@ export function FlowPaperTrading() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Chip
-                        tone={pos.slot_type === "day_trade" ? "blue" : "purple"}
-                        className="num"
-                      >
-                        {slotLabel}
-                      </Chip>
-                      <span className="font-mono text-base font-extrabold text-text-primary">
+                      <SideIcon side={pos.side} />
+                      <span className="num text-sm font-semibold text-text-primary">
                         {pos.ticker}
                       </span>
                       <span className="num text-sm text-text-primary">
                         ${pos.strike} {pos.option_type}
                       </span>
-                      <span className="text-text-muted text-xs num">
-                        x{pos.contracts}
-                        {pos.scaled_out ? " (scaled)" : ""}
+                      <span className="text-text-muted text-xs">
+                        <span className="num">x{pos.contracts}</span>
+                        {pos.scaled_out ? " (scaled)" : ""} · <span title={pos.slot_type === "day_trade" ? "Day trade slot" : "Swing slot"}>{slotLabel}</span>
                       </span>
                     </div>
                     <div className="flex items-center gap-4">
@@ -621,7 +577,7 @@ export function FlowPaperTrading() {
                       <div className="text-right">
                         <div className="text-text-muted text-xs">P/L</div>
                         <div
-                          className="num text-sm font-extrabold"
+                          className="num text-sm font-semibold"
                           style={{ color: pnlColor }}
                         >
                           {signedPercent(pos.pnl_pct)}
@@ -657,11 +613,11 @@ export function FlowPaperTrading() {
                           </div>
                         </div>
                         <div>
-                          <div className="text-text-muted">Entry Date</div>
+                          <div className="text-text-muted">Entry date</div>
                           <div className="num text-text-primary">{pos.entry_date}</div>
                         </div>
                         <div>
-                          <div className="text-text-muted">Hold Days</div>
+                          <div className="text-text-muted">Hold days</div>
                           <div className="num text-text-primary">{pos.hold_days ?? "—"}</div>
                         </div>
                         <div>
@@ -670,15 +626,12 @@ export function FlowPaperTrading() {
                         </div>
                         <div>
                           <div className="text-text-muted">Slot</div>
-                          <div style={{
-                            color: pos.slot_type === "day_trade" ? "var(--accent-blue)" : "var(--accent-purple)"
-                          }}>{pos.slot_type === "day_trade" ? "Day Trade" : "Swing"}</div>
+                          <div className="text-text-primary">{pos.slot_type === "day_trade" ? "Day trade" : "Swing"}</div>
                         </div>
                       </div>
 
                       {pos.analysis && (
-                        <div className="text-xs text-text-secondary leading-relaxed rounded-md px-2 py-1.5"
-                             style={{ background: "color-mix(in srgb, var(--bg-card) 50%, transparent)" }}>
+                        <div className="text-sm text-text-secondary leading-relaxed max-w-[72ch]">
                           {pos.analysis}
                         </div>
                       )}
@@ -689,7 +642,7 @@ export function FlowPaperTrading() {
                         <span className="text-accent-red">
                           Stop ${stopTarget.toFixed(2)} ({signedPercent(policy.stop_pct, 0)})
                         </span>
-                        <span className="text-accent-orange">
+                        <span className="text-text-secondary">
                           TP1 ${tp1Target.toFixed(2)} ({signedPercent(policy.tp1_pct, 0)})
                         </span>
                         <span className="text-accent-green">
@@ -729,13 +682,13 @@ export function FlowPaperTrading() {
               );
             })}
           </div>
-        </div>
+        </GlassPanel>
       )}
 
       {/* Trade Decision Log — closed positions with full scoring rationale + exit reason */}
       <details className="text-xs">
-        <summary className="text-xs uppercase tracking-wider text-text-muted font-semibold cursor-pointer mb-2">
-          Trade Decision Log
+        <summary className="text-sm font-semibold text-text-primary cursor-pointer">
+          Trade decision log
         </summary>
         <div className="mt-2"><TradeDecisionLog /></div>
       </details>
@@ -745,12 +698,8 @@ export function FlowPaperTrading() {
         <div className="space-y-3">
           {/* WL-A — Auto-Entry */}
           {wla.length > 0 && (
-            <div>
-              <div className="text-xs uppercase tracking-wider text-accent-green font-semibold flex items-center gap-1 mb-2">
-                <Zap size={10} />
-                WL-A — Auto-Entry ({wla.length})
-              </div>
-              <div className="space-y-1">
+            <GlassPanel title={<span className="inline-flex items-center gap-1.5"><Zap size={12} className="text-text-muted" />Watchlist A: auto-entry <span className="num font-normal text-text-muted">{wla.length}</span></span>}>
+              <div className="divide-y divide-border">
                 {wla.map((w, idx) => {
                   const optColor =
                     w.option_type === "CALL" || w.option_type === "C"
@@ -760,16 +709,12 @@ export function FlowPaperTrading() {
                   return (
                     <div
                       key={w.id ?? idx}
-                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-md"
-                      style={{
-                        background: "color-mix(in srgb, var(--accent-green) 5%, transparent)",
-                        border: "1px solid color-mix(in srgb, var(--accent-green) 24%, transparent)",
-                      }}
+                      className="flex flex-wrap items-center justify-between gap-2 px-1 py-2 hover:bg-bg-card-hover"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <ScoreBadge score={w.score} />
                         <SideIcon side={w.side} />
-                        <span className="font-mono text-sm font-bold text-text-primary">
+                        <span className="num text-sm font-semibold text-text-primary">
                           {w.ticker}
                         </span>
                         <span className="num text-xs text-text-primary">
@@ -778,17 +723,17 @@ export function FlowPaperTrading() {
                         <span className="text-xs" style={{ color: optColor }}>
                           {w.option_type}
                         </span>
-                        <span className="text-xs text-accent-blue num">
+                        <span className="text-xs text-text-muted num">
                           exp {w.expiry}
                         </span>
                         <SourceTag source={w.source} />
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-sm text-text-muted num">
+                        <span className="text-xs text-text-muted num">
                           ref ${typeof w.ref_premium === "number" ? w.ref_premium.toFixed(2) : w.ref_premium}
                         </span>
                         {w.gate_price != null && (
-                          <span className="num text-xs text-accent-green font-semibold">
+                          <span className="num text-xs text-text-primary font-semibold">
                             gate ${typeof w.gate_price === "number" ? w.gate_price.toFixed(2) : w.gate_price}
                           </span>
                         )}
@@ -799,17 +744,13 @@ export function FlowPaperTrading() {
                   );
                 })}
               </div>
-            </div>
+            </GlassPanel>
           )}
 
           {/* WL-B — Analysis Only */}
           {wlb.length > 0 && (
-            <div>
-              <div className="text-xs uppercase tracking-wider text-accent-orange font-semibold flex items-center gap-1 mb-2">
-                <Eye size={10} />
-                WL-B — Analysis Only ({wlb.length})
-              </div>
-              <div className="space-y-1">
+            <GlassPanel title={<span className="inline-flex items-center gap-1.5"><Eye size={12} className="text-text-muted" />Watchlist B: analysis only <span className="num font-normal text-text-muted">{wlb.length}</span></span>}>
+              <div className="divide-y divide-border">
                 {wlb.map((w, idx) => {
                   const optColor =
                     w.option_type === "CALL" || w.option_type === "C"
@@ -819,16 +760,12 @@ export function FlowPaperTrading() {
                   return (
                     <div
                       key={w.id ?? idx}
-                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-md"
-                      style={{
-                        background: "color-mix(in srgb, var(--accent-orange) 5%, transparent)",
-                        border: "1px solid color-mix(in srgb, var(--accent-orange) 24%, transparent)",
-                      }}
+                      className="flex flex-wrap items-center justify-between gap-2 px-1 py-2 hover:bg-bg-card-hover"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <ScoreBadge score={w.score} />
                         <SideIcon side={w.side} />
-                        <span className="font-mono text-sm font-bold text-text-primary">
+                        <span className="num text-sm font-semibold text-text-primary">
                           {w.ticker}
                         </span>
                         <span className="num text-xs text-text-primary">
@@ -837,7 +774,7 @@ export function FlowPaperTrading() {
                         <span className="text-xs" style={{ color: optColor }}>
                           {w.option_type}
                         </span>
-                        <span className="text-xs text-accent-blue num">
+                        <span className="text-xs text-text-muted num">
                           exp {w.expiry}
                         </span>
                         <SourceTag source={w.source} />
@@ -845,10 +782,10 @@ export function FlowPaperTrading() {
                       <div className="flex items-center gap-3">
                         <PnlBadge pnl={pnl} />
                         <MarkFreshness at={w.last_marked_at} />
-                        <span className="text-sm text-text-muted num">
+                        <span className="text-xs text-text-muted num">
                           ref ${typeof w.ref_premium === "number" ? w.ref_premium.toFixed(2) : w.ref_premium}
                         </span>
-                        <span className="text-xs text-text-muted italic">
+                        <span className="text-xs text-text-muted">
                           {w.block_reason ?? "Monitoring"}
                         </span>
                       </div>
@@ -856,15 +793,15 @@ export function FlowPaperTrading() {
                   );
                 })}
               </div>
-            </div>
+            </GlassPanel>
           )}
         </div>
       )}
 
       {/* Missed Opportunities — WL-A unfilled + WL-B high-score with what-if P/L */}
       <details className="text-xs">
-        <summary className="text-xs uppercase tracking-wider text-text-muted font-semibold cursor-pointer mb-2">
-          Missed Opportunities
+        <summary className="text-sm font-semibold text-text-primary cursor-pointer">
+          Missed opportunities
         </summary>
         <div className="mt-2"><MissedOpportunities /></div>
       </details>
@@ -872,12 +809,11 @@ export function FlowPaperTrading() {
       {/* Synthesis Report Panel + trigger */}
       <GlassPanel
         title={
-          <span className="inline-flex items-center gap-1 text-accent-cyan">
-            <Activity size={10} />
-            Daily Synthesis
+          <span className="inline-flex items-center gap-1.5">
+            Daily synthesis
             {synthesis?.date && (
-              <span className="text-text-muted font-normal ml-1 normal-case tracking-normal num">
-                — {synthesis.date}
+              <span className="text-text-muted font-normal num">
+                {synthesis.date}
               </span>
             )}
           </span>
@@ -886,7 +822,8 @@ export function FlowPaperTrading() {
           <button
             onClick={() => synthesisMutation.mutate()}
             disabled={synthesisMutation.isPending}
-            className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-accent-cyan/15 text-accent-cyan hover:bg-accent-cyan/25 transition-colors disabled:opacity-40"
+            type="button"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors disabled:opacity-40"
           >
             {synthesisMutation.isPending ? (
               <>
@@ -903,7 +840,7 @@ export function FlowPaperTrading() {
         }
       >
         {synthesisMutation.isPending && (
-          <div className="flex items-center gap-2 py-3 text-sm text-accent-cyan">
+          <div className="flex items-center gap-2 py-3 text-sm text-text-secondary">
             <Loader2 size={14} className="animate-spin" />
             Claude is analyzing flow data + research... this takes 30-60 seconds
           </div>
@@ -920,7 +857,7 @@ export function FlowPaperTrading() {
       {/* Empty state */}
       {positions.length === 0 && wla.length === 0 && wlb.length === 0 && (
         <div className="text-center py-8 text-text-muted text-sm">
-          Click <strong>Scan & Trade</strong> to analyze flow entries and start
+          Click <strong>Scan and trade</strong> to analyze flow entries and start
           watching for dip-buy opportunities.
         </div>
       )}

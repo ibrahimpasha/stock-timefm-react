@@ -32,24 +32,24 @@ function AdminDeskBlock({ ticker }: { ticker: string }) {
     : d === "macro" ? "var(--accent-blue)" : "var(--text-muted)";
   return (
     <div className="card">
-      <div className="flex items-center gap-1.5 mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-        <ShieldCheck size={12} className="text-accent-purple" />
+      <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-text-primary">
+        <ShieldCheck size={13} className="text-accent-purple" />
         Admin desk
-        <span className="text-text-muted normal-case tracking-normal font-normal">
+        <span className="text-xs font-normal text-text-muted">
           {calls.length} mention{calls.length > 1 ? "s" : ""} · 14d
         </span>
       </div>
-      <div className="space-y-1.5">
+      <div className="divide-y divide-border">
         {calls.map((c) => (
-          <div key={c.msg_id} className="text-xs leading-snug">
+          <div key={c.msg_id} className="max-w-[72ch] py-2 text-sm leading-relaxed">
             <span className="num text-text-muted">{c.ts.slice(5, 10)}</span>
-            <span className="mx-1.5 font-semibold" style={{ color: dirColor(c.direction) }}>
-              {c.direction.toUpperCase()}
+            <span className="mx-1.5 text-xs font-medium" style={{ color: dirColor(c.direction) }}>
+              {c.direction.charAt(0).toUpperCase() + c.direction.slice(1)}
             </span>
             <span className="text-text-muted">{c.author}</span>
             <span className="text-text-secondary"> — {c.thesis}</span>
             {c.levels && (
-              <span className="num" style={{ color: "var(--accent-cyan)" }}> · {c.levels}</span>
+              <span className="num text-text-primary"> · {c.levels}</span>
             )}
           </div>
         ))}
@@ -219,16 +219,18 @@ export function TickerDetail({
       <div className="card">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Eye size={14} className="text-accent-cyan" />
-            <span className="font-mono font-bold text-lg text-text-primary">{ticker}</span>
+            <Eye size={14} className="text-text-muted" />
+            <span className="num text-lg font-semibold text-text-primary">{ticker}</span>
           </div>
-          <span className="text-xs text-text-muted num">{trackedData.total_entries} total</span>
+          <span className="text-xs text-text-muted">
+            <span className="num text-text-secondary">{trackedData.total_entries}</span> entries
+          </span>
         </div>
         <BullBearBar bull={trackedData.bullish} total={total} />
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
           <span className="text-text-muted">
-            Net Premium:{" "}
-            <span className="text-text-secondary num">{trackedData.net_premium}</span>
+            Net premium{" "}
+            <span className="num text-text-primary">{trackedData.net_premium}</span>
           </span>
           <EarningsBadge
             isoDate={earningsData?.earnings_date ?? null}
@@ -243,8 +245,8 @@ export function TickerDetail({
 
       {tickerPicks.length > 0 && (
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-2">
-            Picks ({tickerPicks.length})
+          <h4 className="mb-2 text-sm font-semibold text-text-primary">
+            Picks <span className="num text-xs font-normal text-text-muted">{tickerPicks.length}</span>
           </h4>
           <div className="space-y-2">
             {tickerPicks.map((p) => (
@@ -255,20 +257,21 @@ export function TickerDetail({
       )}
 
       <div>
-        <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-2">
+        <h4 className="mb-2 text-sm font-semibold text-text-primary">
           {tradersOnly ? (
-            <span className="text-accent-purple">
-              Trader Positions ({totalTraderPositions})
+            <span>
+              Trader positions <span className="num text-xs font-normal text-text-muted">{totalTraderPositions}</span>
             </span>
           ) : (
             <>
               {isAllDates
-                ? `Flow History (${totalEntries})`
+                ? "Flow history"
                 : isSingleDate
-                ? `Flow — ${formatDate(singleDate)} (${totalEntries})`
-                : `Flow — ${selectedDates.size} dates (${totalEntries})`}
+                ? `Flow on ${formatDate(singleDate)}`
+                : `Flow across ${selectedDates.size} dates`}
+              <span className="ml-1.5 num text-xs font-normal text-text-muted">{totalEntries}</span>
               {totalTraderPositions > 0 && (
-                <span className="ml-2 text-accent-purple">
+                <span className="ml-2 text-xs font-normal text-accent-purple">
                   + {totalTraderPositions} trader position{totalTraderPositions === 1 ? "" : "s"}
                 </span>
               )}
@@ -276,21 +279,21 @@ export function TickerDetail({
           )}
         </h4>
         {loading ? (
-          <div className="text-xs text-text-muted animate-pulse">Loading...</div>
+          <div className="animate-pulse text-sm text-text-muted">Loading…</div>
         ) : dateKeys.length === 0 ? (
           <div className="text-sm text-text-muted text-center py-4">
             No entries match filters
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-5">
             {dateKeys.map((date) => (
               <div key={date}>
                 {!isSingleDate && (
-                  <div className="text-xs font-semibold text-accent-blue mb-1">
+                  <div className="mb-1 border-b border-border pb-1.5 text-xs font-medium text-text-secondary">
                     {formatDate(date)}
                   </div>
                 )}
-                <div className="min-w-0 space-y-0.5 border-l-2 border-border pl-2">
+                <div className="min-w-0 divide-y divide-border">
                   {(traderByDate[date] || []).map((g) => (
                     <TraderEventRow
                       key={`t-${g.key}`}

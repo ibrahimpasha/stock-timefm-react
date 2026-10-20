@@ -81,6 +81,21 @@ function shortLabel(label: string, max = 32): string {
   return label.slice(0, max - 1) + "…";
 }
 
+// ponytail: "AI_POWER_GRID" -> "AI power grid". Short all-caps words are kept as
+// acronyms (AI, EUV, WFE) unless they're stopwords; a curated label map would
+// be the upgrade if a long acronym ever reads wrong.
+const STOP = new Set(["AND", "OF", "THE", "FOR", "IN", "TO", "OR", "ON", "BY"]);
+export function sentenceCase(raw: string): string {
+  const words = raw.replace(/_/g, " ").trim().split(/\s+/);
+  return words
+    .map((w, i) => {
+      if (w.length <= 3 && w === w.toUpperCase() && !STOP.has(w)) return w;
+      const lw = w.toLowerCase();
+      return i === 0 ? lw.charAt(0).toUpperCase() + lw.slice(1) : lw;
+    })
+    .join(" ");
+}
+
 function macroSortKey(code: string): number {
   if (code === NO_MACRO) return 999;
   const n = parseInt(code.replace(/^M/, ""), 10);
@@ -178,54 +193,45 @@ export function ThemeSection({
         ) : (
           <ChevronRight size={14} className="text-text-muted shrink-0" />
         )}
-        <span className="min-w-0 flex-1 truncate text-xs font-semibold uppercase tracking-wider text-text-primary md:flex-none">
-          {category.replace(/_/g, " ")}
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary md:flex-none">
+          {sentenceCase(category)}
         </span>
-        <span className="text-xs font-mono text-text-muted">{tickerCount} tkr</span>
-        <span className="text-xs font-mono">
-          <span style={{ color: "var(--accent-green)" }}>{bull}B</span>
-          <span className="text-text-muted">/</span>
-          <span style={{ color: "var(--accent-red)" }}>{bear}R</span>
-        </span>
-        <span
-          className="text-xs font-mono"
-          style={{ color: netBull ? "var(--accent-green)" : "var(--accent-red)" }}
-        >
-          {formatPremium(premium)}
-        </span>
-        {catEsc.esc > 0 && (
-          <span
-            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold"
-            style={{
-              background: "color-mix(in srgb, var(--accent-green) 10%, transparent)",
-              color: "var(--accent-green)",
-              border: "1px solid color-mix(in srgb, var(--accent-green) 30%, transparent)",
-            }}
-            title={`${catEsc.esc} ticker${catEsc.esc === 1 ? "" : "s"} with strike-ladder escalation in last 14d (${catEsc.bullDom} bull-dominant, ${catEsc.bearDom} bear-dominant overall)`}
-          >
-            <TrendingUp size={10} />
-            {catEsc.esc}
+        <span className="flex shrink-0 items-center gap-2 text-xs text-text-muted">
+          <span className="num">{tickerCount}</span>
+          <span className="num max-sm:hidden">
+            <span style={{ color: "var(--accent-green)" }}>{bull}</span>
+            {" / "}
+            <span style={{ color: "var(--accent-red)" }}>{bear}</span>
           </span>
-        )}
-        {bnDef && (
-          <span className="ml-auto hidden min-w-0 items-center gap-2 truncate font-mono text-[10px] text-text-muted sm:flex">
+          <span
+            className="num"
+            style={{ color: netBull ? "var(--accent-green)" : "var(--accent-red)" }}
+          >
+            {formatPremium(premium)}
+          </span>
+          {catEsc.esc > 0 && (
             <span
-              className="px-1.5 py-0.5 rounded truncate"
-              style={{
-                background: "color-mix(in srgb, var(--accent-orange) 10%, transparent)",
-                color: "var(--accent-orange)",
-                border: "1px solid color-mix(in srgb, var(--accent-orange) 25%, transparent)",
-              }}
-              title={`${topBottleneck}: ${bnDef.detail}`}
+              className="num inline-flex items-center gap-0.5"
+              style={{ color: "var(--accent-green)" }}
+              title={`${catEsc.esc} ticker${catEsc.esc === 1 ? "" : "s"} with strike-ladder escalation in last 14d (${catEsc.bullDom} bull-dominant, ${catEsc.bearDom} bear-dominant overall)`}
             >
-              {topBottleneck} {shortLabel(bnDef.label, 28)}
+              <TrendingUp size={11} />
+              {catEsc.esc}
             </span>
+          )}
+        </span>
+        {bnDef && (
+          <span
+            className="ml-auto hidden min-w-0 truncate text-xs text-text-muted sm:block"
+            title={`${topBottleneck}: ${bnDef.detail}`}
+          >
+            Bottleneck: <span className="text-text-secondary">{shortLabel(bnDef.label, 32)}</span>
           </span>
         )}
       </button>
 
       {expanded && (
-        <div className="ml-1 mt-2 min-w-0 space-y-3 border-l border-border pl-2 md:pl-4">
+        <div className="mt-2 min-w-0 space-y-4 pl-1 md:pl-6">
           {subGroupOrder.map((key) => {
             const items = bySubGroup[key];
             if (!items.length) return null;
@@ -244,7 +250,7 @@ export function ThemeSection({
             return (
               <div key={key}>
                 <div
-                  className="mb-1.5 flex min-w-0 items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider"
+                  className="mb-2 flex min-w-0 items-baseline gap-2 text-xs"
                   title={
                     isThemeMode
                       ? themeDesc || (isSentinel ? "Tickers with no theme tag" : "")
@@ -253,50 +259,27 @@ export function ThemeSection({
                   }
                 >
                   <span
-                    className="max-w-full shrink-0 truncate rounded px-1.5 py-0.5 font-mono"
-                    style={{
-                      background: isSentinel
-                        ? "transparent"
-                        : isThemeMode
-                          ? "color-mix(in srgb, var(--accent-purple) 10%, transparent)"
-                          : "color-mix(in srgb, var(--accent-blue) 10%, transparent)",
-                      color: isSentinel
-                        ? "var(--text-muted)"
-                        : isThemeMode
-                          ? "var(--accent-purple, #c084fc)"
-                          : "var(--accent-blue)",
-                      border: isSentinel
-                        ? "1px dashed var(--border)"
-                        : isThemeMode
-                          ? "1px solid color-mix(in srgb, var(--accent-purple) 25%, transparent)"
-                          : "1px solid color-mix(in srgb, var(--accent-blue) 25%, transparent)",
-                    }}
+                    className={`max-w-full shrink-0 truncate font-medium ${isSentinel ? "text-text-muted" : "text-text-primary"}`}
                   >
-                    {chipLabel}
+                    {isSentinel ? "Untagged" : isThemeMode ? sentenceCase(chipLabel) : chipLabel}
                   </span>
-                  <span className="min-w-0 flex-1 truncate normal-case tracking-normal text-text-secondary max-sm:hidden">
-                    {secondary}
-                  </span>
-                  <span className="opacity-60 font-mono normal-case tracking-normal">
-                    {items.length}
-                  </span>
+                  <span className="num text-text-muted">{items.length}</span>
                   {(() => {
                     const sc = escCounts(items, escMap);
                     return sc.esc > 0 ? (
                       <span
-                        className="inline-flex items-center gap-0.5 px-1 py-px rounded text-[9px] font-mono normal-case tracking-normal"
-                        style={{
-                          background: "color-mix(in srgb, var(--accent-green) 10%, transparent)",
-                          color: "var(--accent-green)",
-                          border: "1px solid color-mix(in srgb, var(--accent-green) 25%, transparent)",
-                        }}
+                        className="num inline-flex items-center gap-0.5"
+                        style={{ color: "var(--accent-green)" }}
                         title={`${sc.esc} of ${items.length} ticker${items.length === 1 ? "" : "s"} escalating in last 14d`}
                       >
-                        <TrendingUp size={9} />
+                        <TrendingUp size={11} />
                         {sc.esc}
                       </span>
                     ) : null;
                   })()}
+                  <span className="min-w-0 flex-1 truncate text-text-muted max-sm:hidden">
+                    {secondary}
+                  </span>
                 </div>
                 <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   {items.map((t) => (

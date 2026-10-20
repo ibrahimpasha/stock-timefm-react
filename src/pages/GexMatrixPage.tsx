@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { GlassPanel, Chip, Segmented } from "../components/Glass";
+import { GlassPanel, Segmented } from "../components/Glass";
 import {
   useGexMatrix,
   useGexTickers,
@@ -29,8 +29,8 @@ const METRICS: { value: GexMetric; label: string }[] = [
   { value: "gex", label: "GEX" },
   { value: "vex", label: "VEX" },
   { value: "oi", label: "OI" },
-  { value: "vol", label: "VOL" },
-  { value: "unusual", label: "UNUSUAL" },
+  { value: "vol", label: "Volume" },
+  { value: "unusual", label: "Unusual" },
 ];
 
 const BANDS: { value: string; label: string }[] = [
@@ -161,21 +161,22 @@ export function GexMatrixPage() {
   );
 
   return (
-    <div className="flex flex-col gap-3">
-      <GlassPanel
-        title="Dealer Positioning Matrix"
-        actions={
-          <div className="flex items-center gap-2">
-            {data?.ok && (
-              <>
-                <Chip tone="cyan">{data.ticker} ${spot.toFixed(2)}</Chip>
-                <Chip tone="neutral">{data.updated_at?.slice(0, 16).replace("T", " ")}</Chip>
-              </>
-            )}
+    <div className="desk-page">
+      <header className="desk-header">
+        <div className="desk-header__title">
+          <h1>GEX</h1>
+          <p>Dealer gamma, vega and open interest by strike and expiry</p>
+        </div>
+        {data?.ok && (
+          <div className="desk-header__actions text-sm text-text-secondary">
+            <span className="num font-semibold text-text-primary">{data.ticker}</span>
+            <span className="num">${spot.toFixed(2)}</span>
+            <span className="num text-xs text-text-muted">{data.updated_at?.slice(0, 16).replace("T", " ")}</span>
           </div>
-        }
-      >
-        <div className="flex flex-wrap items-center gap-2 mb-3">
+        )}
+      </header>
+      <GlassPanel title="Dealer positioning matrix">
+        <div className="flex flex-wrap items-center gap-2 mb-4">
           <div className="mobile-horizontal-strip flex w-full min-w-0 gap-1 overflow-x-auto lg:w-auto lg:flex-wrap lg:overflow-visible">
             {(tickers ?? []).map((t) => (
               <button
@@ -185,7 +186,7 @@ export function GexMatrixPage() {
                 aria-pressed={t.ticker === ticker}
                 className={`min-h-11 shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-colors lg:min-h-0 ${
                   t.ticker === ticker
-                    ? "bg-accent-cyan/15 text-accent-cyan"
+                    ? "bg-accent-blue/15 text-accent-blue"
                     : "text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
                 }`}
               >
@@ -197,24 +198,24 @@ export function GexMatrixPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="any ticker…"
+              placeholder="Any ticker…"
               aria-label="Look up a ticker's dealer positioning"
               className="min-h-11 w-28 px-2 py-1 rounded-full text-xs bg-bg-card border border-border lg:min-h-0
                          text-text-primary placeholder:text-text-muted focus:outline-none
-                         focus:border-accent-cyan num"
+                         focus:border-accent-blue num"
             />
           </form>
           <div className="w-full min-w-0 lg:ml-auto lg:w-auto">{header}</div>
         </div>
 
         {isLoading && !data && (
-          <p className="text-xs text-text-muted animate-pulse">loading chain…</p>
+          <p className="text-sm text-text-muted animate-pulse">Loading chain…</p>
         )}
 
         {data && !data.ok && (
           <div className="py-4 flex flex-col items-start gap-2">
-            <p className="text-xs text-text-muted">
-              No grid for <span className="num font-bold text-text-primary">{ticker}</span> yet —
+            <p className="text-sm text-text-secondary leading-relaxed max-w-[72ch]">
+              No grid for <span className="num font-semibold text-text-primary">{ticker}</span> yet —
               the nightly build covers the anchors, your book and the top flow names only.
             </p>
             <button
@@ -222,13 +223,13 @@ export function GexMatrixPage() {
               disabled={building}
               onClick={() => refresh.mutate(ticker)}
               className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors
-                         bg-accent-cyan/15 text-accent-cyan hover:bg-accent-cyan/25
+                         bg-accent-blue/15 text-accent-blue hover:bg-accent-blue/25
                          disabled:opacity-60"
             >
-              {building ? `building ${ticker}…` : `Build ${ticker} now`}
+              {building ? `Building ${ticker}…` : `Build ${ticker} now`}
             </button>
             {building && (
-              <p className="text-[10px] text-text-muted">
+              <p className="text-xs text-text-muted">
                 Pulling 8 option chains — usually 5-10s. This page refreshes itself.
               </p>
             )}
@@ -242,7 +243,7 @@ export function GexMatrixPage() {
             <table className="text-xs border-separate w-full max-w-5xl" style={{ borderSpacing: 2 }}>
               <thead>
                 <tr>
-                  <th className="text-left font-medium text-[10px] uppercase tracking-wider text-text-muted px-2 sticky left-0 bg-bg-primary z-10 w-20">
+                  <th className="text-left text-xs font-medium text-text-muted px-2 sticky left-0 bg-[var(--card-bg)] z-10 w-20">
                     Strike
                   </th>
                   {data.expiries.map((e) => {
@@ -255,7 +256,7 @@ export function GexMatrixPage() {
                         >
                           {d}
                         </div>
-                        <div className="text-[10px] text-text-muted font-normal num">{tag}</div>
+                        <div className="text-xs text-text-muted font-normal num">{tag}</div>
                       </th>
                     );
                   })}
@@ -267,9 +268,9 @@ export function GexMatrixPage() {
                   return (
                     <tr key={k}>
                       <td
-                        className="px-2 num text-right sticky left-0 bg-bg-primary z-10 whitespace-nowrap"
+                        className="px-2 num text-right sticky left-0 bg-[var(--card-bg)] z-10 whitespace-nowrap"
                         style={{
-                          color: isAtm ? "var(--accent-cyan)" : "var(--text-secondary)",
+                          color: isAtm ? "var(--accent-blue)" : "var(--text-secondary)",
                           fontWeight: isAtm ? 700 : 400,
                         }}
                       >
@@ -320,7 +321,7 @@ export function GexMatrixPage() {
               {data.totals && (
                 <tfoot>
                   <tr>
-                    <td className="px-2 text-[10px] uppercase tracking-wider text-text-muted sticky left-0 bg-bg-primary z-10">
+                    <td className="px-2 text-xs font-medium text-text-muted sticky left-0 bg-[var(--card-bg)] z-10">
                       Net
                     </td>
                     {data.expiries.map((e) => {
@@ -341,7 +342,7 @@ export function GexMatrixPage() {
         )}
       </GlassPanel>
 
-      <p className="text-[10px] text-text-muted px-1">
+      <p className="text-xs leading-relaxed text-text-muted max-w-[72ch]">
         Sign convention: dealers long calls, short puts. Positive (green) gamma dampens moves
         through that strike; negative (red) amplifies them. <strong>Green is dealer positioning,
         not a buy signal</strong> — a big green cell often acts as a magnet/pin, and a call there

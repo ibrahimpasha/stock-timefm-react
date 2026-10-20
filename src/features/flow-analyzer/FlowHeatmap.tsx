@@ -15,7 +15,7 @@ import {
   Sigma,
 } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
-import { Chip, Segmented } from "../../components/Glass";
+import { Segmented } from "../../components/Glass";
 import { useDashboardFilters } from "../../store/useDashboardFilters";
 import { useTickerNames } from "../../api/tickerNames";
 import { useTickerMeta, type TickerMeta } from "../../api/tickerMeta";
@@ -525,7 +525,7 @@ export function FlowHeatmap() {
       <style>{HEATMAP_KEYFRAMES}</style>
       <QueryNotice queries={[datesQuery, ...summaries, ...(colorMetric === "pl" ? [returnsQuery] : [])]} label="Heat map data" />
       {colorMetric === "pl" && <FlowCoverageNotice meta={returns?.meta} />}
-      {/* ── Controls ─────────────────────────────────────────── */}
+      {/* ── Controls: one toolbar row; rarely-touched knobs live in Options ── */}
       <div className="flex items-center gap-2 flex-wrap">
         {viewToggle}
         {/* Date strip — a mini entry-volume histogram: each day's bar height is
@@ -538,7 +538,7 @@ export function FlowHeatmap() {
             type="button"
             onClick={() => patchHeatmap({ selectedDates: new Set(dates.map((d) => d.date)) })}
             aria-pressed={isAll}
-            className="min-h-8 px-3 text-xs font-semibold transition-colors flex items-center"
+            className="min-h-8 px-3 text-xs font-medium transition-colors flex items-center"
             style={{
               background: isAll ? "color-mix(in srgb, var(--accent-blue) 15%, transparent)" : "transparent",
               color: isAll ? "var(--accent-blue)" : "var(--text-muted)",
@@ -553,14 +553,14 @@ export function FlowHeatmap() {
               const on =
                 selectedDates.has(d.date) || (selectedDates.size === 0 && d.date === latestDate);
               const isToday = d.date === latestDate;
-              const barH = Math.max(3, Math.round(((d.entries || 0) / maxE) * 20));
+              const barH = Math.max(3, Math.round(((d.entries || 0) / maxE) * 16));
               return (
                 <button
                   type="button"
                   key={d.date}
                   onClick={(e) => pickDate(d.date, e.shiftKey || e.metaKey || e.ctrlKey)}
                   aria-pressed={on}
-                  className="flex min-h-8 min-w-8 flex-col items-center justify-end gap-1 px-1.5 py-1.5 border-l border-border transition-colors"
+                  className="flex min-h-8 min-w-8 flex-col items-center justify-end gap-1 px-1.5 py-1 border-l border-border transition-colors"
                   style={{ background: on ? "color-mix(in srgb, var(--accent-blue) 14%, transparent)" : "transparent" }}
                   title={`${d.entries} entries · ${d.date}${isToday ? " (today)" : ""} · click to view · shift-click to add days`}
                 >
@@ -573,7 +573,7 @@ export function FlowHeatmap() {
                     }}
                   />
                   <span
-                    className="text-[9px] num leading-none"
+                    className="text-xs num leading-none"
                     style={{ color: on ? "var(--accent-blue)" : "var(--text-muted)" }}
                   >
                     {isToday ? "Today" : d.date.slice(5)}
@@ -584,109 +584,115 @@ export function FlowHeatmap() {
           })()}
         </div>
 
-        <MetricSelect label="Size" icon={Maximize2} accent="var(--accent-blue)" value={sizeMetric} onChange={(v) => patchHeatmap({ sizeMetric: v as SizeMetric })} options={SIZE_OPTIONS} />
-        <MetricSelect label="Color" icon={Palette} accent="var(--accent-purple)" value={colorMetric} onChange={(v) => patchHeatmap({ colorMetric: v as ColorMetric })} options={COLOR_OPTIONS} />
-        <MetricSelect label="Group" icon={Layers} accent="var(--accent-cyan)" value={groupBy} onChange={(v) => patchHeatmap({ groupBy: v as GroupBy })} options={GROUP_OPTIONS} />
-        <MetricSelect label="Pulse" icon={Radio} accent="var(--accent-orange)" value={pulse} onChange={(v) => patchHeatmap({ pulse: v as Pulse })} options={PULSE_OPTIONS} />
+        <MetricSelect label="Size" icon={Maximize2} value={sizeMetric} onChange={(v) => patchHeatmap({ sizeMetric: v as SizeMetric })} options={SIZE_OPTIONS} />
+        <MetricSelect label="Color" icon={Palette} value={colorMetric} onChange={(v) => patchHeatmap({ colorMetric: v as ColorMetric })} options={COLOR_OPTIONS} />
+        <MetricSelect label="Group" icon={Layers} value={groupBy} onChange={(v) => patchHeatmap({ groupBy: v as GroupBy })} options={GROUP_OPTIONS} />
+        <MetricSelect label="Pulse" icon={Radio} value={pulse} onChange={(v) => patchHeatmap({ pulse: v as Pulse })} options={PULSE_OPTIONS} />
 
-        {/* Threshold for the score-based pulses (ML / TA / pattern).
-            Earnings pulses gate on the ≤10/20/30d window instead. */}
-        {(pulse === "ml" || pulse === "play" || pulse === "technical" || pulse === "pattern") && (
-          <label
-            className="control-surface flex items-center gap-1.5 border px-2 py-1.5"
-            style={{ borderRadius: "var(--radius-control)" }}
-            title="Minimum 0–100 strength a ticker needs to pulse (e.g. ML ≥ 80)"
-          >
-            <span className="text-[10px] uppercase tracking-wide text-text-muted">≥</span>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step={5}
-              value={pulseThreshold}
-              aria-label="Minimum pulse strength"
-              onChange={(e) => patchHeatmap({ pulseThreshold: clamp(Number(e.target.value) || 0, 0, 100) })}
-              className="w-12 bg-transparent text-xs text-text-primary outline-none num"
-            />
-          </label>
-        )}
-
-        {/* Pulse the whole sector/theme frame instead of individual tiles. */}
-        {pulse !== "off" && (
-          <label
-            className={`control-surface flex items-center gap-1.5 border px-2 py-1.5 text-xs select-none ${
-              groupBy === "none"
-                ? "border-border text-text-muted opacity-50 cursor-not-allowed"
-                : "border-border text-text-secondary cursor-pointer"
-            }`}
-            style={{ borderRadius: "var(--radius-control)" }}
-            title={
-              groupBy === "none"
-                ? "Pick a Group (Sector / Theme / Sub-category) to enable group pulsing"
-                : "Pulse the entire group frame when any member clears the threshold"
-            }
-          >
-            <input
-              type="checkbox"
-              checked={pulseGroup && groupBy !== "none"}
-              disabled={groupBy === "none"}
-              onChange={(e) => patchHeatmap({ pulseGroup: e.target.checked })}
-              className="accent-accent-blue"
-            />
-            Pulse group
-          </label>
-        )}
-
-        {/* Tile filters — hide tiles below/over the slider value when toggled on. */}
-        <span className="text-[10px] uppercase tracking-wide text-text-muted ml-1">Filter</span>
-        <FilterSlider
-          label="ML ≥" on={mlOn} value={mlMin} min={0} max={100} step={5}
-          onToggle={(v) => patchHeatmap({ mlOn: v })} onValue={(v) => patchHeatmap({ mlMin: v })}
-          title="Hide tiles whose best within-DTE ML percentile is below this"
-        />
-        <FilterSlider
-          label="Play ≥" on={playOn} value={playMin} min={0} max={100} step={5}
-          onToggle={(v) => patchHeatmap({ playOn: v })} onValue={(v) => patchHeatmap({ playMin: v })}
-          title="Hide tiles whose Theme-Pulse play score is below this"
-        />
-        <FilterSlider
-          label="ER ≤" on={earnOn} value={earnDays} min={1} max={90} step={1} suffix="d"
-          onToggle={(v) => patchHeatmap({ earnOn: v })} onValue={(v) => patchHeatmap({ earnDays: v })}
-          title="Hide tiles with no earnings within this many days (single source: ticker_earnings). Also sets the Earnings pulse window."
-        />
-
-        <div className="ml-auto flex items-center gap-2 text-xs">
+        <div className="ml-auto flex items-center gap-3 text-xs text-text-muted">
           {activeDates.length > 1 && (
-            <Chip
-              tone="blue"
-              title="Flow from these dates is merged (unioned). Click a single date to view just that day."
-            >
-              {activeDates.length} days merged
-            </Chip>
+            <span title="Flow from these dates is merged (unioned). Click a single date to view just that day.">
+              <span className="num text-text-primary">{activeDates.length}</span> days merged
+            </span>
           )}
-          <Chip>
-            <Grid3x3 size={12} className="text-accent-blue" />
+          <span className="inline-flex items-center gap-1">
+            <Grid3x3 size={12} />
             <span className="num font-semibold text-text-primary">
               {filtersActive ? `${vcells.length}/${cells.length}` : cells.length}
             </span>
-            <span className="text-text-muted">tickers</span>
-          </Chip>
-          <Chip>
-            <Sigma size={12} className="text-accent-green" />
+            tickers
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Sigma size={12} />
             <span className="num font-semibold text-text-primary">{formatPremium(totalPremium)}</span>
-            <span className="text-text-muted">total</span>
-          </Chip>
+            total
+          </span>
           <ColorLegend metric={colorMetric} />
+        </div>
+      </div>
+
+      <details className="group text-xs">
+        <summary className="inline-flex cursor-pointer select-none items-center gap-1 text-text-muted hover:text-text-primary">
+          <ChevronDown size={12} className="transition-transform group-open:rotate-180" />
+          Options
+          {filtersActive && <span className="text-accent-blue">· filters on</span>}
+        </summary>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {/* Threshold for the score-based pulses (ML / TA / pattern).
+              Earnings pulses gate on the ER window instead. */}
+          {(pulse === "ml" || pulse === "play" || pulse === "technical" || pulse === "pattern") && (
+            <label
+              className="control-surface flex items-center gap-1.5 border px-2 py-1.5"
+              style={{ borderRadius: "var(--radius-control)" }}
+              title="Minimum 0–100 strength a ticker needs to pulse (e.g. ML ≥ 80)"
+            >
+              <span className="text-xs text-text-muted">Pulse ≥</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={5}
+                value={pulseThreshold}
+                aria-label="Minimum pulse strength"
+                onChange={(e) => patchHeatmap({ pulseThreshold: clamp(Number(e.target.value) || 0, 0, 100) })}
+                className="w-12 bg-transparent text-xs text-text-primary outline-none num"
+              />
+            </label>
+          )}
+
+          {/* Pulse the whole sector/theme frame instead of individual tiles. */}
+          {pulse !== "off" && (
+            <label
+              className={`control-surface flex items-center gap-1.5 border px-2 py-1.5 text-xs select-none ${
+                groupBy === "none"
+                  ? "border-border text-text-muted opacity-50 cursor-not-allowed"
+                  : "border-border text-text-secondary cursor-pointer"
+              }`}
+              style={{ borderRadius: "var(--radius-control)" }}
+              title={
+                groupBy === "none"
+                  ? "Pick a Group (Sector / Theme / Sub-category) to enable group pulsing"
+                  : "Pulse the entire group frame when any member clears the threshold"
+              }
+            >
+              <input
+                type="checkbox"
+                checked={pulseGroup && groupBy !== "none"}
+                disabled={groupBy === "none"}
+                onChange={(e) => patchHeatmap({ pulseGroup: e.target.checked })}
+                className="accent-accent-blue"
+              />
+              Pulse group
+            </label>
+          )}
+
+          {/* Tile filters — hide tiles below/over the slider value when toggled on. */}
+          <FilterSlider
+            label="ML ≥" on={mlOn} value={mlMin} min={0} max={100} step={5}
+            onToggle={(v) => patchHeatmap({ mlOn: v })} onValue={(v) => patchHeatmap({ mlMin: v })}
+            title="Hide tiles whose best within-DTE ML percentile is below this"
+          />
+          <FilterSlider
+            label="Play ≥" on={playOn} value={playMin} min={0} max={100} step={5}
+            onToggle={(v) => patchHeatmap({ playOn: v })} onValue={(v) => patchHeatmap({ playMin: v })}
+            title="Hide tiles whose Theme-Pulse play score is below this"
+          />
+          <FilterSlider
+            label="ER ≤" on={earnOn} value={earnDays} min={1} max={90} step={1} suffix="d"
+            onToggle={(v) => patchHeatmap({ earnOn: v })} onValue={(v) => patchHeatmap({ earnDays: v })}
+            title="Hide tiles with no earnings within this many days (single source: ticker_earnings). Also sets the Earnings pulse window."
+          />
+
           <a
             href="/api/intel-graph/theme-pulse/export?format=csv"
             download
             title="Download all theme pulses (CSV) for manual analysis"
-            className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs font-medium text-text-muted hover:text-accent-cyan transition-colors"
+            className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
           >
-            <Download size={12} /> pulses
+            <Download size={12} /> Export pulses (CSV)
           </a>
         </div>
-      </div>
+      </details>
 
       {/* ── Treemap ──────────────────────────────────────────── */}
       <div
@@ -732,15 +738,15 @@ export function FlowHeatmap() {
             >
               <div
                 className="absolute inset-0 rounded-sm"
-                style={{ border: gp.on ? "1px solid rgba(255,255,255,0.35)" : "1px solid rgba(255,255,255,0.15)", ...frameStyle }}
+                style={{ border: `1px solid color-mix(in srgb, var(--text-primary) ${gp.on ? 40 : 18}%, transparent)`, ...frameStyle }}
               />
               {g.headerH > 0 && (
                 <div
-                  className="absolute left-0 top-0 w-full px-1 flex items-center text-[10px] font-semibold uppercase tracking-wide truncate"
-                  style={{ height: g.headerH, background: gp.on ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.04)", color: gp.on ? "var(--text-primary)" : "var(--text-secondary)" }}
+                  className="absolute left-0 top-0 w-full px-1 flex items-center text-xs font-medium truncate leading-none"
+                  style={{ height: g.headerH, background: `color-mix(in srgb, var(--text-primary) ${gp.on ? 10 : 5}%, transparent)`, color: gp.on ? "var(--text-primary)" : "var(--text-secondary)" }}
                 >
                   <span className="truncate">{g.key}</span>
-                  <span className="ml-1 opacity-50">{g.n}</span>
+                  <span className="ml-1 num text-text-muted">{g.n}</span>
                   {gp.on && gp.count > 0 && (
                     <span className="ml-1" style={{ color: "var(--accent-blue)" }}>· {gp.count}★</span>
                   )}
@@ -888,7 +894,7 @@ function Tile({
       title={tip}
       aria-pressed={active}
       aria-label={`${cell.ticker}${name ? `, ${name}` : ""}: ${formatPremium(cell.premium)} premium, ${cell.count} entries, ${label}`}
-      className="absolute flex flex-col items-center justify-center overflow-hidden text-center transition-[outline] hover:outline hover:outline-2 hover:outline-white/40"
+      className="absolute flex flex-col items-center justify-center overflow-hidden text-center transition-[outline] hover:outline hover:outline-2 hover:outline-text-primary/40"
       style={{
         left: x,
         top: y,
@@ -907,7 +913,6 @@ function Tile({
           style={{
             fontSize: 11,
             color: pulse.dir === "up" ? "var(--accent-green)" : "var(--accent-red)",
-            textShadow: "0 0 2px rgba(0,0,0,0.6)",
           }}
         >
           {pulse.dir === "up" ? "▲" : "▼"}
@@ -915,17 +920,17 @@ function Tile({
       )}
       {showTicker && (
         <span
-          className="font-mono font-bold text-text-primary leading-none"
+          className="num font-semibold text-text-primary leading-none"
           style={{ fontSize: Math.min(18, Math.max(9, Math.min(w / 4.5, h / 2.2))) }}
         >
           {cell.ticker}
         </span>
       )}
       {showVal && (
-        <span className="font-mono text-text-primary/80 leading-none mt-0.5 text-[10px]">{label}</span>
+        <span className="num text-text-primary/80 leading-none mt-1 text-xs">{label}</span>
       )}
       {showName && (
-        <span className="text-text-primary/60 leading-tight mt-0.5 px-1 text-[10px] line-clamp-1">{name}</span>
+        <span className="text-text-secondary leading-tight mt-0.5 px-1 text-xs line-clamp-1">{name}</span>
       )}
     </button>
   );
@@ -974,8 +979,8 @@ function FilterSlider({
         className="accent-accent-blue"
       />
       <span
-        className="text-[10px] uppercase tracking-wide whitespace-nowrap"
-        style={{ color: on ? accent : "var(--text-muted)" }}
+        className="text-xs whitespace-nowrap"
+        style={{ color: on ? "var(--text-primary)" : "var(--text-muted)" }}
       >
         {label}
       </span>
@@ -991,11 +996,8 @@ function FilterSlider({
         style={{ opacity: on ? 1 : 0.5 }}
       />
       <span
-        className="num text-xs font-semibold w-9 text-center rounded px-1 py-0.5"
-        style={{
-          color: on ? accent : "var(--text-muted)",
-          background: on ? `color-mix(in srgb, ${accent} 14%, transparent)` : "transparent",
-        }}
+        className="num text-xs font-semibold w-9 text-center"
+        style={{ color: on ? "var(--text-primary)" : "var(--text-muted)" }}
       >
         {value}
         {suffix}
@@ -1012,14 +1014,12 @@ function MetricSelect({
   onChange,
   options,
   icon: Icon,
-  accent = "var(--accent-blue)",
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: { id: string; label: string; hint?: string }[];
   icon?: React.ComponentType<{ size?: number; style?: React.CSSProperties }>;
-  accent?: string;
 }) {
   const active = options.find((o) => o.id === value);
   return (
@@ -1032,8 +1032,8 @@ function MetricSelect({
       }}
       title={active?.hint}
     >
-      {Icon && <Icon size={13} style={{ color: accent }} />}
-      <span className="text-[9px] uppercase tracking-wider text-text-muted">{label}</span>
+      {Icon && <Icon size={13} style={{ color: "var(--text-muted)" }} />}
+      <span className="text-xs text-text-muted">{label}</span>
       <span className="text-xs font-semibold text-text-primary whitespace-nowrap">
         {active?.label ?? value}
       </span>
@@ -1067,8 +1067,7 @@ function ColorLegend({ metric }: { metric: ColorMetric }) {
   const [lo, hi] = ends[metric];
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-1 text-[10px]"
-      style={{ background: "var(--glass-bg)" }}
+      className="inline-flex items-center gap-1.5 text-xs"
     >
       <span style={{ color: "var(--accent-red)" }}>{lo}</span>
       <span

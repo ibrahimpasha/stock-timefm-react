@@ -38,34 +38,57 @@ export function RotationPage() {
     <Segmented options={WINDOWS} value={window} onChange={setWindow} ariaLabel="Rotation window" />
   );
 
+  const header = (
+    <header className="desk-header">
+      <div className="desk-header__title">
+        <h1>Rotation</h1>
+        <p>
+          {data?.ok
+            ? `Relative strength of the 11 SPDR sectors + XRT vs ${data.benchmark}, as of ${data.as_of}`
+            : "Relative strength of the 11 SPDR sectors + XRT vs SPY"}
+        </p>
+      </div>
+      <div className="desk-header__actions">{picker}</div>
+    </header>
+  );
+
   if (isLoading && !data) {
-    return <div className="p-8 text-sm text-text-muted animate-pulse">loading rotation…</div>;
+    return (
+      <div className="desk-page">
+        {header}
+        <div className="p-8 text-sm text-text-muted animate-pulse">Loading rotation…</div>
+      </div>
+    );
   }
   if (!data?.ok) {
     return (
-      <GlassPanel title="Sector Rotation">
-        <QueryNotice queries={[rotationQuery]} label="Sector rotation" />
-        {data && <p className="text-xs text-text-muted">{data.reason ?? "Rotation data unavailable"}</p>}
-      </GlassPanel>
+      <div className="desk-page">
+        {header}
+        <GlassPanel title="Sector rotation">
+          <QueryNotice queries={[rotationQuery]} label="Sector rotation" />
+          {data && <p className="text-sm text-text-muted">{data.reason ?? "Rotation data unavailable"}</p>}
+        </GlassPanel>
+      </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="desk-page">
+      {header}
       <QueryNotice queries={[rotationQuery]} label="Sector rotation" />
       <GlassPanel
-        title="Sector Overview"
+        title="Sector overview"
         actions={
-          <span className="text-[10px] uppercase tracking-wider text-text-muted">
-            sorted by {window} momentum score
+          <span className="text-xs text-text-muted">
+            Sorted by {window} momentum score
           </span>
         }
       >
         <SectorStrip sectors={sectors} />
       </GlassPanel>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(340px,520px)_minmax(0,1.15fr)_minmax(0,0.85fr)] gap-3">
-        <GlassPanel title="Rotation Map">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(340px,520px)_minmax(0,1.15fr)_minmax(0,0.85fr)] gap-4">
+        <GlassPanel title="Rotation map">
           <RotationMap sectors={sectors} atIndex={idx} />
           <RotationScrubber
             dates={dates}
@@ -77,40 +100,39 @@ export function RotationPage() {
           />
         </GlassPanel>
 
-        <div className="flex flex-col gap-3 min-w-0">
-          <GlassPanel title="Rotation Timeline" actions={picker}>
+        <div className="flex flex-col gap-4 min-w-0">
+          <GlassPanel title="Rotation timeline">
             <RotationTimeline sectors={sectors} />
           </GlassPanel>
           <GlassPanel
-            title="Sector Momentum Ranking"
-            actions={<Chip tone="blue">{window}</Chip>}
+            title="Momentum ranking"
+            actions={<Chip>{window}</Chip>}
           >
             <MomentumRanking sectors={sectors} />
           </GlassPanel>
         </div>
 
-        <div className="flex flex-col gap-3 min-w-0">
-          <GlassPanel title="Rotation Insights" actions={<Chip tone="blue">{window}</Chip>}>
-            <div className="flex flex-col gap-3 text-xs text-text-secondary leading-relaxed">
+        <div className="flex flex-col gap-4 min-w-0">
+          <GlassPanel title="Insights" actions={<Chip>{window}</Chip>}>
+            <ul className="flex flex-col gap-3 text-sm text-text-secondary leading-relaxed max-w-[72ch]">
               {data.insights.map((ins, i) => (
-                <div key={i} className="flex gap-2">
-                  <span className="mt-1 size-1.5 rounded-full shrink-0"
-                        style={{ background: "var(--accent-green)" }} />
+                <li key={i} className="flex gap-2">
+                  <span className="mt-2 size-1.5 rounded-full shrink-0 bg-text-muted" />
                   <InsightLine ins={ins} />
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           </GlassPanel>
           <GlassPanel
-            title="Live Rotation Alerts"
-            actions={<Chip tone="purple">{data.as_of}</Chip>}
+            title="Live rotation alerts"
+            actions={<span className="text-xs text-text-muted num">{data.as_of}</span>}
           >
             <AlertFeed alerts={data.alerts} />
           </GlassPanel>
         </div>
       </div>
 
-      <p className="text-[10px] text-text-muted px-1">
+      <p className="text-xs text-text-muted leading-relaxed max-w-[72ch]">
         {data.sessions} sessions vs {data.benchmark}. RS-Ratio / RS-Momentum are the standard open
         approximation of a relative-rotation graph — quadrant semantics match, absolute values will
         not tie out against proprietary RRG implementations.

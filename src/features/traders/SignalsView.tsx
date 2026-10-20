@@ -7,13 +7,13 @@
  * `{ ok: false, reason: 'alerts_db_not_ready' }` until populated — each tab
  * renders a clean empty state when that happens.
  *
- * Glass remodel: the shell is a `GlassPanel`, the three tabs and every
- * window/lookback selector are `Segmented` controls, badges are `Chip`s and
- * tables follow the spec treatment (muted sticky header, hover rows, `num`
- * on all metrics). Behavior and data flow are unchanged.
+ * 2026-10 redesign: `GlassPanel` shell, tabs + selectors are `Segmented`,
+ * sentiment/catalyst/ticker pills became plain text (color only on signed
+ * sentiment / direction), sentence-case labels, opaque sticky table heads
+ * (no blur), divided rows. Behavior and data flow are unchanged.
  */
 import { useMemo, useState } from "react";
-import { TrendingUp, Flame, Award, BarChart3, X, ShieldCheck } from "lucide-react";
+import { X } from "lucide-react";
 
 import {
   useTrending,
@@ -26,7 +26,6 @@ import {
 import { useAppStore } from "../../store/useAppStore";
 import { Sparkline, RangeBar } from "../../components/CCPrimitives";
 import { GlassPanel, Segmented, Chip, type ChipTone } from "../../components/Glass";
-import { catalystTagColor } from "../../lib/constants";
 import {
   relativeAge,
   absoluteAge,
@@ -61,27 +60,18 @@ function sentimentTone(s: number | null | undefined): ChipTone {
 
 function sentimentLabel(s: number | null | undefined): string {
   if (s == null) return "—";
-  if (s >= 0.15) return "BULL";
-  if (s <= -0.15) return "BEAR";
-  return "NEUTRAL";
+  if (s >= 0.15) return "Bull";
+  if (s <= -0.15) return "Bear";
+  return "Neutral";
 }
 
-/** Map the catalyst color vars from `catalystTagColor` onto Chip tones. */
-const VAR_TO_TONE: Record<string, ChipTone> = {
-  "var(--accent-green)": "green",
-  "var(--accent-red)": "red",
-  "var(--accent-blue)": "blue",
-  "var(--accent-purple)": "purple",
-  "var(--accent-orange)": "orange",
-  "var(--accent-yellow)": "yellow",
-  "var(--accent-cyan)": "cyan",
-};
-
-function catalystTone(tag: string): ChipTone {
-  return VAR_TO_TONE[catalystTagColor(tag)] ?? "neutral";
+function toneColor(t: ChipTone): string {
+  if (t === "green") return "var(--accent-green)";
+  if (t === "red") return "var(--accent-red)";
+  return "var(--text-secondary)";
 }
 
-/** Shared spec table header cell: muted, sticky, glass-strong backdrop. */
+/** Shared table header cell: muted, sticky, opaque (no blur in content). */
 function Th({
   children,
   align = "left",
@@ -91,15 +81,13 @@ function Th({
 }) {
   return (
     <th
-      className="px-2.5 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-text-muted whitespace-nowrap"
+      className="px-2.5 py-2 text-xs font-medium text-text-muted whitespace-nowrap"
       style={{
         textAlign: align,
         position: "sticky",
         top: 0,
         zIndex: 1,
-        background: "var(--glass-bg-strong)",
-        backdropFilter: "blur(var(--glass-blur))",
-        WebkitBackdropFilter: "blur(var(--glass-blur))",
+        background: "var(--card-bg)",
         borderBottom: "1px solid var(--border)",
       }}
     >
@@ -109,7 +97,6 @@ function Th({
 }
 
 const TD_BASE = "px-2.5 py-2";
-const TD_BORDER = { borderBottom: "1px solid var(--border)" } as const;
 
 /* ── Shared empty / loading bits ─────────────────────────── */
 
@@ -139,7 +126,7 @@ function LoadingRows({ rows = 4 }: { rows?: number }) {
   );
 }
 
-/* ── Catalyst chip strip ─────────────────────────────────── */
+/* ── Catalyst list (plain text — a row of colored pills is noise) ── */
 
 export function CatalystChips({
   catalysts,
@@ -152,14 +139,10 @@ export function CatalystChips({
   const shown = catalysts.slice(0, max);
   const extra = catalysts.length - shown.length;
   return (
-    <span className="inline-flex flex-wrap gap-1 items-center">
-      {shown.map((c) => (
-        <Chip key={c} tone={catalystTone(c)} className="uppercase">
-          {c}
-        </Chip>
-      ))}
+    <span className="text-xs text-text-secondary" title={catalysts.join(", ")}>
+      {shown.join(" · ")}
       {extra > 0 && (
-        <span className="num text-xs text-text-muted">+{extra}</span>
+        <span className="num ml-1 text-text-muted">+{extra}</span>
       )}
     </span>
   );
@@ -173,16 +156,7 @@ export function ConvictionBadge({
   conviction: string | null | undefined;
 }) {
   if (!conviction) return null;
-  const u = conviction.toUpperCase();
-  const tone: ChipTone =
-    u === "HIGH"
-      ? "green"
-      : u === "MEDIUM" || u === "MED"
-        ? "orange"
-        : u === "LOTTO" || u === "LOW"
-          ? "red"
-          : "neutral";
-  return <Chip tone={tone}>{u}</Chip>;
+  return <Chip className="capitalize">{conviction.toLowerCase()}</Chip>;
 }
 
 /* ── Trending tab ────────────────────────────────────────── */
@@ -214,10 +188,8 @@ function TrendingTab({
   return (
     <div>
       {/* Window selector */}
-      <div className="flex items-center gap-2 px-2.5 py-2 flex-wrap">
-        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-          Window
-        </span>
+      <div className="flex items-center gap-2 pb-3 flex-wrap">
+        <span className="text-xs text-text-muted">Window</span>
         <Segmented
           options={WINDOW_OPTIONS.map((o) => ({
             value: String(o.hours),
@@ -226,10 +198,7 @@ function TrendingTab({
           value={String(windowHours)}
           onChange={(v) => onWindow(Number(v))}
         />
-        <span className="ml-auto inline-flex items-center gap-1 text-xs text-text-muted">
-          <TrendingUp size={12} />
-          auto-refresh 2m
-        </span>
+        <span className="ml-auto text-xs text-text-muted">Auto-refresh 2m</span>
       </div>
 
       {/* Body */}
@@ -257,7 +226,7 @@ function TrendingTab({
                 <Th>First by</Th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {rows.map((r) => {
                 const scorePct = Math.round(
                   ((r.trending_score || 0) / maxScore) * 100,
@@ -267,11 +236,11 @@ function TrendingTab({
                     key={r.ticker}
                     className="hover:bg-bg-card-hover transition-colors"
                   >
-                    <td className={TD_BASE} style={TD_BORDER}>
+                    <td className={TD_BASE}>
                       <button
                         type="button"
                         onClick={() => onTickerClick(r.ticker)}
-                        className="num text-sm font-bold text-accent-blue cursor-pointer"
+                        className="num text-sm font-semibold text-accent-blue cursor-pointer"
                         style={{
                           background: "transparent",
                           border: "none",
@@ -283,19 +252,19 @@ function TrendingTab({
                     </td>
                     <td
                       className={`${TD_BASE} num text-right text-text-secondary`}
-                      style={TD_BORDER}
+                     
                     >
                       {r.n_mentions}
                     </td>
                     <td
                       className={`${TD_BASE} num text-right text-text-secondary`}
-                      style={TD_BORDER}
+                     
                     >
                       {r.n_unique_authors}
                     </td>
                     <td
                       className={`${TD_BASE} min-w-24`}
-                      style={TD_BORDER}
+                     
                     >
                       <div className="flex items-center gap-1.5">
                         <span className="num text-xs text-text-secondary min-w-7 text-right">
@@ -311,22 +280,25 @@ function TrendingTab({
                         </div>
                       </div>
                     </td>
-                    <td className={TD_BASE} style={TD_BORDER}>
-                      <Chip tone={sentimentTone(r.sentiment_avg)}>
+                    <td className={TD_BASE}>
+                      <span
+                        className="whitespace-nowrap text-xs"
+                        style={{ color: toneColor(sentimentTone(r.sentiment_avg)) }}
+                      >
                         {sentimentLabel(r.sentiment_avg)}
                         {r.sentiment_avg != null && (
-                          <span className="num opacity-80">
+                          <span className="num ml-1">
                             {r.sentiment_avg.toFixed(2)}
                           </span>
                         )}
-                      </Chip>
+                      </span>
                     </td>
-                    <td className={TD_BASE} style={TD_BORDER}>
+                    <td className={TD_BASE}>
                       <CatalystChips catalysts={r.catalysts_top} max={3} />
                     </td>
-                    <td className={TD_BASE} style={TD_BORDER}>
+                    <td className={TD_BASE}>
                       <div
-                        className="num text-xs text-text-primary max-w-32 truncate"
+                        className="text-xs text-text-primary max-w-32 truncate"
                         title={r.first_mention_author || ""}
                       >
                         {r.first_mention_author || "—"}
@@ -381,18 +353,15 @@ function TickerDrawer({
       );
     } else {
       body = (
-        <div className="max-h-[360px] overflow-auto">
+        <div className="max-h-[360px] overflow-auto divide-y divide-border">
           {ok.calls.map((c: AlertCallRow) => (
             <div
               key={c.call_id ?? c.alert_id}
               className="grid items-center gap-2 px-3 py-2 text-sm hover:bg-bg-card-hover transition-colors"
-              style={{
-                gridTemplateColumns: "140px 1fr auto",
-                borderBottom: "1px solid var(--border)",
-              }}
+              style={{ gridTemplateColumns: "140px 1fr auto" }}
             >
               <div
-                className="num text-text-primary truncate"
+                className="text-text-primary truncate"
                 title={c.author || ""}
               >
                 {c.author || "—"}
@@ -433,13 +402,10 @@ function TickerDrawer({
   }
 
   return (
-    <div className="glass-strong mt-2.5 overflow-hidden">
-      <header
-        className="flex items-center justify-between px-3 py-2"
-        style={{ borderBottom: "1px solid var(--border)" }}
-      >
-        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-          {ticker} · mention history
+    <div className="mt-4 border-t border-border pt-3">
+      <header className="flex items-center justify-between pb-2">
+        <span className="text-sm font-semibold text-text-primary">
+          <span className="num">{ticker}</span> mention history
         </span>
         <button
           type="button"
@@ -479,10 +445,8 @@ function LeadersTab() {
 
   return (
     <div>
-      <div className="flex items-center gap-2 px-2.5 py-2 flex-wrap">
-        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-          Lookback
-        </span>
+      <div className="flex items-center gap-2 pb-3 flex-wrap">
+        <span className="text-xs text-text-muted">Lookback</span>
         <Segmented
           options={[7, 14, 30].map((d) => ({
             value: String(d),
@@ -492,7 +456,7 @@ function LeadersTab() {
           onChange={(v) => setDays(Number(v))}
         />
         <span className="ml-auto text-xs text-text-muted">
-          first-callers whose picks were followed by 2+ others within 24h
+          First-callers whose picks were followed by 2+ others within 24h
         </span>
       </div>
 
@@ -517,7 +481,7 @@ function LeadersTab() {
                 <Th>Leading tickers</Th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {rows.map((r) => {
                 const followers = r.n_followers_within_24h_avg ?? 0;
                 const influencing = followers > 1;
@@ -525,49 +489,47 @@ function LeadersTab() {
                   <tr
                     key={r.author}
                     className="hover:bg-bg-card-hover transition-colors"
-                    style={{
-                      background: influencing
-                        ? "color-mix(in srgb, var(--accent-purple) 6%, transparent)"
-                        : undefined,
-                    }}
                   >
-                    <td className={TD_BASE} style={TD_BORDER}>
+                    <td className={TD_BASE}>
                       <span
-                        className={`num text-sm text-text-primary ${
-                          influencing ? "font-bold" : "font-medium"
+                        className={`inline-flex items-center gap-1.5 text-sm text-text-primary ${
+                          influencing ? "font-semibold" : "font-medium"
                         }`}
                         title={r.author}
                       >
+                        <span
+                          aria-hidden={!influencing}
+                          aria-label={influencing ? "Influencing" : undefined}
+                          className="h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{
+                            background: influencing
+                              ? "var(--accent-purple)"
+                              : "transparent",
+                          }}
+                          title={
+                            influencing
+                              ? "Influencing: followed by 2+ traders within 24h"
+                              : undefined
+                          }
+                        />
                         {r.author}
-                        {influencing && (
-                          <span
-                            className="ml-1.5 text-xs"
-                            style={{ color: "var(--accent-purple)" }}
-                            title="Influencing: followed by 2+ traders within 24h"
-                          >
-                            ●
-                          </span>
-                        )}
                       </span>
                     </td>
                     <td
                       className={`${TD_BASE} num text-right text-text-secondary`}
-                      style={TD_BORDER}
+                     
                     >
                       {r.n_first_mentions}
                     </td>
                     <td
                       className={`${TD_BASE} min-w-36`}
-                      style={TD_BORDER}
+                     
                     >
                       <div className="flex items-center gap-1.5">
                         <span
-                          className="num text-xs min-w-8 text-right"
-                          style={{
-                            color: influencing
-                              ? "var(--accent-purple)"
-                              : "var(--text-secondary)",
-                          }}
+                          className={`num text-xs min-w-8 text-right ${
+                            influencing ? "text-text-primary" : "text-text-secondary"
+                          }`}
                         >
                           {followers.toFixed(1)}
                         </span>
@@ -581,15 +543,11 @@ function LeadersTab() {
                         </div>
                       </div>
                     </td>
-                    <td className={TD_BASE} style={TD_BORDER}>
-                      <span className="inline-flex flex-wrap gap-1">
-                        {(r.leading_tickers || []).slice(0, 6).map((t) => (
-                          <Chip key={t} tone="blue">
-                            {t}
-                          </Chip>
-                        ))}
+                    <td className={TD_BASE}>
+                      <span className="num text-xs text-text-secondary">
+                        {(r.leading_tickers || []).slice(0, 6).join(" ")}
                         {(r.leading_tickers || []).length > 6 && (
-                          <span className="num text-xs text-text-muted">
+                          <span className="ml-1 text-text-muted">
                             +{(r.leading_tickers || []).length - 6}
                           </span>
                         )}
@@ -648,10 +606,8 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
   return (
     <div>
       {/* Ticker selector */}
-      <div className="flex items-center gap-2 px-2.5 py-2 flex-wrap">
-        <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
-          Ticker
-        </span>
+      <div className="flex items-center gap-2 pb-3 flex-wrap">
+        <span className="text-xs text-text-muted">Ticker</span>
         <input
           type="text"
           value={draft}
@@ -682,7 +638,7 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
           Load
         </button>
         <span className="ml-auto text-xs text-text-muted">
-          14-day daily sentiment + bull/bear split
+          14-day daily sentiment and bull/bear split
         </span>
       </div>
 
@@ -697,12 +653,12 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
           No mentions for {ticker} in last 14 days.
         </div>
       ) : (
-        <div className="p-3">
+        <div>
           {/* Sparkline header */}
           <div className="flex items-center gap-4 mb-3">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-1">
-                {ticker} · sentiment trajectory
+              <div className="text-sm font-semibold text-text-primary mb-1">
+                <span className="num">{ticker}</span> sentiment trajectory
               </div>
               <Sparkline
                 points={sentSeries}
@@ -719,7 +675,7 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
                 className="num text-sm mt-1 font-semibold"
                 style={{ color: changeColor(lastSent) }}
               >
-                last: {lastSent.toFixed(2)}
+                Last {lastSent.toFixed(2)}
               </div>
             </div>
           </div>
@@ -782,13 +738,12 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
 
           {/* Per-day catalyst strip */}
           <div
-            className="pt-2"
-            style={{ borderTop: "1px solid var(--border)" }}
+            className="border-t border-border pt-3"
           >
-            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-1.5">
+            <div className="text-sm font-semibold text-text-primary mb-1.5">
               Daily catalysts
             </div>
-            <div className="max-h-40 overflow-auto">
+            <div className="max-h-40 overflow-auto divide-y divide-border">
               {points
                 .filter(
                   (p) => p.top_catalysts && p.top_catalysts.length > 0,
@@ -797,11 +752,8 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
                 .map((p) => (
                   <div
                     key={p.date}
-                    className="grid items-center gap-2 py-1"
-                    style={{
-                      gridTemplateColumns: "80px 1fr",
-                      borderBottom: "1px solid var(--border)",
-                    }}
+                    className="grid items-center gap-2 py-2"
+                    style={{ gridTemplateColumns: "80px 1fr" }}
                   >
                     <span className="num text-xs text-text-secondary">
                       {p.date}
@@ -815,7 +767,7 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
               {points.every(
                 (p) => !p.top_catalysts || p.top_catalysts.length === 0,
               ) && (
-                <div className="p-2 text-sm text-text-muted">
+                <div className="py-2 text-sm text-text-muted">
                   No catalysts tagged in this window.
                 </div>
               )}
@@ -830,31 +782,41 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
 /* ── Admin analysis tab ──────────────────────────────────── */
 
 const DIR_TONE: Record<AdminCall["direction"], ChipTone> = {
-  bull: "green", bear: "red", neutral: "neutral", macro: "blue",
+  bull: "green", bear: "red", neutral: "neutral", macro: "neutral",
 };
 
 function AdminTab({ onTickerClick }: { onTickerClick: (t: string) => void }) {
   const { data, isLoading } = useAdminAnalysis();
   if (isLoading && !data)
-    return <div className="p-3 text-sm text-text-muted animate-pulse">loading admin analysis…</div>;
+    return <div className="py-3 text-sm text-text-muted animate-pulse">Loading admin analysis…</div>;
   if (!data?.authors?.length)
     return (
-      <div className="p-3 text-sm text-text-muted">
+      <div className="py-3 text-sm text-text-muted">
         No admin-analysis digest generated yet.
       </div>
     );
   return (
-    <div className="p-2 space-y-3">
-      <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        <span className="text-text-muted uppercase tracking-[0.08em] font-semibold">
-          Most discussed
-        </span>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
+        <span className="text-text-muted">Most discussed</span>
         {(data.top_tickers ?? []).slice(0, 10).map((t) => (
-          <button key={t.ticker} onClick={() => onTickerClick(t.ticker)}>
-            <Chip tone={t.bull > t.bear ? "green" : t.bear > t.bull ? "red" : "neutral"}>
-              <span className="num">{t.ticker}</span>
-              <span className="text-text-muted ml-1">{t.n}</span>
-            </Chip>
+          <button
+            key={t.ticker}
+            type="button"
+            onClick={() => onTickerClick(t.ticker)}
+            className="hover:underline"
+          >
+            <span
+              className="num text-sm font-semibold"
+              style={{
+                color: toneColor(
+                  t.bull > t.bear ? "green" : t.bear > t.bull ? "red" : "neutral",
+                ),
+              }}
+            >
+              {t.ticker}
+            </span>
+            <span className="num text-text-muted ml-1">{t.n}</span>
           </button>
         ))}
         <span className="ml-auto text-text-muted">
@@ -866,18 +828,24 @@ function AdminTab({ onTickerClick }: { onTickerClick: (t: string) => void }) {
         <div key={a.author}>
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-sm font-semibold text-text-primary">{a.author}</span>
-            <span className="text-xs text-text-muted">{a.n_calls} posts</span>
+            <span className="text-xs text-text-muted">
+              <span className="num">{a.n_calls}</span> posts
+            </span>
           </div>
-          <div className="text-xs text-text-muted mb-1.5">{a.style}</div>
-          <div className="space-y-1">
+          <div className="text-sm text-text-secondary mb-1.5 max-w-[72ch]">{a.style}</div>
+          <div className="divide-y divide-border">
             {a.calls.map((c) => (
               <div
                 key={c.msg_id}
-                className="flex items-start gap-2 text-xs rounded-md px-2 py-1.5"
-                style={{ background: "color-mix(in srgb, var(--bg-card) 60%, transparent)" }}
+                className="flex items-start gap-2.5 py-2 text-sm"
               >
-                <span className="num text-text-muted w-14 shrink-0">{c.ts.slice(5, 10)}</span>
-                <Chip tone={DIR_TONE[c.direction] ?? "neutral"}>{c.direction.toUpperCase()}</Chip>
+                <span className="num text-xs text-text-muted w-12 shrink-0 pt-0.5">{c.ts.slice(5, 10)}</span>
+                <span
+                  className="w-12 shrink-0 text-xs font-medium capitalize pt-0.5"
+                  style={{ color: toneColor(DIR_TONE[c.direction] ?? "neutral") }}
+                >
+                  {c.direction}
+                </span>
                 <span className="flex flex-wrap gap-1 shrink-0">
                   {c.tickers.slice(0, 4).map((t) => (
                     <button
@@ -889,7 +857,7 @@ function AdminTab({ onTickerClick }: { onTickerClick: (t: string) => void }) {
                     </button>
                   ))}
                 </span>
-                <span className="text-text-secondary min-w-0">
+                <span className="text-text-secondary min-w-0 leading-relaxed">
                   {c.thesis}
                   {c.levels && (
                     <span className="text-text-muted"> · {c.levels}</span>
@@ -935,45 +903,25 @@ export function SignalsView() {
       actions={
         <>
           <span className="text-xs text-text-muted max-md:hidden">
-            mentions · catalysts · first-callers
+            Mentions, catalysts, first-callers
           </span>
           <Segmented<SignalsTab>
             options={[
               {
                 value: "trending",
-                label: (
-                  <span className="inline-flex items-center gap-1">
-                    <Flame size={12} />
-                    Trending
-                  </span>
-                ),
+                label: "Trending",
               },
               {
                 value: "leaders",
-                label: (
-                  <span className="inline-flex items-center gap-1">
-                    <Award size={12} />
-                    Leaders
-                  </span>
-                ),
+                label: "Leaders",
               },
               {
                 value: "sentiment",
-                label: (
-                  <span className="inline-flex items-center gap-1">
-                    <BarChart3 size={12} />
-                    Sentiment
-                  </span>
-                ),
+                label: "Sentiment",
               },
               {
                 value: "admin",
-                label: (
-                  <span className="inline-flex items-center gap-1">
-                    <ShieldCheck size={12} />
-                    Admin
-                  </span>
-                ),
+                label: "Admin",
               },
             ]}
             value={tab}

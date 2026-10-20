@@ -10,7 +10,7 @@ import "leaflet.heat";
 import { useTickerMap, type BayAreaCompany } from "../api/map";
 import { useTickerTaxonomy } from "../api/tickerTaxonomy";
 import { useAppStore } from "../store/useAppStore";
-import { Chip, Segmented } from "../components/Glass";
+import { Segmented } from "../components/Glass";
 
 type HeatPoint = [number, number, number];
 
@@ -211,15 +211,11 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
     <div className="flex flex-col gap-3">
       <style>{MAP_CSS}</style>
 
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-base font-bold text-text-primary">Company Map</h1>
-          <p className="text-xs text-text-muted">
-            Every tracked ticker at its building. <span className="text-text-secondary">size = market cap</span>,{" "}
-            <span className="text-text-secondary">color = bull/bear</span> (technical + momentum + flow). Search or
-            filter to zero in.
-          </p>
-        </div>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <p className="text-sm leading-relaxed text-text-secondary max-w-[72ch]">
+          Every tracked ticker at its building. Size = market cap, color = bull/bear
+          (technical + momentum + flow). Search or filter to zero in.
+        </p>
         <div className="max-sm:w-full">
           <label htmlFor={searchId} className="sr-only">
             Search mapped companies by ticker or name
@@ -232,7 +228,7 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
               setFocusTicker(null);
             }}
             placeholder="Search ticker or name…"
-            className="control-surface min-h-8 w-56 rounded-full border px-3 py-1.5 text-xs text-text-primary transition-colors max-sm:min-h-11 max-sm:w-full"
+            className="control-surface min-h-8 w-56 rounded-full border px-3 py-1.5 text-sm text-text-primary transition-colors max-sm:min-h-11 max-sm:w-full"
           />
         </div>
       </div>
@@ -240,7 +236,7 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)] gap-3 max-lg:grid-cols-1">
       <div className="overflow-hidden border border-border relative" style={{ height: `calc(100dvh - ${heightOffset}px)`, minHeight: 460, borderRadius: "var(--radius-panel)" }}>
         {/* Floating control bar — chrome only; the map surface below is untouched */}
-        <div className="absolute top-3 left-3 right-3 z-[1000] glass-strong px-3 py-2 flex items-center gap-2 flex-wrap text-xs">
+        <div className="absolute top-3 left-3 right-3 z-[1000] rounded-[var(--radius-panel)] border border-border bg-[var(--card-bg)] shadow-lg px-3 py-2 flex items-center gap-2 flex-wrap text-xs">
           <div className="flex min-h-11 w-full items-center justify-between gap-2 lg:hidden">
             <span className="min-w-0 truncate text-text-secondary">
               {MODES.find((item) => item.id === mode)?.label} · <span className="num">{stats.shown}</span> shown
@@ -300,22 +296,15 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
             value={colorBy}
             onChange={setColorBy}
           />
-          <div className="flex items-center gap-1">
-            {CAP_FILTERS.map((f) => (
-              <button
-                key={f.label}
-                type="button"
-                onClick={() => {
-                  setMinCap(f.min);
-                  setFocusTicker(null);
-                }}
-                aria-pressed={minCap === f.min}
-                className="inline-flex min-h-11 shrink-0 cursor-pointer items-center rounded-full lg:min-h-6"
-              >
-                <Chip tone={minCap === f.min ? "blue" : "neutral"}>{f.label}</Chip>
-              </button>
-            ))}
-          </div>
+          <Segmented<string>
+            ariaLabel="Minimum market cap"
+            options={CAP_FILTERS.map((f) => ({ value: String(f.min), label: f.label }))}
+            value={String(minCap)}
+            onChange={(v) => {
+              setMinCap(Number(v));
+              setFocusTicker(null);
+            }}
+          />
           <span className="text-text-muted ml-auto" aria-live="polite">
             <span className="text-text-secondary num">{stats.shown}</span>
             {stats.shown !== stats.total && <span className="num">/{stats.total}</span>} shown ·{" "}
@@ -323,17 +312,17 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
             <span className="text-accent-red num">{stats.bear}▼</span>
           </span>
           {mode === "footprints" && (
-            <span className="text-accent-orange basis-full">
+            <span className="text-text-muted basis-full">
               ⌖ real building footprints — zoom in to see the shapes
             </span>
           )}
           </div>
         </div>
 
-        {/* Group legend — glass panel floating over the map */}
+        {/* Group legend — solid panel floating over the map */}
         {colorBy !== "signal" && groupLegend.length > 0 && (
-          <div className="absolute bottom-5 left-3 z-[1000] glass-strong px-3 py-2 max-w-md flex flex-col gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
+          <div className="absolute bottom-5 left-3 z-[1000] rounded-[var(--radius-panel)] border border-border bg-[var(--card-bg)] shadow-lg px-3 py-2 max-w-md flex flex-col gap-1.5">
+            <span className="text-sm font-semibold text-text-primary">
               {colorBy === "sector" ? "Sector" : "Theme"}
             </span>
             <div className="flex items-center gap-x-3 gap-y-1 text-xs text-text-muted flex-wrap">
@@ -412,16 +401,16 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
         className="card flex max-h-[calc(100vh-220px)] min-h-0 flex-col overflow-hidden max-lg:max-h-80"
       >
         <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 id={listHeadingId} className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
+          <h2 id={listHeadingId} className="text-sm font-semibold text-text-primary">
             Companies
           </h2>
           <span className="num text-xs text-text-muted">{filtered.length}</span>
         </div>
         <QueryNotice queries={[mapQuery]} label="Company map" />
         {filtered.length === 0 ? (
-          !mapQuery.isPending && !mapQuery.isError && mapQuery.fetchStatus !== "paused" && <p className="text-xs text-text-muted">No companies match the current filters.</p>
+          !mapQuery.isPending && !mapQuery.isError && mapQuery.fetchStatus !== "paused" && <p className="text-sm text-text-muted">No companies match the current filters.</p>
         ) : (
-          <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
+          <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto pr-1">
             {filtered.map((c) => {
               const selected = activeTicker === c.ticker;
               const signalLabel =
@@ -432,12 +421,12 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
                     type="button"
                     onClick={() => selectCompany(c)}
                     aria-pressed={selected}
-                    className={`flex min-h-8 w-full items-center gap-2 rounded px-2 py-1.5 text-left transition-colors max-lg:min-h-11 ${
+                    className={`flex min-h-8 w-full items-center gap-2 rounded px-2 py-2 text-left transition-colors max-lg:min-h-11 ${
                       selected ? "segmented-option-active" : "text-text-secondary hover:bg-bg-card-hover hover:text-text-primary"
                     }`}
                   >
-                    <span className="num w-14 shrink-0 text-xs font-bold">{c.ticker}</span>
-                    <span className="min-w-0 flex-1 truncate text-xs">{c.name}</span>
+                    <span className="num w-14 shrink-0 text-xs font-semibold">{c.ticker}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm">{c.name}</span>
                     <span className="sr-only">{signalLabel}, market cap {fmtCap(c.market_cap)}</span>
                     <span className="num shrink-0 text-xs" aria-hidden="true">
                       {c.score == null ? "—" : `${c.score > 0 ? "+" : ""}${c.score}`}
@@ -456,7 +445,17 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
 
 // Standalone /map route.
 export function BayAreaMapPage() {
-  return <CompanyMapView />;
+  return (
+    <div className="desk-page">
+      <header className="desk-header">
+        <div className="desk-header__title">
+          <h1>Map</h1>
+          <p>Tracked companies at their headquarters, colored by bull/bear signal</p>
+        </div>
+      </header>
+      <CompanyMapView heightOffset={290} />
+    </div>
+  );
 }
 
 function CompanyPopup({ c }: { c: BayAreaCompany }) {
@@ -464,22 +463,22 @@ function CompanyPopup({ c }: { c: BayAreaCompany }) {
     val == null ? null : (
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
         <span style={{ color: "var(--text-secondary)" }}>{label}</span>
-        <span style={{ fontFamily: "monospace", color: color ?? "var(--text-primary)" }}>{val}</span>
+        <span className="num" style={{ color: color ?? "var(--text-primary)" }}>{val}</span>
       </div>
     );
   return (
     <div style={{ minWidth: 180, fontSize: 12 }}>
-      <div style={{ fontWeight: 700, fontSize: 13 }}>
+      <div style={{ fontWeight: 600, fontSize: 13 }}>
         {c.ticker} <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}>· {c.city}{c.state ? `, ${c.state}` : ""}</span>
       </div>
       <div style={{ color: "var(--text-secondary)", marginBottom: 6 }}>{c.name}</div>
-      {c.is_campus && <div style={{ color: "var(--accent-orange)", marginBottom: 6, fontSize: 11 }}>◌ Bay Area campus · {c.hq_note}</div>}
+      {c.is_campus && <div style={{ color: "var(--accent-orange)", marginBottom: 6, fontSize: 12 }}>◌ Bay Area campus · {c.hq_note}</div>}
       {row("Market cap", fmtCap(c.market_cap))}
       {row("Composite", c.score != null ? `${c.score > 0 ? "+" : ""}${c.score}` : "no signal", c.score != null ? scoreColor(c.score) : undefined)}
       {row("30d return", c.momentum_30d != null ? `${c.momentum_30d > 0 ? "+" : ""}${c.momentum_30d}%` : null)}
       {row("Technical", c.tech_score != null ? `${c.tech_score > 0 ? "+" : ""}${c.tech_score}` : null)}
       {row("Flow bull%", c.flow_bull_share != null ? `${Math.round(c.flow_bull_share * 100)}%` : null)}
-      {c.components.length > 0 && <div style={{ color: "var(--text-muted)", marginTop: 6, fontSize: 11 }}>signals: {c.components.join(" + ")}</div>}
+      {c.components.length > 0 && <div style={{ color: "var(--text-muted)", marginTop: 6, fontSize: 12 }}>signals: {c.components.join(" + ")}</div>}
     </div>
   );
 }

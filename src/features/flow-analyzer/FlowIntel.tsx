@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../../api/client";
-import { Chip, GlassPanel, Segmented } from "../../components/Glass";
+import { GlassPanel, Segmented } from "../../components/Glass";
 import { useTrackedTickers } from "../../api/flow";
 import { STALE_TIMES } from "../../lib/constants";
 import { formatPremium } from "../../lib/utils";
@@ -181,19 +181,19 @@ function AccumulationChart({ ticker }: { ticker: string }) {
 
   const label = data.accumulation_label || "UNKNOWN";
   const score = data.accumulation_score || 0;
-  const labelTone = label.includes("BULL") ? "green" : label.includes("BEAR") ? "red" : "orange";
+  const labelColor = label.includes("BULL") ? "var(--accent-green)" : label.includes("BEAR") ? "var(--accent-red)" : "var(--text-muted)";
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="font-mono font-bold text-text-primary">{ticker}</span>
-          <Chip tone={labelTone as "green" | "red" | "orange"}>{label.replace(/_/g, " ")}</Chip>
-          <span className="text-xs num text-text-muted">score: {score.toFixed(2)}</span>
+          <span className="num text-sm font-semibold text-text-primary">{ticker}</span>
+          <span className="text-xs font-medium" style={{ color: labelColor }}>{label.replace(/_/g, " ").toLowerCase()}</span>
+          <span className="text-xs text-text-muted">score <span className="num">{score.toFixed(2)}</span></span>
         </div>
         {data.summary?.strikes_escalating && (
           <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: "var(--accent-green)" }}>
-            <ArrowUpRight size={12} /> Strikes Escalating
+            <ArrowUpRight size={12} /> Strikes escalating
           </span>
         )}
       </div>
@@ -218,11 +218,11 @@ function AccumulationChart({ ticker }: { ticker: string }) {
 
       {/* Exit signals */}
       {data.exit_signals && data.exit_signals.length > 0 && (
-        <div className="space-y-1">
+        <div className="space-y-1 border-t border-border pt-2">
           {data.exit_signals.map((sig, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs px-2 py-1 rounded-md" style={{ background: "color-mix(in srgb, var(--accent-red) 8%, transparent)" }}>
+            <div key={i} className="flex items-center gap-2 text-xs">
               <AlertTriangle size={11} style={{ color: "var(--accent-orange)" }} />
-              <span className="text-text-muted">{sig.contract}</span>
+              <span className="num text-text-muted">{sig.contract}</span>
               <span className="font-semibold" style={{ color: "var(--accent-red)" }}>{sig.signal}</span>
               <span className="text-text-muted">{sig.detail}</span>
             </div>
@@ -268,16 +268,16 @@ function StrikeChart({ ticker }: { ticker: string }) {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="font-mono font-bold text-text-primary">{ticker}</span>
-          <span className="text-xs text-text-muted">Strike drift:</span>
-          <span className="text-xs num font-bold" style={{ color: drift > 0 ? "var(--accent-green)" : drift < 0 ? "var(--accent-red)" : "var(--text-muted)" }}>
+          <span className="num text-sm font-semibold text-text-primary">{ticker}</span>
+          <span className="text-xs text-text-muted">Strike drift</span>
+          <span className="text-xs num font-semibold" style={{ color: drift > 0 ? "var(--accent-green)" : drift < 0 ? "var(--accent-red)" : "var(--text-muted)" }}>
             {drift >= 0 ? "+" : ""}{drift.toFixed(1)}%
           </span>
         </div>
         {escalating && (
-          <Chip tone="green">
+          <span className="flex items-center gap-1 text-xs font-medium" style={{ color: "var(--accent-green)" }}>
             <TrendingUp size={11} /> Escalating
-          </Chip>
+          </span>
         )}
       </div>
 
@@ -366,26 +366,16 @@ function SectorClustering() {
       </ResponsiveContainer>
 
       {/* Sector detail cards */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-3 border-t border-border pt-3 sm:grid-cols-2">
         {sectorData.filter((s) => s.total_entries >= 2).map((s) => {
           const bullish = s.bull_pct > 55;
           const bearish = s.bull_pct < 45;
           const momentum = s.tickers.length >= 3;
           return (
-            <div key={s.sector} className="px-3 py-2 border border-border text-xs space-y-1 transition-colors hover:bg-bg-card-hover"
-              style={{
-                borderRadius: "var(--radius-control)",
-                borderColor: momentum
-                  ? bullish
-                    ? "color-mix(in srgb, var(--accent-green) 30%, transparent)"
-                    : bearish
-                      ? "color-mix(in srgb, var(--accent-red) 30%, transparent)"
-                      : undefined
-                  : undefined,
-              }}>
+            <div key={s.sector} className="text-xs space-y-1">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-text-primary">{s.sector}</span>
-                <span className="num text-text-muted">{s.total_entries} flows</span>
+                <span className="text-sm font-medium text-text-primary">{s.sector}</span>
+                <span className="text-text-muted"><span className="num">{s.total_entries}</span> flows</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-1.5 rounded-full bg-border overflow-hidden">
@@ -395,11 +385,11 @@ function SectorClustering() {
                   {s.bull_pct.toFixed(0)}%
                 </span>
               </div>
-              <div className="text-text-muted">{s.tickers.join(", ")}</div>
+              <div className="num text-text-muted">{s.tickers.join(", ")}</div>
               {momentum && (bullish || bearish) && (
-                <div className="flex items-center gap-1 font-semibold" style={{ color: bullish ? "var(--accent-green)" : "var(--accent-red)" }}>
-                  {bullish ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
-                  Sector Momentum ({s.tickers.length} tickers)
+                <div className="flex items-center gap-1 font-medium" style={{ color: bullish ? "var(--accent-green)" : "var(--accent-red)" }}>
+                  {bullish ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
+                  Sector momentum ({s.tickers.length} tickers)
                 </div>
               )}
             </div>
@@ -461,22 +451,22 @@ function TopMovers() {
   if (movers.length === 0) return <div className="text-xs text-text-muted py-4 text-center">No multi-day data</div>;
 
   return (
-    <div className="space-y-1.5">
+    <div className="divide-y divide-border">
       {movers.map((m) => {
         const isBull = m.label.includes("BULL");
         const isBear = m.label.includes("BEAR");
         const hasExits = m.exitCount > 0;
         return (
-          <div key={m.ticker} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors hover:bg-bg-card-hover">
-            <span className="font-mono font-bold text-text-primary w-12">{m.ticker}</span>
-            <Chip tone={isBull ? "green" : isBear ? "red" : "neutral"}>
-              {m.label.replace(/_/g, " ").replace("ACCUMULATION", "ACCUM")}
-            </Chip>
+          <div key={m.ticker} className="flex items-center gap-3 px-2 py-2 text-xs transition-colors hover:bg-bg-card-hover">
+            <span className="num text-sm font-semibold text-text-primary w-14">{m.ticker}</span>
+            <span className="font-medium" style={{ color: isBull ? "var(--accent-green)" : isBear ? "var(--accent-red)" : "var(--text-muted)" }}>
+              {m.label.replace(/_/g, " ").replace("ACCUMULATION", "ACCUM").toLowerCase()}
+            </span>
             <span className="num text-text-muted">{m.days}d</span>
             {m.escalating && <span style={{ color: "var(--accent-green)" }}><ArrowUpRight size={11} /></span>}
             {hasExits && <span className="flex items-center gap-0.5 num" style={{ color: "var(--accent-orange)" }}><AlertTriangle size={10} />{m.exitCount}</span>}
             <span className="ml-auto num text-text-muted">{formatPremium(m.total)}</span>
-            <span className="num font-bold w-14 text-right" style={{ color: m.premiumTrend > 10 ? "var(--accent-green)" : m.premiumTrend < -10 ? "var(--accent-red)" : "var(--text-muted)" }}>
+            <span className="num font-semibold w-14 text-right" style={{ color: m.premiumTrend > 10 ? "var(--accent-green)" : m.premiumTrend < -10 ? "var(--accent-red)" : "var(--text-muted)" }}>
               {m.premiumTrend >= 0 ? "+" : ""}{m.premiumTrend.toFixed(0)}%
             </span>
           </div>
@@ -548,23 +538,21 @@ function UnusualActivity() {
   if (unusual.length === 0) return <div className="text-xs text-text-muted py-8 text-center">No unusual activity detected in the last 5 days</div>;
 
   return (
-    <div className="space-y-1">
+    <div className="divide-y divide-border">
       {unusual.map((e: any, i: number) => {
         const side = (e._corrected_side || e.side || "").toLowerCase();
         const isBull = side.includes("bull");
         const color = isBull ? "var(--accent-green)" : "var(--accent-red)";
         const optType = e.type || e.option_type || "";
         return (
-          <div key={i} className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg transition-colors hover:bg-bg-card-hover"
-            style={{ background: e._unusualScore >= 6 ? "color-mix(in srgb, var(--accent-green) 6%, transparent)" : undefined,
-                     border: e._unusualScore >= 6 ? "1px solid color-mix(in srgb, var(--accent-green) 15%, transparent)" : "1px solid transparent" }}>
-            <span className="num font-bold text-accent-cyan w-5">{e._unusualScore}</span>
-            <span className="font-mono font-bold text-text-primary w-12">{e.ticker}</span>
-            <span style={{ color }} className="font-semibold w-8">{isBull ? "Bull" : "Bear"}</span>
+          <div key={i} className="flex items-center gap-3 text-xs px-2 py-2 transition-colors hover:bg-bg-card-hover">
+            <span className={`num w-5 ${e._unusualScore >= 6 ? "font-semibold text-text-primary" : "text-text-muted"}`} title="Unusual score">{e._unusualScore}</span>
+            <span className="num text-sm font-semibold text-text-primary w-14">{e.ticker}</span>
+            <span style={{ color }} className="font-medium w-8">{isBull ? "Bull" : "Bear"}</span>
             <span className="num text-text-primary">${e.strike} {optType}</span>
             <span className="num text-text-muted">{e.expiry}</span>
-            {e.vol_oi_ratio > 0 && <span className="text-accent-cyan num">{Number(e.vol_oi_ratio).toFixed(1)}x</span>}
-            {e.ask_pct > 0 && <span className="text-accent-orange num">{e.ask_pct}%ask</span>}
+            {e.vol_oi_ratio > 0 && <span className="num text-text-secondary" title="Vol/OI">{Number(e.vol_oi_ratio).toFixed(1)}x</span>}
+            {e.ask_pct > 0 && <span className="num text-text-secondary">{e.ask_pct}% ask</span>}
             <span className="ml-auto num text-text-secondary">{e.premium}</span>
             <span className="text-text-muted num w-12">{e._date?.slice(5)}</span>
           </div>
@@ -631,35 +619,33 @@ function ContractTracker() {
   if (contracts.length === 0) return <div className="text-xs text-text-muted py-8 text-center">No repeated contracts in the last 10 days</div>;
 
   return (
-    <div className="space-y-1">
+    <div className="divide-y divide-border">
       {contracts.map((c) => {
         const isBull = c.side.includes("bull");
         const color = isBull ? "var(--accent-green)" : "var(--accent-red)";
         const isExpanded = expanded === c.key;
         return (
           <div key={c.key}>
-            <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-bg-card-hover transition-colors"
-              onClick={() => setExpanded(isExpanded ? null : c.key)}
-              style={{ background: c.daysActive >= 3 ? "color-mix(in srgb, var(--accent-green) 6%, transparent)" : undefined,
-                       border: c.daysActive >= 3 ? "1px solid color-mix(in srgb, var(--accent-green) 15%, transparent)" : "1px solid transparent" }}>
-              <span className="font-mono font-bold text-text-primary w-12">{c.ticker}</span>
-              <span style={{ color }} className="font-semibold w-8">{isBull ? "Bull" : "Bear"}</span>
+            <div className="flex items-center gap-3 text-xs px-2 py-2 cursor-pointer hover:bg-bg-card-hover transition-colors"
+              onClick={() => setExpanded(isExpanded ? null : c.key)}>
+              <span className="num text-sm font-semibold text-text-primary w-14">{c.ticker}</span>
+              <span style={{ color }} className="font-medium w-8">{isBull ? "Bull" : "Bear"}</span>
               <span className="num text-text-primary">${c.strike} {c.optType}</span>
               <span className="num text-text-muted">{c.expiry}</span>
-              <span className="flex items-center gap-1 font-semibold num" style={{ color: c.daysActive >= 3 ? "var(--accent-green)" : "var(--accent-blue)" }}>
+              <span className={`flex items-center gap-1 num ${c.daysActive >= 3 ? "font-semibold text-text-primary" : "text-text-secondary"}`}>
                 <Target size={10} />
                 {c.daysActive}d / {c.totalEntries}x
               </span>
               <span className="ml-auto num text-text-secondary">{formatPremium(c.totalPremium)}</span>
             </div>
             {isExpanded && (
-              <div className="ml-4 pl-3 border-l-2 border-border space-y-0.5 py-1">
+              <div className="space-y-0.5 pb-2 pl-[4.25rem]">
                 {c.entries.map((e: any, i: number) => (
                   <div key={i} className="flex items-center gap-2 text-xs text-text-muted">
                     <span className="num w-12">{e._date?.slice(5)}</span>
                     <span className="num">{e.premium}</span>
-                    {e.vol_oi_ratio > 0 && <span className="text-accent-cyan num">{Number(e.vol_oi_ratio).toFixed(1)}x</span>}
-                    {e.ask_pct > 0 && <span className="text-accent-orange num">{e.ask_pct}%ask</span>}
+                    {e.vol_oi_ratio > 0 && <span className="num text-text-secondary" title="Vol/OI">{Number(e.vol_oi_ratio).toFixed(1)}x</span>}
+                    {e.ask_pct > 0 && <span className="num text-text-secondary">{e.ask_pct}% ask</span>}
                   </div>
                 ))}
               </div>
@@ -711,8 +697,8 @@ function FlowVsPrice({ ticker }: { ticker: string }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <span className="font-mono font-bold text-text-primary">{ticker}</span>
-        <span className="text-xs text-text-muted">Price + Flow Overlay</span>
+        <span className="num text-sm font-semibold text-text-primary">{ticker}</span>
+        <span className="text-xs text-text-muted">Price and flow overlay</span>
       </div>
       <ResponsiveContainer width="100%" height={220}>
         <ComposedChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
@@ -829,25 +815,15 @@ function ExpiryHeatmap() {
       </ResponsiveContainer>
 
       {/* Detail cards for top expiries */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-3 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-3">
         {expiryData.slice(0, 9).map((d) => {
           const intensity = d.totalPremium / maxPremium;
           const bullish = d.bullPct > 55;
           const bearish = d.bullPct < 45;
           return (
-            <div key={d.expiry} className="px-3 py-2 border border-border text-xs space-y-1 transition-colors hover:bg-bg-card-hover"
-              style={{
-                borderRadius: "var(--radius-control)",
-                borderColor: intensity > 0.5
-                  ? bullish
-                    ? "color-mix(in srgb, var(--accent-green) 30%, transparent)"
-                    : bearish
-                      ? "color-mix(in srgb, var(--accent-red) 30%, transparent)"
-                      : "color-mix(in srgb, var(--accent-blue) 25%, transparent)"
-                  : undefined,
-              }}>
+            <div key={d.expiry} className="text-xs space-y-1">
               <div className="flex items-center justify-between">
-                <span className="num font-bold text-text-primary">{d.expiry}</span>
+                <span className={`num text-sm ${intensity > 0.5 ? "font-semibold text-text-primary" : "font-medium text-text-secondary"}`}>{d.expiry}</span>
                 <span className="num text-text-muted">{d.count}x</span>
               </div>
               <div className="flex items-center gap-2">
@@ -858,7 +834,7 @@ function ExpiryHeatmap() {
                   {formatPremium(d.totalPremium)}
                 </span>
               </div>
-              <div className="text-text-muted truncate">{d.tickers.slice(0, 6).join(", ")}{d.tickers.length > 6 ? ` +${d.tickers.length - 6}` : ""}</div>
+              <div className="num text-text-muted truncate">{d.tickers.slice(0, 6).join(", ")}{d.tickers.length > 6 ? ` +${d.tickers.length - 6}` : ""}</div>
             </div>
           );
         })}
@@ -901,7 +877,7 @@ function TickerSelector({ tickers, selected, onSelect, pinned, onPin, onUnpin }:
   }, [pinned, tickers]);
 
   return (
-    <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+    <div className="flex items-center gap-1.5 flex-wrap">
       {all.map((t) => {
         const isPinned = pinned.includes(t);
         const isAuto = tickers.includes(t);
@@ -911,13 +887,12 @@ function TickerSelector({ tickers, selected, onSelect, pinned, onPin, onUnpin }:
               background: selected === t ? "color-mix(in srgb, var(--accent-blue) 14%, transparent)" : "var(--glass-bg)",
               borderColor: selected === t
                 ? "color-mix(in srgb, var(--accent-blue) 30%, transparent)"
-                : isPinned && !isAuto
-                  ? "color-mix(in srgb, var(--accent-purple) 30%, transparent)"
-                  : "var(--border)",
+                : "var(--border)",
             }}>
             <button onClick={() => onSelect(selected === t ? "" : t)}
-              className="px-2 py-0.5 text-xs font-mono font-medium transition-colors"
-              style={{ color: selected === t ? "var(--accent-blue)" : isPinned && !isAuto ? "var(--accent-purple)" : "var(--text-secondary)" }}>
+              title={isPinned && !isAuto ? "Pinned" : undefined}
+              className="px-2 py-0.5 text-xs num font-medium transition-colors"
+              style={{ color: selected === t ? "var(--accent-blue)" : "var(--text-secondary)" }}>
               {t}
             </button>
             {isPinned && (
@@ -938,7 +913,7 @@ function TickerSelector({ tickers, selected, onSelect, pinned, onPin, onUnpin }:
           onChange={(e) => setInput(e.target.value.toUpperCase())}
           onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
           placeholder="Add ticker..."
-          className="bg-transparent border-none outline-none text-text-primary font-mono text-xs w-20 placeholder:text-text-muted" />
+          className="bg-transparent border-none outline-none text-text-primary num text-xs w-20 placeholder:text-text-muted" />
         {input && (
           <button onClick={handleAdd} className="text-accent-blue"><Plus size={12} /></button>
         )}
@@ -995,11 +970,11 @@ export function FlowIntel() {
         onChange={setView}
         options={([
           ["accumulation", "Accumulation", Activity],
-          ["strikes", "Strike Drift", TrendingUp],
+          ["strikes", "Strike drift", TrendingUp],
           ["unusual", "Unusual", Zap],
           ["contracts", "Contracts", Target],
-          ["flowprice", "Flow vs Price", Crosshair],
-          ["expiry", "Expiry Map", Calendar],
+          ["flowprice", "Flow vs price", Crosshair],
+          ["expiry", "Expiry map", Calendar],
           ["sectors", "Sectors", Layers],
         ] as const).map(([id, label, Icon]) => ({
           value: id as IntelView,
@@ -1015,9 +990,9 @@ export function FlowIntel() {
       {/* Top Movers summary (always visible) */}
       <GlassPanel
         title={
-          <span className="inline-flex items-center gap-1.5">
-            <Activity size={12} className="text-accent-cyan" /> Multi-Day Movers (7d, 2+ entries)
-          </span>
+          <>
+            Multi-day movers <span className="font-normal text-text-muted">7d, 2+ entries</span>
+          </>
         }
       >
         <TopMovers />
@@ -1025,10 +1000,10 @@ export function FlowIntel() {
 
       {/* Accumulation / Strikes views */}
       {(view === "accumulation" || view === "strikes") && (
-        <div className="space-y-4">
-          <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-2">
-            {view === "accumulation" ? "Ticker Accumulation Charts" : "Strike Escalation / De-escalation"}
-          </h4>
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-text-primary">
+            {view === "accumulation" ? "Ticker accumulation" : "Strike escalation and de-escalation"}
+          </h3>
           <TickerSelector
             tickers={topTickers} selected={selectedTicker} onSelect={handleSelectTicker}
             pinned={pinned} onPin={handlePin} onUnpin={handleUnpin}
@@ -1052,12 +1027,12 @@ export function FlowIntel() {
       {view === "unusual" && (
         <GlassPanel
           title={
-            <span className="inline-flex items-center gap-1.5">
-              <Zap size={12} style={{ color: "var(--accent-orange)" }} /> Unusual Activity (5-day, score 3+)
-            </span>
+            <>
+              Unusual activity <span className="font-normal text-text-muted">5 days, score 3+</span>
+            </>
           }
         >
-          <p className="text-xs text-text-muted mb-3">
+          <p className="mb-3 max-w-[72ch] text-sm leading-relaxed text-text-secondary">
             Entries scored by premium outlier + vol/OI spike + ask% conviction. Higher score = more abnormal.
           </p>
           <UnusualActivity />
@@ -1067,12 +1042,12 @@ export function FlowIntel() {
       {view === "contracts" && (
         <GlassPanel
           title={
-            <span className="inline-flex items-center gap-1.5">
-              <Target size={12} style={{ color: "var(--accent-green)" }} /> Repeated Contracts (10-day)
-            </span>
+            <>
+              Repeated contracts <span className="font-normal text-text-muted">10 days</span>
+            </>
           }
         >
-          <p className="text-xs text-text-muted mb-3">
+          <p className="mb-3 max-w-[72ch] text-sm leading-relaxed text-text-secondary">
             Same contract (ticker+strike+expiry) appearing on multiple days = institutional conviction. Click to expand daily breakdown.
           </p>
           <ContractTracker />
@@ -1081,10 +1056,10 @@ export function FlowIntel() {
 
       {view === "flowprice" && (
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-2 flex items-center gap-1.5">
-            <Crosshair size={12} style={{ color: "var(--accent-blue)" }} /> Flow vs Price (30-day)
-          </h4>
-          <p className="text-xs text-text-muted mb-3">
+          <h3 className="mb-1 text-sm font-semibold text-text-primary">
+            Flow vs price <span className="font-normal text-text-muted">30 days</span>
+          </h3>
+          <p className="mb-3 max-w-[72ch] text-sm leading-relaxed text-text-secondary">
             Price action overlaid with daily bull/bear flow. Did the stock move after institutional flow?
           </p>
           <FlowVsPriceView
@@ -1101,12 +1076,12 @@ export function FlowIntel() {
       {view === "expiry" && (
         <GlassPanel
           title={
-            <span className="inline-flex items-center gap-1.5">
-              <Calendar size={12} style={{ color: "var(--accent-purple)" }} /> Expiry Premium Heatmap (7-day)
-            </span>
+            <>
+              Expiry premium heatmap <span className="font-normal text-text-muted">7 days</span>
+            </>
           }
         >
-          <p className="text-xs text-text-muted mb-3">
+          <p className="mb-3 max-w-[72ch] text-sm leading-relaxed text-text-secondary">
             Where is premium concentrated by expiry? Tall bars = gamma walls. Shows which dates institutions are targeting.
           </p>
           <ExpiryHeatmap />
@@ -1114,7 +1089,7 @@ export function FlowIntel() {
       )}
 
       {view === "sectors" && (
-        <GlassPanel title="Sector Flow Clustering (7-day)">
+        <GlassPanel title={<>Sector flow clustering <span className="font-normal text-text-muted">7 days</span></>}>
           <SectorClustering />
         </GlassPanel>
       )}

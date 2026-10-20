@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /* Shared atoms for the glass design language. Consume tokens only — no
- * literal colors. See DESIGN_SPEC.md at the repo root for usage rules. */
+ * literal colors. See DESIGN.md (2026-10 Redesign Rules) for usage rules. */
 
 export function GlassPanel({
   title,

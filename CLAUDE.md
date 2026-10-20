@@ -32,15 +32,18 @@ Don't reach for Redux or Context. If a piece of state spans pages, put it in Zus
 
 | Route | Page | Purpose |
 |---|---|---|
-| `/` | `CommandCenterPage` | Main command center: flow, analysis, forecast, intelligence |
-| `/command-center` | `CommandCenterPage` | Alias for the main command center |
+| `/` | `DeskPage section="brief"` | Daily Brief (home) |
+| `/flow[/heatmap\|/bounce]` | `DeskPage section="flow"` | iFlow tape, heat map, bounce board |
+| `/books[/flow-trader]` | `DeskPage section="books"` | TraderJoe paper books, Flow Trader |
+| `/intel[/voices\|/news]` | `DeskPage section="intel"` | Flow intel, voices, news |
+| `/command-center` | redirect | Old bookmarks → `/` |
 | `/pillars` | `PillarsPage` | Cross-source intelligence pillars |
 | `/traders` | `TraderLeaderboardPage` | Master/detail trader leaderboard. Left: ranked traders. Right: selected trader's positions (one row per position, click to expand event timeline) + the `SignalsView` panel on top (Trending / Leaders / Sentiment). |
 | `/rotation` | `RotationPage` | Sector rotation: RRG quadrant map (custom SVG, trails clipped to the circle, greedy label declutter), timeline, momentum ranking, insights, quadrant-transition alerts. One endpoint (`/market/sector-rotation`) feeds the whole page. **The map scales each axis independently** — RS-Ratio moves in a much tighter band than RS-Momentum, so a shared span flattens it into a vertical line. |
 | `/gex` | `GexMatrixPage` | Dealer positioning matrix — strikes down, expiries across, 5 metric tabs (GEX/VEX/OI/VOL/UNUSUAL) off one fetch. Heat scales to the 95th percentile of on-screen cells, not the max, so one 0DTE monster doesn't flatten the rest. |
 | `/map` | `BayAreaMapPage` | Bay Area company and campus map |
 
-Nav order is in `src/lib/constants.ts::NAV_ITEMS`. Adding a route = add to `App.tsx` Routes + push to NAV_ITEMS.
+`DeskPage` (src/pages/CommandCenterPage.tsx) owns the desk sections (`SECTIONS` map) and the shared ticker analysis side panel. Sidebar/bottom-nav order is `NAV_GROUPS` in `App.tsx`. Adding a route = add to `App.tsx` Routes + `NAV_GROUPS`. Standalone pages open with the `desk-page` / `desk-header` markup for a consistent header.
 
 ## Key Files
 
@@ -56,7 +59,7 @@ Nav order is in `src/lib/constants.ts::NAV_ITEMS`. Adding a route = add to `App.
 | `src/api/intel.ts` | `/intel/latest`, `/intel/refresh` hooks |
 | `src/api/intelV3.ts` | Typed React Query hooks for the `/intel-v3/*` endpoints (convergence, timeline, calendar, brief). |
 | `src/api/eval.ts` | Model trust scores |
-| `src/lib/constants.ts` | `MODEL_COLORS`, `STALE_TIMES`, `NAV_ITEMS`, `DEFAULT_TICKER`, `INTEL_TAG_COLORS`, `INTEL_VIEW_COLORS` |
+| `src/lib/constants.ts` | `MODEL_COLORS`, `STALE_TIMES`, `DEFAULT_TICKER`, `INTEL_TAG_COLORS`, `INTEL_VIEW_COLORS` |
 | `src/lib/types.ts` | Shared TS types (Signal, MarketPrice, TrackedTicker, …) |
 | `src/lib/utils.ts` | Formatters (`formatCurrency`, `formatDate`, `formatPremium`) + `relativeAge`/`absoluteAge` |
 | `src/components/CCPrimitives.tsx` | Pure atoms: `Sparkline`, `RangeBar`, `DotGauge`, `Tag`, `Panel`, `useSparkSeed` |
@@ -198,7 +201,7 @@ layout — but the file remains on disk.
 ## Conventions
 
 ### Always
-- **Read `DESIGN_SPEC.md` (repo root) before styling anything** — the 2026-07 "modern glass" remodel defines the surface/type/motion language. Use the shared primitives in `src/components/Glass.tsx` (`GlassPanel`, `Chip`, `Stat`, `Segmented`) instead of ad-hoc badges/tab rows; numerics get the `num` class. `backdrop-filter` blur belongs ONLY on `.glass-strong` chrome — never on repeated cards (compositing cost).
+- **Read `DESIGN.md` (repo root, esp. "2026-10 Redesign Rules") before styling anything.** `DESIGN_SPEC.md` is historical. Use the shared primitives in `src/components/Glass.tsx` (`GlassPanel`, `Chip`, `Stat`, `Segmented`) instead of ad-hoc badges/tab rows; numerics get the `num` class. `backdrop-filter` blur belongs ONLY on `.glass-strong` chrome — never on repeated cards (compositing cost).
 - Use `apiClient` from `src/api/client.ts` — never inline axios or fetch
 - Wrap every data fetch in a typed `useQuery<T>` with an explicit `queryKey` array
 - Read tickers from `useAppStore((s) => s.activeTicker)` — never from a local prop

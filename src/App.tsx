@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, type ElementType } from "react";
+import { lazy, Suspense, useState, type ElementType } from "react";
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -143,8 +143,9 @@ function TopBar() {
 
 function MobileNavigation() {
   const { pathname } = useLocation();
-  const [moreOpen, setMoreOpen] = useState(false);
-  useEffect(() => setMoreOpen(false), [pathname]);
+  // Keyed to the path it was opened on, so navigating closes it for free.
+  const [moreOpenOn, setMoreOpenOn] = useState<string | null>(null);
+  const moreOpen = moreOpenOn === pathname;
   const moreActive = MOBILE_MORE.some((item) => isActivePath(item.path, pathname));
   return (
     <>
@@ -175,7 +176,7 @@ function MobileNavigation() {
         ))}
         <button
           type="button"
-          onClick={() => setMoreOpen((v) => !v)}
+          onClick={() => setMoreOpenOn(moreOpen ? null : pathname)}
           aria-expanded={moreOpen}
           className={`mobile-bottom-nav__item ${moreActive || moreOpen ? "mobile-bottom-nav__item--active" : ""}`}
         >

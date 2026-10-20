@@ -19,8 +19,8 @@ export function PickHistory() {
 
   if (picks.length === 0) {
     return (
-      <div className="card text-center py-8">
-        <Archive size={24} className="mx-auto mb-2 text-text-muted opacity-40" />
+      <div className="text-center py-8">
+        <Archive size={20} className="mx-auto mb-2 text-text-muted opacity-60" />
         <p className="text-sm text-text-muted">No closed picks yet</p>
       </div>
     );
@@ -44,22 +44,22 @@ export function PickHistory() {
         <div className="flex items-center gap-1.5">
           <History size={13} className="text-text-secondary" />
           <span className="text-text-secondary">
-            {sorted.length} closed picks
+            <span className="num">{sorted.length}</span> closed picks
           </span>
         </div>
         <div>
-          <span className="text-text-muted">Win Rate: </span>
+          <span className="text-text-muted">Win rate </span>
           <span
-            className="font-mono font-semibold"
+            className="num font-semibold"
             style={{ color: winRate >= 50 ? "var(--accent-green)" : "var(--accent-red)" }}
           >
             {winRate.toFixed(0)}%
           </span>
         </div>
         <div>
-          <span className="text-text-muted">Avg P/L: </span>
+          <span className="text-text-muted">Avg P/L </span>
           <span
-            className="font-mono font-semibold"
+            className="num font-semibold"
             style={{ color: avgPnl >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}
           >
             {avgPnl >= 0 ? "+" : ""}

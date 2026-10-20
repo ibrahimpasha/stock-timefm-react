@@ -13,6 +13,7 @@
  * Built from a `TraderMatch` carried in `entry.trader_matches`.
  */
 import { useId, useState } from "react";
+import { ChevronRight } from "lucide-react";
 
 import { useAlertsPositions } from "../../../api/alerts";
 import {
@@ -185,125 +186,61 @@ export function TraderEventRow({
       color = "var(--text-muted)";
       bg = "color-mix(in srgb, var(--text-muted) 10%, transparent)";
     }
-    return { label: s.toUpperCase(), pct: headlinePct, color, bg };
+    return { label: s.charAt(0).toUpperCase() + s.slice(1), pct: headlinePct, color, bg };
   })();
 
+  const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+
   return (
-    <div
-      style={{
-        background: "color-mix(in srgb, var(--accent-purple) 6%, transparent)",
-        borderLeft: "2px solid var(--accent-purple)",
-        borderRadius: "var(--radius-control)",
-      }}
-    >
-      {/* Header row — clickable */}
+    <div>
+      {/* Header row — clickable. Purple leading dot marks a human trader event. */}
       <button
         type="button"
-        className="flex min-h-11 w-full min-w-0 cursor-pointer flex-wrap items-center gap-2 px-2 py-1.5 text-left text-xs transition-colors hover:bg-bg-card-hover lg:min-h-7 lg:flex-nowrap"
+        className="flex min-h-11 w-full min-w-0 cursor-pointer flex-wrap items-center gap-2 px-2 py-2 text-left text-xs transition-colors hover:bg-bg-card-hover lg:min-h-7 lg:flex-nowrap"
         onClick={() => setExpanded((s) => !s)}
         aria-expanded={expanded}
         aria-controls={detailsId}
         title={`${match.author} — alert ${match.alert_id} — ${match.ts}`}
       >
         <span
-          className="shrink-0 font-bold uppercase lg:min-w-[50px]"
-          style={{
-            color: "var(--accent-purple)",
-            fontSize: 10,
-            letterSpacing: 0.6,
-          }}
-        >
-          TRADER
-        </span>
-
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={{ background: "var(--accent-purple)" }}
+          aria-label="Trader event"
+        />
         <span
-          className="font-mono font-bold shrink-0"
-          style={{
-            color: dirColor,
-            background: `color-mix(in srgb, ${dirColor} 12%, transparent)`,
-            border: `1px solid color-mix(in srgb, ${dirColor} 40%, transparent)`,
-            padding: "1px 6px",
-            borderRadius: 999,
-            fontSize: 11,
-          }}
+          className="num shrink-0 font-semibold"
+          style={{ color: dirColor }}
+          title={`${match.author} (colored by direction alignment)`}
         >
           {initials(match.author)}
         </span>
 
-        <span
-          className="min-w-0 max-w-full truncate text-text-secondary lg:min-w-20"
-          style={{ fontSize: 12 }}
-        >
+        <span className="min-w-0 max-w-full truncate text-text-secondary lg:min-w-20">
           {match.author}
         </span>
 
-        <span
-          className="font-mono font-bold shrink-0"
-          style={{
-            color: evColor,
-            background: `color-mix(in srgb, ${evColor} 12%, transparent)`,
-            border: `1px solid color-mix(in srgb, ${evColor} 40%, transparent)`,
-            padding: "1px 6px",
-            borderRadius: 999,
-            fontSize: 10,
-            letterSpacing: 0.5,
-          }}
-        >
-          {ev.toUpperCase()}
+        <span className="shrink-0 font-medium" style={{ color: evColor }}>
+          {cap(ev)}
         </span>
 
-        <span
-          className="num font-bold shrink-0 text-text-primary"
-          style={{ fontSize: 12 }}
-        >
-          {strike != null ? `$${strike}${opt ? ` ${opt}` : ""}` : "SHARES"}
+        <span className="num shrink-0 font-semibold text-text-primary">
+          {strike != null ? `$${strike}${opt ? ` ${opt}` : ""}` : "Shares"}
         </span>
-        {exp && (
-          <span
-            className="num text-text-muted shrink-0"
-            style={{ fontSize: 11 }}
-          >
-            {exp}
-          </span>
-        )}
+        {exp && <span className="num shrink-0 text-text-muted">{exp}</span>}
 
-        {/* "+N events" badge when this row collapses multiple events from
-            the same position. Tells the user that expanding will show a
-            multi-step timeline rather than just one message. */}
+        {/* "+N events" when this row collapses multiple events from the
+            same position — expanding shows the multi-step timeline. */}
         {eventCount && eventCount > 1 && (
-          <span
-            className="num shrink-0"
-            style={{
-              color: "var(--accent-purple)",
-              background: "color-mix(in srgb, var(--accent-purple) 12%, transparent)",
-              border: "1px solid color-mix(in srgb, var(--accent-purple) 40%, transparent)",
-              padding: "1px 6px",
-              borderRadius: 999,
-              fontSize: 10,
-              letterSpacing: 0.5,
-              opacity: 0.85,
-            }}
-            title={`${eventCount} events in this position`}
-          >
-            +{eventCount} events
+          <span className="shrink-0 text-text-muted" title={`${eventCount} events in this position`}>
+            <span className="num">{eventCount}</span> events
           </span>
         )}
 
-        {/* Status + P/L chip. Renders for every status; for open/runner the
-            pct is the live unrealized estimate, for closed/stopped/partial
-            it's the headline realized exit. */}
+        {/* Status + P/L. For open/runner the pct is the live unrealized
+            estimate, for closed/stopped/partial it's the realized exit. */}
         {outcome && (
           <span
-            className="num font-bold shrink-0 ml-auto"
-            style={{
-              color: outcome.color,
-              border: `1px solid color-mix(in srgb, ${outcome.color} 40%, transparent)`,
-              background: outcome.bg,
-              padding: "2px 7px",
-              borderRadius: 999,
-              fontSize: 11,
-              letterSpacing: 0.6,
-            }}
+            className="ml-auto shrink-0 text-text-muted"
             title={
               position && (position.status === "closed" || position.status === "stopped" || position.status === "partial")
                 ? "realized P/L (latest trader-stated exit)"
@@ -312,7 +249,7 @@ export function TraderEventRow({
           >
             {outcome.label}
             {outcome.pct != null && (
-              <span style={{ marginLeft: 4 }}>
+              <span className="num ml-1 font-semibold" style={{ color: outcome.color }}>
                 {outcome.pct >= 0 ? "+" : ""}
                 {Math.round(outcome.pct)}%
               </span>
@@ -321,18 +258,18 @@ export function TraderEventRow({
         )}
 
         <span
-          className="num text-text-muted shrink-0"
-          style={{ fontSize: 11, marginLeft: outcome ? 0 : "auto" }}
+          className="num shrink-0 text-text-muted"
+          style={{ marginLeft: outcome ? 0 : "auto" }}
+          title="Days between the trader call and the flow print"
         >
           {match.days_offset >= 0 ? "+" : ""}
-          {match.days_offset}d vs flow
+          {match.days_offset}d
         </span>
-        <span
-          className="shrink-0"
-          style={{ fontSize: 10, color: "var(--text-muted)" }}
-        >
-          {expanded ? "▾" : "▸"}
-        </span>
+        <ChevronRight
+          size={13}
+          aria-hidden="true"
+          className={`shrink-0 text-text-muted transition-transform ${expanded ? "rotate-90" : ""}`}
+        />
       </button>
 
       {/* Expanded detail — fetched lazily on first click */}
@@ -341,8 +278,7 @@ export function TraderEventRow({
           id={detailsId}
           className="text-xs"
           style={{
-            padding: "8px 12px 12px 56px",
-            background: "color-mix(in srgb, var(--bg-card) 40%, transparent)",
+            padding: "4px 12px 12px 28px",
             color: "var(--text-secondary)",
             display: "flex",
             flexDirection: "column",
@@ -352,7 +288,7 @@ export function TraderEventRow({
         >
           {isFetching && !data && (
             <span className="animate-pulse text-text-muted">
-              loading position...
+              Loading position…
             </span>
           )}
           {!isFetching && !position && data && (
@@ -362,19 +298,11 @@ export function TraderEventRow({
           )}
           {position && (
             <>
-              <div
-                className="font-mono"
-                style={{
-                  fontSize: 12,
-                  color: "var(--text-muted)",
-                  letterSpacing: 0.4,
-                  textTransform: "uppercase",
-                }}
-              >
-                {position.status} · {position.events.length} event
-                {position.events.length === 1 ? "" : "s"} · current pl{" "}
+              <div className="text-xs text-text-muted">
+                {cap(position.status)} · <span className="num">{position.events.length}</span> event
+                {position.events.length === 1 ? "" : "s"} · current P/L{" "}
                 {position.current_pl_pct != null ? (
-                  <span style={{ color: changeColor(position.current_pl_pct) }}>
+                  <span className="num font-semibold" style={{ color: changeColor(position.current_pl_pct) }}>
                     {formatPercentRaw(position.current_pl_pct, 2)}
                   </span>
                 ) : (
@@ -395,21 +323,12 @@ export function TraderEventRow({
                         flexWrap: "wrap",
                         alignItems: "baseline",
                         gap: 8,
-                        paddingBottom: 4,
-                        borderBottom: "1px dotted var(--border)",
+                        paddingBottom: 6,
+                        borderBottom: "1px solid var(--border)",
                       }}
                     >
-                      <span
-                        className="font-mono"
-                        style={{
-                          color: c,
-                          fontWeight: 700,
-                          minWidth: 50,
-                          fontSize: 12,
-                          letterSpacing: 0.5,
-                        }}
-                      >
-                        {eType.toUpperCase()}
+                      <span className="text-xs font-medium" style={{ color: c, minWidth: 50 }}>
+                        {cap(eType)}
                       </span>
                       <span
                         className="num text-text-muted"
@@ -423,8 +342,8 @@ export function TraderEventRow({
                           className="num"
                           style={{
                             color: changeColor(e.exit_pct),
-                            fontWeight: 700,
-                            fontSize: 13,
+                            fontWeight: 600,
+                            fontSize: 12,
                           }}
                         >
                           {e.exit_pct >= 0 ? "+" : ""}
@@ -462,10 +381,7 @@ export function TraderEventRow({
                         </span>
                       )}
                       {sizing.length > 0 && (
-                        <span
-                          className="font-mono text-text-muted"
-                          style={{ fontSize: 11, letterSpacing: 0.5 }}
-                        >
+                        <span className="num text-text-muted" style={{ fontSize: 12 }}>
                           [{sizing.join(", ")}]
                         </span>
                       )}
@@ -473,8 +389,9 @@ export function TraderEventRow({
                         <span
                           style={{
                             color: "var(--text-secondary)",
-                            fontStyle: "italic",
-                            fontSize: 12,
+                            fontSize: 13,
+                            lineHeight: 1.6,
+                            maxWidth: "72ch",
                             flexBasis: "100%",
                             marginLeft: 58,
                           }}
@@ -493,14 +410,11 @@ export function TraderEventRow({
                   onClick={() => setShowMessages((s) => !s)}
                   aria-expanded={showMessages}
                   aria-controls={messagesId}
-                  className="font-mono"
                   style={{
                     background: "transparent",
                     border: "1px solid var(--border)",
-                    color: "var(--text-muted)",
-                    fontSize: 11,
-                    letterSpacing: 0.6,
-                    textTransform: "uppercase",
+                    color: "var(--text-secondary)",
+                    fontSize: 12,
                     padding: "3px 10px",
                     borderRadius: 999,
                     cursor: "pointer",
@@ -522,25 +436,16 @@ export function TraderEventRow({
                         key={`msg-${e.alert_id}`}
                         style={{ display: "flex", flexDirection: "column", gap: 4 }}
                       >
-                        <div
-                          className="font-mono"
-                          style={{
-                            fontSize: 11,
-                            color: "var(--text-muted)",
-                            letterSpacing: 0.4,
-                          }}
-                        >
-                          {shortDate(e.ts)} · {(e.event_type || "event").toUpperCase()}
+                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                          <span className="num">{shortDate(e.ts)}</span> · {cap((e.event_type || "event").toLowerCase())}
                         </div>
                         <div
                           style={{
                             whiteSpace: "pre-wrap",
                             fontSize: 12,
                             color: "var(--text-secondary)",
-                            background: "color-mix(in srgb, var(--bg-card-hover) 50%, transparent)",
-                            padding: 8,
-                            borderRadius: "var(--radius-control)",
-                            border: "1px solid var(--border)",
+                            padding: "4px 0 4px 10px",
+                            lineHeight: 1.6,
                             maxHeight: 180,
                             overflow: "auto",
                           }}
@@ -553,11 +458,8 @@ export function TraderEventRow({
               )}
 
               {position.opened_at && (
-                <div
-                  className="font-mono"
-                  style={{ fontSize: 11, color: "var(--text-muted)" }}
-                >
-                  opened {relativeAge(position.opened_at)}
+                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                  Opened {relativeAge(position.opened_at)}
                 </div>
               )}
             </>

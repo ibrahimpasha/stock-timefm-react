@@ -19,6 +19,7 @@
 import { useMemo } from "react";
 import { Sparkles, Zap, ArrowUp, ArrowDown, Minus } from "lucide-react";
 import { useAppStore } from "../../../store/useAppStore";
+import { Segmented } from "../../../components/Glass";
 import { relativeAge } from "../../../lib/utils";
 import {
   useVoicesPatterns,
@@ -56,9 +57,19 @@ function VelocityTable({
   // ticker fills the bar; everything else is proportional.
   const maxMomentum = Math.max(1, ...rows.map((r) => r.momentum_score));
   return (
-    <div className="space-y-0.5">
+    <div className="divide-y divide-border">
+      {rows.length > 0 && (
+        <div className="grid grid-cols-12 gap-2 px-2 pb-1.5 text-xs font-medium text-text-muted">
+          <span className="col-span-2">Ticker</span>
+          <span className="col-span-1 text-right">Recent</span>
+          <span className="col-span-2">Delta</span>
+          <span className="col-span-5">Momentum</span>
+          <span className="col-span-1 text-right">Bull/bear</span>
+          <span className="col-span-1 text-right">Last</span>
+        </div>
+      )}
       {rows.length === 0 && (
-        <div className="text-xs text-text-muted italic">
+        <div className="text-sm text-text-muted">
           No velocity data yet — backfill needs at least two windows of history.
         </div>
       )}
@@ -67,25 +78,23 @@ function VelocityTable({
         return (
           <div
             key={r.ticker}
-            className="grid grid-cols-12 items-center gap-2 py-1 px-2 rounded hover:bg-bg-card-hover cursor-pointer"
+            className="grid grid-cols-12 items-center gap-2 py-2 px-2 hover:bg-bg-card-hover cursor-pointer"
             onClick={() => onPick(r.ticker)}
           >
-            <span className="col-span-2 font-mono font-semibold text-xs text-text-primary truncate">
+            <span className="col-span-2 num font-semibold text-xs text-text-primary truncate">
               {r.ticker}
             </span>
-            <span className="col-span-1 text-xs font-mono text-text-muted text-right">
+            <span className="col-span-1 text-xs num text-text-muted text-right">
               {r.mentions_recent}
             </span>
-            <span className="col-span-2 inline-flex items-center gap-1 text-xs font-mono">
+            <span className="col-span-2 inline-flex items-center gap-1 text-xs num">
               <VelocityArrow delta={r.delta} />
               <span style={{ color: sentColor(r.net_sentiment) }}>
                 {r.delta >= 0 ? "+" : ""}
                 {r.delta}
               </span>
               {r.is_new && (
-                <span className="text-[9px] uppercase px-1 rounded bg-accent-purple/15 text-accent-purple">
-                  new
-                </span>
+                <span className="font-sans text-xs text-text-muted">new</span>
               )}
             </span>
             <div className="col-span-5 h-1.5 rounded-full bg-bg-card overflow-hidden">
@@ -97,7 +106,7 @@ function VelocityTable({
                 }}
               />
             </div>
-            <span className="col-span-1 text-xs font-mono text-text-secondary text-right">
+            <span className="col-span-1 text-xs num text-text-secondary text-right">
               {r.bullish}/{r.bearish}
             </span>
             <span className="col-span-1 text-xs text-text-muted text-right">
@@ -144,19 +153,14 @@ function ClusterCard({
   }, [cluster, internalPairs]);
 
   return (
-    <div className="card p-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xs uppercase text-text-muted font-semibold">
-            Cluster C{cluster.id}
-          </span>
-          <span className="text-xs text-text-muted">
-            {cluster.size} tickers · {cluster.internal_edges} edges · hub
-          </span>
-          <span className="font-mono font-semibold text-xs text-accent-purple">
-            {hub}
-          </span>
-        </div>
+    <div className="card space-y-2">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <h4 className="text-sm font-semibold text-text-primary">
+          <span className="num">{hub}</span> basket
+        </h4>
+        <span className="text-xs text-text-muted">
+          Cluster C{cluster.id} · <span className="num">{cluster.size}</span> tickers · <span className="num">{cluster.internal_edges}</span> edges
+        </span>
       </div>
 
       {/* Member chips, sized by mention count */}
@@ -175,16 +179,12 @@ function ClusterCard({
               key={t}
               type="button"
               onClick={() => onPick(t)}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono font-semibold transition-colors hover:brightness-110"
-              style={{
-                background: `color-mix(in srgb, ${c} 9%, transparent)`,
-                color: c,
-                border: `1px solid color-mix(in srgb, ${c} 25%, transparent)`,
-              }}
+              className="num inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs font-semibold transition-colors hover:bg-bg-card-hover"
+              style={{ color: c === "var(--text-muted)" ? "var(--text-secondary)" : c }}
               title={`${ns.mentions} mentions · ${ns.bullish}B / ${ns.bearish}S`}
             >
               {t}
-              <span className="text-[9px] opacity-70">{ns.mentions}</span>
+              <span className="font-normal text-text-muted">{ns.mentions}</span>
             </button>
           );
         })}
@@ -192,7 +192,7 @@ function ClusterCard({
 
       {/* Top 3 internal pair edges */}
       {internalPairs.length > 0 && (
-        <div className="text-xs text-text-muted font-mono">
+        <div className="text-xs text-text-muted num">
           {internalPairs.slice(0, 4).map((p) => (
             <span key={`${p.a}-${p.b}`} className="mr-3">
               {p.a}↔{p.b}
@@ -224,67 +224,51 @@ export function PatternsView({
   return (
     <div className="space-y-3">
       {/* Window selector */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs uppercase text-text-muted font-semibold">
-          Window
-        </span>
-        <div className="flex items-center rounded border border-border overflow-hidden">
-          {WINDOWS.map((w) => {
-            const active = w.days === windowDays;
-            return (
-              <button
-                key={w.label}
-                type="button"
-                onClick={() => onWindowChange(w.days)}
-                className="px-2 py-1 text-xs font-semibold transition-colors"
-                style={{
-                  background: active ? "var(--accent-blue)" : "transparent",
-                  color: active ? "var(--bg-primary)" : "var(--text-secondary)",
-                }}
-              >
-                {w.label}
-              </button>
-            );
-          })}
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Segmented
+          ariaLabel="Patterns window"
+          value={String(windowDays)}
+          onChange={(v) => onWindowChange(Number(v))}
+          options={WINDOWS.map((w) => ({ value: String(w.days), label: w.label }))}
+        />
         {cooc && (
           <span className="ml-auto text-xs text-text-muted">
-            {cooc.n_tickers} tickers across {cooc.n_tweets_considered} tweets ·{" "}
-            {cooc.pairs.length} pairs · {cooc.clusters.length} clusters
+            <span className="num">{cooc.n_tickers}</span> tickers across <span className="num">{cooc.n_tweets_considered}</span> tweets ·{" "}
+            <span className="num">{cooc.pairs.length}</span> pairs · <span className="num">{cooc.clusters.length}</span> clusters
           </span>
         )}
         {isFetching && (
-          <span className="text-xs text-text-muted animate-pulse">refreshing…</span>
+          <span className="text-xs text-text-muted animate-pulse">Refreshing…</span>
         )}
       </div>
 
       {/* Velocity panel */}
-      <div className="card p-3 space-y-2">
-        <div className="flex items-center gap-2">
-          <Zap size={13} className="text-accent-orange" />
-          <span className="text-sm font-semibold text-text-primary">
-            Conviction Velocity
-          </span>
+      <div className="card space-y-2">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+            <Zap size={13} className="text-text-muted" />
+            Conviction velocity
+          </h3>
           <span className="text-xs text-text-muted">
-            mention delta vs prior {windowDays}d
+            Mention delta vs prior {windowDays}d
           </span>
         </div>
         <VelocityTable rows={velocity.slice(0, 20)} onPick={handlePick} />
       </div>
 
       {/* Co-occurrence clusters */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Sparkles size={13} className="text-accent-purple" />
-          <span className="text-sm font-semibold text-text-primary">
-            Co-occurrence Baskets
-          </span>
+      <div className="space-y-2 pt-2">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+            <Sparkles size={13} className="text-text-muted" />
+            Co-occurrence baskets
+          </h3>
           <span className="text-xs text-text-muted">
-            tickers mentioned together — the implicit baskets
+            Tickers mentioned together, the implicit baskets
           </span>
         </div>
         {!cooc || cooc.clusters.length === 0 ? (
-          <div className="card p-4 text-sm text-text-muted italic">
+          <div className="card text-sm text-text-muted">
             No clusters yet — needs at least 2 tweets each mentioning 2+ tickers.
           </div>
         ) : (
@@ -307,7 +291,7 @@ export function PatternsView({
             <summary className="cursor-pointer text-xs text-text-muted hover:text-text-primary">
               All pairs (top {Math.min(cooc.pairs.length, 30)})
             </summary>
-            <div className="mt-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 text-xs font-mono">
+            <div className="mt-2 grid grid-cols-2 gap-x-6 md:grid-cols-3 lg:grid-cols-4 text-xs num">
               {cooc.pairs.slice(0, 30).map((p) => {
                 const bullDominant = p.both_bullish > p.both_bearish;
                 const c = bullDominant
@@ -318,7 +302,7 @@ export function PatternsView({
                 return (
                   <div
                     key={`${p.a}-${p.b}`}
-                    className="flex items-center justify-between px-1.5 py-1 rounded bg-bg-card border border-border"
+                    className="flex items-center justify-between border-b border-border py-1.5"
                     style={{ color: c }}
                   >
                     <span>

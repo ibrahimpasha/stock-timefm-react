@@ -15,21 +15,15 @@ export function AlertCard({ alert, onDismiss, onSendDiscord }: AlertCardProps) {
     alert.side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
 
   return (
-    <div
-      className="card flex flex-col gap-2"
-      style={{ borderLeftWidth: "3px", borderLeftColor: stateColor }}
-    >
+    <div className="card flex flex-col gap-2">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Bell size={14} style={{ color: stateColor }} />
-          <span
-            className="text-xs font-bold uppercase px-2 py-0.5 rounded"
-            style={{ color: stateColor, background: `${stateColor}20` }}
-          >
-            {alert.state}
+          <span className="text-xs font-medium capitalize text-text-secondary">
+            {String(alert.state).toLowerCase()}
           </span>
-          <span className="font-mono font-bold text-text-primary">
+          <span className="num font-bold text-text-primary">
             {alert.ticker}
           </span>
           <span
@@ -62,7 +56,7 @@ export function AlertCard({ alert, onDismiss, onSendDiscord }: AlertCardProps) {
       </div>
 
       {/* Contract details */}
-      <div className="font-mono text-sm text-text-secondary">
+      <div className="num text-sm text-text-secondary">
         ${alert.strike} {alert.option_type} &middot; {alert.premium}
       </div>
 
@@ -70,13 +64,13 @@ export function AlertCard({ alert, onDismiss, onSendDiscord }: AlertCardProps) {
       <div className="flex items-center gap-4 text-xs">
         <div>
           <span className="text-text-muted">Ref: </span>
-          <span className="font-mono text-text-primary">
+          <span className="num text-text-primary">
             {formatCurrency(alert.ref_price)}
           </span>
         </div>
         <div>
           <span className="text-text-muted">Now: </span>
-          <span className="font-mono text-text-primary">
+          <span className="num text-text-primary">
             {formatCurrency(alert.current_price)}
           </span>
         </div>
@@ -84,7 +78,7 @@ export function AlertCard({ alert, onDismiss, onSendDiscord }: AlertCardProps) {
           <div>
             <span className="text-text-muted">Dip: </span>
             <span
-              className="font-mono font-semibold"
+              className="num font-semibold"
               style={{
                 color:
                   alert.dip_pct < 0

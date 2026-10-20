@@ -35,9 +35,9 @@ export function PnlBadge({ pnl }: { pnl: number | null }) {
   const color = pnl >= 0 ? "var(--accent-green)" : "var(--accent-red)";
   return (
     <span
-      className="num px-1.5 rounded-full font-semibold"
+      className="num shrink-0 font-semibold"
       title="Estimated option P/L since the print (delta+theta model)"
-      style={{ color, background: `color-mix(in srgb, ${color} 12%, transparent)` }}
+      style={{ color }}
     >
       Est. {pnl >= 0 ? "+" : ""}{pnl.toFixed(0)}%
     </span>
@@ -67,12 +67,15 @@ export function TopPicks({ date, dteFilter }: { date: string; dteFilter: DteFilt
   if (!scored.length) return null;
   return (
     <div className="mb-4">
-      <h4 className="text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary mb-2 flex items-center gap-1.5">
-        <TrendingUp size={12} className="text-accent-green" />
-        Top Conviction Flow — {formatDate(date)} ({scored.length})
+      <h4 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-text-primary">
+        <TrendingUp size={13} className="text-text-muted" />
+        Top conviction flow
+        <span className="text-xs font-normal text-text-muted">
+          {formatDate(date)} · <span className="num">{scored.length}</span>
+        </span>
       </h4>
       <GexWallLegend />
-      <div className="space-y-1">
+      <div className="divide-y divide-border">
         {scored.map((e: any, i: number) => {
           const { side, action } = optionIntent(e);
           const color = side === "Unknown" ? "var(--text-muted)" : side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
@@ -84,44 +87,42 @@ export function TopPicks({ date, dteFilter }: { date: string; dteFilter: DteFilt
           return (
             <div
               key={i}
-              className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
-              style={{
-                background: mega ? "color-mix(in srgb, var(--accent-green) 8%, transparent)" : "color-mix(in srgb, var(--bg-card) 70%, transparent)",
-                border: mega ? "1px solid color-mix(in srgb, var(--accent-green) 25%, transparent)" : "1px solid transparent",
-              }}
+              className="flex items-center gap-2 px-2 py-2 text-xs transition-colors hover:bg-bg-card-hover"
             >
-              <span className="num text-xs font-bold text-accent-cyan w-6">
+              <span className="num w-7 shrink-0 font-semibold text-text-primary" title="Conviction score">
                 {e._score.toFixed(1)}
               </span>
-              <span className="font-mono font-bold text-text-primary w-14">{e.ticker}</span>
+              <span className="num w-14 shrink-0 text-sm font-semibold text-text-primary">{e.ticker}</span>
               <span className="num text-text-primary">
                 ${e.strike} {e.type || e.option_type}
               </span>
-              <span style={{ color }} className="font-semibold">
+              <span style={{ color }} className="font-medium">
                 {side}
               </span>
-              <span className="text-text-muted italic">{action}</span>
+              <span className="text-text-muted">{action}</span>
               <span className="num text-text-muted">{canonicalExpiry(e.expiry, e._date ?? date, e.dte) ?? `${e.expiry} (year unknown)`}</span>
               {dl && (
-                <span
-                  className="num px-1 rounded-full"
-                  style={{ color: dl.color, background: dl.bg }}
-                >
-                  {dl.text}
-                </span>
+                <span className="text-text-muted">{dl.text.toLowerCase()}</span>
               )}
               {e.vol_oi_ratio > 0 && (
-                <span className="text-accent-cyan num">
+                <span className="num text-text-secondary" title="Volume / open interest">
                   {Number(e.vol_oi_ratio).toFixed(1)}x
                 </span>
               )}
               {e.ask_pct > 0 && (
-                <span className="text-accent-orange num">{e.ask_pct}%ask</span>
+                <span className="num text-text-secondary" title="Filled at ask">{e.ask_pct}% ask</span>
               )}
               <GexWall ticker={e.ticker} strike={Number(e.strike) || null} showLabel />
               <span className="text-text-secondary ml-auto num">{e.premium}</span>
               <PnlBadge pnl={entryPnl(e, priceMap, date)} />
-              {mega && <span className="text-xs font-bold text-accent-green">MEGA</span>}
+              {mega && (
+                <span
+                  className="text-xs font-medium text-accent-green"
+                  title="≥$1M premium, vol/OI ≥10, ≥95% at ask"
+                >
+                  mega
+                </span>
+              )}
             </div>
           );
         })}

@@ -1,4 +1,4 @@
-import { Brain, BookOpen, AlertTriangle, Clock, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import apiClient from "../../api/client";
@@ -89,8 +89,7 @@ function buildFallbackThesis(cats: IntelCategoryResponse[] | undefined): string 
 
 function SkeletonIntel() {
   return (
-    <div className="card animate-pulse">
-      <div className="h-4 w-32 rounded bg-text-muted/20 mb-4" />
+    <div className="animate-pulse">
       <div className="space-y-2">
         <div className="h-3 w-full rounded bg-text-muted/20" />
         <div className="h-3 w-5/6 rounded bg-text-muted/20" />
@@ -138,20 +137,6 @@ function parseThesisSections(text: string): { title: string; content: string }[]
   return sections.filter((s) => s.content.length > 0);
 }
 
-function SectionIcon({ title }: { title: string }) {
-  const lower = title.toLowerCase();
-  if (lower.includes("risk") || lower.includes("caution") || lower.includes("warning")) {
-    return <AlertTriangle size={13} className="text-accent-orange shrink-0" />;
-  }
-  if (lower.includes("catalyst") || lower.includes("event") || lower.includes("timeline")) {
-    return <Clock size={13} className="text-accent-cyan shrink-0" />;
-  }
-  if (lower.includes("thesis") || lower.includes("rationale") || lower.includes("analysis")) {
-    return <Brain size={13} className="text-accent-purple shrink-0" />;
-  }
-  return <BookOpen size={13} className="text-text-secondary shrink-0" />;
-}
-
 /* ── Main component ──────────────────────────────────────────── */
 
 export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePanelProps) {
@@ -177,10 +162,9 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
     // "run analysis" prompt so the user doesn't blame themselves.
     if (catsLoading && ticker) return <SkeletonIntel />;
     return (
-      <div className="card">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-[0.08em] flex items-center gap-1.5 mb-3">
-          <Brain size={13} />
-          Intelligence
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs text-text-muted">No cached intel</span>
           {ticker && (
             <button
               onClick={() => {
@@ -194,22 +178,22 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
               }}
               disabled={refresh.isPending}
               title="Fetch this ticker's intel via Perplexity / Claude web-search. Takes ~30-60s."
-              className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium normal-case tracking-normal text-accent-blue hover:bg-accent-blue/10 border border-accent-blue/30 transition-colors disabled:opacity-50"
+              className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium text-accent-blue hover:bg-bg-card-hover transition-colors disabled:opacity-50"
             >
               <RefreshCw
-                size={10}
+                size={12}
                 className={refresh.isPending ? "animate-spin" : ""}
               />
-              {refresh.isPending ? "fetching…" : "fetch now"}
+              {refresh.isPending ? "Fetching…" : "Fetch now"}
             </button>
           )}
-        </h3>
+        </div>
         {refreshError && (
           <div className="mb-2 text-xs text-accent-red">
             {refreshError}
           </div>
         )}
-        <p className="text-xs text-text-muted text-center py-4">
+        <p className="text-sm text-text-muted py-2">
           {refresh.isPending
             ? `Fetching intel for ${ticker} — this takes 30-60s...`
             : `No cached intelligence for ${ticker || "this ticker"} — click "fetch now" to backfill.`}
@@ -221,25 +205,23 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
   const sections = parseThesisSections(effectiveThesis);
 
   return (
-    <div className="card">
-      <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-[0.08em] flex items-center gap-1.5 mb-4">
-        <Brain size={13} />
-        Intelligence
-        <div className="ml-auto flex items-center gap-2 normal-case tracking-normal font-normal">
+    <div>
+      <div className="flex items-center justify-end gap-2 mb-3">
+        <div className="flex items-center gap-2">
           {fromCache && (
             <span
               className="text-xs text-text-muted"
               title="Showing cached web-search intel because no ML thesis exists yet. Click Analyze for a full ensemble-backed thesis."
             >
-              web-search cache
+              Web-search cache
             </span>
           )}
           {lastRefreshLabel && (
             <span
-              className="num text-xs text-text-muted"
+              className="text-xs text-text-muted"
               title={lastRefreshIso ? `Last refreshed ${absoluteAge(lastRefreshIso)}` : undefined}
             >
-              updated {lastRefreshLabel}
+              Updated {lastRefreshLabel}
             </span>
           )}
           {ticker && (
@@ -252,14 +234,14 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
               }}
               disabled={refresh.isPending}
               title="Re-fetch this ticker's intel via Perplexity / Claude web-search. Takes ~30-60s."
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-accent-blue hover:bg-accent-blue/10 border border-accent-blue/30 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium text-accent-blue hover:bg-bg-card-hover transition-colors disabled:opacity-50"
             >
-              <RefreshCw size={10} className={refresh.isPending ? "animate-spin" : ""} />
-              {refresh.isPending ? "fetching…" : "refresh"}
+              <RefreshCw size={12} className={refresh.isPending ? "animate-spin" : ""} />
+              {refresh.isPending ? "Fetching…" : "Refresh"}
             </button>
           )}
         </div>
-      </h3>
+      </div>
       {refreshError && (
         <div className="mb-2 text-xs text-accent-red">
           {refreshError}
@@ -272,20 +254,11 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
           intel sections below carry the factual narrative without a synthesized
           directional call. */}
 
-      <div className="space-y-3">
+      <div className="space-y-5">
         {sections.map((section, idx) => (
-          <div
-            key={idx}
-            className="rounded-lg p-3"
-            style={{ background: "color-mix(in srgb, var(--bg-card) 50%, transparent)" }}
-          >
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <SectionIcon title={section.title} />
-              <span className="text-xs font-semibold text-text-primary">
-                {section.title}
-              </span>
-            </div>
-            <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
+          <div key={idx}>
+            <h4 className="text-sm font-semibold text-text-primary mb-1">{section.title}</h4>
+            <p className="max-w-[72ch] text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
               {section.content}
             </p>
           </div>
