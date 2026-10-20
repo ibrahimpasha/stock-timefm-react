@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Direction A - Cockpit</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0d0e10}
+a{color:#f5b83d}a:hover{color:#ffd27a}
+</style>
+</helmet>
+<div style="min-height: 1180px; background: #0d0e10; color: #eceef1; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px;">
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 24px; padding: 14px 28px; border-bottom: 1px solid #22252a;">
+    <div style="display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; letter-spacing: -0.01em;">
+      <span style="display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; background: #f5b83d; color: #0d0e10; font-family: 'IBM Plex Mono', monospace; font-size: 12px;">TF</span>
+      Stock-TimeFM
+    </div>
+    <nav style="display: flex; flex-wrap: wrap; gap: 4px; font-size: 13px; font-weight: 500;">
+      <a href="#" style="padding: 7px 12px; border-radius: 6px; background: #1d2025; color: #fff; text-decoration: none;">Brief</a>
+      <a href="#" style="padding: 7px 12px; color: #9aa1ab; text-decoration: none;">Flow</a>
+      <a href="#" style="padding: 7px 12px; color: #9aa1ab; text-decoration: none;">Books</a>
+      <a href="#" style="padding: 7px 12px; color: #9aa1ab; text-decoration: none;">Intel</a>
+      <a href="#" style="padding: 7px 12px; color: #9aa1ab; text-decoration: none;">Traders</a>
+      <span style="width: 1px; background: #2a2e34; margin: 4px 6px;"></span>
+      <a href="#" style="padding: 7px 12px; color: #9aa1ab; text-decoration: none;">Pillars</a>
+      <a href="#" style="padding: 7px 12px; color: #9aa1ab; text-decoration: none;">Rotation</a>
+      <a href="#" style="padding: 7px 12px; color: #9aa1ab; text-decoration: none;">GEX</a>
+      <a href="#" style="padding: 7px 12px; color: #9aa1ab; text-decoration: none;">Map</a>
+    </nav>
+    <div style="flex: 1;"></div>
+    <label style="display: flex; align-items: center; gap: 8px; width: 280px; padding: 8px 12px; border: 1px solid #2a2e34; border-radius: 8px; color: #8a919b; font-size: 13px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+      <input aria-label="Search ticker" placeholder="Search ticker or company" style="flex: 1; min-width: 0; background: transparent; border: 0; color: #eceef1; font: inherit; outline: none;">
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 1px 6px; border: 1px solid #2a2e34; border-radius: 4px;">⌘K</span>
+    </label>
+  </header>
+
+  <main style="max-width: 1384px; margin: 0 auto; padding: 22px 28px 40px; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px;">
+    <sc-for list="{{ strip }}" as="s" hint-placeholder-count="4">
+      <section style="grid-column: span 3; background: #16181c; border: 1px solid #22252a; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px;">
+        <span style="font-size: 12px; color: #8a919b;">{{ s.label }}</span>
+        <div style="display: flex; align-items: baseline; gap: 10px;">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 28px; font-weight: 600; letter-spacing: -0.02em;">{{ s.value }}</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 600; color: {{ s.color }};">{{ s.delta }}</span>
+        </div>
+        <span style="font-size: 12px; color: #8a919b;">{{ s.sub }}</span>
+      </section>
+    </sc-for>
+
+    <section style="grid-column: span 7; background: #16181c; border: 1px solid #22252a; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: #8a919b;">
+        <span style="padding: 3px 9px; border-radius: 999px; background: #2a2412; color: #f5b83d; font-weight: 600;">After-hours brief</span>
+        Mon Oct 19 · generated 1:35 PM PT
+      </div>
+      <h1 style="margin: 0; font-size: 30px; line-height: 1.15; font-weight: 600; letter-spacing: -0.025em;">NFLX, UAL, HAL report tomorrow. IRON's +39% after-hours move still has no verified catalyst.</h1>
+      <p style="margin: 0; color: #b4bac3; font-size: 15px; line-height: 1.6; max-width: 70ch;">CLF's Q3 beat ($612M adj EBITDA) drove a +16.3% gap, but intel flags "indefinitely idled" operations. Bear flow is concentrating pre-FOMC: QQQ ($2.5M) and VRT ($2M) are today's two largest prints.</p>
+      <div style="display: flex; gap: 10px; margin-top: auto;">
+        <a href="#" style="padding: 9px 14px; border-radius: 8px; background: #f5b83d; color: #0d0e10; font-weight: 600; text-decoration: none; font-size: 13px;">Read full brief</a>
+        <a href="#" style="padding: 9px 14px; border-radius: 8px; border: 1px solid #2a2e34; color: #eceef1; text-decoration: none; font-size: 13px;">Pre-market · Midday</a>
+      </div>
+    </section>
+
+    <section style="grid-column: span 5; background: #16181c; border: 1px solid #22252a; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600;">Session movers</h2>
+        <span style="font-size: 12px; color: #8a919b;">% change</span>
+      </div>
+      <sc-for list="{{ movers }}" as="m" hint-placeholder-count="12">
+        <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr) 64px; align-items: center; gap: 8px; height: 20px;">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 13px;">{{ m.t }}</span>
+          <div style="display: flex; justify-content: flex-end;"><span style="height: 12px; border-radius: 3px 0 0 3px; background: #ff5c5c; width: {{ m.neg }};"></span></div>
+          <div style="display: flex; border-left: 1px solid #33373e;"><span style="height: 12px; border-radius: 0 3px 3px 0; background: #3ddc97; width: {{ m.pos }};"></span></div>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; text-align: right; color: {{ m.color }};">{{ m.pct }}</span>
+        </div>
+      </sc-for>
+    </section>
+
+    <section style="grid-column: span 5; background: #16181c; border: 1px solid #22252a; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600;">Unusual flow today</h2>
+        <span style="font-size: 12px; color: #8a919b;">premium · ML score</span>
+      </div>
+      <sc-for list="{{ flow }}" as="f" hint-placeholder-count="8">
+        <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) 70px 40px; align-items: center; gap: 10px; height: 22px;">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 13px;">{{ f.t }}</span>
+          <div style="height: 14px; background: #1f2226; border-radius: 3px;"><div style="height: 14px; border-radius: 3px; background: {{ f.color }}; width: {{ f.w }};"></div></div>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; text-align: right;">{{ f.prem }}</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #8a919b; text-align: right;">{{ f.ml }}</span>
+        </div>
+      </sc-for>
+      <div style="display: flex; gap: 14px; font-size: 12px; color: #8a919b;"><span><span style="color: #3ddc97;">■</span> Bull</span><span><span style="color: #ff5c5c;">■</span> Bear</span></div>
+    </section>
+
+    <section style="grid-column: span 4; background: #16181c; border: 1px solid #22252a; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600;">Paper books</h2>
+        <span style="font-size: 12px; color: #8a919b;">return since reset</span>
+      </div>
+      <sc-for list="{{ books }}" as="b" hint-placeholder-count="7">
+        <div style="display: grid; grid-template-columns: 92px minmax(0, 1fr) 64px; align-items: center; gap: 10px; height: 22px;">
+          <span style="font-size: 13px; color: #c9ced5;">{{ b.name }}</span>
+          <div style="display: grid; grid-template-columns: 1fr 1fr;">
+            <div style="display: flex; justify-content: flex-end;"><span style="height: 12px; border-radius: 3px 0 0 3px; background: #ff5c5c; width: {{ b.neg }};"></span></div>
+            <div style="display: flex; border-left: 1px solid #33373e;"><span style="height: 12px; border-radius: 0 3px 3px 0; background: #3ddc97; width: {{ b.pos }};"></span></div>
+          </div>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; text-align: right; color: {{ b.color }};">{{ b.pct }}</span>
+        </div>
+      </sc-for>
+    </section>
+
+    <section style="grid-column: span 3; background: #16181c; border: 1px solid #22252a; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 600;">Market regime</h2>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <span style="font-size: 12px; color: #8a919b;">VIX 18.44 · moderate</span>
+        <div style="position: relative; height: 10px; border-radius: 999px; background: linear-gradient(90deg, #3ddc97, #f5b83d 55%, #ff5c5c);">
+          <span style="position: absolute; left: 42%; top: -4px; width: 4px; height: 18px; border-radius: 2px; background: #fff;"></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #8a919b;"><span>10</span><span>20</span><span>30+</span></div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px;">
+        <div><div style="font-size: 12px; color: #8a919b;">Posture</div><div style="font-size: 16px; font-weight: 600;">Neutral</div></div>
+        <div><div style="font-size: 12px; color: #8a919b;">Sizing</div><div style="font-size: 16px; font-weight: 600;">Full</div></div>
+      </div>
+    </section>
+
+    <section style="grid-column: span 7; background: #16181c; border: 1px solid #22252a; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 600;">Theme heat <span style="font-weight: 400; color: #8a919b; font-size: 12px;">· flow vs 20-day norm</span></h2>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;">
+        <sc-for list="{{ themes }}" as="h" hint-placeholder-count="8">
+          <div style="border-radius: 8px; padding: 12px; background: {{ h.bg }}; display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-size: 12px; color: #d8dce1;">{{ h.name }}</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600;">{{ h.x }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="grid-column: span 5; background: #16181c; border: 1px solid #22252a; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 600;">Earnings this week</h2>
+      <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px;">
+        <sc-for list="{{ days }}" as="d" hint-placeholder-count="5">
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 8px; background: {{ d.bg }};">
+            <span style="font-size: 12px; color: #8a919b;">{{ d.day }}</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; line-height: 1.7; white-space: pre-line;">{{ d.names }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const up = '#3ddc97', dn = '#ff5c5c';
+    const mv = [['IRON',38.9],['CLF',16.3],['MANE',12.4],['PBLS',11.4],['AGIO',11.4],['ARQT',10.7],['SE',-5.7],['FRVO',-6.0],['QXO',-6.6],['BLSH',-7.0],['IBRX',-8.3],['ALM',-10.2]];
+    const movers = mv.map(([t,p]) => ({ t, pct: (p>0?'+':'') + p.toFixed(1) + '%', color: p>0?up:dn, pos: p>0 ? Math.min(100,p/40*100)+'%' : '0%', neg: p<0 ? Math.min(100,-p/40*100)+'%' : '0%' }));
+    const fl = [['QQQ','Bear',2.55,96],['VRT','Bear',2.01,95],['TTWO','Bear',0.91,95],['MSTR','Bull',0.84,93],['MRVL','Bear',0.21,98],['ARM','Bull',0.14,95],['PFE','Bear',0.09,95],['DTM','Bull',0.09,94]];
+    const flow = fl.map(([t,s,p,ml]) => ({ t, ml, prem: p>=1 ? '$'+p.toFixed(1)+'M' : '$'+Math.round(p*1000)+'K', w: Math.max(3,p/2.6*100)+'%', color: s==='Bull'?up:dn }));
+    const bk = [['Gem Finder',3.34],['Supercycle',1.21],['Aggressive',-3.19],['Smart',-5.70],['Conviction',-17.97],['Builder',-18.58],['Ruby',-23.77]];
+    const books = bk.map(([name,p]) => ({ name, pct: (p>0?'+':'')+p.toFixed(1)+'%', color: p>0?up:dn, pos: p>0? (p/25*100)+'%':'0%', neg: p<0? (-p/25*100)+'%':'0%' }));
+    const th = [['REITs',2.72],['Energy',1.83],['Comms & media',1.68],['Industrials',1.40],['Health care',1.12],['Materials',0.96],['Financials',0.53],['AI infra',0.47]];
+    const themes = th.map(([name,x]) => ({ name, x: x.toFixed(2)+'×', bg: x>=1 ? `rgba(61,220,151,${Math.min(0.42,(x-1)*0.24+0.08)})` : `rgba(255,92,92,${Math.min(0.42,(1-x)*0.6+0.08)})` }));
+    const days = [
+      { day: 'Mon 19', names: 'CLF\nCCK\nZION\nAGNC\nWAL', bg: '#1f2226' },
+      { day: 'Tue 20', names: 'NFLX\nUAL\nHAL', bg: '#2a2412' },
+      { day: 'Wed 21', names: 'STLD', bg: '#1b1d21' },
+      { day: 'Thu 22', names: 'INTC\nCRS', bg: '#1b1d21' },
+      { day: 'Fri 23', names: '—', bg: '#1b1d21' },
+    ];
+    const strip = [
+      { label: 'S&P 500 (SPY)', value: '766.48', delta: '+0.69%', color: up, sub: 'closed · 12:38 AM ET' },
+      { label: 'Volatility (VIX)', value: '18.44', delta: '+2.9', color: dn, sub: 'moderate regime' },
+      { label: 'Flow premium today', value: '$24.8B', delta: '76% bull', color: up, sub: '1,622 tickers · 18,017 prints' },
+      { label: 'TraderJoe equity', value: '$18,860', delta: '−5.7%', color: dn, sub: '15 open · 55% deployed' },
+    ];
+    return { movers, flow, books, themes, days, strip };
+  }
+}
+</script>
+</body>
+</html>

@@ -32,7 +32,8 @@ import type { WatchlistSort } from "../../lib/watchlist";
 import { MarkFreshness } from "../../components/MarkFreshness";
 import { QueryNotice } from "../../components/QueryNotice";
 import { useAppStore } from "../../store/useAppStore";
-import { GlassPanel, Chip, Stat, Segmented } from "../../components/Glass";
+import { Chip, Stat, Segmented } from "../../components/Glass";
+import { TileGrid, Tile, Kpi, BarRow, HeatTile, CockpitButton, toneOf, toneColor } from "../../components/Cockpit";
 import { GexWall } from "../gex/GexWall";
 
 type PersonaName = "smart" | "aggressive" | "builder" | "ruby" | "gemfinder" | "supercycle" | "conviction";
@@ -527,11 +528,12 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
     );
   };
   return (
-    <section className="space-y-4">
-      <SectionHead
-        title={<>Watchlist <span className="num text-base text-text-muted">{activeCount}</span></>}
-        sub="Contracts this book is screening or monitoring, with modeled P/L since added."
-        actions={<>
+    <Tile
+      span={12}
+      bodyClassName="gap-4"
+      title={<>Watchlist <span className="num font-normal text-text-muted">{activeCount}</span></>}
+      meta="Screening or monitoring, modeled P/L since added"
+      actions={<>
           <button type="button" title="Reload watchlist" aria-label="Reload watchlist" disabled={isFetching}
             onClick={() => void refetch()} className="flex size-11 items-center justify-center text-text-muted hover:text-text-primary disabled:opacity-50 md:size-8">
             <RefreshCw size={15} className={isFetching ? "animate-spin" : ""} />
@@ -542,7 +544,7 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
             <RotateCcw size={14} />{reset.isPending ? "Resetting..." : "Reset watchlist"}
           </button>
         </>}
-      />
+    >
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex min-h-11 items-center gap-2 text-xs text-text-muted">
           Sort
@@ -588,11 +590,11 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
           <p className="mt-1 text-text-muted">Latest observed flow: {activity.latest_source_date ?? "Not recorded"}</p>
         </div>
         <div id={`watchlist-activity-${persona}`} className={`${activityExpanded ? "block" : "hidden"} space-y-3 md:block`}>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-text-muted lg:grid-cols-4">
-          <div>Added today ({zoneLabel})<div className="num mt-1 text-lg font-semibold text-text-primary">{activityDates.todayAdded}</div></div>
-          <div>Added in 7 days<div className="num mt-1 text-lg font-semibold text-text-primary">{activityDates.weekAdded}</div></div>
-          <div>Last addition<div className="mt-1 text-sm text-text-primary">{watchlistTime(activity.last_added_at ?? activity.last_added_date)}</div></div>
-          <div>Last recorded scan<div className="mt-1 text-sm text-text-primary">{watchlistTime(activity.last_scan_at)}</div></div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg bg-bg-card-hover p-3 lg:grid-cols-4">
+          <Kpi size="md" label={`Added today (${zoneLabel})`} value={activityDates.todayAdded} />
+          <Kpi size="md" label="Added in 7 days" value={activityDates.weekAdded} />
+          <Kpi size="md" label="Last addition" value={<span className="text-sm">{watchlistTime(activity.last_added_at ?? activity.last_added_date)}</span>} />
+          <Kpi size="md" label="Last recorded scan" value={<span className="text-sm">{watchlistTime(activity.last_scan_at)}</span>} />
         </div>
         <div className="flex flex-wrap gap-x-5 gap-y-1 text-text-muted">
           <span>Latest observed flow: {activity.latest_source_date ?? "Not recorded"}</span>
@@ -624,7 +626,7 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
           { value: "history", label: "Moves", badge: <span className="num">{(data?.history ?? []).length}</span> },
         ]}
       />
-      <div className="card space-y-8">
+      <div className="space-y-8">
         {section("wla", "Screened", wla, "No screened observations in this period.")}
         {section("wlb", "Monitoring / blocked", wlb, "No monitored observations in this period.")}
         <div className={`${visibleSection === "history" ? "block" : "hidden"} ${(data?.history ?? []).length > 0 ? "md:block" : "md:hidden"}`}>
@@ -647,7 +649,7 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
           )}
         </div>
       </div>
-    </section>
+    </Tile>
   );
 }
 
@@ -678,21 +680,20 @@ function useRubyLog(enabled: boolean) {
 function RubyDeskLog() {
   const { data } = useRubyLog(true);
   const events = data?.events ?? [];
+  const meta = "Ruby's intraday judge, one entry per eventful 15-min cycle";
   if (!events.length) {
     return (
-      <section className="space-y-2">
-        <SectionHead title="Desk log" sub="Ruby's intraday judge, one entry per eventful 15-min cycle" />
+      <Tile span={12} title="Desk log" meta={meta}>
         <p className="text-sm text-text-muted">
           No cycles logged yet — the log fills as the 15-min intraday loop
           enters, vetoes, trims, or freezes. Quiet cycles are not recorded.
         </p>
-      </section>
+      </Tile>
     );
   }
   return (
-    <section className="space-y-3">
-      <SectionHead title="Desk log" sub="Ruby's intraday judge, one entry per eventful 15-min cycle" />
-      <div className="divide-y divide-border">
+    <Tile span={12} title={<>Desk log <span className="num font-normal text-text-muted">{events.length}</span></>} meta={meta}>
+      <div className="max-h-[32rem] divide-y divide-border overflow-y-auto">
         {events.map((e, i) => (
           <div key={`${e.ts}-${i}`} className="space-y-2 py-4 first:pt-0">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
@@ -726,7 +727,7 @@ function RubyDeskLog() {
                 <span className="num">{e.candidates ?? 0}</span> flow, <span className="num">{e.passed ?? 0}</span> passed gate
               </span>
             </div>
-            {e.read && <p className="prose-read max-w-[72ch] text-text-secondary">{e.read}</p>}
+            {e.read && <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">{e.read}</p>}
             {(e.vetoes ?? []).length > 0 && (
               <div className="space-y-0.5 text-xs text-text-muted">
                 {(e.vetoes ?? []).map((v, j) => (
@@ -739,7 +740,7 @@ function RubyDeskLog() {
           </div>
         ))}
       </div>
-    </section>
+    </Tile>
   );
 }
 
@@ -946,7 +947,7 @@ function GraphContextPanel({ ticker }: { ticker: string }) {
               <button
                 key={`${p.ticker}-${i}`}
                 onClick={() => setActiveTicker(p.ticker)}
-                className="num text-text-secondary hover:text-accent-blue"
+                className="num text-text-secondary hover:text-accent"
                 title={p.role ? `${p.ticker}: ${p.role}` : p.ticker}
               >
                 {p.ticker}
@@ -1121,11 +1122,11 @@ function WhyPick({ reason, compact = false }: { reason: string | null; compact?:
     );
   }
   return (
-    <div className="prose-read mt-2 max-w-[72ch] text-text-secondary">
+    <div className="mt-2 max-w-[72ch] text-sm leading-relaxed text-text-secondary">
       <span className="font-medium text-text-primary">Why this pick: </span>
       {lead}
       {rest.length > 0 && (
-        <div className="mt-0.5 font-sans text-xs text-text-muted">{rest.join(" · ")}</div>
+        <div className="mt-0.5 text-xs text-text-muted">{rest.join(" · ")}</div>
       )}
     </div>
   );
@@ -1218,7 +1219,7 @@ function PositionCard({
             {!isEquity && <SideIcon side={p.side} />}
             <button
               onClick={() => setActiveTicker(p.ticker)}
-              className="ticker text-base transition-colors hover:text-accent-blue"
+              className="ticker text-base transition-colors hover:text-accent"
               title={`Open ${p.ticker} in the detail panel`}
             >
               {p.ticker}
@@ -1341,7 +1342,7 @@ function PositionCard({
       </div>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="mt-2 flex min-h-11 items-center gap-1 text-xs text-text-muted transition-colors hover:text-accent-blue md:min-h-0"
+        className="mt-2 flex min-h-11 items-center gap-1 text-xs text-text-muted transition-colors hover:text-accent md:min-h-0"
       >
         {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         <Network size={12} />
@@ -1366,29 +1367,25 @@ function CategoryTrendPanel() {
   const trend = data?.trend ?? [];
   const visible = showAll ? trend : trend.slice(0, 8);
   const maxRatio = Math.max(...trend.map((t) => t.hotness_ratio), 1);
+  const open = trend.find((t) => t.category === expanded);
 
   return (
-    <section className="space-y-3">
-      <SectionHead
-        title="Hot categories"
-        sub={data
-          ? `${trend.length} categories with option-flow activity · ${
-              WINDOW_TABS.find((w) => w.id === window)?.sub
-            }`
-          : "Option-premium heat by category"}
-        actions={
-          <Segmented<CategoryWindow>
-            ariaLabel="Category window"
-            options={WINDOW_TABS.map((w) => ({ value: w.id, label: w.label }))}
-            value={window}
-            onChange={(w) => {
-              setWindow(w);
-              setExpanded(null);
-            }}
-          />
-        }
-      />
-      <div className="card">
+    <Tile
+      span={5}
+      title="Hot categories"
+      meta={data ? `${trend.length} · ${WINDOW_TABS.find((w) => w.id === window)?.sub}` : "premium vs baseline"}
+      actions={
+        <Segmented<CategoryWindow>
+          ariaLabel="Category window"
+          options={WINDOW_TABS.map((w) => ({ value: w.id, label: w.label }))}
+          value={window}
+          onChange={(w) => {
+            setWindow(w);
+            setExpanded(null);
+          }}
+        />
+      }
+    >
       {isLoading && !data && (
         <div className="text-text-muted text-xs flex items-center gap-1 py-2">
           <Loader2 size={12} className="animate-spin" />
@@ -1403,82 +1400,72 @@ function CategoryTrendPanel() {
           No category activity for this window.
         </div>
       )}
-      <div className="divide-y divide-border">
-        {visible.map((t) => {
-          const isExpanded = expanded === t.category;
-          const heat =
-            t.hotness_ratio >= 1.5
-              ? "var(--accent-red)"
-              : t.hotness_ratio >= 1.0
-              ? "var(--accent-orange)"
-              : "var(--text-muted)";
-          const barPct = Math.min(100, (t.hotness_ratio / maxRatio) * 100);
-          return (
-            <div key={t.category} className="text-xs">
-              <button
-                onClick={() => setExpanded(isExpanded ? null : t.category)}
-                className="flex min-h-11 w-full flex-col items-stretch justify-between gap-1 py-2 text-left hover:bg-bg-card-hover sm:flex-row sm:items-center md:min-h-0"
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  {isExpanded ? <ChevronDown size={12} className="text-text-muted" /> : <ChevronRight size={12} className="text-text-muted" />}
-                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: heat }} aria-hidden="true" />
-                  <span className="text-sm font-medium text-text-primary">{t.category}</span>
-                  <span className="text-text-muted"><span className="num">{t.ticker_count}</span> tickers</span>
-                </div>
-                <div className="flex w-full shrink-0 items-center justify-between gap-3 pl-5 sm:w-auto sm:justify-start sm:pl-0">
-                  <div className="hidden h-1.5 w-20 overflow-hidden rounded-full bg-border sm:block">
-                    <div className="h-full rounded-full" style={{ width: `${barPct}%`, background: heat }} />
-                  </div>
-                  <span className="num w-12 text-right font-semibold text-text-primary">{t.hotness_ratio.toFixed(2)}x</span>
-                  <span className="num text-right text-text-secondary sm:w-16">${(t.premium_window / 1e6).toFixed(1)}M</span>
-                </div>
-              </button>
-              {isExpanded && (
-                <div className="space-y-1 pb-2 pl-5 leading-relaxed text-text-secondary">
-                  <p>
-                    <span className="text-text-muted">Top tickers: </span>
-                    {t.top_tickers.map((tt, i) => (
-                      <span key={tt.ticker}>
-                        {i > 0 && ", "}
-                        <span className="num text-text-primary">{tt.ticker}</span>{" "}
-                        <span className="num text-text-muted">${(tt.premium / 1e6).toFixed(1)}M</span>
-                      </span>
-                    ))}
-                  </p>
-                  {t.themes.length > 0 && (
-                    <p>
-                      <span className="text-text-muted">Themes: </span>
-                      {t.themes.map((th, i) => (
-                        <span key={th.theme}>
-                          {i > 0 && ", "}
-                          {th.theme} <span className="num text-text-muted">${(th.premium / 1e6).toFixed(1)}M</span>
-                        </span>
-                      ))}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {visible.length > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          {visible.map((t) => {
+            const hot = t.hotness_ratio >= 1;
+            const intensity = hot
+              ? (t.hotness_ratio - 1) / Math.max(maxRatio - 1, 0.01)
+              : 1 - t.hotness_ratio;
+            return (
+              <HeatTile
+                key={t.category}
+                label={t.category}
+                value={`${t.hotness_ratio.toFixed(2)}x`}
+                sub={`$${(t.premium_window / 1e6).toFixed(1)}M · ${t.ticker_count} tickers`}
+                tone={hot ? "up" : "down"}
+                intensity={intensity}
+                onClick={() => setExpanded(expanded === t.category ? null : t.category)}
+              />
+            );
+          })}
+        </div>
+      )}
+      {open && (
+        <div className="space-y-1 rounded-lg bg-bg-card-hover p-3 text-xs leading-relaxed text-text-secondary">
+          <div className="text-sm font-semibold text-text-primary">{open.category}</div>
+          <p>
+            <span className="text-text-muted">Top tickers: </span>
+            {open.top_tickers.map((tt, i) => (
+              <span key={tt.ticker}>
+                {i > 0 && ", "}
+                <span className="num text-text-primary">{tt.ticker}</span>{" "}
+                <span className="num text-text-muted">${(tt.premium / 1e6).toFixed(1)}M</span>
+              </span>
+            ))}
+          </p>
+          {open.themes.length > 0 && (
+            <p>
+              <span className="text-text-muted">Themes: </span>
+              {open.themes.map((th, i) => (
+                <span key={th.theme}>
+                  {i > 0 && ", "}
+                  {th.theme} <span className="num text-text-muted">${(th.premium / 1e6).toFixed(1)}M</span>
+                </span>
+              ))}
+            </p>
+          )}
+        </div>
+      )}
       {trend.length > 8 && (
         <button
+          type="button"
           onClick={() => setShowAll((v) => !v)}
-          className="mt-2 text-xs text-accent-blue hover:underline"
+          className="self-start text-xs text-accent hover:underline"
         >
           {showAll ? "show less" : `show all ${trend.length}`}
         </button>
       )}
-      {/* Honest footer about the historical gap */}
-      <div className="mt-3 max-w-[72ch] border-t border-border pt-2 text-xs leading-relaxed text-text-muted">
-        Year-over-year cyclical view not yet available — iFlow corpus begins
-        2026-03-16 (~2.5 months). Full 12-month "last year this time"
-        comparison unlocks ~March 2027.
-        {data?.note && <div className="mt-1">{data.note}</div>}
-      </div>
-      </div>
-    </section>
+      <details className="text-xs text-text-muted">
+        <summary className="cursor-pointer">About this window</summary>
+        <div className="mt-1 max-w-[72ch] leading-relaxed">
+          Year-over-year cyclical view not yet available — iFlow corpus begins
+          2026-03-16 (~2.5 months). Full 12-month "last year this time"
+          comparison unlocks ~March 2027.
+          {data?.note && <div className="mt-1">{data.note}</div>}
+        </div>
+      </details>
+    </Tile>
   );
 }
 
@@ -1512,7 +1499,7 @@ function ClosedRow({ p, trims = [] }: { p: Position; trims?: Position[] }) {
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <button
             onClick={() => setActiveTicker(p.ticker)}
-            className="ticker text-sm transition-colors hover:text-accent-blue"
+            className="ticker text-sm transition-colors hover:text-accent"
             title={`Open ${p.ticker} in the detail panel`}
           >
             {p.ticker}
@@ -1565,9 +1552,11 @@ function ClosedRow({ p, trims = [] }: { p: Position; trims?: Position[] }) {
 function RejectionBlock({
   ruleKey,
   entries,
+  max,
 }: {
   ruleKey: string;
   entries: RejectedEntry[];
+  max: number;
 }) {
   const meta = RULE_LABELS[ruleKey] ?? {
     id: 0,
@@ -1581,8 +1570,11 @@ function RejectionBlock({
           <ChevronRight size={12} className="shrink-0 text-text-muted transition-transform group-open:rotate-90" aria-hidden="true" />
           <span className="min-w-0 text-sm font-medium text-text-primary max-md:line-clamp-2">{meta.label}</span>
         </span>
-        <span className="shrink-0 text-text-muted">
-          <span className="num text-text-primary">{entries.length}</span> {entries.length === 1 ? "entry" : "entries"}
+        <span className="flex shrink-0 items-center gap-3 text-text-muted">
+          <span className="hidden h-3 w-32 rounded-[3px] sm:block" style={{ background: "var(--track)" }} aria-hidden="true">
+            <span className="block h-3 rounded-[3px]" style={{ width: `${max > 0 ? Math.max(3, (entries.length / max) * 100) : 0}%`, background: "var(--accent-orange)" }} />
+          </span>
+          <span><span className="num text-text-primary">{entries.length}</span> {entries.length === 1 ? "entry" : "entries"}</span>
         </span>
       </summary>
       <div className="pb-2 pl-5">
@@ -1615,11 +1607,11 @@ function EquityCurve({ history }: { history: HistoryPoint[] }) {
   const max = Math.max(...values);
   const span = max - min || 1;
   const W = 600;
-  const H = 80;
+  const H = 200;
   const points = history
     .map((h, i) => {
       const x = (i / (history.length - 1)) * W;
-      const y = H - ((h.value - min) / span) * H;
+      const y = H - 6 - ((h.value - min) / span) * (H - 12);
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
@@ -1627,34 +1619,29 @@ function EquityCurve({ history }: { history: HistoryPoint[] }) {
   const color =
     last.return_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)";
   return (
-    <figure className="mt-4">
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-16 w-full" role="img" aria-label={`Equity curve over ${history.length} days`}>
-        <polyline
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          vectorEffect="non-scaling-stroke"
-          points={points}
-        />
-      </svg>
-      <figcaption className="mt-1 flex justify-between text-xs text-text-muted">
-        <span>Equity curve, <span className="num">{history.length}</span>d</span>
-        <span className="num">{history[0].date} → {last.date}</span>
+    <figure className="m-0 flex flex-col gap-1">
+      <div className="flex">
+        <div className="num flex w-16 shrink-0 flex-col justify-between py-0.5 text-xs text-text-muted">
+          <span>{formatCurrency(max, 0)}</span>
+          <span>{formatCurrency(min, 0)}</span>
+        </div>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-48 min-w-0 flex-1 lg:h-56" role="img" aria-label={`Equity curve over ${history.length} days`}>
+          <line x1="0" x2={W} y1={H / 2} y2={H / 2} stroke="var(--border)" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />
+          <polygon points={`0,${H} ${points} ${W},${H}`} fill={`color-mix(in srgb, ${color} 12%, transparent)`} />
+          <polyline
+            fill="none"
+            stroke={color}
+            strokeWidth="2"
+            vectorEffect="non-scaling-stroke"
+            points={points}
+          />
+        </svg>
+      </div>
+      <figcaption className="num flex justify-between pl-16 text-xs text-text-muted">
+        <span>{history[0].date}</span>
+        <span>{last.date}</span>
       </figcaption>
     </figure>
-  );
-}
-
-/** v2 section heading: serif title, optional sub, actions to the right. */
-function SectionHead({ title, sub, actions }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-      <div className="min-w-0">
-        <h2 className="section-title">{title}</h2>
-        {sub && <p className="section-sub">{sub}</p>}
-      </div>
-      {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>}
-    </div>
   );
 }
 
@@ -1694,51 +1681,65 @@ function TradeDecisionHistory({
     (p) => (p.exit_reason || "").startsWith("stop_"),
   ).length;
   const expired = logical.filter((p) => p.exit_reason === "expiration").length;
-  const realizedColor = changeColor(totalRealized);
+  const recent = [...logical]
+    .sort((x, y) => (y.exit_date ?? "").localeCompare(x.exit_date ?? ""))
+    .slice(0, 12);
+  const recentMax = Math.max(1, ...recent.map((p) => Math.abs(tradeRealized(p))));
 
   return (
-    <section className="space-y-3">
-      <button
-        onClick={onToggle}
-        aria-expanded={expanded}
-        className="flex min-h-11 w-full flex-col items-stretch justify-between gap-2 text-left transition-colors md:min-h-0 md:flex-row md:items-end"
-      >
-        <div className="flex min-w-0 items-center gap-2">
-          {expanded ? <ChevronDown size={16} className="text-text-muted" /> : <ChevronRight size={16} className="text-text-muted" />}
-          <h2 className="section-title">
-            Closed trades <span className="num text-base text-text-muted">{logical.length}</span>
-          </h2>
-          {todayExits.length > 0 && (
-            <span className="text-sm text-text-muted"><span className="num">{todayExits.length}</span> closed today</span>
-          )}
-        </div>
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 pl-6 text-sm md:justify-end md:pl-0">
-          {logical.length > 0 ? (
-            <>
-              <span className="text-text-muted">
-                <span className="num text-text-secondary">{wins}W / {logical.length - wins}L</span>, <span className="num text-text-secondary">{winRate.toFixed(0)}%</span> win
-              </span>
-              {stopped > 0 && <span className="text-text-muted">stopped <span className="num">{stopped}</span></span>}
-              {expired > 0 && <span className="text-text-muted">expired <span className="num">{expired}</span></span>}
-              <span className="num text-xl font-semibold" style={{ color: realizedColor }}>
-                {totalRealized >= 0 ? "+" : ""}
-                {formatCurrency(totalRealized)}
-              </span>
-            </>
-          ) : (
-            <span className="text-text-muted">no exits yet</span>
-          )}
-        </div>
-      </button>
-      {expanded && (
-        <div className="card space-y-5">
-          {logical.length === 0 && (
-            <p className="py-4 text-center text-sm text-text-muted">
-              No closed trades yet. Positions exit when they hit the persona's
-              stop (-40% / -60% / -20%) or expire. The cron MTM runs at 06:30 /
-              10:30 / 13:30 PT each market day.
-            </p>
-          )}
+    <Tile
+      span={7}
+      title={<>Closed trades <span className="num font-normal text-text-muted">{logical.length}</span></>}
+      meta={todayExits.length > 0 ? <><span className="num">{todayExits.length}</span> closed today</> : "realized per trade, trims included"}
+    >
+      {logical.length > 0 ? (
+        <>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+            <Kpi size="md" label="Realized" value={<span style={{ color: changeColor(totalRealized) }}>{totalRealized >= 0 ? "+" : ""}{formatCurrency(totalRealized, 0)}</span>} />
+            <Kpi size="md" label="Win rate" value={`${winRate.toFixed(0)}%`} sub={`${wins}W / ${logical.length - wins}L`} />
+            <Kpi size="md" label="Stopped" value={stopped} />
+            <Kpi size="md" label="Expired" value={expired} />
+          </div>
+          <div className="flex flex-col gap-1 pt-1">
+            <div className="text-xs text-text-muted">Most recent <span className="num">{recent.length}</span> · $ realized · %</div>
+            {recent.map((p) => {
+              const d = tradeRealized(p);
+              const pct = p.realized_pnl_pct ?? 0;
+              return (
+                <BarRow
+                  key={p.id}
+                  diverging
+                  label={p.ticker}
+                  value={d}
+                  max={recentMax}
+                  display={`${d >= 0 ? "+" : "-"}$${Math.abs(d).toFixed(0)}`}
+                  trailing={`${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%`}
+                  title={`${p.ticker} ${p.exit_date ?? ""} · ${p.exit_reason ?? ""}`}
+                />
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <p className="py-4 text-sm text-text-muted">
+          No closed trades yet. Positions exit when they hit the persona's
+          stop (-40% / -60% / -20%) or expire. The cron MTM runs at 06:30 /
+          10:30 / 13:30 PT each market day.
+        </p>
+      )}
+      {logical.length > 0 && (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          className="flex min-h-11 items-center gap-1.5 self-start text-xs font-medium text-text-secondary hover:text-text-primary md:min-h-8"
+        >
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          {expanded ? "Hide trade details" : `Show all ${logical.length} trade details`}
+        </button>
+      )}
+      {expanded && logical.length > 0 && (
+        <div className="space-y-5 border-t border-border pt-3">
           {todayExits.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-text-primary">
@@ -1765,7 +1766,7 @@ function TradeDecisionHistory({
           )}
         </div>
       )}
-    </section>
+    </Tile>
   );
 }
 
@@ -1846,6 +1847,7 @@ function PositionsTable({
       return asc ? cmp : -cmp;
     });
   }, [positions, cutoff, sortKey, asc]);
+  const pnlMax = Math.max(1, ...rows.map((p) => Math.abs(p.pnl_pct ?? 0)));
 
   const toggle = (k: PosSortKey) => {
     if (k === sortKey) setAsc((v) => !v);
@@ -1913,7 +1915,7 @@ function PositionsTable({
                   <Stat label="Cost" value={formatCurrency(p.cost_basis)} />
                   <Stat label="Value" value={p.current_value == null ? "Unknown" : formatCurrency(p.current_value)} />
                   <Stat label="P/L" value={p.pnl_dollars == null ? "Unknown" : `${p.pnl_dollars >= 0 ? "+" : ""}$${p.pnl_dollars.toFixed(0)}`} tone={p.pnl_dollars == null ? undefined : p.pnl_dollars >= 0 ? "green" : "red"} />
-                  <Stat label="Peak" value={p.peak_pnl_pct != null ? `+${p.peak_pnl_pct.toFixed(0)}%` : "—"} />
+                  <Stat label="Peak" value={p.peak_pnl_pct != null ? signedPercent(p.peak_pnl_pct, 0) : "—"} />
                 </div>
                 <MarkFreshness at={p.last_marked_at} status={p.mark_status} />
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
@@ -1927,7 +1929,7 @@ function PositionsTable({
                 <button
                   type="button"
                   onClick={() => setActiveTicker(p.ticker)}
-                  className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-control)] border border-border text-xs font-semibold text-accent-blue transition-colors hover:bg-bg-card-hover"
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-control)] border border-border text-xs font-semibold text-accent transition-colors hover:bg-bg-card-hover"
                 >
                   Open {p.ticker} analysis
                 </button>
@@ -1967,7 +1969,7 @@ function PositionsTable({
                   <td className="px-3 py-2.5">
                     <button
                       onClick={() => setActiveTicker(p.ticker)}
-                      className="ticker hover:text-accent-blue"
+                      className="ticker hover:text-accent"
                     >
                       {p.ticker}
                     </button>
@@ -1992,13 +1994,21 @@ function PositionsTable({
                   <td className="px-3 py-2.5 text-right text-text-secondary">{formatCurrency(p.cost_basis)}</td>
                   <td className="px-3 py-2.5 text-right text-text-primary">{p.current_value == null ? "Unknown" : formatCurrency(p.current_value)}</td>
                   <td className="px-3 py-2.5 text-right font-semibold" style={{ color: changeColor(pnl) }}>
-                    {signedPercent(p.pnl_pct)}
+                    <span className="inline-flex items-center justify-end gap-2">
+                      <span className="h-2 w-12 rounded-[2px]" style={{ background: "var(--track)" }} aria-hidden="true">
+                        <span
+                          className="block h-2 rounded-[2px]"
+                          style={{ width: `${p.pnl_pct ? Math.max(4, (Math.abs(pnl) / pnlMax) * 100) : 0}%`, background: toneColor(toneOf(pnl)) }}
+                        />
+                      </span>
+                      {signedPercent(p.pnl_pct)}
+                    </span>
                   </td>
                   <td className="px-3 py-2.5 text-right" style={{ color: changeColor(p.pnl_dollars ?? 0) }}>
                     {p.pnl_dollars == null ? "Unknown" : `${p.pnl_dollars >= 0 ? "+" : ""}$${p.pnl_dollars.toFixed(0)}`}
                   </td>
                   <td className="px-3 py-2.5 text-right text-text-muted">
-                    {p.peak_pnl_pct != null ? `+${p.peak_pnl_pct.toFixed(0)}%` : "—"}
+                    {p.peak_pnl_pct != null ? signedPercent(p.peak_pnl_pct, 0) : "—"}
                   </td>
                   <td className="px-3 py-2.5 text-right">
                     {scaled
@@ -2058,8 +2068,7 @@ function OpenPositionsGrouped({
   });
 
   return (
-    <GlassPanel>
-      <div className="space-y-4">
+    <div className="space-y-4">
       {cats.map(([cat, themeMap]) => {
         const allInCat = Array.from(themeMap.values()).flat();
         const catCount = allInCat.length;
@@ -2126,8 +2135,7 @@ function OpenPositionsGrouped({
           </div>
         );
       })}
-      </div>
-    </GlassPanel>
+    </div>
   );
 }
 
@@ -2174,6 +2182,7 @@ const PERSONA_META: Record<
 
 export function SmartTrader() {
   const queryClient = useQueryClient();
+  const setActiveTicker = useAppStore((s) => s.setActiveTicker);
   const [persona, setPersona] = useState<PersonaName>("smart");
   const [showClosed, setShowClosed] = useState(false);
   // Open-positions layout: grouped cards (rich) vs dense sortable table
@@ -2268,8 +2277,24 @@ export function SmartTrader() {
       onChange={(v) => setPosView(v as "table" | "grouped")}
     />
   );
+  // Allocation: carried value by ticker, plus calls vs puts for option books.
+  const byTicker = new Map<string, number>();
+  let callValue = 0;
+  let putValue = 0;
+  for (const p of summary.positions) {
+    const v = p.current_value ?? p.cost_basis;
+    byTicker.set(p.ticker, (byTicker.get(p.ticker) ?? 0) + v);
+    if (p.option_type === "CALL") callValue += v;
+    else if (p.option_type === "PUT") putValue += v;
+  }
+  const alloc = [...byTicker.entries()].sort((a, b) => b[1] - a[1]);
+  const allocMax = alloc[0]?.[1] ?? 0;
+  const allocShown = alloc.slice(0, 10);
+  const optValue = callValue + putValue;
+  const exposure = markedExposure(summary.positions);
+
   return (
-    <div className="max-w-full space-y-8 overflow-x-clip pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <div className="max-w-full space-y-4 overflow-x-clip pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       {/* Persona selector + active book description */}
       <div
         className="mobile-workspace-controls sticky z-20 space-y-2 p-2 md:static md:z-auto md:p-0"
@@ -2295,10 +2320,10 @@ export function SmartTrader() {
           value={persona}
           onChange={setPersona}
         />
-        <p className="line-clamp-2 max-w-[72ch] text-sm leading-relaxed text-text-secondary md:line-clamp-none">
+        <p className="line-clamp-2 max-w-[90ch] text-xs leading-relaxed text-text-muted md:line-clamp-none">
           {personaRow?.description || summary.persona_description || PERSONA_META[persona].tagline}
           {personaRow ? (
-            <span className="text-text-muted">
+            <span>
               {" "}
               · <span className="num">{personaRow.open_positions}</span> open · <span className="num">${(personaRow.total_value / 1000).toFixed(1)}K</span>
               {personaRow.ml_serving_mode === "gate_and_rank"
@@ -2314,61 +2339,93 @@ export function SmartTrader() {
         )}
       </div>
 
-      {/* Hero: book equity + P/L is the focal point; supporting stats beside it. */}
-      <section className="space-y-4" aria-label={`${PERSONA_META[persona].label} book summary`}>
-        <div className="grid items-start gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-          <div className="min-w-0">
-            <div className="text-sm text-text-muted">{PERSONA_META[persona].label} book equity</div>
-            <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <span className="num text-3xl font-semibold tracking-tight text-text-primary">
-                {formatCurrency(summary.total_value)}
-              </span>
-              <span className="num text-xl font-semibold" style={{ color: changeColor(pnlTotal) }}>
-                {signedMoney(pnlTotal)}
-              </span>
-              <span className="num text-xl font-semibold" style={{ color: retColor }}>
-                {ret >= 0 ? "+" : ""}{ret.toFixed(2)}%
-              </span>
-            </div>
-            <div className="mt-1 text-xs text-text-muted">
-              from <span className="num">{formatCurrency(summary.starting_capital)}</span> starting capital
-            </div>
-            {historyQuery.isError && !history && (
-              <QueryErrorState label="Unable to load equity history." onRetry={() => void historyQuery.refetch()} />
-            )}
-            {history && history.length >= 2 && <EquityCurve history={history} />}
+      <TileGrid>
+        {/* KPI strip */}
+        <Tile span={3}>
+          <Kpi
+            size="xl"
+            label={`${PERSONA_META[persona].label} book equity`}
+            value={formatCurrency(summary.total_value, 0)}
+            delta={`${ret >= 0 ? "+" : ""}${ret.toFixed(2)}%`}
+            tone={toneOf(ret)}
+            sub={<>from <span className="num">{formatCurrency(summary.starting_capital, 0)}</span> start</>}
+          />
+        </Tile>
+        <Tile span={3}>
+          <Kpi
+            label="Total P/L"
+            value={<span style={{ color: retColor }}>{signedMoney(pnlTotal)}</span>}
+            sub={<>realized <span className="num">{signedMoney(summary.realized_pnl)}</span> · open <span className="num">{signedMoney(summary.unrealized_pnl)}</span></>}
+          />
+        </Tile>
+        <Tile span={3}>
+          <Kpi
+            label="Deployed"
+            value={`${deployedPct.toFixed(0)}%`}
+            sub={<><span className="num">{formatCurrency(summary.positions_value, 0)}</span> in positions · <span className="num">{formatCurrency(summary.cash, 0)}</span> cash</>}
+          />
+          <div className="h-1.5 rounded-full" style={{ background: "var(--track)" }} aria-hidden="true">
+            <div className="h-1.5 rounded-full bg-accent" style={{ width: `${Math.min(100, deployedPct)}%` }} />
           </div>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4 min-[480px]:grid-cols-3">
-            <Stat label="Deployed" value={`${deployedPct.toFixed(0)}%`} sub={`${formatCurrency(summary.positions_value)} in positions`} />
-            <Stat label="Open" value={summary.open_positions} sub={`${summary.closed_positions} closed`} />
-            <Stat label="Cash" value={formatCurrency(summary.cash)} />
-            <Stat label="Realized" tone={summary.realized_pnl >= 0 ? "green" : "red"} value={signedMoney(summary.realized_pnl)} />
-            <Stat label="Unrealized" tone={summary.unrealized_pnl >= 0 ? "green" : "red"} value={signedMoney(summary.unrealized_pnl)} />
-            <Stat label="Win rate" value={summary.closed_positions > 0 ? `${summary.win_rate.toFixed(0)}%` : "—"} />
-            {(summary.banked_from_trims ?? 0) > 0 && (
-              <div title="Realized gains banked from AbTrader-style scale-out trims">
-                <Stat label="Banked from trims" tone="green" value={`+${formatCurrency(summary.banked_from_trims ?? 0)}`} />
-              </div>
+        </Tile>
+        <Tile span={3}>
+          <Kpi
+            label="Open positions"
+            value={summary.open_positions}
+            sub={<><span className="num">{summary.closed_positions}</span> closed · win <span className="num">{summary.closed_positions > 0 ? `${summary.win_rate.toFixed(0)}%` : "—"}</span></>}
+          />
+        </Tile>
+
+        {(exposure.count > 0 || (summary.persona_description && summary.persona_description !== (personaRow?.description || summary.persona_description)) || markMutation.isError || resetMutation.isError || resetMutation.isSuccess) && (
+          <div className="flex min-w-0 flex-col gap-2 lg:col-span-12">
+            {exposure.count > 0 && <p className="callout max-w-[90ch]">Recorded valuation: <span className="num">{exposure.count}</span> positions (<span className="num">{formatCurrency(exposure.value)}</span> carried exposure) have stale or unknown marks. Portfolio return is not a live quote.</p>}
+            {summary.persona_description && summary.persona_description !== (personaRow?.description || summary.persona_description) && (
+              <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">{summary.persona_description}</p>
             )}
+            {(markMutation.isError || resetMutation.isError) && <p role="alert" className="callout" style={{ "--callout": "var(--accent-red)" } as React.CSSProperties}>Trader action failed. Reload the book before retrying; a timed-out action may have completed.</p>}
+            {resetMutation.isSuccess && <p role="status" className="text-xs text-text-secondary">Reset completed. Reloaded positions show any automatic picks returned by the endpoint.</p>}
           </div>
+        )}
+        <div className="min-w-0 lg:col-span-12 empty:hidden">
+          <QueryNotice queries={[summaryQuery, todayQuery, historyQuery, personaQuery]} label="Persona data" />
         </div>
 
-        {(() => { const exposure = markedExposure(summary.positions); return exposure.count > 0 && <p className="callout max-w-[72ch]">Recorded valuation: <span className="num">{exposure.count}</span> positions (<span className="num">{formatCurrency(exposure.value)}</span> carried exposure) have stale or unknown marks. Portfolio return is not a live quote.</p>; })()}
-        {summary.persona_description && summary.persona_description !== (personaRow?.description || summary.persona_description) && (
-          <p className="prose-read max-w-[72ch] text-text-secondary">{summary.persona_description}</p>
-        )}
-
-        {/* Marking and reset actions do not manually select new entries. */}
-        <div className="flex flex-wrap items-center gap-3 text-xs">
-          <button
-            onClick={() => markMutation.mutate()}
-            disabled={markMutation.isPending}
-            className="flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-border px-3 text-xs font-medium text-text-primary transition-colors hover:bg-bg-card-hover disabled:opacity-40 md:min-h-8"
-          >
-            {markMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            Mark to market
-          </button>
-          <details className="group">
+        {/* Equity curve (primary) + allocation */}
+        <Tile
+          span={8}
+          title="Equity curve"
+          meta={history && history.length >= 2 ? <><span className="num">{history.length}</span> days</> : undefined}
+          actions={
+            <>
+              <CockpitButton primary onClick={() => markMutation.mutate()} disabled={markMutation.isPending}>
+                {markMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                Mark to market
+              </CockpitButton>
+            </>
+          }
+        >
+          {historyQuery.isError && !history && (
+            <QueryErrorState label="Unable to load equity history." onRetry={() => void historyQuery.refetch()} />
+          )}
+          {history && history.length >= 2 ? (
+            <EquityCurve history={history} />
+          ) : (
+            !historyQuery.isError && <p className="py-10 text-center text-sm text-text-muted">Not enough history for a curve yet.</p>
+          )}
+          <div className="mt-1 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-border pt-3 sm:grid-cols-4">
+            <Kpi size="md" label="Realized" value={<span style={{ color: changeColor(summary.realized_pnl) }}>{signedMoney(summary.realized_pnl)}</span>} />
+            <Kpi size="md" label="Unrealized" value={<span style={{ color: changeColor(summary.unrealized_pnl) }}>{signedMoney(summary.unrealized_pnl)}</span>} />
+            <Kpi size="md" label="Cash" value={formatCurrency(summary.cash)} />
+            {(summary.banked_from_trims ?? 0) > 0 ? (
+              <div title="Realized gains banked from AbTrader-style scale-out trims">
+                <Kpi size="md" label="Banked from trims" value={<span className="text-accent-green">+{formatCurrency(summary.banked_from_trims ?? 0)}</span>} />
+              </div>
+            ) : (
+              <Kpi size="md" label="Win rate" value={summary.closed_positions > 0 ? `${summary.win_rate.toFixed(0)}%` : "—"} />
+            )}
+          </div>
+          {/* Reset does not manually select new entries. */}
+          <details className="group text-xs">
             <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 text-text-muted marker:content-none hover:text-text-primary md:min-h-8">
               <ChevronRight size={12} className="transition-transform group-open:rotate-90" aria-hidden="true" />
               Reset book
@@ -2384,7 +2441,7 @@ export function SmartTrader() {
                   value={resetCapital}
                   onChange={(e) => setResetCapital(e.target.value)}
                   aria-label="Reset starting capital"
-                  className="num min-h-11 w-24 rounded-[var(--radius-control)] border border-border bg-bg-card px-2 text-xs text-text-primary focus:border-accent-blue/50 focus:outline-none md:min-h-8"
+                  className="num min-h-11 w-24 rounded-[var(--radius-control)] border border-border bg-bg-card px-2 text-xs text-text-primary focus:border-accent focus:outline-none md:min-h-8"
                 />
               </span>
               <button
@@ -2409,96 +2466,130 @@ export function SmartTrader() {
               </button>
             </div>
           </details>
-        </div>
-        <QueryNotice queries={[summaryQuery, todayQuery, historyQuery, personaQuery]} label="Persona data" />
-        {(markMutation.isError || resetMutation.isError) && <p role="alert" className="callout" style={{ "--callout": "var(--accent-red)" } as React.CSSProperties}>Trader action failed. Reload the book before retrying; a timed-out action may have completed.</p>}
-        {resetMutation.isSuccess && <p role="status" className="text-xs text-text-secondary">Reset completed. Reloaded positions show any automatic picks returned by the endpoint.</p>}
-      </section>
+        </Tile>
 
-      {/* Open Positions — dense table (default) or grouped cards */}
-      {summary.positions.length > 0 && (
-        <section className="space-y-3">
-          <SectionHead
-            title={<>Open positions <span className="num text-base text-text-muted">{summary.positions.length}</span></>}
-            sub="Click a ticker to open its analysis."
+        <Tile span={4} title="Allocation" meta="carried value by ticker">
+          {alloc.length === 0 ? (
+            <p className="py-6 text-sm text-text-muted">No open positions.</p>
+          ) : (
+            <>
+              {optValue > 0 && (
+                <div className="flex flex-col gap-1.5 pb-1">
+                  <div className="flex h-3 overflow-hidden rounded-[3px]" style={{ background: "var(--track)" }} aria-hidden="true">
+                    <span style={{ width: `${(callValue / optValue) * 100}%`, background: "var(--accent-green)" }} />
+                    <span style={{ width: `${(putValue / optValue) * 100}%`, background: "var(--accent-red)" }} />
+                  </div>
+                  <div className="num flex justify-between text-xs">
+                    <span className="text-accent-green">Calls {formatCurrency(callValue, 0)} · {((callValue / optValue) * 100).toFixed(0)}%</span>
+                    <span className="text-accent-red">Puts {formatCurrency(putValue, 0)}</span>
+                  </div>
+                </div>
+              )}
+              {allocShown.map(([t, v]) => (
+                <BarRow
+                  key={t}
+                  label={t}
+                  value={v}
+                  max={allocMax}
+                  tone="info"
+                  display={formatCurrency(v, 0)}
+                  trailing={summary.total_value > 0 ? `${((v / summary.total_value) * 100).toFixed(0)}%` : "—"}
+                  onClick={() => setActiveTicker(t)}
+                  title={`Open ${t} analysis`}
+                />
+              ))}
+              {alloc.length > allocShown.length && (
+                <span className="text-xs text-text-muted">
+                  +<span className="num">{alloc.length - allocShown.length}</span> more tickers · <span className="num">{formatCurrency(alloc.slice(10).reduce((s, [, v]) => s + v, 0), 0)}</span>
+                </span>
+              )}
+            </>
+          )}
+        </Tile>
+
+        {/* Open Positions — dense table (default) or grouped cards */}
+        {summary.positions.length > 0 && (
+          <Tile
+            span={12}
+            title={<>Open positions <span className="num font-normal text-text-muted">{summary.positions.length}</span></>}
+            meta="Click a ticker to open its analysis"
             actions={viewToggle}
-          />
-          {posView === "table" ? (
-            <div className="card">
+          >
+            {posView === "table" ? (
               <PositionsTable
                 positions={summary.positions}
                 stopPct={PERSONA_META[persona].stopPct}
                 trimsByParent={trimsByParent}
               />
-            </div>
-          ) : (
-            <OpenPositionsGrouped
-              positions={summary.positions}
-              stopPct={PERSONA_META[persona].stopPct}
-              trimsByParent={trimsByParent}
-            />
-          )}
-        </section>
-      )}
+            ) : (
+              <OpenPositionsGrouped
+                positions={summary.positions}
+                stopPct={PERSONA_META[persona].stopPct}
+                trimsByParent={trimsByParent}
+              />
+            )}
+          </Tile>
+        )}
 
-      {/* Ruby — the intraday desk log (judge reads, entries, vetoes, freezes) */}
-      {persona === "ruby" && <RubyDeskLog />}
+        {/* Ruby — the intraday desk log (judge reads, entries, vetoes, freezes) */}
+        {persona === "ruby" && <RubyDeskLog />}
 
-      {/* iFlow-Trader-style WL-A / WL-B for every persona (options books) */}
-      <WatchlistPanel key={persona} persona={persona} />
+        {/* Trade Decision History — always visible, even when empty */}
+        <TradeDecisionHistory
+          closed={summary.closed}
+          trimsByParent={trimsByParent}
+          expanded={showClosed}
+          onToggle={() => setShowClosed((v) => !v)}
+        />
 
-      {/* Trade Decision History — always visible, even when empty */}
-      <TradeDecisionHistory
-        closed={summary.closed}
-        trimsByParent={trimsByParent}
-        expanded={showClosed}
-        onToggle={() => setShowClosed((v) => !v)}
-      />
+        {/* Hot categories — Today / 7d / 30d windows, self-fetches */}
+        <CategoryTrendPanel />
 
-      {/* Today — what got rejected, grouped by rule */}
-      {todayQuery.isError && !today && (
-        <QueryErrorState label="Unable to load today's decisions." onRetry={() => void todayQuery.refetch()} />
-      )}
-      {today && (
-        <details className="group/today">
-          <summary className="flex cursor-pointer list-none flex-wrap items-end justify-between gap-x-4 gap-y-1 marker:content-none">
-            <span className="flex items-center gap-2">
-              <ChevronRight size={16} className="shrink-0 text-text-muted transition-transform group-open/today:rotate-90" aria-hidden="true" />
-              <span className="section-title">Today's decisions</span>
-              <span className="num text-sm text-text-muted">{today.date}</span>
-            </span>
-            <span className="text-sm text-text-muted">
-              <span className="num text-text-primary">{today.picked.length}</span> picks, <span className="num text-text-primary">{today.rejected_count}</span> rejected
-            </span>
-          </summary>
-          <div className="card mt-3">
+        {/* iFlow-Trader-style WL-A / WL-B for every persona (options books) */}
+        <WatchlistPanel key={persona} persona={persona} />
+
+        {/* Today — what got rejected, grouped by rule */}
+        {todayQuery.isError && !today && (
+          <div className="lg:col-span-12">
+            <QueryErrorState label="Unable to load today's decisions." onRetry={() => void todayQuery.refetch()} />
+          </div>
+        )}
+        {today && (
+          <Tile
+            span={12}
+            title="Today's decisions"
+            meta={<><span className="num">{today.date}</span> · <span className="num">{today.picked.length}</span> picks, <span className="num">{today.rejected_count}</span> rejected</>}
+          >
             {today.picked.length === 0 && today.rejected_count === 0 ? (
-              <div className="py-4 text-center text-sm text-text-muted">
+              <div className="py-2 text-sm text-text-muted">
                 No entries or rejections recorded for this market date.
               </div>
             ) : (
-              <div className="divide-y divide-border">
-                {rejectedRules.length > 0 ? (
-                  rejectedRules.map(([rk, entries]) => (
-                    <RejectionBlock key={rk} ruleKey={rk} entries={entries} />
-                  ))
-                ) : (
-                  <div className="py-2 text-center text-sm text-text-muted">
-                    No rejected entries logged for {today.date}.
-                  </div>
-                )}
-              </div>
+              <details className="group/today">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm text-text-secondary marker:content-none hover:text-text-primary md:min-h-8">
+                  <ChevronRight size={14} className="shrink-0 text-text-muted transition-transform group-open/today:rotate-90" aria-hidden="true" />
+                  Rejections by rule <span className="num text-text-muted">{rejectedRules.length}</span>
+                </summary>
+                <div className="mt-2 divide-y divide-border">
+                  {rejectedRules.length > 0 ? (
+                    rejectedRules.map(([rk, entries]) => (
+                      <RejectionBlock key={rk} ruleKey={rk} entries={entries} max={rejectedRules[0][1].length} />
+                    ))
+                  ) : (
+                    <div className="py-2 text-sm text-text-muted">
+                      No rejected entries logged for {today.date}.
+                    </div>
+                  )}
+                </div>
+              </details>
             )}
-          </div>
-        </details>
-      )}
-
-      {/* Hot categories — Today / 7d / 30d windows, self-fetches */}
-      <CategoryTrendPanel />
+          </Tile>
+        )}
+      </TileGrid>
 
       {/* Empty state — only when nothing has ever been picked */}
       {summary.positions.length === 0 && summary.closed.length === 0 && (
-        <p className="prose-read py-8 text-center text-text-muted">
+        <p className="py-8 text-center text-sm text-text-muted">
           Book is empty. The daily cron opens positions automatically at
           06:30 PT — check back after the next run.
         </p>

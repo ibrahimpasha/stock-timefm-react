@@ -246,9 +246,10 @@ export function TraderPositionRow({
 
   return (
     <div>
-      {/* Main row — clickable */}
+      {/* Main row — clickable. Columns match the Positions tile header:
+          last | status | contract | DTE | entry | und | ev | P/L | toggle. */}
       <div
-        className="data-row text-sm py-2.5 px-4 cursor-pointer flex items-center gap-x-3 gap-y-1 flex-wrap"
+        className="data-row grid cursor-pointer grid-cols-[3.25rem_minmax(0,1fr)_5rem_1.5rem] items-center gap-x-3 px-2 py-2 text-sm md:grid-cols-[3.25rem_4.75rem_minmax(0,1fr)_5rem_3.75rem_4.5rem_3rem_5.5rem_1.5rem]"
         onClick={() => onToggle(key)}
       >
         {/* Latest-activity date — leftmost so the eye sees recency at a glance.
@@ -259,7 +260,7 @@ export function TraderPositionRow({
             position.opened_at ||
             (position.events[0] ? position.events[0].ts : null);
           const latestTs = lastEvent?.ts || openTs;
-          if (!latestTs) return null;
+          if (!latestTs) return <span />;
           const isToday =
             new Date(latestTs).toDateString() === new Date().toDateString();
           const sameAsOpen = !openTs || shortDate(openTs) === shortDate(latestTs);
@@ -268,7 +269,7 @@ export function TraderPositionRow({
             : `last activity ${absoluteAge(latestTs) || ""} (${relativeAge(latestTs)}) · opened ${shortDate(openTs)} (${relativeAge(openTs)})`;
           return (
             <span
-              className={`num shrink-0 text-sm min-w-12 ${
+              className={`num text-[0.8125rem] ${
                 isToday ? "font-semibold text-text-primary" : "text-text-muted"
               }`}
               title={title}
@@ -278,9 +279,9 @@ export function TraderPositionRow({
           );
         })()}
 
-        {/* Status / outcome chip (carries cumulative P/L context via tone) */}
+        {/* Status / outcome (tone on the dot only) */}
         <span
-          className="inline-flex shrink-0 min-w-18 items-center gap-1.5 text-xs text-text-secondary"
+          className="inline-flex min-w-0 items-center gap-1.5 text-xs text-text-secondary max-md:hidden"
           title={`status: ${status.label.toLowerCase()}`}
         >
           <span
@@ -291,105 +292,94 @@ export function TraderPositionRow({
           {sentence(status.label)}
         </span>
 
-        {/* Ticker */}
-        {ticker ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onTickerClick?.(ticker);
-            }}
-            className="ticker shrink-0 text-sm cursor-pointer rounded-[var(--radius-control)]"
-            style={{
-              color: tickerHi
-                ? "var(--accent-blue)"
-                : "var(--text-primary)",
-              background: tickerHi
-                ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)"
-                : "transparent",
-              border: "none",
-              padding: tickerHi ? "1px 6px" : 0,
-            }}
-          >
-            {ticker}
-          </button>
-        ) : (
-          <span className="num shrink-0 text-sm text-text-muted">—</span>
-        )}
-
-        {/* Strike + opt type, or SHARES fallback */}
-        <span className="num shrink-0 text-sm text-text-primary">
-          {hasStrike ? (
-            <>
-              ${strike}
-              {optType ? ` ${optType}` : ""}
-            </>
+        {/* Contract: ticker, strike + type (or shares), expiry, today pulse */}
+        <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          {ticker ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTickerClick?.(ticker);
+              }}
+              className="ticker shrink-0 text-sm cursor-pointer rounded-[var(--radius-control)]"
+              style={{
+                color: tickerHi ? "var(--accent)" : "var(--text-primary)",
+                background: tickerHi
+                  ? "color-mix(in srgb, var(--accent) 14%, transparent)"
+                  : "transparent",
+                border: "none",
+                padding: tickerHi ? "1px 6px" : 0,
+              }}
+            >
+              {ticker}
+            </button>
           ) : (
-            "SHARES"
+            <span className="num shrink-0 text-sm text-text-muted">—</span>
+          )}
+          <span className="num shrink-0 text-[0.8125rem] text-text-primary">
+            {hasStrike ? (
+              <>
+                ${strike}
+                {optType ? ` ${optType}` : ""}
+              </>
+            ) : (
+              "SHARES"
+            )}
+          </span>
+          {pk.expiry && (
+            <span className="num shrink-0 text-xs text-text-muted">{pk.expiry}</span>
+          )}
+          {/* "Today" pulse — visible when any events landed today (local TZ). */}
+          {todayEventCount > 0 && (
+            <Chip
+              className="shrink-0 text-text-primary"
+              title={
+                lastTodayEvent
+                  ? `${todayEventCount} event${todayEventCount === 1 ? "" : "s"} today, latest at ${new Date(lastTodayEvent.ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
+                  : `${todayEventCount} events today`
+              }
+            >
+              <span className="num">{todayEventCount}</span> today
+            </Chip>
           )}
         </span>
 
-        {/* Expiry */}
-        {pk.expiry && (
-          <span className="num text-text-muted shrink-0 text-xs">
-            {pk.expiry}
-          </span>
-        )}
-
-        {/* DTE chip */}
-        {dl && (
-          <span className="shrink-0 text-xs text-text-muted">
-            {sentence(dl.text)}
-            {dte != null && <span className="num ml-1">{dte}d</span>}
-          </span>
-        )}
+        {/* DTE */}
+        <span className="truncate text-xs text-text-muted max-md:hidden">
+          {dl ? (
+            <>
+              {sentence(dl.text)}
+              {dte != null && <span className="num ml-1">{dte}d</span>}
+            </>
+          ) : (
+            "—"
+          )}
+        </span>
 
         {/* Entry premium */}
-        {entry?.premium != null && (
-          <span
-            className="num text-text-secondary shrink-0 text-xs"
-            title="Entry premium (first open/add)"
-          >
-            @{Number(entry.premium).toFixed(2)}
-          </span>
-        )}
+        <span
+          className="num text-right text-xs text-text-secondary max-md:hidden"
+          title="Entry premium (first open/add)"
+        >
+          {entry?.premium != null ? `@${Number(entry.premium).toFixed(2)}` : "—"}
+        </span>
 
         {/* Entry underlying */}
-        {entry?.entry_underlying != null && (
-          <span
-            className="num text-text-muted shrink-0 text-xs"
-            title="Underlying at entry"
-          >
-            und {Number(entry.entry_underlying).toFixed(2)}
-          </span>
-        )}
+        <span
+          className="num text-right text-xs text-text-muted max-md:hidden"
+          title="Underlying at entry"
+        >
+          {entry?.entry_underlying != null ? Number(entry.entry_underlying).toFixed(2) : "—"}
+        </span>
 
-        {/* n_events badge — only when >1, otherwise noisy. */}
-        {position.n_events > 1 && (
-          <span className="shrink-0 text-xs text-text-muted">
-            <span className="num">{position.n_events}</span> events
-          </span>
-        )}
+        {/* Event count */}
+        <span className="num text-right text-xs text-text-muted max-md:hidden" title="Events on this position">
+          {position.n_events}
+        </span>
 
-        {/* "Today" pulse — visible when any events landed today (local TZ).
-            Tells the user the position was active TODAY without expanding. */}
-        {todayEventCount > 0 && (
-          <Chip
-            className="shrink-0 text-text-primary"
-            title={
-              lastTodayEvent
-                ? `${todayEventCount} event${todayEventCount === 1 ? "" : "s"} today, latest at ${new Date(lastTodayEvent.ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
-                : `${todayEventCount} events today`
-            }
-          >
-            <span className="num">{todayEventCount}</span> today
-          </Chip>
-        )}
-
-        {/* P/L block — right aligned. When partial+closed we render two
-            numbers (realized in headline color; unrealized struck through). */}
-        <div className="ml-auto flex items-baseline gap-1.5">
-          {/* Strikethrough unrealized when fully closed — the live mark is no longer meaningful. */}
+        {/* P/L — right aligned. When fully closed, the last unrealized mark
+            sits struck through above the realized headline. */}
+        <span className="flex flex-col items-end leading-tight">
           {isClosed && unrealized != null && hasRealized && (
             <span
               className="num text-xs line-through opacity-65 text-text-muted"
@@ -399,13 +389,13 @@ export function TraderPositionRow({
             </span>
           )}
           <span
-            className="num font-semibold shrink-0 text-base min-w-16 text-right"
+            className="num font-semibold text-sm text-right"
             style={{ color: pnlColor }}
             title={pnlTitle}
           >
             {pnlLabel}
           </span>
-        </div>
+        </span>
         <button
           type="button"
           onClick={(e) => {
@@ -425,7 +415,7 @@ export function TraderPositionRow({
       {expanded && (
         <div
           id={detailsId}
-          className="text-sm pt-1 pr-4 pb-4 pl-16 max-sm:pl-4 text-text-secondary flex flex-col gap-3 leading-relaxed"
+          className="text-sm pt-1 pr-2 pb-4 pl-16 max-sm:pl-2 text-text-secondary flex flex-col gap-3 leading-relaxed"
         >
           <div className="text-xs font-medium text-text-muted">
             Timeline · <span className="num">{position.events.length}</span>
@@ -495,7 +485,7 @@ export function TraderPositionRow({
                   )}
 
                   {ev.rationale && (
-                    <span className="font-display text-base leading-relaxed text-text-secondary basis-full pl-[3.625rem] max-sm:pl-0">
+                    <span className="text-sm leading-relaxed text-text-secondary basis-full pl-[3.625rem] max-sm:pl-0">
                       {ev.rationale}
                     </span>
                   )}
@@ -512,7 +502,7 @@ export function TraderPositionRow({
               onClick={() => setShowMessages((s) => !s)}
               aria-expanded={showMessages}
               aria-controls={messagesId}
-              className="self-start text-xs font-medium text-accent-blue cursor-pointer py-1 transition-colors hover:underline"
+              className="self-start text-xs font-medium text-accent cursor-pointer py-1 transition-colors hover:underline"
             >
               {showMessages
                 ? "Hide messages"

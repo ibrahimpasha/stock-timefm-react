@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../../../store/useAppStore";
 import { Segmented } from "../../../components/Glass";
+import { CockpitButton, Tile } from "../../../components/Cockpit";
 import { relativeAge, absoluteAge } from "../../../lib/utils";
 import {
   useGenerateSynthesis,
@@ -46,7 +47,7 @@ function PickTicker({ t }: { t: string }) {
     <button
       type="button"
       onClick={() => setActiveTicker(t)}
-      className="ticker inline-block text-sm hover:text-accent-blue"
+      className="ticker inline-block text-sm hover:text-accent"
     >
       {t}
     </button>
@@ -73,11 +74,11 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-2 border-t border-border pt-5">
-      <h4 className="font-display text-lg font-medium text-text-primary">
+    <section className="space-y-2">
+      <h4 className="m-0 text-sm font-semibold text-text-primary">
         {title}
         {count !== undefined && (
-          <span className="num ml-2 align-middle text-xs font-normal text-text-muted">{count}</span>
+          <span className="num ml-2 text-xs font-normal text-text-muted">{count}</span>
         )}
       </h4>
       {children}
@@ -85,127 +86,136 @@ function Section({
   );
 }
 
-function BriefBody({ content }: { content: SynthesisContent }) {
+/** Weighted sector row; wider label column than Cockpit BarRow (sector names, not tickers). */
+function SectorBar({ sector, pct, lean, notes }: { sector: string; pct: number; lean?: string | null; notes?: string | null }) {
   return (
-    <div className="max-w-[68ch] space-y-5">
-      {/* Sentiment + overall view: the lead of the brief */}
-      <div className="space-y-2">
-        <span
-          className="tag capitalize"
-          style={{ "--tag": sentColor(content.overall_sentiment) } as React.CSSProperties}
-        >
-          {content.overall_sentiment}
-        </span>
-        <p className="font-display text-xl leading-snug text-text-primary text-pretty">
-          {content.overall_view || "—"}
-        </p>
+    <div className="grid min-h-6 grid-cols-[8rem_minmax(0,1fr)_3rem] items-center gap-2.5" title={notes ? `${sector}: ${notes}` : sector}>
+      <span className="truncate text-sm capitalize text-text-primary">{sector}</span>
+      <div className="h-3.5 rounded-[3px]" style={{ background: "var(--track)" }}>
+        <div className="h-3.5 rounded-[3px]" style={{ width: `${Math.max(2, Math.min(100, pct))}%`, background: sentColor(lean) }} />
+      </div>
+      <span className="num text-right text-sm" style={{ color: sentColor(lean) }}>{pct}%</span>
+    </div>
+  );
+}
+
+function BriefBody({ content }: { content: SynthesisContent }) {
+  const hasAside = content.sector_focus.length > 0 || content.watch_list.length > 0 || content.emerging_themes.length > 0;
+  return (
+    <div className={`grid gap-8 ${hasAside ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : ""}`}>
+      {/* Reading column: the overall view leads */}
+      <div className="min-w-0 max-w-[68ch] space-y-6">
+        <div className="space-y-2">
+          <span
+            className="tag capitalize"
+            style={{ "--tag": sentColor(content.overall_sentiment) } as React.CSSProperties}
+          >
+            {content.overall_sentiment}
+          </span>
+          <p className="m-0 text-lg font-semibold leading-snug text-text-primary text-pretty">
+            {content.overall_view || "—"}
+          </p>
+        </div>
+
+        {content.top_thesis && (
+          <Section title="Top thesis">
+            <p className="prose-read whitespace-pre-wrap">{content.top_thesis}</p>
+          </Section>
+        )}
+
+        {content.high_conviction.length > 0 && (
+          <Section title="High conviction" count={content.high_conviction.length}>
+            <div className="divide-y divide-border">
+              {content.high_conviction.map((h) => (
+                <div key={h.ticker} className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4 py-3">
+                  <div className="flex flex-col items-start gap-1">
+                    <PickTicker t={h.ticker} />
+                    <span
+                      className="tag capitalize"
+                      style={{ "--tag": sentColor(h.sentiment) } as React.CSSProperties}
+                    >
+                      {h.sentiment}
+                    </span>
+                    <span className="num text-xs text-text-muted" title="Evidence count">×{h.evidence_count}</span>
+                  </div>
+                  <p className="prose-read">{h.thesis}</p>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {content.bottlenecks.length > 0 && (
+          <Section title="Bottlenecks" count={content.bottlenecks.length}>
+            <ul className="m-0 list-none space-y-3 p-0">
+              {content.bottlenecks.map((b, idx) => (
+                <li key={idx} className="space-y-0.5">
+                  <p className="m-0 text-sm leading-relaxed text-text-primary">{b.description}</p>
+                  {b.exposed_tickers.length > 0 && (
+                    <p className="m-0 text-xs text-text-muted">
+                      Exposed <TickerList tickers={b.exposed_tickers} />
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+
+        {content.private_companies.length > 0 && (
+          <Section title="Private to public proxies" count={content.private_companies.length}>
+            <ul className="m-0 list-none space-y-3 p-0">
+              {content.private_companies.map((p, idx) => (
+                <li key={idx} className="space-y-0.5">
+                  <div className="text-sm font-semibold text-text-primary">{p.name}</div>
+                  <p className="m-0 text-sm leading-relaxed text-text-secondary">{p.rationale}</p>
+                  {p.public_proxies.length > 0 && (
+                    <p className="m-0 text-xs text-text-muted">
+                      Proxies <TickerList tickers={p.public_proxies} />
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
       </div>
 
-      {content.top_thesis && (
-        <Section title="Top thesis">
-          <p className="prose-read whitespace-pre-wrap">{content.top_thesis}</p>
-        </Section>
-      )}
+      {hasAside && (
+        <aside className="min-w-0 space-y-6 lg:border-l lg:border-border lg:pl-6">
+          {content.sector_focus.length > 0 && (
+            <Section title="Sector focus" count={content.sector_focus.length}>
+              {content.sector_focus.map((s) => (
+                <SectorBar key={s.sector} sector={s.sector} pct={s.weight_pct} lean={s.lean} notes={s.notes} />
+              ))}
+            </Section>
+          )}
 
-      {content.sector_focus.length > 0 && (
-        <Section title="Sector focus" count={content.sector_focus.length}>
-          <div className="space-y-1.5">
-            {content.sector_focus.map((s) => (
-              <div key={s.sector} className="grid grid-cols-[9rem_minmax(0,1fr)_3rem] items-center gap-3">
-                <span className="truncate text-sm capitalize text-text-primary">{s.sector}</span>
-                <div className="h-1.5 overflow-hidden rounded-full bg-border">
-                  <div
-                    className="h-full rounded-full"
-                    style={{ width: `${Math.min(100, s.weight_pct)}%`, background: sentColor(s.lean) }}
-                  />
-                </div>
-                <span className="num text-right text-sm text-text-secondary">{s.weight_pct}%</span>
+          {content.watch_list.length > 0 && (
+            <Section title="Watch list" count={content.watch_list.length}>
+              <div className="divide-y divide-border">
+                {content.watch_list.map((w, idx) => (
+                  <div key={idx} className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 py-2">
+                    <PickTicker t={w.ticker} />
+                    <span className="text-sm leading-relaxed text-text-secondary">{w.why_watch}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </Section>
-      )}
+            </Section>
+          )}
 
-      {content.high_conviction.length > 0 && (
-        <Section title="High conviction" count={content.high_conviction.length}>
-          <div className="divide-y divide-border">
-            {content.high_conviction.map((h) => (
-              <div key={h.ticker} className="grid grid-cols-[5rem_minmax(0,1fr)] gap-4 py-3">
-                <div className="flex flex-col items-start gap-1">
-                  <PickTicker t={h.ticker} />
-                  <span
-                    className="tag capitalize"
-                    style={{ "--tag": sentColor(h.sentiment) } as React.CSSProperties}
-                  >
-                    {h.sentiment}
-                  </span>
-                  <span className="num text-xs text-text-muted" title="Evidence count">×{h.evidence_count}</span>
-                </div>
-                <p className="prose-read">{h.thesis}</p>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {content.bottlenecks.length > 0 && (
-        <Section title="Bottlenecks" count={content.bottlenecks.length}>
-          <ul className="space-y-3">
-            {content.bottlenecks.map((b, idx) => (
-              <li key={idx} className="space-y-0.5">
-                <p className="text-sm leading-relaxed text-text-primary">{b.description}</p>
-                {b.exposed_tickers.length > 0 && (
-                  <p className="text-xs text-text-muted">
-                    Exposed <TickerList tickers={b.exposed_tickers} />
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {content.private_companies.length > 0 && (
-        <Section title="Private to public proxies" count={content.private_companies.length}>
-          <ul className="space-y-3">
-            {content.private_companies.map((p, idx) => (
-              <li key={idx} className="space-y-0.5">
-                <div className="text-sm font-medium text-text-primary">{p.name}</div>
-                <p className="text-sm leading-relaxed text-text-secondary">{p.rationale}</p>
-                {p.public_proxies.length > 0 && (
-                  <p className="text-xs text-text-muted">
-                    Proxies <TickerList tickers={p.public_proxies} />
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {content.emerging_themes.length > 0 && (
-        <Section title="Emerging themes" count={content.emerging_themes.length}>
-          <ul className="space-y-2">
-            {content.emerging_themes.map((t, idx) => (
-              <li key={idx} className="text-sm leading-relaxed text-text-secondary">
-                <span className="font-medium text-text-primary">{t.theme}</span> — {t.rationale}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {content.watch_list.length > 0 && (
-        <Section title="Watch list" count={content.watch_list.length}>
-          <div className="divide-y divide-border">
-            {content.watch_list.map((w, idx) => (
-              <div key={idx} className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 py-2">
-                <PickTicker t={w.ticker} />
-                <span className="text-sm leading-relaxed text-text-secondary">{w.why_watch}</span>
-              </div>
-            ))}
-          </div>
-        </Section>
+          {content.emerging_themes.length > 0 && (
+            <Section title="Emerging themes" count={content.emerging_themes.length}>
+              <ul className="m-0 list-none space-y-2 p-0">
+                {content.emerging_themes.map((t, idx) => (
+                  <li key={idx} className="text-sm leading-relaxed text-text-secondary">
+                    <span className="font-medium text-text-primary">{t.theme}</span> — {t.rationale}
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
+        </aside>
       )}
     </div>
   );
@@ -245,41 +255,37 @@ export function VoiceBriefPanel({
   const hasContent = !!content;
 
   return (
-    <div className="card">
-      {/* Collapsed header — clickable */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 text-left"
-      >
-        <div className="flex min-w-0 items-center gap-3">
-          <Brain size={16} className="shrink-0 text-text-muted" />
-          <div className="min-w-0">
-            <div className="section-title">Voice brief</div>
-            <div className="section-sub">
-              @{voiceUsername}
-              {data?.generated_at && (
-                <span title={absoluteAge(data.generated_at) || ""}>
-                  {" "}· {relativeAge(data.generated_at)}
-                </span>
-              )}
-              {!hasContent && !isFetching && !isError && <span> · not generated yet</span>}
-            </div>
-          </div>
-        </div>
-        {open ? (
-          <ChevronUp size={14} className="text-text-muted" />
-        ) : (
-          <ChevronDown size={14} className="text-text-muted" />
-        )}
-      </button>
-
-      {/* Expanded body */}
+    <Tile
+      span={12}
+      title={
+        <span className="inline-flex items-center gap-2">
+          <Brain size={15} className="text-text-muted" /> Voice brief
+        </span>
+      }
+      meta={
+        <>
+          @{voiceUsername}
+          {data?.generated_at && (
+            <span title={absoluteAge(data.generated_at) || ""}> · {relativeAge(data.generated_at)}</span>
+          )}
+          {!hasContent && !isFetching && !isError && <span> · not generated yet</span>}
+        </>
+      }
+      actions={
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-text-secondary hover:bg-bg-card-hover hover:text-text-primary"
+        >
+          {open ? "Hide" : "Show"}
+          {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+      }
+    >
       {open && (
-        <div className="mt-5 space-y-5">
-          {/* Controls */}
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="space-y-5 border-t border-border pt-4">
+          <div className="flex flex-wrap items-center gap-2">
             <Segmented
               ariaLabel="Voice brief window"
               value={String(windowDays)}
@@ -293,36 +299,31 @@ export function VoiceBriefPanel({
               </span>
             )}
 
-            <button
-              type="button"
-              disabled={generate.isPending}
-              onClick={handleGenerate}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-text-secondary hover:bg-bg-card-hover hover:text-text-primary disabled:opacity-50"
-            >
-              {generate.isPending ? (
-                <>
-                  <Loader2 size={11} className="animate-spin" />
-                  Generating…
-                </>
-              ) : (
-                <>
-                  <RefreshCw size={11} />
-                  {hasContent ? "Re-generate" : "Generate"}
-                </>
-              )}
-            </button>
+            <span className="ml-auto">
+              <CockpitButton disabled={generate.isPending} onClick={handleGenerate} primary={!hasContent}>
+                {generate.isPending ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    Generating…
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw size={13} />
+                    {hasContent ? "Re-generate" : "Generate"}
+                  </>
+                )}
+              </CockpitButton>
+            </span>
           </div>
 
-          {/* Body */}
           {generate.isPending && !hasContent && (
-            <div className="text-center py-6 text-sm text-text-muted">
-              <Loader2 size={16} className="animate-spin inline-block mb-1.5" />
+            <div className="py-6 text-center text-sm text-text-muted">
+              <Loader2 size={16} className="mb-1.5 inline-block animate-spin" />
               <div>
                 One LLM call summarizing @{voiceUsername}'s last {windowDays}d. 30-90s.
               </div>
             </div>
           )}
-
 
           {generate.isError && (
             <div className="callout" style={{ "--callout": "var(--accent-red)" } as React.CSSProperties} role="alert">
@@ -350,7 +351,7 @@ export function VoiceBriefPanel({
           )}
 
           {!generate.isPending && !isError && !hasContent && (
-            <div className="text-center py-4 text-sm text-text-muted">
+            <div className="py-4 text-center text-sm text-text-muted">
               No brief cached for this window. Click{" "}
               <span className="font-medium text-text-primary">Generate</span>{" "}
               (single LLM call, ~30-90s).
@@ -360,6 +361,6 @@ export function VoiceBriefPanel({
           {hasContent && content && <BriefBody content={content} />}
         </div>
       )}
-    </div>
+    </Tile>
   );
 }

@@ -16,6 +16,7 @@ import { useEntryLifetime } from "./hooks";
 import { parseLocalDate } from "../../../lib/dateOnly";
 import { formatPremium } from "../../../lib/utils";
 import { Segmented } from "../../../components/Glass";
+import { Tile } from "../../../components/Cockpit";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const SURGE = 3;
@@ -91,20 +92,18 @@ export function WeekdayBehavior({ ticker }: { ticker: string }) {
   const fmtPct = (v: number | null, dp = 1) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(dp)}%`);
 
   return (
-    <section>
-      <div className="mb-3 flex items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="section-title">Weekday behavior</h3>
-          <p className="section-sub">How {ticker} moves on each weekday, with the flow printed that day</p>
-        </div>
+    <Tile
+      title="Weekday behavior"
+      meta={`How ${ticker} moves on each weekday, with the flow printed that day`}
+      actions={
         <Segmented
           options={[{ value: "3M", label: "3M" }, { value: "6M", label: "6M" }]}
           value={months}
           onChange={setMonths}
           ariaLabel="Weekday behavior window"
         />
-      </div>
-      <div className="card">
+      }
+    >
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
         <span><span className="inline-block w-2 h-2 rounded-sm mr-1" style={{ background: "var(--accent-green)" }} />avg surge day (≥+{SURGE}%)</span>
         <span><span className="inline-block w-2 h-2 rounded-sm mr-1" style={{ background: "var(--accent-red)" }} />avg drop day (≤{DROP}%)</span>
@@ -190,7 +189,7 @@ export function WeekdayBehavior({ ticker }: { ticker: string }) {
             <div key={i} title={`${WEEKDAYS[i]}: surge ${pS.toFixed(0)}% · between ${(100 - pS - pD).toFixed(0)}% · drop ${pD.toFixed(0)}% of ${d.all.length} days`}>
               <div className="flex h-2 rounded-full overflow-hidden" style={{ gap: 1 }}>
                 <div style={{ width: `${pS}%`, background: "var(--accent-green)" }} />
-                <div style={{ width: `${100 - pS - pD}%`, background: "var(--border)" }} />
+                <div style={{ width: `${100 - pS - pD}%`, background: "var(--track)" }} />
                 <div style={{ width: `${pD}%`, background: "var(--accent-red)" }} />
               </div>
               <div className="mt-0.5 flex justify-between text-xs num">
@@ -224,7 +223,6 @@ export function WeekdayBehavior({ ticker }: { ticker: string }) {
       <div className="mt-2 max-w-[72ch] text-xs leading-relaxed text-text-muted">
         Close-to-close daily returns, last {months === "3M" ? "3" : "6"} months · flow row = prints landed that weekday, median 10d peak P/L from the nightly grading corpus
       </div>
-      </div>
-    </section>
+    </Tile>
   );
 }

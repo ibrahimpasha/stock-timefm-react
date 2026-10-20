@@ -5,7 +5,8 @@ import {
   TrendingUp, TrendingDown, ChevronDown, ChevronRight, Target,
   AlertOctagon, Activity, RefreshCw,
 } from "lucide-react";
-import { Segmented, Stat } from "../../components/Glass";
+import { Segmented } from "../../components/Glass";
+import { TileGrid, Tile, KpiTile, HeatTile, toneOf } from "../../components/Cockpit";
 
 interface ClosedPosition {
   ticker: string;
@@ -100,7 +101,7 @@ function ReasonChips({ reasons, flags }: { reasons?: string[]; flags?: string[] 
   );
 }
 
-function TradeRow({ pos }: { pos: ClosedPosition }) {
+function TradeRow({ pos, max }: { pos: ClosedPosition; max: number }) {
   const [expanded, setExpanded] = useState(false);
   const exitInfo = exitReasonLabel(pos.exit_reason || "");
   const ExitIcon = exitInfo.Icon;
@@ -109,11 +110,13 @@ function TradeRow({ pos }: { pos: ClosedPosition }) {
   const SideIcon = sideBull ? TrendingUp : TrendingDown;
   const sideColor = sideBull ? "var(--accent-green)" : "var(--accent-red)";
   const pnlColor = isWin ? "var(--accent-green)" : "var(--accent-red)";
+  const barW = `${Math.max(2, Math.min(100, (Math.abs(pos.pnl_pct) / (max || 1)) * 100))}%`;
 
   return (
     <div>
       <div
-        className="data-row flex cursor-pointer items-center gap-3 px-2 py-2.5"
+        className="data-row grid cursor-pointer items-center gap-x-3 rounded-md px-1 py-2"
+        style={{ gridTemplateColumns: "0.875rem 4.25rem minmax(0,1fr) minmax(0,9rem) 4.5rem" }}
         role="button"
         tabIndex={0}
         aria-expanded={expanded}
@@ -125,28 +128,33 @@ function TradeRow({ pos }: { pos: ClosedPosition }) {
           }
         }}
       >
-        {expanded ? <ChevronDown size={14} className="shrink-0 text-text-muted" /> : <ChevronRight size={14} className="shrink-0 text-text-muted" />}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
-            <SideIcon size={13} className="shrink-0 self-center" style={{ color: sideColor }} />
-            <span className="ticker text-sm">{pos.ticker}</span>
-            <span className="num truncate text-xs text-text-secondary">
-              ${pos.strike} {pos.option_type} {pos.expiry} <span className="text-text-muted">×{pos.contracts}</span>
-            </span>
-            {pos.is_lotto && <span className="tag">lotto</span>}
+        {expanded ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <SideIcon size={13} className="shrink-0" style={{ color: sideColor }} />
+          <span className="ticker truncate text-[0.8125rem]">{pos.ticker}</span>
+        </span>
+        <div className="min-w-0">
+          <div className="num truncate text-xs text-text-secondary">
+            ${pos.strike} {pos.option_type} {pos.expiry} <span className="text-text-muted">×{pos.contracts}</span>
+            {pos.is_lotto && <span className="tag ml-1.5">lotto</span>}
           </div>
-          <div className="mt-0.5 flex items-center gap-1 text-xs" style={{ color: exitInfo.color }}>
-            <ExitIcon size={12} />
-            {exitInfo.label}
-            <span className="num ml-2 text-text-muted">{fmtDate(pos.closed_at)}</span>
+          <div className="flex min-w-0 items-center gap-1 text-xs" style={{ color: exitInfo.color }}>
+            <ExitIcon size={12} className="shrink-0" />
+            <span className="truncate">{exitInfo.label}</span>
+            <span className="num ml-1.5 shrink-0 text-text-muted">{fmtDate(pos.closed_at)}</span>
           </div>
         </div>
-        <span className={`w-20 shrink-0 text-right text-lg font-semibold ${isWin ? "delta-up" : "delta-down"}`}>
+        {/* diverging P/L bar: losses grow left of the zero line, wins right */}
+        <div className="grid grid-cols-2" aria-hidden="true">
+          <div className="flex justify-end">{pos.pnl_pct <= 0 && <span className="h-3 rounded-l-[3px]" style={{ width: barW, background: pnlColor }} />}</div>
+          <div className="flex border-l border-border">{pos.pnl_pct > 0 && <span className="h-3 rounded-r-[3px]" style={{ width: barW, background: pnlColor }} />}</div>
+        </div>
+        <span className={`num text-right text-sm font-semibold ${isWin ? "delta-up" : "delta-down"}`}>
           {pos.pnl_pct >= 0 ? "+" : ""}{pos.pnl_pct.toFixed(1)}%
         </span>
       </div>
       {expanded && (
-        <div className="space-y-4 pb-4 pl-9 pr-2 pt-1 text-xs">
+        <div className="space-y-4 rounded-lg bg-bg-card-hover px-4 py-3 text-xs">
           {/* Trade lifecycle */}
           <div className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
             <div>
@@ -263,38 +271,73 @@ export function TradeDecisionLog() {
   const totalPnlPct = data.length > 0 ? data.reduce((s, p) => s + p.pnl_pct, 0) / data.length : 0;
   const winRate = data.length > 0 ? (wins / data.length) * 100 : 0;
 
-  return (
-    <div className="space-y-4">
-      {/* Filter + stats (the parent disclosure already titles this section) */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="grid grid-cols-2 gap-8">
-          <Stat label="Win rate" value={`${winRate.toFixed(0)}%`} tone={winRate >= 50 ? "green" : "red"} />
-          <Stat label="Avg P/L" value={`${totalPnlPct >= 0 ? "+" : ""}${totalPnlPct.toFixed(1)}%`} tone={totalPnlPct >= 0 ? "green" : "red"} />
-        </div>
-        <Segmented
-          ariaLabel="Filter trades"
-          value={filter}
-          onChange={setFilter}
-          options={[
-            { value: "all", label: <>All <span className="num">{data.length}</span></> },
-            { value: "wins", label: <>Wins <span className="num">{wins}</span></> },
-            { value: "losses", label: <>Losses <span className="num">{losses}</span></> },
-          ]}
-        />
-      </div>
+  const best = data.reduce<ClosedPosition | null>((b, p) => (!b || p.pnl_pct > b.pnl_pct ? p : b), null);
+  const max = Math.max(1, ...filtered.map((p) => Math.abs(p.pnl_pct)));
+  // Exit-reason rollup: how trades ended and what each path earned on average.
+  const exits = (() => {
+    const m = new Map<string, { n: number; sum: number }>();
+    for (const p of data) {
+      // Strip the per-trade "(-21.3%)" suffix so reasons group into paths.
+      const k = exitReasonLabel(p.exit_reason || "").label.replace(/\s*\(.*$/, "").trim() || "Closed";
+      const cur = m.get(k) ?? { n: 0, sum: 0 };
+      cur.n += 1;
+      cur.sum += p.pnl_pct;
+      m.set(k, cur);
+    }
+    return [...m.entries()].map(([label, v]) => ({ label, n: v.n, avg: v.sum / v.n })).sort((a, b) => b.n - a.n);
+  })();
+  const maxExit = Math.max(1, ...exits.map((e) => e.n));
+  const pct = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 
-      {/* Trade rows */}
-      {filtered.length === 0 ? (
-        <div className="py-8 text-center text-sm text-text-muted">
-          No trades match the filter
-        </div>
-      ) : (
-        <div className="divide-y divide-border">
-          {filtered.map((pos, i) => (
-            <TradeRow key={`${pos.ticker}_${pos.closed_at}_${i}`} pos={pos} />
+  return (
+    <TileGrid>
+      <KpiTile label="Closed trades" value={data.length} sub={`${wins} wins · ${losses} losses`} />
+      <KpiTile label="Win rate" value={<span className={winRate >= 50 ? "delta-up" : "delta-down"}>{winRate.toFixed(0)}%</span>} sub={`${wins} of ${data.length} closed green`} />
+      <KpiTile label="Avg P/L" value={<span className={totalPnlPct >= 0 ? "delta-up" : "delta-down"}>{pct(totalPnlPct)}</span>} sub="mean of closed-trade P/L" />
+      <KpiTile label="Best trade" value={best?.ticker ?? "—"} delta={best ? pct(best.pnl_pct) : undefined} tone={toneOf(best?.pnl_pct)} />
+
+      <Tile
+        span={8}
+        title="Trades"
+        meta="click a row for entry rationale and exit"
+        actions={
+          <Segmented
+            ariaLabel="Filter trades"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: "all", label: <>All <span className="num">{data.length}</span></> },
+              { value: "wins", label: <>Wins <span className="num">{wins}</span></> },
+              { value: "losses", label: <>Losses <span className="num">{losses}</span></> },
+            ]}
+          />
+        }
+      >
+        {filtered.length === 0 ? (
+          <div className="py-8 text-center text-sm text-text-muted">No trades match the filter</div>
+        ) : (
+          <div className="flex max-h-[64vh] flex-col overflow-y-auto">
+            {filtered.map((pos, i) => (
+              <TradeRow key={`${pos.ticker}_${pos.closed_at}_${i}`} pos={pos} max={max} />
+            ))}
+          </div>
+        )}
+      </Tile>
+
+      <Tile span={4} title="How trades ended" meta="count · avg P/L">
+        <div className="grid grid-cols-2 gap-2">
+          {exits.map((e) => (
+            <HeatTile
+              key={e.label}
+              label={e.label}
+              value={e.n}
+              intensity={e.n / maxExit}
+              tone={e.avg > 0 ? "up" : "down"}
+              sub={`avg ${pct(e.avg)}`}
+            />
           ))}
         </div>
-      )}
-    </div>
+      </Tile>
+    </TileGrid>
   );
 }

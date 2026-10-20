@@ -3,9 +3,10 @@ import { useMemo, useState } from "react";
 import { useAdminAnalysis, type AdminCall } from "../../../api/alerts";
 import { useFlowPicks } from "../../../api/flow";
 import { BullBearBar } from "../../../components/BullBearBar";
-import { Stat } from "../../../components/Glass";
+import { BarRow, Kpi, Tile } from "../../../components/Cockpit";
+import { optionIntent } from "../../../lib/optionContract";
 import { PickCard } from "../../../components/PickCard";
-import { formatDate } from "../../../lib/utils";
+import { formatDate, formatPremium } from "../../../lib/utils";
 import type { TrackedTicker } from "../../../lib/types";
 import { matchesDte, normExpiry, parsePremium } from "./utils";
 import { useIFlowEntries, useIFlowHistory, useStockPrice, useTickerEarnings } from "./hooks";
@@ -31,14 +32,13 @@ function AdminDeskBlock({ ticker }: { ticker: string }) {
     d === "bull" ? "var(--accent-green)" : d === "bear" ? "var(--accent-red)"
     : d === "macro" ? "var(--accent-blue)" : "var(--text-muted)";
   return (
-    <section>
-      <h3 className="section-title">Admin desk</h3>
-      <p className="section-sub mb-2">
-        {calls.length} mention{calls.length > 1 ? "s" : ""} in #admin-analysis · last 14 days
-      </p>
+    <Tile
+      title="Admin desk"
+      meta={`${calls.length} mention${calls.length > 1 ? "s" : ""} in #admin-analysis · last 14 days`}
+    >
       <div className="divide-y divide-border">
         {calls.map((c) => (
-          <div key={c.msg_id} className="max-w-[72ch] py-2.5">
+          <div key={c.msg_id} className="max-w-[72ch] py-2.5 first:pt-0">
             <div className="flex items-baseline gap-2 text-xs">
               <span className="num text-text-muted">{c.ts.slice(5, 10)}</span>
               <span className="font-medium" style={{ color: dirColor(c.direction) }}>
@@ -55,7 +55,7 @@ function AdminDeskBlock({ ticker }: { ticker: string }) {
           </div>
         ))}
       </div>
-    </section>
+    </Tile>
   );
 }
 
@@ -212,24 +212,54 @@ export function TickerDetail({
     (n, arr) => n + arr.length, 0,
   );
   const tickerPicks = (allPicks ?? []).filter((p) => p.ticker === ticker);
+  // Signed (bull +, bear -) premium per visible flow date — the cockpit bar
+  // view of the history below. Pure derivation from `grouped`.
+  const dayNet = useMemo(() => {
+    const rows = Object.keys(grouped)
+      .sort()
+      .reverse()
+      .slice(0, 12)
+      .map((d) => {
+        let net = 0;
+        for (const e of grouped[d]) {
+          const side = optionIntent(e).side;
+          const p = parsePremium(e.premium || "$0");
+          net += side === "Bull" ? p : side === "Bear" ? -p : 0;
+        }
+        return { d, net, n: grouped[d].length };
+      });
+    return { rows, max: Math.max(1, ...rows.map((r) => Math.abs(r.net))) };
+  }, [grouped]);
+  const bullPct = trackedData.bullish + trackedData.bearish > 0
+    ? Math.round((trackedData.bullish / (trackedData.bullish + trackedData.bearish)) * 100)
+    : null;
+  const netBull = trackedData.bullish > trackedData.bearish;
   const total = trackedData.bullish + trackedData.bearish;
   const toggle = (k: string) => setExpanded(expanded === k ? null : k);
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <h2 className="ticker text-3xl tracking-tight">{ticker}</h2>
+    <div className="flex min-w-0 flex-col gap-3.5">
+      <Tile
+        title={<span className="ticker text-2xl tracking-tight">{ticker}</span>}
+        actions={
           <EarningsBadge
             isoDate={earningsData?.earnings_date ?? null}
             session={earningsData?.earnings_session ?? null}
           />
-        </div>
-        <div className="grid grid-cols-3 gap-x-6 gap-y-3">
-          <Stat label="Net premium" value={trackedData.net_premium} />
-          <Stat label="Entries" value={trackedData.total_entries.toLocaleString()} />
-          <Stat
+        }
+      >
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+          <Kpi
+            label="Net premium"
+            value={trackedData.net_premium}
+            size="md"
+            delta={netBull ? "Bull" : "Bear"}
+            tone={netBull ? "up" : "down"}
+          />
+          <Kpi label="Entries" value={trackedData.total_entries.toLocaleString()} size="md" />
+          <Kpi
             label="Bull / bear"
+            size="md"
             value={
               <>
                 <span className="delta-up">{trackedData.bullish}</span>
@@ -238,20 +268,47 @@ export function TickerDetail({
               </>
             }
           />
+          <Kpi
+            label="Bull share"
+            size="md"
+            value={bullPct != null ? `${bullPct}%` : "—"}
+            tone={bullPct == null ? "neutral" : bullPct >= 50 ? "up" : "down"}
+          />
         </div>
         <BullBearBar bull={trackedData.bullish} total={total} />
-      </header>
+      </Tile>
+
+      {dayNet.rows.length >= 2 && (
+        <Tile title="Net premium by day" meta="bull minus bear, visible flow">
+          <div className="flex flex-col gap-1">
+            {dayNet.rows.map((r) => (
+              <BarRow
+                key={r.d}
+                label={r.d.slice(5)}
+                value={r.net}
+                max={dayNet.max}
+                diverging
+                display={`${r.net < 0 ? "-" : ""}${formatPremium(Math.abs(r.net))}`}
+                trailing={r.n}
+                title={`${formatDate(r.d)}: ${r.n} entries`}
+              />
+            ))}
+          </div>
+        </Tile>
+      )}
 
       <AdminDeskBlock ticker={ticker} />
 
       <WeekdayBehavior ticker={ticker} />
 
+      {/* PickCard is itself a bordered card, so picks sit directly in the
+          column (not inside a Tile) to avoid nested cards. */}
       {tickerPicks.length > 0 && (
-        <section>
-          <h3 className="section-title mb-3 flex items-baseline gap-2">
-            Picks <span className="num text-sm font-normal text-text-muted">{tickerPicks.length}</span>
-          </h3>
-          <div className="space-y-3">
+        <section className="flex min-w-0 flex-col gap-2">
+          <h2 className="m-0 px-1 text-[0.9375rem] font-semibold text-text-primary">
+            Picks <span className="num text-xs font-normal text-text-muted">{tickerPicks.length}</span>
+          </h2>
+          <div className="flex flex-col gap-3.5">
             {tickerPicks.map((p) => (
               <PickCard key={p.id} pick={p} />
             ))}
@@ -259,18 +316,18 @@ export function TickerDetail({
         </section>
       )}
 
-      <section>
-        <h3 className="section-title">
-          {tradersOnly
+      <Tile
+        title={
+          tradersOnly
             ? "Trader positions"
             : isAllDates
             ? "Flow history"
             : isSingleDate
             ? `Flow on ${formatDate(singleDate)}`
-            : `Flow across ${selectedDates.size} dates`}
-        </h3>
-        <p className="section-sub mb-3">
-          {tradersOnly ? (
+            : `Flow across ${selectedDates.size} dates`
+        }
+        meta={
+          tradersOnly ? (
             <>
               <span className="num">{totalTraderPositions}</span> position{totalTraderPositions === 1 ? "" : "s"}
             </>
@@ -283,8 +340,9 @@ export function TickerDetail({
                 </span>
               )}
             </>
-          )}
-        </p>
+          )
+        }
+      >
         {loading ? (
           <div className="animate-pulse text-sm text-text-muted">Loading…</div>
         ) : dateKeys.length === 0 ? (
@@ -292,12 +350,13 @@ export function TickerDetail({
             No entries match filters
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {dateKeys.map((date) => (
               <div key={date}>
                 {!isSingleDate && (
-                  <div className="mb-1 border-b border-border pb-1.5 text-sm font-medium text-text-primary">
-                    {formatDate(date)}
+                  <div className="mb-1 flex items-baseline justify-between gap-2 border-b border-border pb-1.5 text-xs">
+                    <span className="font-semibold text-text-primary">{formatDate(date)}</span>
+                    <span className="num text-text-muted">{(grouped[date] || []).length}</span>
                   </div>
                 )}
                 <div className="min-w-0 divide-y divide-border">
@@ -326,7 +385,7 @@ export function TickerDetail({
             ))}
           </div>
         )}
-      </section>
+      </Tile>
     </div>
   );
 }

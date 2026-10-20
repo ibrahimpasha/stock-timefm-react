@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "../../api/client";
-import { Chip, Stat } from "../../components/Glass";
+import { Chip } from "../../components/Glass";
+import { TileGrid, Tile, Kpi, BarRow, ActionCard } from "../../components/Cockpit";
 import {
   Shield, AlertTriangle, AlertOctagon, Lock, Activity, RefreshCw,
 } from "lucide-react";
@@ -76,13 +77,14 @@ function CircuitBreakerBadge({ state, remainingMin, supported }: { state: string
   );
 }
 
-function DrawdownBar({ drawdown, freezeAt, cashAt, supported }: { drawdown: number; freezeAt: number | null; cashAt: number | null; supported: boolean }) {
+/** Drawdown tile: big figure + a track from 0% to the cash-out threshold
+ *  with a marker at the freeze level. */
+function DrawdownTile({ drawdown, freezeAt, cashAt, supported, breaker }: { drawdown: number; freezeAt: number | null; cashAt: number | null; supported: boolean; breaker: React.ReactNode }) {
   if (!supported || freezeAt == null || cashAt == null || cashAt >= 0) {
     return (
-      <div className="flex flex-col gap-0.5">
-        <span className="text-xs font-medium text-text-muted">Recorded drawdown</span>
-        <span className="num text-3xl font-semibold tracking-tight text-text-primary">{drawdown.toFixed(1)}%</span>
-      </div>
+      <Tile span={5} title="Recorded drawdown" actions={breaker}>
+        <Kpi label="From peak" value={`${drawdown.toFixed(1)}%`} size="xl" />
+      </Tile>
     );
   }
   // Visualize 0% to cashAt (e.g., -25%). Drawdown is negative.
@@ -99,84 +101,52 @@ function DrawdownBar({ drawdown, freezeAt, cashAt, supported }: { drawdown: numb
   else if (ddAbs >= freezeAbs * 0.7) color = "var(--accent-yellow)";
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-text-muted">Drawdown from peak</span>
-      <span className="num text-3xl font-semibold tracking-tight" style={{ color }}>
-        {drawdown >= 0 ? "+" : ""}{drawdown.toFixed(1)}%
-      </span>
-      <div className="relative h-1.5 w-full min-w-[120px] overflow-hidden rounded-full bg-border">
+    <Tile span={5} title="Drawdown from peak" actions={breaker}>
+      <Kpi
+        label={`${fillPct.toFixed(0)}% of the way to cash-out`}
+        value={<span style={{ color }}>{drawdown >= 0 ? "+" : ""}{drawdown.toFixed(1)}%</span>}
+        size="xl"
+      />
+      <div className="relative mt-1 h-3.5 w-full rounded-[3px]" style={{ background: "var(--track)" }}>
+        <div className="absolute h-full rounded-[3px] transition-all duration-500" style={{ width: `${fillPct}%`, background: color }} />
         <div
-          className="absolute h-full rounded-full transition-all duration-500"
-          style={{ width: `${fillPct}%`, background: color }}
-        />
-        <div
-          className="absolute top-0 h-full w-px bg-accent-orange"
-          style={{ left: `${freezeMark}%`, opacity: 0.6 }}
+          className="absolute -top-1 h-[22px] w-0.5 rounded-sm bg-accent-orange"
+          style={{ left: `calc(${freezeMark}% - 1px)` }}
           title={`Freeze at ${freezeAt}%`}
         />
       </div>
-      <span className="text-xs text-text-muted">
-        Freeze at <span className="num">{freezeAt}%</span> · cash-out at <span className="num">{cashAt}%</span>
-      </span>
-    </div>
+      <div className="num flex justify-between text-xs text-text-muted">
+        <span>0%</span>
+        <span>freeze {freezeAt}%</span>
+        <span>cash-out {cashAt}%</span>
+      </div>
+    </Tile>
   );
 }
 
-function SlotPills({ slots }: { slots: RiskData["slots"] }) {
-  const items: { label: string; used: number; max: number; color: string }[] = [
-    { label: "Day", used: slots.day_trade.used, max: slots.day_trade.max, color: "var(--accent-blue)" },
-    { label: "Swing", used: slots.swing.used, max: slots.swing.max, color: "var(--accent-blue)" },
-    { label: "Lotto", used: slots.lotto.used, max: slots.lotto.max, color: "var(--accent-blue)" },
+function SlotsTile({ slots }: { slots: RiskData["slots"] }) {
+  const items = [
+    { label: "Day", ...slots.day_trade },
+    { label: "Swing", ...slots.swing },
+    { label: "Lotto", ...slots.lotto },
   ];
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+    <Tile span={4} title="Slots" meta="used / max">
       {items.map((item) => {
-        const isFull = item.used >= item.max;
+        const isFull = item.max > 0 && item.used >= item.max;
         return (
-          <div key={item.label} className="flex items-center gap-1">
-            <span className="w-10 text-xs text-text-secondary">{item.label}</span>
-            <div className="flex items-center gap-0.5">
-              {Array.from({ length: item.max }, (_, i) => (
-                <div
-                  key={i}
-                  className="h-3 w-3 rounded-sm"
-                  style={{
-                    background: i < item.used ? item.color : "transparent",
-                    border: `1px solid ${i < item.used ? item.color : "var(--border)"}`,
-                  }}
-                />
-              ))}
-            </div>
-            <span
-              className="num text-xs"
-              style={{ color: item.max > 0 && isFull ? "var(--accent-orange)" : "var(--text-muted)" }}
-            >
-              {item.max === 0 ? "disabled" : `${item.used}/${item.max}`}
-            </span>
-          </div>
+          <BarRow
+            key={item.label}
+            label={item.label}
+            value={item.used}
+            max={item.max}
+            tone={isFull ? "warn" : "info"}
+            display={item.max === 0 ? "disabled" : `${item.used}/${item.max}`}
+            title={isFull ? "All slots in use" : undefined}
+          />
         );
       })}
-    </div>
-  );
-}
-
-function SectorWarnings({ warnings }: { warnings: RiskData["risk"]["sector_warnings"] }) {
-  if (warnings.length === 0) return null;
-  return (
-    <div className="callout flex flex-wrap items-center gap-x-4 gap-y-1" title="3+ same-direction positions in one sector">
-      <span className="flex items-center gap-1.5 font-medium">
-        <AlertTriangle size={13} /> Sector concentration
-      </span>
-      {warnings.map((w, i) => {
-        const isBull = w.side === "Bull";
-        return (
-          <span key={i} className="text-text-secondary">
-            {w.sector} <span className={isBull ? "delta-up" : "delta-down"}>{w.side}</span>{" "}
-            <span className="num">×{w.count}</span>
-          </span>
-        );
-      })}
-    </div>
+    </Tile>
   );
 }
 
@@ -212,40 +182,44 @@ export function SystemRiskStatus() {
   const hasLottoBudget = portfolio.lotto_budget > 0;
 
   const cbSupported = risk.circuit_breaker_enabled ?? risk.circuit_breaker_supported ?? false;
+  const breaker = <CircuitBreakerBadge state={risk.circuit_breaker_state} remainingMin={risk.freeze_remaining_min} supported={cbSupported} />;
 
   return (
-    <div className="card flex flex-col gap-5 px-5 py-4">
-      <div className="flex flex-wrap items-start justify-between gap-x-10 gap-y-5">
-        {/* Focal: drawdown */}
-        <div className="min-w-[200px] max-w-[320px] flex-1">
-          <DrawdownBar
-            drawdown={risk.drawdown_pct}
-            freezeAt={risk.drawdown_freeze_threshold}
-            cashAt={risk.drawdown_cash_threshold}
-            supported={cbSupported}
-          />
-        </div>
-
-        {/* Secondary figures */}
-        <div className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-3">
-          <Stat label="Peak value" value={fmtMoney(portfolio.peak_value)} />
-          {hasLottoBudget && <Stat label="Lotto budget" value={fmtMoney(portfolio.lotto_budget)} />}
-          <Stat
+    <TileGrid>
+      <DrawdownTile
+        drawdown={risk.drawdown_pct}
+        freezeAt={risk.drawdown_freeze_threshold}
+        cashAt={risk.drawdown_cash_threshold}
+        supported={cbSupported}
+        breaker={breaker}
+      />
+      <SlotsTile slots={slots} />
+      <Tile span={3} title="Book">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-1">
+          <Kpi label="Peak value" value={fmtMoney(portfolio.peak_value)} size="md" />
+          {hasLottoBudget && <Kpi label="Lotto budget" value={fmtMoney(portfolio.lotto_budget)} size="md" />}
+          <Kpi
             label="Watchlist A · B"
             value={<>{data.watchlist.wla_count}<span className="text-text-muted"> · </span>{data.watchlist.wlb_count}</>}
+            size="md"
           />
         </div>
-      </div>
+      </Tile>
 
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-border pt-3">
-        <CircuitBreakerBadge state={risk.circuit_breaker_state} remainingMin={risk.freeze_remaining_min} supported={cbSupported} />
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-text-muted">Slots</span>
-          <SlotPills slots={slots} />
+      {risk.sector_warnings.length > 0 && (
+        <div className="min-w-0 lg:col-span-12" title="3+ same-direction positions in one sector">
+          <ActionCard kind={<span className="flex items-center gap-1.5"><AlertTriangle size={13} /> Sector concentration</span>} tone="warn" title={`${risk.sector_warnings.length} crowded sector${risk.sector_warnings.length > 1 ? "s" : ""}`}>
+            <span className="flex flex-wrap gap-x-5 gap-y-1">
+              {risk.sector_warnings.map((w, i) => (
+                <span key={i}>
+                  {w.sector} <span className={w.side === "Bull" ? "delta-up" : "delta-down"}>{w.side}</span>{" "}
+                  <span className="num">×{w.count}</span>
+                </span>
+              ))}
+            </span>
+          </ActionCard>
         </div>
-      </div>
-
-      <SectorWarnings warnings={risk.sector_warnings} />
-    </div>
+      )}
+    </TileGrid>
   );
 }

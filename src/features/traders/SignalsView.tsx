@@ -24,7 +24,8 @@ import {
   type AdminCall,
 } from "../../api/alerts";
 import { useAppStore } from "../../store/useAppStore";
-import { Sparkline, RangeBar } from "../../components/CCPrimitives";
+import { Sparkline } from "../../components/CCPrimitives";
+import { Tile, Kpi, HeatTile, CockpitButton } from "../../components/Cockpit";
 import { Segmented, Chip, type ChipTone } from "../../components/Glass";
 import {
   relativeAge,
@@ -97,6 +98,18 @@ function Th({
 }
 
 const TD_BASE = "px-2.5 py-2.5";
+
+/** Plain track bar, fills from the left. `pct` 0..100. */
+function TrackBar({ pct, color = "var(--accent-blue)" }: { pct: number; color?: string }) {
+  return (
+    <div className="h-3 min-w-0 flex-1 rounded-[3px]" style={{ background: "var(--track)" }}>
+      <div
+        className="h-3 rounded-[3px]"
+        style={{ width: `${Math.max(pct > 0 ? 2 : 0, Math.min(100, pct))}%`, background: color }}
+      />
+    </div>
+  );
+}
 
 /* ── Shared empty / loading bits ─────────────────────────── */
 
@@ -213,6 +226,21 @@ function TrendingTab({
           No mentions in this window.
         </div>
       ) : (
+        <div className="flex flex-col gap-4">
+        {/* Top of the board as heat tiles: fill = score vs leader, hue = sentiment */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+          {rows.slice(0, 8).map((r) => (
+            <HeatTile
+              key={r.ticker}
+              label={<span className="ticker text-text-primary">{r.ticker}</span>}
+              value={(r.trending_score || 0).toFixed(1)}
+              intensity={(r.trending_score || 0) / maxScore}
+              tone={(r.sentiment_avg ?? 0) < 0 ? "down" : "up"}
+              sub={`${r.n_mentions} mentions · ${r.n_unique_authors} authors`}
+              onClick={() => onTickerClick(r.ticker)}
+            />
+          ))}
+        </div>
         <div className="overflow-auto max-h-[360px]">
           <table className="w-full border-collapse text-sm">
             <thead>
@@ -240,7 +268,7 @@ function TrendingTab({
                       <button
                         type="button"
                         onClick={() => onTickerClick(r.ticker)}
-                        className="ticker cursor-pointer text-sm transition-colors hover:text-accent-blue"
+                        className="ticker cursor-pointer text-sm transition-colors hover:text-accent"
                       >
                         {r.ticker}
                       </button>
@@ -265,13 +293,8 @@ function TrendingTab({
                         <span className="num text-xs text-text-secondary min-w-7 text-right">
                           {(r.trending_score || 0).toFixed(1)}
                         </span>
-                        <div className="flex-1 min-w-10">
-                          <RangeBar
-                            low={0}
-                            high={100}
-                            last={scorePct}
-                            width="100%"
-                          />
+                        <div className="flex min-w-10 flex-1">
+                          <TrackBar pct={scorePct} />
                         </div>
                       </div>
                     </td>
@@ -312,6 +335,7 @@ function TrendingTab({
               })}
             </tbody>
           </table>
+        </div>
         </div>
       )}
     </div>
@@ -399,7 +423,7 @@ function TickerDrawer({
   return (
     <div className="mt-4 border-t border-border pt-3">
       <header className="flex items-center justify-between pb-2">
-        <h3 className="font-display text-lg font-medium text-text-primary">
+        <h3 className="m-0 text-sm font-semibold text-text-primary">
           <span className="ticker">{ticker}</span> mention history
         </h3>
         <button
@@ -466,93 +490,47 @@ function LeadersTab() {
           No first-mention activity in window.
         </div>
       ) : (
-        <div className="overflow-auto max-h-[360px]">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr>
-                <Th>Author</Th>
-                <Th align="right">First calls</Th>
-                <Th>Avg followers / 24h</Th>
-                <Th>Leading tickers</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {rows.map((r) => {
-                const followers = r.n_followers_within_24h_avg ?? 0;
-                const influencing = followers > 1;
-                return (
-                  <tr
-                    key={r.author}
-                    className="hover:bg-bg-card-hover transition-colors"
-                  >
-                    <td className={TD_BASE}>
-                      <span
-                        className={`inline-flex items-center gap-1.5 text-sm text-text-primary ${
-                          influencing ? "font-semibold" : "font-medium"
-                        }`}
-                        title={r.author}
-                      >
-                        <span
-                          aria-hidden={!influencing}
-                          aria-label={influencing ? "Influencing" : undefined}
-                          className="h-1.5 w-1.5 shrink-0 rounded-full"
-                          style={{
-                            background: influencing
-                              ? "var(--accent-purple)"
-                              : "transparent",
-                          }}
-                          title={
-                            influencing
-                              ? "Influencing: followed by 2+ traders within 24h"
-                              : undefined
-                          }
-                        />
-                        {r.author}
-                      </span>
-                    </td>
-                    <td
-                      className={`${TD_BASE} num text-right text-text-secondary`}
-                     
-                    >
-                      {r.n_first_mentions}
-                    </td>
-                    <td
-                      className={`${TD_BASE} min-w-36`}
-                     
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`num text-xs min-w-8 text-right ${
-                            influencing ? "text-text-primary" : "text-text-secondary"
-                          }`}
-                        >
-                          {followers.toFixed(1)}
-                        </span>
-                        <div className="flex-1 min-w-10">
-                          <RangeBar
-                            low={0}
-                            high={maxFollowers}
-                            last={followers}
-                            width="100%"
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    <td className={TD_BASE}>
-                      <span className="num text-xs text-text-secondary">
-                        {(r.leading_tickers || []).slice(0, 6).join(" ")}
-                        {(r.leading_tickers || []).length > 6 && (
-                          <span className="ml-1 text-text-muted">
-                            +{(r.leading_tickers || []).length - 6}
-                          </span>
-                        )}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="max-h-[360px] overflow-auto">
+          <div className="sticky top-0 z-[1] grid grid-cols-[minmax(0,9rem)_3rem_minmax(0,1fr)_2.5rem] items-center gap-x-3 border-b border-border bg-bg-card px-1 pb-1.5 text-xs text-text-muted md:grid-cols-[minmax(0,10rem)_3.5rem_minmax(0,1fr)_2.5rem_minmax(0,14rem)]">
+            <span>Author</span>
+            <span className="text-right">First</span>
+            <span>Avg followers / 24h</span>
+            <span />
+            <span className="max-md:hidden">Leading tickers</span>
+          </div>
+          {rows.map((r) => {
+            const followers = r.n_followers_within_24h_avg ?? 0;
+            const influencing = followers > 1;
+            const lt = r.leading_tickers || [];
+            return (
+              <div
+                key={r.author}
+                className="grid min-h-9 grid-cols-[minmax(0,9rem)_3rem_minmax(0,1fr)_2.5rem] items-center gap-x-3 rounded-md px-1 py-1 text-sm hover:bg-bg-card-hover md:grid-cols-[minmax(0,10rem)_3.5rem_minmax(0,1fr)_2.5rem_minmax(0,14rem)]"
+                title={influencing ? "Influencing: followed by 2+ traders within 24h" : undefined}
+              >
+                <span
+                  className={`truncate text-text-primary ${influencing ? "font-semibold" : "font-medium"}`}
+                  title={r.author}
+                >
+                  {r.author}
+                </span>
+                <span className="num text-right text-[0.8125rem] text-text-secondary">{r.n_first_mentions}</span>
+                <TrackBar
+                  pct={(followers / maxFollowers) * 100}
+                  color={influencing ? "var(--accent-purple)" : "var(--accent-blue)"}
+                />
+                <span
+                  className={`num text-right text-[0.8125rem] ${influencing ? "text-text-primary" : "text-text-secondary"}`}
+                >
+                  {followers.toFixed(1)}
+                </span>
+                <span className="num truncate text-xs text-text-secondary max-md:hidden" title={lt.join(" ")}>
+                  {lt.slice(0, 6).join(" ")}
+                  {lt.length > 6 && <span className="ml-1 text-text-muted">+{lt.length - 6}</span>}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -587,6 +565,9 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
     [points],
   );
 
+  const bullTotal = points.reduce((n, p) => n + p.bull_count, 0);
+  const bearTotal = points.reduce((n, p) => n + p.bear_count, 0);
+
   const lastSent =
     points.length > 0 ? points[points.length - 1].sentiment_avg ?? 0 : 0;
 
@@ -617,21 +598,9 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
             borderRadius: "var(--radius-control)",
           }}
         />
-        <button
-          type="button"
-          onClick={applyTicker}
-          className="text-xs font-medium px-3 py-1 cursor-pointer transition-colors"
-          style={{
-            color: "var(--accent-blue)",
-            background:
-              "color-mix(in srgb, var(--accent-blue) 10%, transparent)",
-            border:
-              "1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent)",
-            borderRadius: "var(--radius-chip)",
-          }}
-        >
+        <CockpitButton primary onClick={applyTicker}>
           Load
-        </button>
+        </CockpitButton>
         <span className="ml-auto text-xs text-text-muted">
           14-day daily sentiment and bull/bear split
         </span>
@@ -649,32 +618,22 @@ function SentimentTab({ defaultTicker }: { defaultTicker: string }) {
         </div>
       ) : (
         <div>
-          {/* Sparkline header */}
-          <div className="flex items-center gap-4 mb-3">
-            <div>
-              <h3 className="mb-2 font-display text-lg font-medium text-text-primary">
-                <span className="ticker">{ticker}</span> sentiment trajectory
-              </h3>
+          {/* KPI strip + trajectory */}
+          <div className="mb-4 flex flex-wrap items-end gap-x-8 gap-y-3">
+            <Kpi
+              label={<><span className="ticker">{ticker}</span> sentiment, last</>}
+              value={<span style={{ color: changeColor(lastSent) }}>{lastSent.toFixed(2)}</span>}
+            />
+            <Kpi label="Bull mentions" value={<span className="text-accent-green">{bullTotal}</span>} size="md" />
+            <Kpi label="Bear mentions" value={<span className="text-accent-red">{bearTotal}</span>} size="md" />
+            <div className="ml-auto overflow-hidden">
               <Sparkline
                 points={sentSeries}
-                width={240}
-                height={40}
-                color={
-                  lastSent >= 0
-                    ? "var(--accent-green)"
-                    : "var(--accent-red)"
-                }
+                width={280}
+                height={48}
+                color={lastSent >= 0 ? "var(--accent-green)" : "var(--accent-red)"}
                 fill
               />
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-xs text-text-muted">Last</span>
-                <span
-                  className="num text-2xl font-semibold tracking-tight"
-                  style={{ color: changeColor(lastSent) }}
-                >
-                  {lastSent.toFixed(2)}
-                </span>
-              </div>
             </div>
           </div>
 
@@ -793,39 +752,45 @@ function AdminTab({ onTickerClick }: { onTickerClick: (t: string) => void }) {
         No admin-analysis digest generated yet.
       </div>
     );
+  const maxTop = (data.top_tickers ?? []).reduce((m, t) => Math.max(m, t.n), 0) || 1;
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
-        <span className="text-text-muted">Most discussed</span>
-        {(data.top_tickers ?? []).slice(0, 10).map((t) => (
-          <button
-            key={t.ticker}
-            type="button"
-            onClick={() => onTickerClick(t.ticker)}
-            className="hover:underline"
-          >
-            <span
-              className="num text-sm font-semibold"
-              style={{
-                color: toneColor(
-                  t.bull > t.bear ? "green" : t.bear > t.bull ? "red" : "neutral",
-                ),
-              }}
-            >
-              {t.ticker}
-            </span>
-            <span className="num text-text-muted ml-1">{t.n}</span>
-          </button>
-        ))}
-        <span className="ml-auto text-text-muted">
-          #admin-analysis · last {data.window_days ?? 14}d
-          {data.generated_at ? ` · ${relativeAge(data.generated_at)}` : ""}
-        </span>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs text-text-muted">
+          <span className="text-sm font-semibold text-text-primary">Most discussed</span>
+          <span>
+            #admin-analysis · last {data.window_days ?? 14}d
+            {data.generated_at ? ` · ${relativeAge(data.generated_at)}` : ""}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 gap-x-8 gap-y-0.5 md:grid-cols-2">
+          {(data.top_tickers ?? []).slice(0, 10).map((t) => {
+            const tone = t.bull > t.bear ? "green" : t.bear > t.bull ? "red" : "neutral";
+            return (
+              <button
+                key={t.ticker}
+                type="button"
+                onClick={() => onTickerClick(t.ticker)}
+                title={`${t.n} mentions · bull ${t.bull} · bear ${t.bear}`}
+                className="data-row grid min-h-7 w-full grid-cols-[4.25rem_minmax(0,1fr)_2.5rem] items-center gap-2.5 rounded-md px-1 text-left"
+              >
+                <span className="ticker text-[0.8125rem]" style={{ color: tone === "neutral" ? undefined : toneColor(tone) }}>
+                  {t.ticker}
+                </span>
+                <TrackBar
+                  pct={(t.n / maxTop) * 100}
+                  color={tone === "neutral" ? "var(--accent-blue)" : toneColor(tone)}
+                />
+                <span className="num text-right text-[0.8125rem] text-text-secondary">{t.n}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
       {data.authors.map((a) => (
         <div key={a.author}>
           <div className="flex items-baseline gap-2 mb-1">
-            <h3 className="font-display text-lg font-medium text-text-primary">{a.author}</h3>
+            <h3 className="m-0 text-sm font-semibold text-text-primary">{a.author}</h3>
             <span className="text-xs text-text-muted">
               <span className="num">{a.n_calls}</span> posts
             </span>
@@ -849,19 +814,19 @@ function AdminTab({ onTickerClick }: { onTickerClick: (t: string) => void }) {
                     <button
                       key={t}
                       onClick={() => onTickerClick(t)}
-                      className="ticker transition-colors hover:text-accent-blue"
+                      className="ticker transition-colors hover:text-accent"
                     >
                       {t}
                     </button>
                   ))}
                 </span>
-                <span className="min-w-0 max-w-[72ch] font-display text-base leading-relaxed text-text-secondary">
+                <span className="min-w-0 max-w-[72ch] text-sm leading-relaxed text-text-secondary">
                   {c.thesis}
                   {c.levels && (
-                    <span className="font-sans text-sm text-text-muted"> · {c.levels}</span>
+                    <span className="text-text-muted"> · {c.levels}</span>
                   )}
                   {c.from_image && (
-                    <span className="font-sans text-sm text-text-muted"> · chart</span>
+                    <span className="text-text-muted"> · chart</span>
                   )}
                 </span>
               </div>
@@ -896,14 +861,10 @@ export function SignalsView() {
   }
 
   return (
-    <section className="flex min-w-0 flex-col gap-3">
-      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-        <div>
-          <h2 className="section-title">Signals</h2>
-          <p className="section-sub">
-            Mentions, catalysts and first-callers across every trader
-          </p>
-        </div>
+    <Tile
+      title="Signals"
+      meta="Mentions, catalysts and first-callers across every trader"
+      actions={
         <Segmented<SignalsTab>
           ariaLabel="Signals view"
           options={[
@@ -915,10 +876,9 @@ export function SignalsView() {
           value={tab}
           onChange={setTab}
         />
-      </div>
-
-      {/* Tab body — one card around the dense dataset */}
-      <div className="card min-w-0">
+      }
+    >
+      <div className="min-w-0">
         {tab === "trending" && (
           <>
             <TrendingTab
@@ -940,6 +900,6 @@ export function SignalsView() {
         )}
         {tab === "admin" && <AdminTab onTickerClick={handleTickerClick} />}
       </div>
-    </section>
+    </Tile>
   );
 }

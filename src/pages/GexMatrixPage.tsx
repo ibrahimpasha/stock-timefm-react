@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Segmented } from "../components/Glass";
+import { TileGrid, Tile, KpiTile, BarRow, CockpitButton, toneOf } from "../components/Cockpit";
 import {
   useGexMatrix,
   useGexTickers,
@@ -157,7 +158,35 @@ export function GexMatrixPage() {
     ? Object.values(data.totals).reduce((sum, t) => sum + (t?.gex ?? 0), 0)
     : null;
 
-  const header = (
+  /* Per-strike profile of the current metric across loaded expiries (signed
+   * metrics sum; unusual takes the max ratio) — the matrix collapsed to one
+   * column, so the walls read at a glance. */
+  const signedMetric = metric === "gex" || metric === "vex";
+  const profile = useMemo(() => {
+    if (!data?.ok) return [] as { k: number; v: number }[];
+    return data.strikes.map((k) => {
+      const vals = data.expiries.map((e) => cellValue(data.cells[`${e.expiry}|${k}`], metric) ?? 0);
+      return { k, v: metric === "unusual" ? Math.max(0, ...vals) : vals.reduce((x, y) => x + y, 0) };
+    });
+  }, [data, metric]);
+  const profileMax = Math.max(1e-9, ...profile.map((p) => Math.abs(p.v)));
+  const gexByStrike = useMemo(() => {
+    if (!data?.ok) return [] as { k: number; v: number }[];
+    return data.strikes.map((k) => ({
+      k,
+      v: data.expiries.reduce((sum, e) => sum + (data.cells[`${e.expiry}|${k}`]?.gex ?? 0), 0),
+    }));
+  }, [data]);
+  const posWall = gexByStrike.reduce<{ k: number; v: number } | null>((b, p) => (p.v > 0 && (!b || p.v > b.v) ? p : b), null);
+  const negWall = gexByStrike.reduce<{ k: number; v: number } | null>((b, p) => (p.v < 0 && (!b || p.v < b.v) ? p : b), null);
+  const pctFromSpot = (k: number) => (spot ? `${k >= spot ? "+" : ""}${(((k - spot) / spot) * 100).toFixed(1)}% from spot` : undefined);
+  const expiryTotals = data?.ok && data.totals
+    ? data.expiries.map((e) => ({ e, v: data.totals?.[e.expiry]?.gex ?? 0 }))
+    : [];
+  const expiryMax = Math.max(1, ...expiryTotals.map((t) => Math.abs(t.v)));
+  const metricLabel = METRICS.find((m) => m.value === metric)?.label ?? metric;
+
+  const controls = (
     <div className="flex w-full min-w-0 flex-wrap items-center gap-2 lg:w-auto">
       <Segmented options={METRICS} value={metric} onChange={setMetric} ariaLabel="Metric" />
       <Segmented options={BANDS} value={band} onChange={setBand} ariaLabel="Strike band" />
@@ -172,70 +201,71 @@ export function GexMatrixPage() {
           <h1>GEX</h1>
           <p>Dealer gamma, vega and open interest by strike and expiry</p>
         </div>
+        <div className="desk-header__actions">{controls}</div>
       </header>
 
-      {/* hero: the name, where spot is, and the net dealer stance */}
-      <section className="flex flex-wrap items-end gap-x-10 gap-y-4">
-        <div className="flex flex-col gap-1">
-          <span className="text-sm text-text-muted">Ticker</span>
-          <span className="ticker text-3xl">{data?.ok ? data.ticker : ticker}</span>
+      {/* toolbar: which name */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="mobile-horizontal-strip flex w-full min-w-0 gap-1 overflow-x-auto lg:w-auto lg:flex-wrap lg:overflow-visible">
+          {(tickers ?? []).map((t) => (
+            <button
+              key={t.ticker}
+              type="button"
+              onClick={() => { setTicker(t.ticker); setParams({ ticker: t.ticker }); }}
+              aria-pressed={t.ticker === ticker}
+              className={`num min-h-11 shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-colors lg:min-h-8 ${
+                t.ticker === ticker
+                  ? "segmented-option-active"
+                  : "text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
+              }`}
+            >
+              {t.ticker}
+            </button>
+          ))}
         </div>
-        {data?.ok && (
-          <>
-            <div className="flex flex-col gap-1">
-              <span className="text-sm text-text-muted">Spot</span>
-              <span className="num text-3xl font-semibold tracking-tight text-text-primary">${spot.toFixed(2)}</span>
-            </div>
-            {netGex != null && (
-              <div className="flex flex-col gap-1" title="Sum of net dealer GEX across the loaded expiries">
-                <span className="text-sm text-text-muted">Net GEX, all expiries</span>
-                <span className={`${netGex >= 0 ? "delta-up" : "delta-down"} text-3xl font-semibold tracking-tight`}>
-                  {money(netGex)}
-                </span>
-              </div>
-            )}
-            <span className="num pb-1 text-xs text-text-muted">
-              Updated {data.updated_at?.slice(0, 16).replace("T", " ")}
-            </span>
-          </>
-        )}
-      </section>
+        <form onSubmit={submit} className="flex items-center gap-1">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Any ticker…"
+            aria-label="Look up a ticker's dealer positioning"
+            className="control-surface num min-h-11 w-32 rounded-full border px-3 py-1 text-xs text-text-primary placeholder:text-text-muted focus:outline-none lg:min-h-8"
+          />
+        </form>
+      </div>
 
-      <section className="flex flex-col gap-3">
-        <div>
-          <h2 className="section-title">Dealer positioning matrix</h2>
-          <p className="section-sub">Strikes down, expiries across. Heat scales to the 95th percentile of on-screen cells.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="mobile-horizontal-strip flex w-full min-w-0 gap-1 overflow-x-auto lg:w-auto lg:flex-wrap lg:overflow-visible">
-            {(tickers ?? []).map((t) => (
-              <button
-                key={t.ticker}
-                type="button"
-                onClick={() => { setTicker(t.ticker); setParams({ ticker: t.ticker }); }}
-                aria-pressed={t.ticker === ticker}
-                className={`num min-h-11 shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-colors lg:min-h-8 ${
-                  t.ticker === ticker
-                    ? "segmented-option-active"
-                    : "text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
-                }`}
-              >
-                {t.ticker}
-              </button>
-            ))}
-          </div>
-          <form onSubmit={submit} className="flex items-center gap-1">
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Any ticker…"
-              aria-label="Look up a ticker's dealer positioning"
-              className="control-surface num min-h-11 w-32 rounded-full border px-3 py-1 text-xs text-text-primary placeholder:text-text-muted focus:outline-none lg:min-h-8"
-            />
-          </form>
-          <div className="w-full min-w-0 lg:ml-auto lg:w-auto">{header}</div>
-        </div>
-      <div className="card">
+      <TileGrid>
+        <KpiTile
+          label="Ticker · spot"
+          value={data?.ok ? `$${spot.toFixed(2)}` : "—"}
+          sub={<><span className="ticker text-text-primary">{data?.ok ? data.ticker : ticker}</span>{data?.ok && data.updated_at ? <> · updated <span className="num">{data.updated_at.slice(0, 16).replace("T", " ")}</span></> : null}</>}
+        />
+        <KpiTile
+          label="Net GEX, all expiries"
+          value={netGex != null ? money(netGex) : "—"}
+          tone={toneOf(netGex)}
+          sub={netGex == null ? undefined : netGex >= 0 ? "dealers long gamma · dampens moves" : "dealers short gamma · amplifies moves"}
+        />
+        <KpiTile
+          label="Largest + gamma strike"
+          value={posWall ? posWall.k : "—"}
+          delta={posWall ? money(posWall.v) : undefined}
+          tone="up"
+          sub={posWall ? pctFromSpot(posWall.k) : undefined}
+        />
+        <KpiTile
+          label="Largest − gamma strike"
+          value={negWall ? negWall.k : "—"}
+          delta={negWall ? money(negWall.v) : undefined}
+          tone="down"
+          sub={negWall ? pctFromSpot(negWall.k) : undefined}
+        />
+
+        <Tile
+          span={9}
+          title="Dealer positioning matrix"
+          meta={`${metricLabel} · strikes down, expiries across · heat = 95th pct of on-screen cells`}
+        >
         {isLoading && !data && (
           <p className="text-sm text-text-muted animate-pulse">Loading chain…</p>
         )}
@@ -246,16 +276,9 @@ export function GexMatrixPage() {
               No grid for <span className="num font-semibold text-text-primary">{ticker}</span> yet —
               the nightly build covers the anchors, your book and the top flow names only.
             </p>
-            <button
-              type="button"
-              disabled={building}
-              onClick={() => refresh.mutate(ticker)}
-              className="min-h-9 px-4 py-1.5 rounded-full text-sm font-medium transition-colors
-                         bg-accent-blue/15 text-accent-blue hover:bg-accent-blue/25
-                         disabled:opacity-60"
-            >
+            <CockpitButton primary disabled={building} onClick={() => refresh.mutate(ticker)}>
               {building ? `Building ${ticker}…` : `Build ${ticker} now`}
-            </button>
+            </CockpitButton>
             {building && (
               <p className="text-xs text-text-muted">
                 Pulling 8 option chains — usually 5-10s. This page refreshes itself.
@@ -271,7 +294,7 @@ export function GexMatrixPage() {
             <table className="text-sm border-separate w-full max-w-5xl" style={{ borderSpacing: 2 }}>
               <thead>
                 <tr>
-                  <th className="text-left text-xs font-medium text-text-muted px-2 sticky left-0 bg-[var(--card-bg)] z-10 w-20">
+                  <th className="text-left text-xs font-medium text-text-muted px-2 sticky left-0 bg-bg-card z-10 w-20">
                     Strike
                   </th>
                   {data.expiries.map((e) => {
@@ -296,7 +319,7 @@ export function GexMatrixPage() {
                   return (
                     <tr key={k}>
                       <td
-                        className="px-2 num text-right sticky left-0 bg-[var(--card-bg)] z-10 whitespace-nowrap"
+                        className="px-2 num text-right sticky left-0 bg-bg-card z-10 whitespace-nowrap"
                         style={{
                           color: isAtm ? "var(--accent-blue)" : "var(--text-secondary)",
                           fontWeight: isAtm ? 700 : 400,
@@ -349,7 +372,7 @@ export function GexMatrixPage() {
               {data.totals && (
                 <tfoot>
                   <tr>
-                    <td className="px-2 text-xs font-medium text-text-muted sticky left-0 bg-[var(--card-bg)] z-10">
+                    <td className="px-2 text-xs font-medium text-text-muted sticky left-0 bg-bg-card z-10">
                       Net
                     </td>
                     {data.expiries.map((e) => {
@@ -368,26 +391,64 @@ export function GexMatrixPage() {
             </table>
           </div>
         )}
-      </div>
-      </section>
+        </Tile>
 
-      <div className="flex flex-col gap-3 max-w-[72ch]">
-        <p className="callout">
-          Sign convention: dealers long calls, short puts. Positive (green) gamma dampens moves
-          through that strike; negative (red) amplifies them. <strong>Green is dealer positioning,
-          not a buy signal</strong> — a big green cell often acts as a magnet/pin, and a call there
-          still needs spot to travel to it.
-        </p>
-        <details className="text-sm text-text-muted">
-          <summary className="cursor-pointer text-text-secondary hover:text-text-primary">How the grid is built</summary>
-          <p className="mt-2 leading-relaxed">
-            Hover any cell for the % move required and the call&apos;s delta. Greeks are Black-Scholes
-            from each chain's own implied vol — yfinance does not publish them. Refreshed by
-            <code className="num"> scripts/backfill_gex_matrix.py</code> on the daily timer, so the
-            grid is end-of-day positioning, not a live tape.
+        <div className="flex min-w-0 flex-col gap-3.5 lg:col-span-3">
+          <Tile title={`${metricLabel} by strike`} meta={metric === "unusual" ? "max across expiries" : "sum across expiries"}>
+            {profile.length === 0 ? (
+              <p className="text-sm text-text-muted">No grid loaded.</p>
+            ) : (
+              <div className="flex flex-col">
+                {profile.map((p) => (
+                  <BarRow
+                    key={p.k}
+                    label={<span style={{ color: p.k === atmStrike ? "var(--accent-blue)" : undefined }}>{p.k === atmStrike ? "▸ " : ""}{p.k}</span>}
+                    value={p.v}
+                    max={profileMax}
+                    diverging={signedMetric}
+                    tone={signedMetric ? undefined : "info"}
+                    display={formatValue(p.v, metric)}
+                    title={pctFromSpot(p.k)}
+                  />
+                ))}
+              </div>
+            )}
+          </Tile>
+          {expiryTotals.length > 0 && (
+            <Tile title="Net GEX by expiry">
+              {expiryTotals.map(({ e, v }) => (
+                <BarRow
+                  key={e.expiry}
+                  label={<span style={{ color: e.is_0dte ? "var(--accent-orange)" : undefined }}>{e.label.split(" ")[0]}</span>}
+                  value={v}
+                  max={expiryMax}
+                  diverging
+                  display={money(v)}
+                  title={e.label}
+                />
+              ))}
+            </Tile>
+          )}
+        </div>
+
+        <Tile span={12} title="Reading the grid">
+          <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">
+            Sign convention: dealers long calls, short puts. Positive (green) gamma dampens moves
+            through that strike; negative (red) amplifies them. <strong className="text-text-primary">Green is dealer positioning,
+            not a buy signal</strong> — a big green cell often acts as a magnet/pin, and a call there
+            still needs spot to travel to it.
           </p>
-        </details>
-      </div>
+          <details className="text-sm text-text-muted">
+            <summary className="cursor-pointer text-text-secondary hover:text-text-primary">How the grid is built</summary>
+            <p className="mt-2 max-w-[72ch] leading-relaxed">
+              Hover any cell for the % move required and the call&apos;s delta. Greeks are Black-Scholes
+              from each chain's own implied vol — yfinance does not publish them. Refreshed by
+              <code className="num"> scripts/backfill_gex_matrix.py</code> on the daily timer, so the
+              grid is end-of-day positioning, not a live tape.
+            </p>
+          </details>
+        </Tile>
+      </TileGrid>
     </div>
   );
 }

@@ -349,7 +349,7 @@ export function TraderEventRow({
                         </span>
                       )}
                       {e.rationale && (
-                        <p className="prose-read ml-[58px] max-w-[68ch] basis-full text-base! max-sm:ml-0">
+                        <p className="ml-[58px] max-w-[68ch] basis-full text-sm leading-relaxed text-text-secondary max-sm:ml-0">
                           {e.rationale}
                         </p>
                       )}

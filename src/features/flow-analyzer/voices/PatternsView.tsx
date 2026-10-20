@@ -1,7 +1,7 @@
 /**
  * PatternsView — derivative signal that nobody can read from a chronological feed.
  *
- * Renders two stacked panels:
+ * Renders a KPI strip, then two tiles side by side:
  *
  *   ┌─ Conviction Velocity (top) ─────────────────┐
  *   │ Per-ticker mention delta vs prior window,   │
@@ -17,9 +17,9 @@
  * global activeTicker so the rest of the dashboard re-aligns.
  */
 import { useMemo } from "react";
-import { ArrowUp, ArrowDown, Minus } from "lucide-react";
 import { useAppStore } from "../../../store/useAppStore";
-import { Segmented, Stat } from "../../../components/Glass";
+import { Segmented } from "../../../components/Glass";
+import { BarRow, Kpi, KpiTile, Tile, TileGrid, toneOf } from "../../../components/Cockpit";
 import { relativeAge } from "../../../lib/utils";
 import {
   useVoicesPatterns,
@@ -40,12 +40,6 @@ function sentColor(s: VelocityRow["net_sentiment"]) {
   return "var(--text-muted)";
 }
 
-function VelocityArrow({ delta }: { delta: number }) {
-  if (delta > 0) return <ArrowUp size={11} style={{ color: "var(--accent-green)" }} />;
-  if (delta < 0) return <ArrowDown size={11} style={{ color: "var(--accent-red)" }} />;
-  return <Minus size={11} style={{ color: "var(--text-muted)" }} />;
-}
-
 function VelocityTable({
   rows,
   onPick,
@@ -53,69 +47,56 @@ function VelocityTable({
   rows: VelocityRow[];
   onPick: (t: string) => void;
 }) {
-  // Normalize bar widths against top momentum so the most-accelerating
-  // ticker fills the bar; everything else is proportional.
-  const maxMomentum = Math.max(1, ...rows.map((r) => r.momentum_score));
+  // Diverging bars on the signed mention delta; trailing = recent mentions.
+  const maxDelta = Math.max(1, ...rows.map((r) => Math.abs(r.delta)));
+  if (rows.length === 0) {
+    return (
+      <div className="py-4 text-sm text-text-muted">
+        No velocity data yet — backfill needs at least two windows of history.
+      </div>
+    );
+  }
+  const fresh = rows.filter((r) => r.is_new);
   return (
-    <div className="divide-y divide-border">
-      {rows.length > 0 && (
-        <div className="grid grid-cols-12 gap-2 px-2 pb-1.5 text-xs font-medium text-text-muted">
-          <span className="col-span-2">Ticker</span>
-          <span className="col-span-1 text-right">Recent</span>
-          <span className="col-span-2">Delta</span>
-          <span className="col-span-5">Momentum</span>
-          <span className="col-span-1 text-right">Bull/bear</span>
-          <span className="col-span-1 text-right">Last</span>
-        </div>
-      )}
-      {rows.length === 0 && (
-        <div className="py-4 text-sm text-text-muted">
-          No velocity data yet — backfill needs at least two windows of history.
-        </div>
-      )}
-      {rows.map((r) => {
-        const barPct = Math.max(2, Math.round((r.momentum_score / maxMomentum) * 100));
-        return (
-          <div
-            key={r.ticker}
-            className="data-row grid cursor-pointer grid-cols-12 items-center gap-2 px-2 py-2.5"
-            onClick={() => onPick(r.ticker)}
-          >
-            <span className="ticker col-span-2 truncate text-sm">
+    <>
+      <div className="grid gap-2.5 px-1 text-xs text-text-muted" style={{ gridTemplateColumns: "4.25rem minmax(0,1fr) 4.5rem 2.75rem" }}>
+        <span>Ticker</span>
+        <span className="text-center">Mention delta vs prior window</span>
+        <span className="text-right">Delta</span>
+        <span className="text-right">Recent</span>
+      </div>
+      {rows.map((r) => (
+        <BarRow
+          key={r.ticker}
+          label={
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-1.5 shrink-0 rounded-full" style={{ background: sentColor(r.net_sentiment) }} aria-hidden="true" />
               {r.ticker}
             </span>
-            <span className="col-span-1 text-right text-sm num text-text-secondary">
-              {r.mentions_recent}
-            </span>
-            <span className="col-span-2 inline-flex items-center gap-1 text-sm num font-semibold">
-              <VelocityArrow delta={r.delta} />
-              <span style={{ color: sentColor(r.net_sentiment) }}>
-                {r.delta >= 0 ? "+" : ""}
-                {r.delta}
-              </span>
-              {r.is_new && (
-                <span className="tag font-sans" style={{ "--tag": "var(--accent-blue)" } as React.CSSProperties}>new</span>
-              )}
-            </span>
-            <div className="col-span-5 h-1.5 rounded-full bg-bg-card overflow-hidden">
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${barPct}%`,
-                  background: sentColor(r.net_sentiment),
-                }}
-              />
-            </div>
-            <span className="col-span-1 text-xs num text-text-secondary text-right">
-              {r.bullish}/{r.bearish}
-            </span>
-            <span className="col-span-1 text-xs text-text-muted text-right">
-              {relativeAge(r.last_mentioned)}
-            </span>
-          </div>
-        );
-      })}
-    </div>
+          }
+          value={r.delta}
+          max={maxDelta}
+          diverging
+          display={`${r.delta >= 0 ? "+" : ""}${r.delta}`}
+          trailing={r.mentions_recent}
+          title={`${r.ticker}: ${r.mentions_recent} recent vs ${r.mentions_prior} prior · momentum ${r.momentum_score.toFixed(2)} · ${r.bullish} bull / ${r.bearish} bear · last ${relativeAge(r.last_mentioned)}${r.is_new ? " · new on radar" : ""}`}
+          onClick={() => onPick(r.ticker)}
+        />
+      ))}
+      <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 border-t border-border pt-2.5 text-xs text-text-muted">
+        <span>Dot = net lean. Ranked by momentum; hover a row for bull/bear and last mention.</span>
+        {fresh.length > 0 && (
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            <span className="font-medium text-accent">New on radar</span>
+            {fresh.map((r) => (
+              <button key={r.ticker} type="button" className="ticker hover:text-accent" onClick={() => onPick(r.ticker)}>
+                {r.ticker}
+              </button>
+            ))}
+          </span>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -153,18 +134,18 @@ function ClusterCard({
   }, [cluster, internalPairs]);
 
   return (
-    <div className="card space-y-3">
+    <div className="space-y-2 py-3 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <h4 className="font-display text-lg font-medium text-text-primary">
-          <span className="ticker text-base">{hub}</span> basket
+        <h4 className="m-0 text-sm font-semibold text-text-primary">
+          <span className="ticker">{hub}</span> basket
         </h4>
         <span className="text-xs text-text-muted">
-          Cluster C{cluster.id} · <span className="num">{cluster.size}</span> tickers · <span className="num">{cluster.internal_edges}</span> edges
+          C{cluster.id} · <span className="num">{cluster.size}</span> tickers · <span className="num">{cluster.internal_edges}</span> edges
         </span>
       </div>
 
       {/* Member chips, sized by mention count */}
-      <div className="flex items-center gap-1 flex-wrap">
+      <div className="flex flex-wrap items-center gap-1">
         {cluster.tickers.map((t) => {
           const ns = nodeStats[t] || { mentions: 0, bullish: 0, bearish: 0 };
           const lean: "bullish" | "bearish" | "neutral" =
@@ -179,8 +160,11 @@ function ClusterCard({
               key={t}
               type="button"
               onClick={() => onPick(t)}
-              className="num inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs font-semibold transition-colors hover:bg-bg-card-hover"
-              style={{ color: c === "var(--text-muted)" ? "var(--text-secondary)" : c }}
+              className="num inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold transition-colors hover:brightness-110"
+              style={{
+                color: c === "var(--text-muted)" ? "var(--text-secondary)" : c,
+                background: `color-mix(in srgb, ${c} 14%, var(--bg-card))`,
+              }}
               title={`${ns.mentions} mentions · ${ns.bullish}B / ${ns.bearish}S`}
             >
               {t}
@@ -190,9 +174,9 @@ function ClusterCard({
         })}
       </div>
 
-      {/* Top 3 internal pair edges */}
+      {/* Top internal pair edges */}
       {internalPairs.length > 0 && (
-        <div className="border-t border-border pt-2 text-xs text-text-muted num">
+        <div className="num text-xs text-text-muted">
           {internalPairs.slice(0, 4).map((p) => (
             <span key={`${p.a}-${p.b}`} className="mr-3">
               {p.a}↔{p.b}
@@ -224,7 +208,7 @@ export function PatternsView({
   const top = velocity[0];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Window selector */}
       <div className="flex flex-wrap items-center gap-3">
         <Segmented
@@ -234,108 +218,104 @@ export function PatternsView({
           options={WINDOWS.map((w) => ({ value: String(w.days), label: w.label }))}
         />
         {isFetching && (
-          <span className="text-xs text-text-muted animate-pulse">Refreshing…</span>
+          <span className="animate-pulse text-xs text-text-muted">Refreshing…</span>
         )}
       </div>
 
-      {/* Headline numbers */}
+      {/* KPI strip */}
       {(top || cooc) && (
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-          {top && (
-            <button type="button" className="text-left" onClick={() => handlePick(top.ticker)}>
-              <Stat
-                label="Top momentum"
-                value={top.ticker}
-                sub={`${top.delta >= 0 ? "+" : ""}${top.delta} mentions vs prior ${windowDays}d`}
-              />
-            </button>
-          )}
-          {cooc && <Stat label="Tickers" value={cooc.n_tickers} sub={`across ${cooc.n_tweets_considered} tweets`} />}
-          {cooc && <Stat label="Pairs" value={cooc.pairs.length} />}
-          {cooc && <Stat label="Baskets" value={cooc.clusters.length} />}
-        </div>
+        <TileGrid>
+          <Tile span={3}>
+            {top ? (
+              <button type="button" className="text-left" onClick={() => handlePick(top.ticker)} title={`Set ${top.ticker} as active ticker`}>
+                <Kpi
+                  label="Top momentum"
+                  value={<span className="ticker">{top.ticker}</span>}
+                  delta={`${top.delta >= 0 ? "+" : ""}${top.delta}`}
+                  tone={toneOf(top.delta)}
+                  sub={`mentions vs prior ${windowDays}d`}
+                />
+              </button>
+            ) : (
+              <Kpi label="Top momentum" value="—" />
+            )}
+          </Tile>
+          <KpiTile label="Tickers" value={cooc?.n_tickers ?? "—"} sub={cooc ? `across ${cooc.n_tweets_considered} tweets` : undefined} />
+          <KpiTile label="Pairs" value={cooc?.pairs.length ?? "—"} sub="co-mentioned together" />
+          <KpiTile label="Baskets" value={cooc?.clusters.length ?? "—"} sub="greedy clusters" />
+        </TileGrid>
       )}
 
-      {/* Velocity panel */}
-      <section className="space-y-3">
-        <div>
-          <h3 className="section-title">Conviction velocity</h3>
-          <p className="section-sub">Mention delta vs prior {windowDays}d, ranked by momentum</p>
-        </div>
-        <div className="card">
+      <TileGrid>
+        <Tile span={7} title="Conviction velocity" meta={`mention delta vs prior ${windowDays}d · top 20`}>
           <VelocityTable rows={velocity.slice(0, 20)} onPick={handlePick} />
-        </div>
-      </section>
+        </Tile>
 
-      {/* Co-occurrence clusters */}
-      <section className="space-y-3">
-        <div>
-          <h3 className="section-title">Co-occurrence baskets</h3>
-          <p className="section-sub">Tickers mentioned together, the implicit baskets</p>
-        </div>
-        {!cooc || cooc.clusters.length === 0 ? (
-          <div className="py-4 text-sm text-text-muted">
-            No clusters yet — needs at least 2 tweets each mentioning 2+ tickers.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {cooc.clusters.map((c) => (
-              <ClusterCard
-                key={c.id}
-                cluster={c}
-                pairs={cooc.pairs}
-                nodeStats={cooc.node_stats}
-                onPick={handlePick}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Top single pairs that don't fit clusters */}
-        {cooc && cooc.pairs.length > 0 && (
-          <details className="mt-2">
-            <summary className="cursor-pointer text-xs text-text-muted hover:text-text-primary">
-              All pairs (top {Math.min(cooc.pairs.length, 30)})
-            </summary>
-            <div className="mt-2 grid grid-cols-2 gap-x-6 md:grid-cols-3 lg:grid-cols-4 text-xs num">
-              {cooc.pairs.slice(0, 30).map((p) => {
-                const bullDominant = p.both_bullish > p.both_bearish;
-                const c = bullDominant
-                  ? "var(--accent-green)"
-                  : p.both_bearish > 0
-                    ? "var(--accent-red)"
-                    : "var(--text-secondary)";
-                return (
-                  <div
-                    key={`${p.a}-${p.b}`}
-                    className="flex items-center justify-between border-b border-border py-1.5"
-                    style={{ color: c }}
-                  >
-                    <span>
-                      <button
-                        type="button"
-                        className="hover:underline"
-                        onClick={() => handlePick(p.a)}
-                      >
-                        {p.a}
-                      </button>
-                      <span className="text-text-muted mx-1">↔</span>
-                      <button
-                        type="button"
-                        className="hover:underline"
-                        onClick={() => handlePick(p.b)}
-                      >
-                        {p.b}
-                      </button>
-                    </span>
-                    <span>×{p.weight}</span>
-                  </div>
-                );
-              })}
+        <Tile span={5} title="Co-occurrence baskets" meta="tickers mentioned together">
+          {!cooc || cooc.clusters.length === 0 ? (
+            <div className="py-4 text-sm text-text-muted">
+              No clusters yet — needs at least 2 tweets each mentioning 2+ tickers.
             </div>
-          </details>
-        )}
-      </section>
+          ) : (
+            <div className="divide-y divide-border">
+              {cooc.clusters.map((c) => (
+                <ClusterCard
+                  key={c.id}
+                  cluster={c}
+                  pairs={cooc.pairs}
+                  nodeStats={cooc.node_stats}
+                  onPick={handlePick}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Top single pairs that don't fit clusters */}
+          {cooc && cooc.pairs.length > 0 && (
+            <details className="border-t border-border pt-2.5">
+              <summary className="cursor-pointer text-xs text-text-muted hover:text-text-primary">
+                All pairs (top {Math.min(cooc.pairs.length, 30)})
+              </summary>
+              <div className="num mt-2 grid grid-cols-2 gap-x-6 text-xs">
+                {cooc.pairs.slice(0, 30).map((p) => {
+                  const bullDominant = p.both_bullish > p.both_bearish;
+                  const c = bullDominant
+                    ? "var(--accent-green)"
+                    : p.both_bearish > 0
+                      ? "var(--accent-red)"
+                      : "var(--text-secondary)";
+                  return (
+                    <div
+                      key={`${p.a}-${p.b}`}
+                      className="flex items-center justify-between border-b border-border py-1.5"
+                      style={{ color: c }}
+                    >
+                      <span>
+                        <button
+                          type="button"
+                          className="hover:underline"
+                          onClick={() => handlePick(p.a)}
+                        >
+                          {p.a}
+                        </button>
+                        <span className="mx-1 text-text-muted">↔</span>
+                        <button
+                          type="button"
+                          className="hover:underline"
+                          onClick={() => handlePick(p.b)}
+                        >
+                          {p.b}
+                        </button>
+                      </span>
+                      <span>×{p.weight}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          )}
+        </Tile>
+      </TileGrid>
     </div>
   );
 }

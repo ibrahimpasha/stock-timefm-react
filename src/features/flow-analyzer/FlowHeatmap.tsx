@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { Segmented } from "../../components/Glass";
+import { TileGrid, Tile, KpiTile, BarRow } from "../../components/Cockpit";
 import { useDashboardFilters } from "../../store/useDashboardFilters";
 import { useTickerNames } from "../../api/tickerNames";
 import { useTickerMeta, type TickerMeta } from "../../api/tickerMeta";
@@ -482,6 +483,11 @@ export function FlowHeatmap() {
 
   const totalPremium = useMemo(() => vcells.reduce((s, c) => s + c.premium, 0), [vcells]);
   const isAll = selectedDates.size > 0 && selectedDates.size === dates.length;
+  const flowSplit = useMemo(
+    () => vcells.reduce((t, c) => ({ bull: t.bull + c.bull, bear: t.bear + c.bear, total: t.total + c.count }), { bull: 0, bear: 0, total: 0 }),
+    [vcells],
+  );
+  const leaders = useMemo(() => [...vcells].sort((a, b) => b.premium - a.premium).slice(0, 30), [vcells]);
 
   const viewToggle = (
     <Segmented
@@ -511,322 +517,330 @@ export function FlowHeatmap() {
 
   if (view === "map") {
     return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">{viewToggle}</div>
-        <CompanyMapView heightOffset={300} />
-      </div>
+      <TileGrid>
+        <Tile span={12} title="Company map" actions={viewToggle}>
+          <CompanyMapView heightOffset={300} />
+        </Tile>
+      </TileGrid>
     );
   }
 
+  const sizeOpt = SIZE_OPTIONS.find((o) => o.id === sizeMetric);
+  const colorOpt = COLOR_OPTIONS.find((o) => o.id === colorMetric);
+
   return (
-    <div className="space-y-4">
+    <TileGrid>
       <style>{HEATMAP_KEYFRAMES}</style>
-      <QueryNotice queries={[datesQuery, ...summaries, ...(colorMetric === "pl" ? [returnsQuery] : [])]} label="Heat map data" />
-      {colorMetric === "pl" && <FlowCoverageNotice meta={returns?.meta} />}
-      {/* ── Focal summary: what the map is showing right now ── */}
-      <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-4">
-        <div className="flex flex-wrap items-end gap-x-10 gap-y-3">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs font-medium text-text-muted">
-              {activeDates.length > 1 ? "Premium across selected days" : "Premium on the tape"}
-            </span>
-            <span className="num text-3xl font-semibold tracking-tight text-text-primary">
-              {formatPremium(totalPremium)}
-            </span>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs font-medium text-text-muted">Tickers</span>
-            <span className="num text-3xl font-semibold tracking-tight text-text-primary">
-              {filtersActive ? (
-                <>
-                  {vcells.length}
-                  <span className="text-lg font-normal text-text-muted">/{cells.length}</span>
-                </>
-              ) : (
-                cells.length
-              )}
-            </span>
-          </div>
-          {activeDates.length > 1 && (
-            <div
-              className="flex flex-col gap-0.5"
-              title="Flow from these dates is merged (unioned). Click a single date to view just that day."
-            >
-              <span className="text-xs font-medium text-text-muted">Days merged</span>
-              <span className="num text-3xl font-semibold tracking-tight text-text-primary">
-                {activeDates.length}
-              </span>
-            </div>
-          )}
-        </div>
-        {viewToggle}
+      <div className="min-w-0 space-y-2 empty:hidden lg:col-span-12">
+        <QueryNotice queries={[datesQuery, ...summaries, ...(colorMetric === "pl" ? [returnsQuery] : [])]} label="Heat map data" />
+        {colorMetric === "pl" && <FlowCoverageNotice meta={returns?.meta} />}
       </div>
 
-      {/* ── Controls: date strip + the three encodings people change; the rest live in Options ── */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Date strip — a mini entry-volume histogram: each day's bar height is
-            its flow entry count, so heavy days stand out at a glance. */}
-        <div
-          className="control-surface flex items-stretch border overflow-hidden"
-          style={{ borderRadius: "var(--radius-control)" }}
-        >
-          <button
-            type="button"
-            onClick={() => patchHeatmap({ selectedDates: new Set(dates.map((d) => d.date)) })}
-            aria-pressed={isAll}
-            className="min-h-8 px-3 text-xs font-medium transition-colors flex items-center"
-            style={{
-              background: isAll ? "color-mix(in srgb, var(--accent-blue) 15%, transparent)" : "transparent",
-              color: isAll ? "var(--accent-blue)" : "var(--text-muted)",
-            }}
+      {/* ── KPI strip: what the map is showing right now ── */}
+      <KpiTile
+        label={activeDates.length > 1 ? "Premium across selected days" : "Premium on the tape"}
+        value={formatPremium(totalPremium)}
+        sub={activeDates.length > 1 ? `${activeDates.length} days merged` : activeDates[0] ?? ""}
+      />
+      <KpiTile
+        label="Tickers"
+        value={filtersActive ? <>{vcells.length}<span className="text-lg font-normal text-text-muted">/{cells.length}</span></> : cells.length}
+        sub={filtersActive ? "after ML / Play / ER filters" : "with flow in range"}
+      />
+      <KpiTile
+        label="Bull share of entries"
+        value={flowSplit.total ? `${Math.round((flowSplit.bull / flowSplit.total) * 100)}%` : "—"}
+        delta={flowSplit.total ? `${flowSplit.bull} / ${flowSplit.bear}` : undefined}
+        tone={flowSplit.bull >= flowSplit.bear ? "up" : "down"}
+        sub="bull / bear prints"
+      />
+      <KpiTile
+        label="Largest name"
+        value={leaders[0]?.ticker ?? "—"}
+        delta={leaders[0] ? formatPremium(leaders[0].premium) : undefined}
+        tone="neutral"
+        sub={leaders[0] && totalPremium ? `${Math.round((leaders[0].premium / totalPremium) * 100)}% of premium` : undefined}
+      />
+
+      {/* ── Toolbar: date strip + the three encodings people change; the rest live in Pulse and filters ── */}
+      <Tile span={12} bodyClassName="gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Date strip — a mini entry-volume histogram: each day's bar height is
+              its flow entry count, so heavy days stand out at a glance. */}
+          <div
+            className="control-surface flex items-stretch border overflow-hidden"
+            style={{ borderRadius: "var(--radius-control)" }}
           >
-            All
-          </button>
-          {(() => {
-            const slice = dates.slice(0, 10);
-            const maxE = Math.max(1, ...slice.map((d) => d.entries || 0));
-            return slice.map((d) => {
-              const on =
-                selectedDates.has(d.date) || (selectedDates.size === 0 && d.date === latestDate);
-              const isToday = d.date === latestDate;
-              const barH = Math.max(3, Math.round(((d.entries || 0) / maxE) * 16));
-              return (
-                <button
-                  type="button"
-                  key={d.date}
-                  onClick={(e) => pickDate(d.date, e.shiftKey || e.metaKey || e.ctrlKey)}
-                  aria-pressed={on}
-                  className="flex min-h-8 min-w-8 flex-col items-center justify-end gap-1 px-1.5 py-1 border-l border-border transition-colors"
-                  style={{ background: on ? "color-mix(in srgb, var(--accent-blue) 14%, transparent)" : "transparent" }}
-                  title={`${d.entries} entries · ${d.date}${isToday ? " (today)" : ""} · click to view · shift-click to add days`}
-                >
-                  <span
-                    className="w-2.5 rounded-sm transition-all"
-                    style={{
-                      height: barH,
-                      background: on ? "var(--accent-blue)" : "var(--text-muted)",
-                      opacity: on ? 1 : 0.45,
-                    }}
-                  />
-                  <span
-                    className="text-xs num leading-none"
-                    style={{ color: on ? "var(--accent-blue)" : "var(--text-muted)" }}
+            <button
+              type="button"
+              onClick={() => patchHeatmap({ selectedDates: new Set(dates.map((d) => d.date)) })}
+              aria-pressed={isAll}
+              className="min-h-8 px-3 text-xs font-medium transition-colors flex items-center"
+              style={{
+                background: isAll ? "var(--accent)" : "transparent",
+                color: isAll ? "var(--accent-ink)" : "var(--text-muted)",
+              }}
+            >
+              All
+            </button>
+            {(() => {
+              const slice = dates.slice(0, 10);
+              const maxE = Math.max(1, ...slice.map((d) => d.entries || 0));
+              return slice.map((d) => {
+                const on =
+                  selectedDates.has(d.date) || (selectedDates.size === 0 && d.date === latestDate);
+                const isToday = d.date === latestDate;
+                const barH = Math.max(3, Math.round(((d.entries || 0) / maxE) * 16));
+                return (
+                  <button
+                    type="button"
+                    key={d.date}
+                    onClick={(e) => pickDate(d.date, e.shiftKey || e.metaKey || e.ctrlKey)}
+                    aria-pressed={on}
+                    className="flex min-h-8 min-w-8 flex-col items-center justify-end gap-1 px-1.5 py-1 border-l border-border transition-colors"
+                    style={{ background: on ? "color-mix(in srgb, var(--accent) 16%, transparent)" : "transparent" }}
+                    title={`${d.entries} entries · ${d.date}${isToday ? " (today)" : ""} · click to view · shift-click to add days`}
                   >
-                    {isToday ? "Today" : d.date.slice(5)}
-                  </span>
-                </button>
-              );
-            });
-          })()}
+                    <span
+                      className="w-2.5 rounded-sm transition-all"
+                      style={{
+                        height: barH,
+                        background: on ? "var(--accent)" : "var(--text-muted)",
+                        opacity: on ? 1 : 0.45,
+                      }}
+                    />
+                    <span
+                      className="text-xs num leading-none"
+                      style={{ color: on ? "var(--text-primary)" : "var(--text-muted)" }}
+                    >
+                      {isToday ? "Today" : d.date.slice(5)}
+                    </span>
+                  </button>
+                );
+              });
+            })()}
+          </div>
+
+          <MetricSelect label="Size" icon={Maximize2} value={sizeMetric} onChange={(v) => patchHeatmap({ sizeMetric: v as SizeMetric })} options={SIZE_OPTIONS} />
+          <MetricSelect label="Color" icon={Palette} value={colorMetric} onChange={(v) => patchHeatmap({ colorMetric: v as ColorMetric })} options={COLOR_OPTIONS} />
+          <MetricSelect label="Group" icon={Layers} value={groupBy} onChange={(v) => patchHeatmap({ groupBy: v as GroupBy })} options={GROUP_OPTIONS} />
+          <div className="ml-auto">{viewToggle}</div>
         </div>
+        <details className="group text-xs">
+          <summary className="inline-flex min-h-8 cursor-pointer select-none items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary">
+            <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
+            Pulse and filters
+            {pulse !== "off" && (
+              <span className="tag" style={{ "--tag": "var(--accent)" } as React.CSSProperties}>
+                pulse: {PULSE_OPTIONS.find((o) => o.id === pulse)?.label}
+              </span>
+            )}
+            {filtersActive && (
+              <span className="tag" style={{ "--tag": "var(--accent)" } as React.CSSProperties}>filters on</span>
+            )}
+          </summary>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <MetricSelect label="Pulse" icon={Radio} value={pulse} onChange={(v) => patchHeatmap({ pulse: v as Pulse })} options={PULSE_OPTIONS} />
+            {/* Threshold for the score-based pulses (ML / TA / pattern).
+                Earnings pulses gate on the ER window instead. */}
+            {(pulse === "ml" || pulse === "play" || pulse === "technical" || pulse === "pattern") && (
+              <label
+                className="control-surface flex items-center gap-1.5 border px-2 py-1.5"
+                style={{ borderRadius: "var(--radius-control)" }}
+                title="Minimum 0–100 strength a ticker needs to pulse (e.g. ML ≥ 80)"
+              >
+                <span className="text-xs text-text-muted">Pulse ≥</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={pulseThreshold}
+                  aria-label="Minimum pulse strength"
+                  onChange={(e) => patchHeatmap({ pulseThreshold: clamp(Number(e.target.value) || 0, 0, 100) })}
+                  className="w-12 bg-transparent text-xs text-text-primary outline-none num"
+                />
+              </label>
+            )}
 
-        <MetricSelect label="Size" icon={Maximize2} value={sizeMetric} onChange={(v) => patchHeatmap({ sizeMetric: v as SizeMetric })} options={SIZE_OPTIONS} />
-        <MetricSelect label="Color" icon={Palette} value={colorMetric} onChange={(v) => patchHeatmap({ colorMetric: v as ColorMetric })} options={COLOR_OPTIONS} />
-        <MetricSelect label="Group" icon={Layers} value={groupBy} onChange={(v) => patchHeatmap({ groupBy: v as GroupBy })} options={GROUP_OPTIONS} />
-      </div>
+            {/* Pulse the whole sector/theme frame instead of individual tiles. */}
+            {pulse !== "off" && (
+              <label
+                className={`control-surface flex items-center gap-1.5 border px-2 py-1.5 text-xs select-none ${
+                  groupBy === "none"
+                    ? "border-border text-text-muted opacity-50 cursor-not-allowed"
+                    : "border-border text-text-secondary cursor-pointer"
+                }`}
+                style={{ borderRadius: "var(--radius-control)" }}
+                title={
+                  groupBy === "none"
+                    ? "Pick a Group (Sector / Theme / Sub-category) to enable group pulsing"
+                    : "Pulse the entire group frame when any member clears the threshold"
+                }
+              >
+                <input
+                  type="checkbox"
+                  checked={pulseGroup && groupBy !== "none"}
+                  disabled={groupBy === "none"}
+                  onChange={(e) => patchHeatmap({ pulseGroup: e.target.checked })}
+                  className="accent-accent"
+                />
+                Pulse group
+              </label>
+            )}
 
-      <details className="group text-xs">
-        <summary className="inline-flex min-h-8 cursor-pointer select-none items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary">
-          <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
-          Pulse and filters
-          {pulse !== "off" && (
-            <span className="tag" style={{ "--tag": "var(--accent-blue)" } as React.CSSProperties}>
-              pulse: {PULSE_OPTIONS.find((o) => o.id === pulse)?.label}
-            </span>
-          )}
-          {filtersActive && (
-            <span className="tag" style={{ "--tag": "var(--accent-blue)" } as React.CSSProperties}>filters on</span>
-          )}
-        </summary>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <MetricSelect label="Pulse" icon={Radio} value={pulse} onChange={(v) => patchHeatmap({ pulse: v as Pulse })} options={PULSE_OPTIONS} />
-          {/* Threshold for the score-based pulses (ML / TA / pattern).
-              Earnings pulses gate on the ER window instead. */}
-          {(pulse === "ml" || pulse === "play" || pulse === "technical" || pulse === "pattern") && (
-            <label
-              className="control-surface flex items-center gap-1.5 border px-2 py-1.5"
-              style={{ borderRadius: "var(--radius-control)" }}
-              title="Minimum 0–100 strength a ticker needs to pulse (e.g. ML ≥ 80)"
+            {/* Tile filters — hide tiles below/over the slider value when toggled on. */}
+            <FilterSlider
+              label="ML ≥" on={mlOn} value={mlMin} min={0} max={100} step={5}
+              onToggle={(v) => patchHeatmap({ mlOn: v })} onValue={(v) => patchHeatmap({ mlMin: v })}
+              title="Hide tiles whose best within-DTE ML percentile is below this"
+            />
+            <FilterSlider
+              label="Play ≥" on={playOn} value={playMin} min={0} max={100} step={5}
+              onToggle={(v) => patchHeatmap({ playOn: v })} onValue={(v) => patchHeatmap({ playMin: v })}
+              title="Hide tiles whose Theme-Pulse play score is below this"
+            />
+            <FilterSlider
+              label="ER ≤" on={earnOn} value={earnDays} min={1} max={90} step={1} suffix="d"
+              onToggle={(v) => patchHeatmap({ earnOn: v })} onValue={(v) => patchHeatmap({ earnDays: v })}
+              title="Hide tiles with no earnings within this many days (single source: ticker_earnings). Also sets the Earnings pulse window."
+            />
+
+            <a
+              href="/api/intel-graph/theme-pulse/export?format=csv"
+              download
+              title="Download all theme pulses (CSV) for manual analysis"
+              className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
             >
-              <span className="text-xs text-text-muted">Pulse ≥</span>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                step={5}
-                value={pulseThreshold}
-                aria-label="Minimum pulse strength"
-                onChange={(e) => patchHeatmap({ pulseThreshold: clamp(Number(e.target.value) || 0, 0, 100) })}
-                className="w-12 bg-transparent text-xs text-text-primary outline-none num"
-              />
-            </label>
-          )}
+              <Download size={12} /> Export pulses (CSV)
+            </a>
+          </div>
+        </details>
 
-          {/* Pulse the whole sector/theme frame instead of individual tiles. */}
-          {pulse !== "off" && (
-            <label
-              className={`control-surface flex items-center gap-1.5 border px-2 py-1.5 text-xs select-none ${
-                groupBy === "none"
-                  ? "border-border text-text-muted opacity-50 cursor-not-allowed"
-                  : "border-border text-text-secondary cursor-pointer"
-              }`}
-              style={{ borderRadius: "var(--radius-control)" }}
-              title={
-                groupBy === "none"
-                  ? "Pick a Group (Sector / Theme / Sub-category) to enable group pulsing"
-                  : "Pulse the entire group frame when any member clears the threshold"
-              }
-            >
-              <input
-                type="checkbox"
-                checked={pulseGroup && groupBy !== "none"}
-                disabled={groupBy === "none"}
-                onChange={(e) => patchHeatmap({ pulseGroup: e.target.checked })}
-                className="accent-accent-blue"
-              />
-              Pulse group
-            </label>
-          )}
+      </Tile>
 
-          {/* Tile filters — hide tiles below/over the slider value when toggled on. */}
-          <FilterSlider
-            label="ML ≥" on={mlOn} value={mlMin} min={0} max={100} step={5}
-            onToggle={(v) => patchHeatmap({ mlOn: v })} onValue={(v) => patchHeatmap({ mlMin: v })}
-            title="Hide tiles whose best within-DTE ML percentile is below this"
-          />
-          <FilterSlider
-            label="Play ≥" on={playOn} value={playMin} min={0} max={100} step={5}
-            onToggle={(v) => patchHeatmap({ playOn: v })} onValue={(v) => patchHeatmap({ playMin: v })}
-            title="Hide tiles whose Theme-Pulse play score is below this"
-          />
-          <FilterSlider
-            label="ER ≤" on={earnOn} value={earnDays} min={1} max={90} step={1} suffix="d"
-            onToggle={(v) => patchHeatmap({ earnOn: v })} onValue={(v) => patchHeatmap({ earnDays: v })}
-            title="Hide tiles with no earnings within this many days (single source: ticker_earnings). Also sets the Earnings pulse window."
-          />
-
-          <a
-            href="/api/intel-graph/theme-pulse/export?format=csv"
-            download
-            title="Download all theme pulses (CSV) for manual analysis"
-            className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
-          >
-            <Download size={12} /> Export pulses (CSV)
-          </a>
-        </div>
-      </details>
-
-      {/* ── Legend: what color and size mean, right above the map ── */}
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-text-secondary">
-        <span className="max-w-[72ch]">
-          Area = <span className="font-medium text-text-primary">{SIZE_OPTIONS.find((o) => o.id === sizeMetric)?.label}</span>
-          {" · "}
-          Color = <span className="font-medium text-text-primary">{COLOR_OPTIONS.find((o) => o.id === colorMetric)?.label}</span>
-          <span className="text-text-muted"> — {COLOR_OPTIONS.find((o) => o.id === colorMetric)?.hint}</span>
-        </span>
-        <ColorLegend metric={colorMetric} />
-      </div>
-
-      {/* ── Treemap ──────────────────────────────────────────── */}
-      <div
-        ref={boxRef}
-        className="relative w-full border overflow-hidden bg-bg-primary"
-        style={{
-          height: "calc(100vh - 380px)",
-          minHeight: 460,
-          borderRadius: "var(--radius-panel)",
-          borderColor: "var(--glass-border)",
-          boxShadow: "var(--shadow-1)",
-        }}
+      {/* ── Treemap tile; legend sits in its header ── */}
+      <Tile
+        span={9}
+        title={<>Area = {sizeOpt?.label} · Color = {colorOpt?.label}</>}
+        meta={colorOpt?.hint}
+        actions={<ColorLegend metric={colorMetric} />}
       >
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center text-text-muted text-sm animate-pulse">
-            loading flow…
-          </div>
-        )}
-        {!loading && !feedFailed && !datesQuery.isPending && vcells.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center text-text-muted text-sm">
-            {cells.length > 0 && filtersActive
-              ? "No tickers match the active filters."
-              : "No flow for the selected date(s)."}
-          </div>
-        )}
-
-        {/* group frames + headers (behind tiles) */}
-        {groups.map((g) => {
-          const gp = pulseGroup ? groupPulseOf(g.key, membersByGroup.get(g.key) ?? []) : { on: false, intensity: 0, count: 0 } as { on: boolean; intensity: number; dir?: "up" | "down"; count: number };
-          const frameStyle: React.CSSProperties = {};
-          if (gp.on) {
-            const dur = gp.intensity >= 0.9 ? 0.85 : gp.intensity >= 0.6 ? 1.2 : 1.7;
-            const glow = gp.dir === "up" ? "var(--accent-green)" : gp.dir === "down" ? "var(--accent-red)" : "var(--accent-orange, #e3a008)";
-            frameStyle.animation = `hm-pulse ${dur}s ease-in-out infinite`;
-            (frameStyle as Record<string, string>)["--hm-glow"] = glow;
-            frameStyle.borderRadius = "2px";
-          }
-          return (
-            <div
-              key={`grp-${g.key}`}
-              className="absolute pointer-events-none"
-              style={{ left: g.x, top: g.y, width: Math.max(0, g.w - 1), height: Math.max(0, g.h - 1) }}
-            >
-              <div
-                className="absolute inset-0 rounded-sm"
-                style={{ border: `1px solid color-mix(in srgb, var(--text-primary) ${gp.on ? 40 : 18}%, transparent)`, ...frameStyle }}
-              />
-              {g.headerH > 0 && (
-                <div
-                  className="absolute left-0 top-0 w-full px-1 flex items-center text-xs font-medium truncate leading-none"
-                  style={{ height: g.headerH, background: `color-mix(in srgb, var(--text-primary) ${gp.on ? 10 : 5}%, transparent)`, color: gp.on ? "var(--text-primary)" : "var(--text-secondary)" }}
-                >
-                  <span className="truncate">{g.key}</span>
-                  <span className="ml-1 num text-text-muted">{g.n}</span>
-                  {gp.on && gp.count > 0 && (
-                    <span className="ml-1" style={{ color: "var(--accent-blue)" }}>· {gp.count}★</span>
-                  )}
-                </div>
-              )}
+        {/* ── Treemap ──────────────────────────────────────────── */}
+        <div
+          ref={boxRef}
+          className="relative w-full overflow-hidden rounded-lg bg-bg-primary"
+          style={{ height: "calc(100vh - 420px)", minHeight: 520 }}
+        >
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center text-text-muted text-sm animate-pulse">
+              loading flow…
             </div>
-          );
-        })}
+          )}
+          {!loading && !feedFailed && !datesQuery.isPending && vcells.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center text-text-muted text-sm">
+              {cells.length > 0 && filtersActive
+                ? "No tickers match the active filters."
+                : "No flow for the selected date(s)."}
+            </div>
+          )}
 
-        {/* tiles */}
-        {tiles.map((p) => {
-          const cv = colorValue(p.cell);
-          const label =
-            colorMetric === "pl"
-              ? cv === null
-                ? "—"
-                : `${cv >= 0 ? "+" : ""}${cv.toFixed(0)}%`
-              : colorMetric === "target"
+          {/* group frames + headers (behind tiles) */}
+          {groups.map((g) => {
+            const gp = pulseGroup ? groupPulseOf(g.key, membersByGroup.get(g.key) ?? []) : { on: false, intensity: 0, count: 0 } as { on: boolean; intensity: number; dir?: "up" | "down"; count: number };
+            const frameStyle: React.CSSProperties = {};
+            if (gp.on) {
+              const dur = gp.intensity >= 0.9 ? 0.85 : gp.intensity >= 0.6 ? 1.2 : 1.7;
+              const glow = gp.dir === "up" ? "var(--accent-green)" : gp.dir === "down" ? "var(--accent-red)" : "var(--accent-orange, #e3a008)";
+              frameStyle.animation = `hm-pulse ${dur}s ease-in-out infinite`;
+              (frameStyle as Record<string, string>)["--hm-glow"] = glow;
+              frameStyle.borderRadius = "2px";
+            }
+            return (
+              <div
+                key={`grp-${g.key}`}
+                className="absolute pointer-events-none"
+                style={{ left: g.x, top: g.y, width: Math.max(0, g.w - 1), height: Math.max(0, g.h - 1) }}
+              >
+                <div
+                  className="absolute inset-0 rounded-sm"
+                  style={{ border: `1px solid color-mix(in srgb, var(--text-primary) ${gp.on ? 40 : 18}%, transparent)`, ...frameStyle }}
+                />
+                {g.headerH > 0 && (
+                  <div
+                    className="absolute left-0 top-0 w-full px-1 flex items-center text-xs font-medium truncate leading-none"
+                    style={{ height: g.headerH, background: `color-mix(in srgb, var(--text-primary) ${gp.on ? 10 : 5}%, transparent)`, color: gp.on ? "var(--text-primary)" : "var(--text-secondary)" }}
+                  >
+                    <span className="truncate">{g.key}</span>
+                    <span className="ml-1 num text-text-muted">{g.n}</span>
+                    {gp.on && gp.count > 0 && (
+                      <span className="ml-1" style={{ color: "var(--accent)" }}>· {gp.count}★</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* tiles */}
+          {tiles.map((p) => {
+            const cv = colorValue(p.cell);
+            const label =
+              colorMetric === "pl"
                 ? cv === null
                   ? "—"
                   : `${cv >= 0 ? "+" : ""}${cv.toFixed(0)}%`
-                : colorMetric === "pattern"
-                  ? technicals?.[p.cell.ticker]?.pattern || sizeLabel(p.cell)
-                  : sizeLabel(p.cell);
-          return (
-            <Tile
-              key={p.cell.ticker}
-              x={p.x}
-              y={p.y}
-              w={p.w}
-              h={p.h}
-              cell={p.cell}
-              name={names?.[p.cell.ticker]}
-              meta={meta?.[p.cell.ticker]}
-              tax={taxonomy?.[p.cell.ticker]}
-              tech={technicals?.[p.cell.ticker]}
-              colorMetric={colorMetric}
-              colorVal={cv}
-              label={label}
-              pulse={pulseOf(p.cell)}
-              active={p.cell.ticker === activeTicker}
-              onClick={() => setActiveTicker(p.cell.ticker)}
+                : colorMetric === "target"
+                  ? cv === null
+                    ? "—"
+                    : `${cv >= 0 ? "+" : ""}${cv.toFixed(0)}%`
+                  : colorMetric === "pattern"
+                    ? technicals?.[p.cell.ticker]?.pattern || sizeLabel(p.cell)
+                    : sizeLabel(p.cell);
+            return (
+              <MapTile
+                key={p.cell.ticker}
+                x={p.x}
+                y={p.y}
+                w={p.w}
+                h={p.h}
+                cell={p.cell}
+                name={names?.[p.cell.ticker]}
+                meta={meta?.[p.cell.ticker]}
+                tax={taxonomy?.[p.cell.ticker]}
+                tech={technicals?.[p.cell.ticker]}
+                colorMetric={colorMetric}
+                colorVal={cv}
+                label={label}
+                pulse={pulseOf(p.cell)}
+                active={p.cell.ticker === activeTicker}
+                onClick={() => setActiveTicker(p.cell.ticker)}
+              />
+            );
+          })}
+        </div>
+      </Tile>
+
+      {/* ── Side: biggest names by premium, colored by net bias ── */}
+      <Tile span={3} title="Top premium" meta="click to open">
+        <div className="flex flex-col gap-0.5">
+          {leaders.map((c) => (
+            <BarRow
+              key={c.ticker}
+              label={c.ticker}
+              value={c.premium}
+              max={leaders[0]?.premium || 1}
+              tone={c.bull > c.bear ? "up" : c.bear > c.bull ? "down" : "neutral"}
+              display={formatPremium(c.premium)}
+              trailing={`${c.count}×`}
+              onClick={() => setActiveTicker(c.ticker)}
+              title={`${c.ticker}${names?.[c.ticker] ? ` · ${names[c.ticker]}` : ""} · ${c.count} entries · ${c.bull} bull / ${c.bear} bear`}
             />
-          );
-        })}
-      </div>
-    </div>
+          ))}
+          {!leaders.length && <span className="text-sm text-text-muted">No flow in range.</span>}
+        </div>
+      </Tile>
+    </TileGrid>
   );
 }
 
@@ -848,7 +862,7 @@ function tileBg(metric: ColorMetric, value: number | null): string {
   return `color-mix(in srgb, ${accent} ${pct}%, var(--bg-card))`;
 }
 
-function Tile({
+function MapTile({
   x,
   y,
   w,
@@ -936,7 +950,7 @@ function Tile({
         width: Math.max(0, w - 1.5),
         height: Math.max(0, h - 1.5),
         background: tileBg(colorMetric, colorVal),
-        outline: active ? "2px solid var(--accent-blue)" : undefined,
+        outline: active ? "2px solid var(--accent)" : undefined,
         outlineOffset: active ? "-2px" : undefined,
         ...pulseStyle,
       }}
@@ -996,7 +1010,7 @@ function FilterSlider({
   onValue: (v: number) => void;
   title?: string;
 }) {
-  const accent = "var(--accent-blue)";
+  const accent = "var(--accent)";
   return (
     <label
       title={title}
@@ -1011,7 +1025,7 @@ function FilterSlider({
         type="checkbox"
         checked={on}
         onChange={(e) => onToggle(e.target.checked)}
-        className="accent-accent-blue"
+        className="accent-accent"
       />
       <span
         className="text-xs whitespace-nowrap"
@@ -1027,7 +1041,7 @@ function FilterSlider({
         step={step}
         value={value}
         onChange={(e) => onValue(Number(e.target.value))}
-        className="w-16 accent-accent-blue cursor-pointer"
+        className="w-16 accent-accent cursor-pointer"
         style={{ opacity: on ? 1 : 0.5 }}
       />
       <span

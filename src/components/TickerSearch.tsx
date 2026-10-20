@@ -142,11 +142,8 @@ export function TickerSearch({
       <label htmlFor={inputId} className="sr-only">
         Ticker or company
       </label>
-      <div
-        className="control-surface flex min-h-10 items-center gap-2.5 rounded-full border px-4 py-2 transition-colors"
-        style={{ boxShadow: "var(--shadow-1)" }}
-      >
-        <Search size={16} className="text-text-muted shrink-0" aria-hidden="true" />
+      <div className="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-bg-card px-3 py-2 transition-colors focus-within:border-accent hover:border-[var(--control-boundary)]">
+        <Search size={15} className="text-text-muted shrink-0" aria-hidden="true" />
         <input
           id={inputId}
           type="text"
@@ -186,7 +183,7 @@ export function TickerSearch({
           id={listboxId}
           role="listbox"
           aria-label="Ticker suggestions"
-          className="glass-strong absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-1rem))] max-h-[min(24rem,60dvh)] overflow-y-auto p-1.5"
+          className="absolute right-0 z-50 mt-1.5 w-[min(22rem,calc(100vw-1rem))] max-h-[min(24rem,60dvh)] overflow-y-auto rounded-lg border border-border bg-bg-card p-1"
           style={{ boxShadow: "var(--shadow-3)" }}
         >
           {matches.map((m, i) => (
@@ -201,11 +198,11 @@ export function TickerSearch({
                 e.preventDefault();
                 choose(m.ticker);
               }}
-              className={`data-row flex min-h-11 w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left lg:min-h-10 ${
+              className={`flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-md px-2.5 py-2 text-left lg:min-h-9 ${
                 i === highlight ? "bg-bg-card-hover" : ""
               }`}
             >
-              <span className="ticker text-sm w-16 shrink-0">
+              <span className={`ticker w-16 shrink-0 text-sm ${i === highlight ? "text-accent" : ""}`}>
                 {m.ticker}
               </span>
               <span className="min-w-0 flex-1 truncate text-sm text-text-secondary">{m.name}</span>

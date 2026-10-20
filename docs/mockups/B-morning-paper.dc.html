@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Direction B - Morning paper</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&amp;family=Public+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#ffffff}
+a{color:#1d4ed8}a:hover{color:#1e3a8a}
+</style>
+</helmet>
+<div style="min-height: 1180px; background: #ffffff; color: #141517; font-family: 'Public Sans', system-ui, sans-serif; font-size: 15px;">
+  <header style="max-width: 1320px; margin: 0 auto; padding: 18px 40px 0;">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; font-size: 13px; color: #5b6068;">
+      <span>Monday, October 19, 2026 · After-hours edition</span>
+      <nav style="display: flex; flex-wrap: wrap; gap: 18px; font-weight: 500;">
+        <a href="#" style="color: #141517; text-decoration: none; border-bottom: 2px solid #141517; padding-bottom: 2px;">Brief</a>
+        <a href="#" style="color: #5b6068; text-decoration: none;">Flow</a>
+        <a href="#" style="color: #5b6068; text-decoration: none;">Books</a>
+        <a href="#" style="color: #5b6068; text-decoration: none;">Intel</a>
+        <a href="#" style="color: #5b6068; text-decoration: none;">Traders</a>
+        <a href="#" style="color: #5b6068; text-decoration: none;">Pillars</a>
+        <a href="#" style="color: #5b6068; text-decoration: none;">Rotation</a>
+        <a href="#" style="color: #5b6068; text-decoration: none;">GEX</a>
+        <a href="#" style="color: #5b6068; text-decoration: none;">Map</a>
+      </nav>
+      <label style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #d9dbdf; border-radius: 6px; width: 220px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5b6068" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <input aria-label="Search ticker" placeholder="Ticker or company" style="flex: 1; min-width: 0; border: 0; font: inherit; outline: none; background: transparent;">
+      </label>
+    </div>
+    <div style="text-align: center; padding: 22px 0 14px; border-bottom: 3px double #141517;">
+      <div style="font-family: Newsreader, Georgia, serif; font-size: 64px; font-weight: 600; letter-spacing: -0.02em; line-height: 1;">The Stock-TimeFM Desk</div>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 18px; padding: 10px 0; border-bottom: 1px solid #141517; font-family: 'JetBrains Mono', monospace; font-size: 13px;">
+      <span>SPY 766.48 <span style="color: #0a7a43;">+0.69%</span></span>
+      <span>VIX 18.44 <span style="color: #b42318;">+2.9</span></span>
+      <span>Posture neutral · full size</span>
+      <span>Flow $24.8B · 76% bull</span>
+      <span>TraderJoe $18,860 <span style="color: #b42318;">−5.7%</span></span>
+      <span>Market closed · 12:38 AM ET</span>
+    </div>
+  </header>
+
+  <main style="max-width: 1320px; margin: 0 auto; padding: 28px 40px 48px; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 0 40px;">
+    <article style="grid-column: span 8; display: flex; flex-direction: column; gap: 18px; padding-right: 40px; border-right: 1px solid #d9dbdf;">
+      <h1 style="margin: 0; font-family: Newsreader, Georgia, serif; font-size: 50px; line-height: 1.04; font-weight: 500; letter-spacing: -0.025em;">NFLX, UAL and HAL report tomorrow; IRON's 39% surge still has no verified catalyst</h1>
+      <p style="margin: 0; font-family: Newsreader, Georgia, serif; font-size: 21px; line-height: 1.45; color: #3a3e45;">Bear flow concentrates before the Fed while CLF's earnings gap hides an operational warning buried in the print.</p>
+      <div style="column-count: 2; column-gap: 32px; font-family: Newsreader, Georgia, serif; font-size: 17px; line-height: 1.6; color: #24272c;">
+        <p style="margin: 0 0 12px;">Yesterday both misses were longs (VICR −12.9%, GOOGL −2.5%), consistent with the audit finding that bullish calls mean-revert. CLF's Q3 beat ($612M adj EBITDA) drove a +16.3% gap, but the intel flags "indefinitely idled" operations the midday brief couldn't resolve. Read the full print before treating it as clean.</p>
+        <p style="margin: 0 0 12px;">IRON is the session outlier: no flow, not on radar, and no government action, contract or guidance change identified. It needs a press-release check before it means anything.</p>
+        <p style="margin: 0;">Bear flow is concentrating pre-FOMC: QQQ ($2.5M) and VRT ($2M) are today's two largest prints, alongside GOOGL and INTC both 9–10 days from earnings — macro-hedge positioning, not single-name thesis.</p>
+      </div>
+
+      <h2 style="margin: 18px 0 0; padding-top: 14px; border-top: 1px solid #141517; font-family: Newsreader, Georgia, serif; font-size: 26px; font-weight: 500;">What moved, and why</h2>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 32px;">
+        <sc-for list="{{ stories }}" as="s" hint-placeholder-count="4">
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; align-items: baseline; gap: 10px;">
+              <span style="font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 15px;">{{ s.t }}</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 15px; color: {{ s.color }};">{{ s.pct }}</span>
+            </div>
+            <p style="margin: 0; font-family: Newsreader, Georgia, serif; font-size: 17px; line-height: 1.5;">{{ s.why }}</p>
+            <p style="margin: 0; font-size: 13px; color: #8a4b0f;">{{ s.caveat }}</p>
+          </div>
+        </sc-for>
+      </div>
+    </article>
+
+    <aside style="grid-column: span 4; display: flex; flex-direction: column; gap: 28px;">
+      <section style="display: flex; flex-direction: column; gap: 10px;">
+        <h2 style="margin: 0; padding-bottom: 6px; border-bottom: 1px solid #141517; font-family: Newsreader, Georgia, serif; font-size: 22px; font-weight: 500;">Plays</h2>
+        <sc-for list="{{ plays }}" as="p" hint-placeholder-count="2">
+          <div style="display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-bottom: 1px solid #e6e7ea;">
+            <div style="display: flex; gap: 8px; align-items: baseline;"><span style="font-size: 12px; font-weight: 700; color: #b42318;">AVOID</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 600;">{{ p.t }}</span></div>
+            <span style="font-size: 14px; line-height: 1.5; color: #3a3e45;">{{ p.trigger }}</span>
+          </div>
+        </sc-for>
+      </section>
+      <section style="display: flex; flex-direction: column; gap: 6px;">
+        <h2 style="margin: 0; padding-bottom: 6px; border-bottom: 1px solid #141517; font-family: Newsreader, Georgia, serif; font-size: 22px; font-weight: 500;">Market table</h2>
+        <sc-for list="{{ movers }}" as="m" hint-placeholder-count="10">
+          <div style="display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 14px; padding: 4px 0; border-bottom: 1px dotted #d9dbdf;">
+            <span style="font-weight: 600;">{{ m.t }}</span><span style="color: #5b6068;">{{ m.price }}</span><span style="color: {{ m.color }}; width: 64px; text-align: right;">{{ m.pct }}</span>
+          </div>
+        </sc-for>
+      </section>
+      <section style="display: flex; flex-direction: column; gap: 6px;">
+        <h2 style="margin: 0; padding-bottom: 6px; border-bottom: 1px solid #141517; font-family: Newsreader, Georgia, serif; font-size: 22px; font-weight: 500;">Reporting this week</h2>
+        <p style="margin: 0; font-size: 14px; line-height: 1.7;"><b>Tomorrow</b> NFLX · UAL · HAL<br><b>Wed</b> STLD · <b>Thu</b> INTC · CRS<br><span style="color: #5b6068;">Flow into the print: VRT, DTM, MSTR, GOOGL, GEV</span></p>
+      </section>
+    </aside>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const up = '#0a7a43', dn = '#b42318';
+    const stories = [
+      { t: 'IRON', pct: '+38.9%', color: up, why: 'No acquisition, contract or guidance change found in the intel snapshot; no flow and not on radar.', caveat: 'Unverified catalyst — do not trade until a dated press release confirms it.' },
+      { t: 'CLF', pct: '+16.3%', color: up, why: 'Q3 earnings: revenue $5.6B, adj EBITDA $612M, liquidity $3.2B drove the gap.', caveat: 'Buried negative: idled facilities may cap follow-through.' },
+      { t: 'ALM', pct: '−10.2%', color: dn, why: 'Investor Day at 9am ET (Sangdong mine operational) — textbook sell-the-news; flow confirms distribution.', caveat: 'Event is past; distribution pressure likely continues near-term.' },
+      { t: 'IBRX', pct: '−8.3%', color: dn, why: 'FDA expanded ANKTIVA label yet stock fell — sell-the-news; flow on the decline is the cleanest confirmation today.', caveat: '' },
+    ];
+    const plays = [
+      { t: 'CLF', trigger: 'No entry above $14.10. Fade only if it prints below $13.00 on volume.' },
+      { t: 'IRON', trigger: 'No entry above $78.93. Revisit only after a confirmed press release.' },
+    ];
+    const mv = [['IRON',78.93,38.9],['CLF',14.10,16.3],['MANE',122.28,12.4],['PBLS',25.35,11.4],['AGIO',34.90,11.4],['ALM',8.83,-10.2],['IBRX',8.42,-8.3],['BLSH',27.42,-7.0],['QXO',10.14,-6.6],['SE',88.47,-5.7]];
+    const movers = mv.map(([t,pr,p]) => ({ t, price: '$'+pr.toFixed(2), pct: (p>0?'+':'−')+Math.abs(p).toFixed(1)+'%', color: p>0?up:dn }));
+    return { stories, plays, movers };
+  }
+}
+</script>
+</body>
+</html>

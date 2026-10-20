@@ -6,6 +6,7 @@ import { useDashboardFilters } from "../../store/useDashboardFilters";
 import { RotationMap, MomentumRanking, AlertFeed, RotationScrubber } from "../rotation/RotationViz";
 import { Sparkline } from "../../components/CCPrimitives";
 import { Segmented } from "../../components/Glass";
+import { Tile, TileGrid } from "../../components/Cockpit";
 
 /* Theme Trends — per-category options-flow "heat" (premium vs a 7-day baseline)
  * over time. Rather than plot raw noisy daily ratios on a zero-based line chart,
@@ -128,11 +129,11 @@ function ThemeRotationView({
       <div className="flex flex-col gap-4 min-w-0">
         <div>
           <div className="flex items-baseline justify-between mb-1.5">
-            <h3 className="font-display text-base font-medium text-text-primary">
+            <h3 className="m-0 text-sm font-semibold text-text-primary">
               Theme momentum
             </h3>
             {scrubbed && (
-              <span className="text-xs num" style={{ color: "var(--accent-cyan)" }}>
+              <span className="text-xs num" style={{ color: "var(--accent)" }}>
                 map showing {dates[idx]} · ranking is current
               </span>
             )}
@@ -141,7 +142,7 @@ function ThemeRotationView({
                            onSelect={selectTheme} selected={categoryFilter} />
         </div>
         <div>
-          <h3 className="font-display text-base font-medium text-text-primary mb-1.5">
+          <h3 className="m-0 mb-1.5 text-sm font-semibold text-text-primary">
             Rotation alerts
           </h3>
           <AlertFeed alerts={data.alerts} />
@@ -269,12 +270,12 @@ function ThemePnlView({
               className="data-row grid items-center gap-3 cursor-pointer px-1.5 -mx-1.5 py-0.5"
               style={{
                 gridTemplateColumns: "minmax(8rem,14rem) minmax(0,1fr) 96px",
-                background: active ? "color-mix(in srgb, var(--accent-cyan) 12%, transparent)" : undefined,
+                background: active ? "color-mix(in srgb, var(--accent) 12%, transparent)" : undefined,
                 opacity: categoryFilter && !active ? 0.55 : 1,
               }}
             >
               <span className="text-sm truncate flex items-center gap-1"
-                    style={{ color: active ? "var(--accent-cyan)" : "var(--text-secondary)" }}>
+                    style={{ color: active ? "var(--accent)" : "var(--text-secondary)" }}>
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setOpen(open === r.cat ? null : r.cat); }}
@@ -439,20 +440,15 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
     </div>
   );
 
-  return (
-    <div className={embedded ? "" : "card"}>
-      <div
-        className="flex items-end justify-between flex-wrap gap-3 mb-4"
-      >
-        <div className="min-w-0">
-          <h2 className="section-title">Theme trends</h2>
-          <p className="section-sub">
-            {view === "pnl" ? "What each theme's flow actually did"
-              : view === "rotation" ? "Where money is rotating"
-              : "Flow heat over time"}
-          </p>
-        </div>
-        <div className="flex w-full max-w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap">
+  const tile = (
+    <Tile
+      span={12}
+      title="Theme trends"
+      meta={view === "pnl" ? "what each theme's flow actually did"
+        : view === "rotation" ? "where money is rotating"
+        : "flow heat over time"}
+      actions={
+        <>
           <Segmented
             options={[
               { value: "matrix", label: "Heat" },
@@ -464,9 +460,9 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
             ariaLabel="Theme view"
           />
           {windowToggle}
-        </div>
-      </div>
-
+        </>
+      }
+    >
       {view === "pnl" && (
         <ThemePnlView data={pnl.data} isFetching={pnl.isFetching} sub={sub.data}
                       onSelectTheme={selectTheme} categoryFilter={categoryFilter} />
@@ -505,14 +501,14 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
                 style={{
                   gridTemplateColumns: "minmax(8rem,14rem) minmax(0,1fr) 124px",
                   background: active
-                    ? "color-mix(in srgb, var(--accent-cyan) 12%, transparent)"
+                    ? "color-mix(in srgb, var(--accent) 12%, transparent)"
                     : undefined,
                   opacity: categoryFilter && !active ? 0.55 : 1,
                 }}
               >
                 <span
                   className="text-sm truncate"
-                  style={{ color: active ? "var(--accent-cyan)" : "var(--text-secondary)" }}
+                  style={{ color: active ? "var(--accent)" : "var(--text-secondary)" }}
                 >
                   {label(r.cat)}
                 </span>
@@ -549,6 +545,8 @@ export function ThemeTrendsChart({ embedded = false }: { embedded?: boolean }) {
           </div>
         </>
       ))}
-    </div>
+    </Tile>
   );
+  // `embedded` = already inside a page TileGrid; standalone gets its own grid.
+  return embedded ? tile : <TileGrid>{tile}</TileGrid>;
 }

@@ -178,7 +178,7 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
               }}
               disabled={refresh.isPending}
               title="Fetch this ticker's intel via Perplexity / Claude web-search. Takes ~30-60s."
-              className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium text-accent-blue hover:bg-bg-card-hover transition-colors disabled:opacity-50"
+              className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium text-accent hover:bg-bg-card-hover transition-colors disabled:opacity-50"
             >
               <RefreshCw
                 size={12}
@@ -234,7 +234,7 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
               }}
               disabled={refresh.isPending}
               title="Re-fetch this ticker's intel via Perplexity / Claude web-search. Takes ~30-60s."
-              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium text-accent-blue hover:bg-bg-card-hover transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium text-accent hover:bg-bg-card-hover transition-colors disabled:opacity-50"
             >
               <RefreshCw size={12} className={refresh.isPending ? "animate-spin" : ""} />
               {refresh.isPending ? "Fetching…" : "Refresh"}
@@ -254,10 +254,10 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
           intel sections below carry the factual narrative without a synthesized
           directional call. */}
 
-      <div className="space-y-6">
+      <div className="space-y-5 border-t border-border pt-4">
         {sections.map((section, idx) => (
           <div key={idx}>
-            <h4 className="text-base font-semibold text-text-primary mb-1.5">{section.title}</h4>
+            <h4 className="mb-1.5 text-sm font-semibold text-text-primary">{section.title}</h4>
             <p className="prose-read max-w-[72ch] text-text-secondary whitespace-pre-wrap">
               {section.content}
             </p>

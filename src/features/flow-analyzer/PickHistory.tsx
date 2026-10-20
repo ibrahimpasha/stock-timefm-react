@@ -1,18 +1,20 @@
 import { PickCard } from "../../components/PickCard";
 import { useFlowPicks } from "../../api/flow";
 import { Archive } from "lucide-react";
-import { Stat } from "../../components/Glass";
+import { TileGrid, Tile, KpiTile, BarRow, toneOf } from "../../components/Cockpit";
+
+const pct = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 
 export function PickHistory() {
   const { data: closedPicks, isLoading } = useFlowPicks("closed");
 
   if (isLoading) {
     return (
-      <div className="animate-pulse space-y-3">
+      <TileGrid className="animate-pulse">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="card h-36" />
+          <Tile key={i} span={4}><div className="h-24" /></Tile>
         ))}
-      </div>
+      </TileGrid>
     );
   }
 
@@ -20,10 +22,12 @@ export function PickHistory() {
 
   if (picks.length === 0) {
     return (
-      <div className="text-center py-8">
-        <Archive size={20} className="mx-auto mb-2 text-text-muted opacity-60" />
-        <p className="text-sm text-text-muted">No closed picks yet</p>
-      </div>
+      <Tile>
+        <div className="py-8 text-center">
+          <Archive size={20} className="mx-auto mb-2 text-text-muted opacity-60" />
+          <p className="text-sm text-text-muted">No closed picks yet</p>
+        </div>
+      </Tile>
     );
   }
 
@@ -37,26 +41,39 @@ export function PickHistory() {
   const winRate = (wins / sorted.length) * 100;
   const totalPnl = sorted.reduce((s, p) => s + p.option_pnl_pct, 0);
   const avgPnl = totalPnl / sorted.length;
+  const ranked = [...sorted].sort((a, b) => b.option_pnl_pct - a.option_pnl_pct);
+  const best = ranked[0];
+  const max = Math.max(1, ...ranked.map((p) => Math.abs(p.option_pnl_pct)));
 
   return (
-    <div>
-      {/* Summary bar */}
-      <div className="mb-4">
-        <h3 className="section-title">Closed picks</h3>
-        <p className="section-sub">Most recent entry first.</p>
-      </div>
-      <div className="mb-6 grid grid-cols-3 gap-6 sm:max-w-md">
-        <Stat label="Closed" value={sorted.length} />
-        <Stat label="Win rate" value={`${winRate.toFixed(0)}%`} tone={winRate >= 50 ? "green" : "red"} />
-        <Stat label="Avg P/L" value={`${avgPnl >= 0 ? "+" : ""}${avgPnl.toFixed(1)}%`} tone={avgPnl >= 0 ? "green" : "red"} />
-      </div>
+    <TileGrid>
+      <KpiTile label="Closed picks" value={sorted.length} />
+      <KpiTile label="Win rate" value={`${winRate.toFixed(0)}%`} delta={`${wins}/${sorted.length}`} tone={winRate >= 50 ? "up" : "down"} />
+      <KpiTile label="Avg P/L" value={pct(avgPnl)} tone={toneOf(avgPnl)} />
+      <KpiTile label="Best pick" value={best.ticker} delta={pct(best.option_pnl_pct)} tone={toneOf(best.option_pnl_pct)} />
 
-      {/* Pick cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {sorted.map((pick) => (
-          <PickCard key={pick.id} pick={pick} />
-        ))}
-      </div>
-    </div>
+      <Tile span={12} title="P/L by pick" meta="best to worst">
+        <div className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto">
+          {ranked.map((p) => (
+            <BarRow
+              key={p.id}
+              label={p.ticker}
+              value={p.option_pnl_pct}
+              max={max}
+              display={pct(p.option_pnl_pct)}
+              diverging
+              title={`$${p.strike} ${p.option_type} ${p.expiry} · entered ${p.entry_date}`}
+            />
+          ))}
+        </div>
+      </Tile>
+
+      {/* Pick cards, most recent entry first */}
+      {sorted.map((pick) => (
+        <div key={pick.id} className="min-w-0 lg:col-span-6">
+          <PickCard pick={pick} />
+        </div>
+      ))}
+    </TileGrid>
   );
 }

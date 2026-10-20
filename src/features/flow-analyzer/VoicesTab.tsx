@@ -7,9 +7,9 @@
  *
  * Layout:
  *   ┌──────────────────────────────────────────────────────┐
- *   │ voice selector | window | trending tickers + themes  │
+ *   │ mode | voice | window | filter;  KPI strip (4 tiles) │
  *   ├──────────────────────────┬───────────────────────────┤
- *   │ tweet feed (chrono)      │ selected tweet detail     │
+ *   │ tweet cards (chrono)     │ selected tweet detail     │
  *   │ (left, scrolls indep.)   │ (right, scrolls indep.)   │
  *   └──────────────────────────┴───────────────────────────┘
  *
@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { Chip, Segmented } from "../../components/Glass";
+import { BarRow, CockpitButton, KpiTile, Tile, TileGrid } from "../../components/Cockpit";
 import { relativeAge, absoluteAge } from "../../lib/utils";
 import {
   useVoicesByTheme,
@@ -100,7 +101,7 @@ function SentimentDot({ s, size = 8 }: { s: VoiceSentiment; size?: number }) {
   );
 }
 
-function VoiceInitials({ name }: { name: string }) {
+function VoiceInitials({ name, size = 28 }: { name: string; size?: number }) {
   const initials = name
     .split(/\s+/)
     .map((w) => w[0])
@@ -109,10 +110,10 @@ function VoiceInitials({ name }: { name: string }) {
     .toUpperCase();
   return (
     <span
-      className="inline-flex items-center justify-center rounded-full text-xs font-bold shrink-0"
+      className="inline-flex shrink-0 items-center justify-center rounded-full text-xs font-bold"
       style={{
-        width: 24,
-        height: 24,
+        width: size,
+        height: size,
         background: "color-mix(in srgb, var(--accent-purple) 14%, transparent)",
         color: "var(--accent-purple)",
       }}
@@ -139,8 +140,10 @@ function TickerChip({
       onClick={onClick}
       aria-pressed={active}
       aria-label={`Filter by ${ticker}`}
-      className={`ticker inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-1.5 py-0.5 text-sm transition-colors hover:bg-bg-card-hover hover:text-accent-blue ${
-        active ? "bg-bg-card-hover text-accent-blue" : ""
+      className={`ticker inline-flex items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-xs transition-colors ${
+        active
+          ? "border-transparent bg-accent text-[var(--accent-ink)]"
+          : "border-border bg-bg-card hover:border-accent hover:text-accent"
       }`}
     >
       {sentiment && <SentimentDot s={sentiment} size={6} />}
@@ -167,9 +170,11 @@ function ThemeChip({
       aria-pressed={active}
       aria-label={`Filter by ${kind ?? "theme"} ${label}`}
       title={kind === "sector" ? "Sector" : "Theme"}
-      className={`inline-flex items-center rounded-[var(--radius-control)] px-1.5 py-0.5 text-xs transition-colors hover:bg-bg-card-hover hover:text-accent-blue ${
-        active ? "bg-bg-card-hover text-accent-blue" : "text-text-muted"
-      } ${kind === "sector" ? "font-medium text-text-secondary" : ""}`}
+      className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-xs transition-colors ${
+        active
+          ? "bg-accent text-[var(--accent-ink)]"
+          : `bg-bg-card-hover hover:text-accent ${kind === "sector" ? "font-medium text-text-secondary" : "text-text-muted"}`
+      }`}
     >
       {label}
     </button>
@@ -186,7 +191,6 @@ function HeaderBar({
   onWindowChange,
   activeFilter,
   onClearFilter,
-  stats,
 }: {
   voiceUsername: string | null;
   voices: { username: string; display_name: string }[];
@@ -195,43 +199,35 @@ function HeaderBar({
   onWindowChange: (d: number) => void;
   activeFilter: ActiveFilter;
   onClearFilter: () => void;
-  stats: { total: number; analyzed: number; latest: string | null };
 }) {
   const voiceSelectId = useId();
   return (
-    <div className="flex flex-1 flex-wrap items-center gap-3">
-      {/* Voice selector */}
-      <div className="flex items-center gap-1.5">
-        <label htmlFor={voiceSelectId} className="sr-only">
-          Voice
-        </label>
-        <select
-          id={voiceSelectId}
-          value={voiceUsername ?? ""}
-          onChange={(e) => onVoiceChange(e.target.value || null)}
-          className="control-surface min-h-7 border px-2 py-1 text-xs text-text-primary"
-          style={{ borderRadius: "var(--radius-control)" }}
-        >
-          <option value="">All voices</option>
-          {voices.map((v) => (
-            <option key={v.username} value={v.username}>
-              @{v.username}
-            </option>
-          ))}
-        </select>
-      </div>
+    <div className="flex flex-wrap items-center gap-3">
+      <label htmlFor={voiceSelectId} className="sr-only">
+        Voice
+      </label>
+      <select
+        id={voiceSelectId}
+        value={voiceUsername ?? ""}
+        onChange={(e) => onVoiceChange(e.target.value || null)}
+        className="control-surface min-h-8 border px-2 py-1 text-xs text-text-primary"
+        style={{ borderRadius: "var(--radius-control)" }}
+      >
+        <option value="">All voices</option>
+        {voices.map((v) => (
+          <option key={v.username} value={v.username}>
+            @{v.username}
+          </option>
+        ))}
+      </select>
 
-      {/* Window selector */}
-      <div className="flex items-center gap-1.5">
-        <Segmented
-          ariaLabel="Voices time window"
-          value={String(windowDays)}
-          onChange={(v) => onWindowChange(Number(v))}
-          options={WINDOW_OPTIONS.map((w) => ({ value: String(w.days), label: w.label }))}
-        />
-      </div>
+      <Segmented
+        ariaLabel="Voices time window"
+        value={String(windowDays)}
+        onChange={(v) => onWindowChange(Number(v))}
+        options={WINDOW_OPTIONS.map((w) => ({ value: String(w.days), label: w.label }))}
+      />
 
-      {/* Active filter chip */}
       {activeFilter.kind !== "all" && (
         <Chip>
           <Filter size={11} />
@@ -240,33 +236,18 @@ function HeaderBar({
           <button
             type="button"
             onClick={onClearFilter}
-            className="p-0.5 rounded-full opacity-60 hover:opacity-100 transition-opacity"
+            className="rounded-full p-0.5 opacity-60 transition-opacity hover:opacity-100"
             aria-label="Clear filter"
           >
             <X size={11} />
           </button>
         </Chip>
       )}
-
-      {/* Stats */}
-      <div className="ml-auto flex items-center gap-3 text-xs text-text-muted">
-        <span>
-          <span className="num text-text-primary">{stats.analyzed}</span> analyzed
-          {stats.total !== stats.analyzed && (
-            <span className="ml-1 text-text-muted num">/ {stats.total} total</span>
-          )}
-        </span>
-        {stats.latest && (
-          <span title={absoluteAge(stats.latest) || ""}>
-            Latest {relativeAge(stats.latest)}
-          </span>
-        )}
-      </div>
     </div>
   );
 }
 
-// ── trending strip ──────────────────────────────────────────
+// ── trending tiles ──────────────────────────────────────────
 
 function TrendingStrip({
   windowDays,
@@ -287,55 +268,61 @@ function TrendingStrip({
   if (!tickers.length && !themes.length) return null;
   const activeTicker = activeFilter.kind === "ticker" ? activeFilter.value : null;
   const activeTheme = activeFilter.kind === "theme" ? activeFilter.value : null;
+  const maxMentions = Math.max(1, ...tickers.map((t) => t.mentions));
   return (
-    <section className="space-y-3">
-      <div>
-        <h3 className="section-title">What the voices are talking about</h3>
-        <p className="section-sub">Most-mentioned names and themes in the window; dot = net lean. Click to filter the feed.</p>
-      </div>
+    <>
       {tickers.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
-          <span className="inline-flex w-20 items-center gap-1 text-xs text-text-muted">
-            <TrendingUp size={12} />
-            Tickers
-          </span>
-          {tickers.map((t) => {
-            const lean: VoiceSentiment =
-              t.bullish > t.bearish ? "bullish" : t.bearish > t.bullish ? "bearish" : "neutral";
-            return (
-              <TickerChip
-                key={t.ticker}
-                ticker={`${t.ticker} ${t.mentions}`}
-                sentiment={lean}
-                active={activeTicker === t.ticker}
-                onClick={() => onPickTicker(t.ticker)}
-              />
-            );
-          })}
-        </div>
+        <Tile
+          span={themes.length > 0 ? 8 : 12}
+          title={<span className="inline-flex items-center gap-1.5"><TrendingUp size={14} /> What the voices are talking about</span>}
+          meta="mentions in window · color = net lean · click to filter"
+        >
+          <div className="grid gap-x-6 gap-y-0.5 sm:grid-cols-2">
+            {tickers.map((t) => {
+              const net = t.bullish - t.bearish;
+              const on = activeTicker === t.ticker;
+              return (
+                <div key={t.ticker} className={on ? "rounded-md ring-1 ring-[var(--accent)]" : undefined}>
+                  <BarRow
+                    label={t.ticker}
+                    value={t.mentions}
+                    max={maxMentions}
+                    tone={net > 0 ? "up" : net < 0 ? "down" : "neutral"}
+                    display={t.mentions}
+                    trailing={`${t.bullish}/${t.bearish}`}
+                    title={`${t.ticker}: ${t.mentions} mentions · ${t.bullish} bullish / ${t.bearish} bearish · last ${relativeAge(t.last_mentioned)}`}
+                    onClick={() => onPickTicker(t.ticker)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </Tile>
       )}
       {themes.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
-          <span className="inline-flex w-20 items-center gap-1 text-xs text-text-muted">
-            <Sparkles size={12} />
-            Themes
-          </span>
-          {themes.map((t) => (
-            <ThemeChip
-              key={`${t.kind}:${t.label}`}
-              label={`${t.label} ${t.mentions}`}
-              kind={t.kind}
-              active={activeTheme === t.label}
-              onClick={() => onPickTheme(t.label)}
-            />
-          ))}
-        </div>
+        <Tile
+          span={tickers.length > 0 ? 4 : 12}
+          title={<span className="inline-flex items-center gap-1.5"><Sparkles size={14} /> Themes</span>}
+          meta="sectors bold"
+        >
+          <div className="flex flex-wrap gap-1.5">
+            {themes.map((t) => (
+              <ThemeChip
+                key={`${t.kind}:${t.label}`}
+                label={`${t.label} ${t.mentions}`}
+                kind={t.kind}
+                active={activeTheme === t.label}
+                onClick={() => onPickTheme(t.label)}
+              />
+            ))}
+          </div>
+        </Tile>
       )}
-    </section>
+    </>
   );
 }
 
-// ── one tweet row ───────────────────────────────────────────
+// ── one tweet card ──────────────────────────────────────────
 
 function TweetRow({
   tweet,
@@ -354,135 +341,114 @@ function TweetRow({
   const visibleText = tweet.text;
   const pending = tweet.analysis_status === "pending";
   return (
-    <div
+    <article
       onClick={onSelect}
-      className={`cursor-pointer border-b border-border px-4 py-4 transition-colors ${
-        selected ? "bg-bg-card-hover" : "hover:bg-bg-card-hover"
+      className={`flex cursor-pointer flex-col gap-2.5 rounded-xl border bg-bg-card p-4 transition-colors ${
+        selected ? "border-accent" : "border-border hover:border-[var(--control-boundary)]"
       }`}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-2.5">
         <VoiceInitials name={tweet.voice_display_name || tweet.voice_username} />
-        <div className="flex-1 min-w-0">
-          {/* Header row */}
-          <div className="mb-1.5 flex items-center gap-2">
-            <span className="text-sm font-medium text-text-primary truncate">
-              {tweet.voice_display_name}
-            </span>
-            <span className="text-xs text-text-muted">
-              @{tweet.voice_username}
-            </span>
-            <span
-              className="text-xs text-text-muted"
-              title={absoluteAge(tweet.posted_at) || ""}
-            >
-              · {relativeAge(tweet.posted_at)}
-            </span>
-            <span className="flex-1" />
-            {pending && (
-              <span className="text-xs text-text-muted">Analyzing…</span>
-            )}
-            {!pending && (
-              <>
-                <SentimentDot s={tweet.overall_sentiment} />
-                <span className="sr-only">
-                  {sentimentLabel(tweet.overall_sentiment)} sentiment
-                </span>
-              </>
-            )}
-            <a
-              href={xUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="text-text-muted hover:text-text-primary"
-              aria-label="Open on X"
-            >
-              <ExternalLink size={11} />
-            </a>
-          </div>
-
-          {/* Tweet text */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelect();
-            }}
-            aria-pressed={selected}
-            aria-controls="voice-tweet-detail"
-            className="prose-read whitespace-pre-wrap text-text-primary"
-            style={{
-              width: "100%",
-              textAlign: "left",
-              display: "-webkit-box",
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: "vertical" as const,
-              overflow: "hidden",
-            }}
-          >
-            {visibleText}
-          </button>
-
-          {/* Ticker chips */}
-          {tweet.tickers.length > 0 && (
-            <div className="-ml-1.5 mt-2 flex flex-wrap items-center gap-x-0.5">
-              {tweet.tickers.map((t) => (
-                <TickerChip
-                  key={t.ticker}
-                  ticker={t.ticker}
-                  sentiment={t.sentiment}
-                  onClick={(e?: React.MouseEvent) => {
-                    e?.stopPropagation?.();
-                    onPickTicker(t.ticker);
-                  }}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Theme chips */}
-          {(tweet.sectors.length > 0 || tweet.themes.length > 0) && (
-            <div className="-ml-1.5 mt-0.5 flex flex-wrap items-center gap-x-0.5">
-              {tweet.sectors.map((s) => (
-                <ThemeChip
-                  key={`s:${s}`}
-                  label={s}
-                  kind="sector"
-                  onClick={(e?: any) => {
-                    e?.stopPropagation?.();
-                    onPickTheme(s);
-                  }}
-                />
-              ))}
-              {tweet.themes.map((th) => (
-                <ThemeChip
-                  key={`t:${th}`}
-                  label={th}
-                  kind="theme"
-                  onClick={(e?: any) => {
-                    e?.stopPropagation?.();
-                    onPickTheme(th);
-                  }}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Engagement */}
-          <div className="mt-2 flex items-center gap-4 text-xs text-text-muted num">
-            <span className="inline-flex items-center gap-1">
-              <Heart size={10} /> {tweet.like_count.toLocaleString()}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Repeat2 size={10} /> {tweet.retweet_count.toLocaleString()}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <MessageSquare size={10} /> {tweet.reply_count.toLocaleString()}
-            </span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold text-text-primary">{tweet.voice_display_name}</div>
+          <div className="truncate text-xs text-text-muted">
+            @{tweet.voice_username}{" "}
+            <span title={absoluteAge(tweet.posted_at) || ""}>· {relativeAge(tweet.posted_at)}</span>
           </div>
         </div>
+        {pending ? (
+          <span className="text-xs text-text-muted">Analyzing…</span>
+        ) : (
+          <span
+            className="tag"
+            style={{ "--tag": sentimentColor(tweet.overall_sentiment) } as React.CSSProperties}
+          >
+            {sentimentLabel(tweet.overall_sentiment)}
+          </span>
+        )}
+        <a
+          href={xUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="text-text-muted hover:text-text-primary"
+          aria-label="Open on X"
+        >
+          <ExternalLink size={12} />
+        </a>
       </div>
-    </div>
+
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect();
+        }}
+        aria-pressed={selected}
+        aria-controls="voice-tweet-detail"
+        className="whitespace-pre-wrap text-sm leading-relaxed text-text-primary"
+        style={{
+          width: "100%",
+          textAlign: "left",
+          display: "-webkit-box",
+          WebkitLineClamp: 4,
+          WebkitBoxOrient: "vertical" as const,
+          overflow: "hidden",
+        }}
+      >
+        {visibleText}
+      </button>
+
+      {(tweet.tickers.length > 0 || tweet.sectors.length > 0 || tweet.themes.length > 0) && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {tweet.tickers.map((t) => (
+            <TickerChip
+              key={t.ticker}
+              ticker={t.ticker}
+              sentiment={t.sentiment}
+              onClick={(e?: React.MouseEvent) => {
+                e?.stopPropagation?.();
+                onPickTicker(t.ticker);
+              }}
+            />
+          ))}
+          {tweet.sectors.map((s) => (
+            <ThemeChip
+              key={`s:${s}`}
+              label={s}
+              kind="sector"
+              onClick={(e?: any) => {
+                e?.stopPropagation?.();
+                onPickTheme(s);
+              }}
+            />
+          ))}
+          {tweet.themes.map((th) => (
+            <ThemeChip
+              key={`t:${th}`}
+              label={th}
+              kind="theme"
+              onClick={(e?: any) => {
+                e?.stopPropagation?.();
+                onPickTheme(th);
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="num flex items-center gap-4 text-xs text-text-muted">
+        <span className="inline-flex items-center gap-1">
+          <Heart size={11} /> {tweet.like_count.toLocaleString()}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Repeat2 size={11} /> {tweet.retweet_count.toLocaleString()}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <MessageSquare size={11} /> {tweet.reply_count.toLocaleString()}
+        </span>
+      </div>
+    </article>
   );
 }
 
@@ -500,7 +466,7 @@ function TweetDetail({
   const setActiveTicker = useAppStore((s) => s.setActiveTicker);
   if (!tweet) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-text-muted">
+      <div className="flex h-full items-center justify-center py-10 text-sm text-text-muted">
         Pick a tweet from the feed to see the full analysis.
       </div>
     );
@@ -508,45 +474,31 @@ function TweetDetail({
   const xUrl = `https://x.com/${tweet.voice_username}/status/${tweet.tweet_id}`;
   const pending = tweet.analysis_status === "pending";
   return (
-    <div className="space-y-6 text-sm leading-snug">
-      {/* Header */}
-      <div className="flex items-start gap-2">
-        <VoiceInitials name={tweet.voice_display_name || tweet.voice_username} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2">
-            <span className="font-display text-lg font-medium text-text-primary">
-              {tweet.voice_display_name}
-            </span>
+    <div className="space-y-5 text-sm leading-snug">
+      <div className="flex items-start gap-2.5">
+        <VoiceInitials name={tweet.voice_display_name || tweet.voice_username} size={32} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <span className="text-base font-semibold text-text-primary">{tweet.voice_display_name}</span>
             <a
               href={`https://x.com/${tweet.voice_username}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-text-muted hover:text-accent-blue"
+              className="text-xs text-text-muted hover:text-accent"
             >
               @{tweet.voice_username}
             </a>
           </div>
-          <div
-            className="text-xs text-text-muted"
-            title={absoluteAge(tweet.posted_at) || ""}
-          >
+          <div className="text-xs text-text-muted" title={absoluteAge(tweet.posted_at) || ""}>
             {new Date(tweet.posted_at).toLocaleString()} · {relativeAge(tweet.posted_at)}
           </div>
         </div>
-        <a
-          href={xUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold border border-border text-text-secondary hover:text-text-primary hover:bg-bg-card-hover transition-colors"
-        >
-          Open on X <ExternalLink size={11} />
-        </a>
+        <CockpitButton href={xUrl} title="Open on X">
+          Open on X <ExternalLink size={12} />
+        </CockpitButton>
       </div>
 
-      {/* Full text */}
-      <p className="prose-read max-w-[68ch] whitespace-pre-wrap text-text-primary">
-        {tweet.text}
-      </p>
+      <p className="m-0 whitespace-pre-wrap text-base leading-relaxed text-text-primary">{tweet.text}</p>
 
       {pending && (
         <div className="callout" style={{ "--callout": "var(--text-muted)" } as React.CSSProperties}>
@@ -554,11 +506,10 @@ function TweetDetail({
         </div>
       )}
 
-      {/* Sentiment + summary */}
       {!pending && (
-        <section className="space-y-2 border-t border-border pt-5">
+        <section className="space-y-2 border-t border-border pt-4">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="section-title">Read</h4>
+            <h4 className="m-0 text-sm font-semibold text-text-primary">Read</h4>
             <span
               className="tag"
               style={{ "--tag": sentimentColor(tweet.overall_sentiment) } as React.CSSProperties}
@@ -569,67 +520,37 @@ function TweetDetail({
             </span>
             {tweet.is_market_related === 0 && <Chip>Non-market</Chip>}
           </div>
-
-          {tweet.summary && (
-            <p className="prose-read max-w-[68ch]">
-              {tweet.summary}
-            </p>
-          )}
+          {tweet.summary && <p className="m-0 text-sm leading-relaxed text-text-secondary">{tweet.summary}</p>}
         </section>
       )}
 
-      {/* Tickers with confidence */}
       {tweet.tickers.length > 0 && (
-        <div>
-          <h4 className="mb-2 font-display text-lg font-medium text-text-primary">
-            Tickers <span className="num ml-1 align-middle text-xs font-normal text-text-muted">{tweet.tickers.length}</span>
+        <section className="space-y-1.5 border-t border-border pt-4">
+          <h4 className="m-0 text-sm font-semibold text-text-primary">
+            Tickers <span className="num ml-1 text-xs font-normal text-text-muted">{tweet.tickers.length} · confidence</span>
           </h4>
-          <div className="divide-y divide-border">
-            {tweet.tickers.map((t) => (
-              <button
-                type="button"
-                key={t.ticker}
-                className="data-row flex min-h-7 w-full cursor-pointer items-center gap-3 px-2 py-2.5 text-left"
-                onClick={() => {
-                  setActiveTicker(t.ticker);
-                  onPickTicker(t.ticker);
-                }}
-              >
-                <SentimentDot s={t.sentiment} />
-                <span className="ticker w-16 text-sm">
-                  {t.ticker}
-                </span>
-                <span
-                  className="w-14 text-xs font-medium"
-                  style={{ color: sentimentColor(t.sentiment) }}
-                >
-                  {sentimentLabel(t.sentiment)}
-                </span>
-                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${Math.round(t.confidence * 100)}%`,
-                      background: sentimentColor(t.sentiment),
-                    }}
-                  />
-                </div>
-                <span className="w-10 text-right text-sm num text-text-secondary" title="Confidence">
-                  {Math.round(t.confidence * 100)}%
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
+          {tweet.tickers.map((t) => (
+            <BarRow
+              key={t.ticker}
+              label={t.ticker}
+              value={Math.round(t.confidence * 100)}
+              max={100}
+              tone={t.sentiment === "bullish" ? "up" : t.sentiment === "bearish" ? "down" : "neutral"}
+              display={`${Math.round(t.confidence * 100)}%`}
+              title={`${t.ticker}: ${sentimentLabel(t.sentiment)}, ${Math.round(t.confidence * 100)}% confidence`}
+              onClick={() => {
+                setActiveTicker(t.ticker);
+                onPickTicker(t.ticker);
+              }}
+            />
+          ))}
+        </section>
       )}
 
-      {/* Sectors + themes */}
       {(tweet.sectors.length > 0 || tweet.themes.length > 0) && (
-        <div>
-          <h4 className="mb-2 font-display text-lg font-medium text-text-primary">
-            Tags
-          </h4>
-          <div className="-ml-1.5 flex flex-wrap items-center gap-x-0.5">
+        <section className="space-y-2 border-t border-border pt-4">
+          <h4 className="m-0 text-sm font-semibold text-text-primary">Tags</h4>
+          <div className="flex flex-wrap items-center gap-1.5">
             {tweet.sectors.map((s) => (
               <ThemeChip key={`s:${s}`} label={s} kind="sector" onClick={() => onPickTheme(s)} />
             ))}
@@ -637,11 +558,10 @@ function TweetDetail({
               <ThemeChip key={`t:${th}`} label={th} kind="theme" onClick={() => onPickTheme(th)} />
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Engagement */}
-      <div className="flex items-center gap-4 border-t border-border pt-3 text-xs text-text-muted num">
+      <div className="num flex flex-wrap items-center gap-4 border-t border-border pt-3 text-xs text-text-muted">
         <span className="inline-flex items-center gap-1">
           <Heart size={12} /> {tweet.like_count.toLocaleString()}
         </span>
@@ -720,77 +640,117 @@ export function VoicesTab() {
         ? feedByTheme.isLoading
         : feedAll.isLoading;
 
+  // KPI strip: pure derivations over the loaded feed.
+  const feedKpi = useMemo(() => {
+    let bull = 0;
+    let bear = 0;
+    const counts = new Map<string, number>();
+    for (const t of tweets) {
+      if (t.overall_sentiment === "bullish") bull += 1;
+      else if (t.overall_sentiment === "bearish") bear += 1;
+      for (const m of t.tickers) counts.set(m.ticker, (counts.get(m.ticker) ?? 0) + 1);
+    }
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+    return { bull, bear, bullPct: bull + bear > 0 ? (bull / (bull + bear)) * 100 : null, top };
+  }, [tweets]);
+
+  const pickTicker = (t: string) => {
+    setActiveFilter({ kind: "ticker", value: t });
+    setSelectedTweetId(null);
+  };
+  const pickTheme = (t: string) => {
+    setActiveFilter({ kind: "theme", value: t });
+    setSelectedTweetId(null);
+  };
+
+  const analyzed = stats?.analyzed ?? 0;
+  const total = stats?.total_tweets ?? 0;
+  const latest = stats?.latest_tweet_at ?? null;
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-      {/* Mode switcher — Feed / Patterns / Synthesis */}
-      <Segmented<VoicesMode>
-        ariaLabel="Voices view"
-        value={mode}
-        onChange={setMode}
-        options={MODE_TABS.map((m) => {
-          const Icon = m.icon;
-          return {
-            value: m.id,
-            label: (
-              <span className="inline-flex items-center gap-1.5" title={m.hint}>
-                <Icon size={11} />
-                {m.label}
-              </span>
-            ),
-          };
-        })}
-      />
-      <HeaderBar
-        voiceUsername={voiceUsername}
-        voices={voices ?? []}
-        onVoiceChange={setVoiceUsername}
-        windowDays={windowDays}
-        onWindowChange={setWindowDays}
-        activeFilter={activeFilter}
-        onClearFilter={() => setActiveFilter({ kind: "all" })}
-        stats={{
-          total: stats?.total_tweets ?? 0,
-          analyzed: stats?.analyzed ?? 0,
-          latest: stats?.latest_tweet_at ?? null,
-        }}
-      />
+        {/* Mode switcher — Feed / Patterns / Synthesis */}
+        <Segmented<VoicesMode>
+          ariaLabel="Voices view"
+          value={mode}
+          onChange={setMode}
+          options={MODE_TABS.map((m) => {
+            const Icon = m.icon;
+            return {
+              value: m.id,
+              label: (
+                <span className="inline-flex items-center gap-1.5" title={m.hint}>
+                  <Icon size={11} />
+                  {m.label}
+                </span>
+              ),
+            };
+          })}
+        />
+        <HeaderBar
+          voiceUsername={voiceUsername}
+          voices={voices ?? []}
+          onVoiceChange={setVoiceUsername}
+          windowDays={windowDays}
+          onWindowChange={setWindowDays}
+          activeFilter={activeFilter}
+          onClearFilter={() => setActiveFilter({ kind: "all" })}
+        />
       </div>
 
       {mode === "feed" && (
         <>
-          {/* Inline Voice Brief — collapsible synthesis panel for the
-              currently-selected voice. Renders nothing when "All voices"
-              is selected (synthesis is per-voice). Mirrors the Trader
-              Brief panel on the Traders page. */}
-          <VoiceBriefPanel voiceUsername={voiceUsername} />
+          <TileGrid>
+            <KpiTile
+              label="Analyzed tweets"
+              value={analyzed.toLocaleString()}
+              sub={total !== analyzed ? `of ${total.toLocaleString()} total` : voiceUsername ? `@${voiceUsername}` : "all voices"}
+            />
+            <KpiTile
+              label="Latest tweet"
+              value={latest ? <span title={absoluteAge(latest) || ""}>{relativeAge(latest)}</span> : "—"}
+              sub={stats?.pending ? `${stats.pending} pending analysis` : "analysis up to date"}
+            />
+            <KpiTile
+              label="Feed lean"
+              value={feedKpi.bullPct == null ? "—" : `${feedKpi.bullPct.toFixed(0)}%`}
+              delta={feedKpi.bullPct == null ? undefined : feedKpi.bullPct >= 50 ? "bull" : "bear"}
+              tone={feedKpi.bullPct == null ? "neutral" : feedKpi.bullPct >= 50 ? "up" : "down"}
+              sub={`${feedKpi.bull} bullish · ${feedKpi.bear} bearish of ${tweets.length}`}
+            />
+            <KpiTile
+              label="Most named in feed"
+              value={feedKpi.top ? <span className="ticker">{feedKpi.top[0]}</span> : "—"}
+              sub={feedKpi.top ? `${feedKpi.top[1]} tweets` : undefined}
+            />
+          </TileGrid>
 
-          <TrendingStrip
-            windowDays={windowDays}
-            voiceUsername={voiceUsername}
-            activeFilter={activeFilter}
-            onPickTicker={(t) => {
-              setActiveFilter({ kind: "ticker", value: t });
-              setSelectedTweetId(null);
-            }}
-            onPickTheme={(t) => {
-              setActiveFilter({ kind: "theme", value: t });
-              setSelectedTweetId(null);
-            }}
-          />
+          <TileGrid>
+            {/* Inline Voice Brief — collapsible synthesis Tile for the
+                currently-selected voice. Renders nothing when "All voices"
+                is selected (synthesis is per-voice). */}
+            <VoiceBriefPanel voiceUsername={voiceUsername} />
 
-          <div
-            className="grid grid-cols-12 items-start gap-6"
-            style={{ height: "calc(100vh - 460px)", minHeight: 420 }}
-          >
-            {/* Feed */}
-            <div className="card col-span-12 lg:col-span-7 h-full overflow-y-auto" style={{ padding: 0 }}>
+            <TrendingStrip
+              windowDays={windowDays}
+              voiceUsername={voiceUsername}
+              activeFilter={activeFilter}
+              onPickTicker={pickTicker}
+              onPickTheme={pickTheme}
+            />
+
+            {/* Feed: one card per tweet */}
+            <div
+              className="flex min-w-0 flex-col gap-2.5 overflow-y-auto pr-1 lg:col-span-7"
+              style={{ maxHeight: "calc(100vh - 260px)", minHeight: 420 }}
+            >
               {isLoading && tweets.length === 0 ? (
-                <div className="p-6 text-sm text-text-muted text-center">
+                <div className="rounded-xl border border-border bg-bg-card p-6 text-center text-sm text-text-muted">
                   Loading tweets…
                 </div>
               ) : tweets.length === 0 ? (
-                <div className="p-6 text-sm text-text-muted text-center">
+                <div className="rounded-xl border border-border bg-bg-card p-6 text-center text-sm text-text-muted">
                   {activeFilter.kind === "all"
                     ? "No tweets yet — try running the voices cron."
                     : `No tweets matching ${activeFilter.kind} = ${activeFilter.value}.`}
@@ -802,34 +762,20 @@ export function VoicesTab() {
                     tweet={t}
                     selected={selectedTweet?.tweet_id === t.tweet_id}
                     onSelect={() => setSelectedTweetId(t.tweet_id)}
-                    onPickTicker={(tk) => {
-                      setActiveFilter({ kind: "ticker", value: tk });
-                      setSelectedTweetId(null);
-                    }}
-                    onPickTheme={(th) => {
-                      setActiveFilter({ kind: "theme", value: th });
-                      setSelectedTweetId(null);
-                    }}
+                    onPickTicker={pickTicker}
+                    onPickTheme={pickTheme}
                   />
                 ))
               )}
             </div>
 
             {/* Detail */}
-            <div id="voice-tweet-detail" className="card col-span-12 h-full overflow-y-auto lg:col-span-5" style={{ padding: "1.5rem" }}>
-              <TweetDetail
-                tweet={selectedTweet}
-                onPickTicker={(t) => {
-                  setActiveFilter({ kind: "ticker", value: t });
-                  setSelectedTweetId(null);
-                }}
-                onPickTheme={(t) => {
-                  setActiveFilter({ kind: "theme", value: t });
-                  setSelectedTweetId(null);
-                }}
-              />
-            </div>
-          </div>
+            <Tile id="voice-tweet-detail" span={5} title="Selected tweet" className="self-start lg:sticky lg:top-4">
+              <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 320px)" }}>
+                <TweetDetail tweet={selectedTweet} onPickTicker={pickTicker} onPickTheme={pickTheme} />
+              </div>
+            </Tile>
+          </TileGrid>
         </>
       )}
 

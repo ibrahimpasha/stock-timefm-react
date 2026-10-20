@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useIntelGraphContext } from "../../api/intelGraph";
 import { useAppStore } from "../../store/useAppStore";
+import { Tile } from "../../components/Cockpit";
 import type {
   GraphConcept,
   GraphThemePeer,
@@ -130,7 +131,7 @@ function TickerChip({
       type="button"
       onClick={() => onClick(ticker)}
       title={role ? role.toLowerCase() : undefined}
-      className="inline-flex items-baseline gap-1 cursor-pointer text-text-primary hover:text-accent-blue"
+      className="inline-flex min-h-7 cursor-pointer items-baseline gap-1 rounded-md bg-bg-card-hover px-2 py-1 text-text-primary transition-colors hover:text-accent"
     >
       <span className="ticker">{ticker}</span>
       {role && <span className="text-xs text-text-muted">{role.slice(0, 4).toLowerCase()}</span>}
@@ -156,9 +157,9 @@ function ConceptChip({ name, confidence }: { name: string; confidence?: string }
 /** A labeled definition row: muted label, plain inline items. */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[6.5rem_1fr] items-baseline gap-3 py-2.5">
-      <div className="text-sm text-text-muted">{label}</div>
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">{children}</div>
+    <div className="grid grid-cols-[5.5rem_1fr] items-baseline gap-3 py-2.5">
+      <div className="text-xs text-text-muted">{label}</div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-sm">{children}</div>
     </div>
   );
 }
@@ -186,7 +187,7 @@ export function GraphContextCard({ ticker }: Props) {
   if (!ticker) return null;
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-3 animate-pulse">
+      <div className="flex animate-pulse flex-col gap-3 rounded-xl border border-border bg-bg-card p-4">
         <div className="h-5 w-32 rounded bg-text-muted/20" />
         <div className="h-[130px] rounded bg-text-muted/10" />
         <div className="h-3 w-full rounded bg-text-muted/10" />
@@ -202,29 +203,27 @@ export function GraphContextCard({ ticker }: Props) {
   ];
 
   return (
-    <section className="flex flex-col gap-4" aria-label="Graph context">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="section-title">Graph context</h3>
-          <p className="section-sub">
-            <span className="num">{totalSignals}</span> signals
-            {data.sector && (
-              <span>
-                {" "}· {data.sector}
-                {data.theme ? ` · ${data.theme}` : ""}
-              </span>
-            )}
-            {data.community?.label && <span> · Cluster: {data.community.label}</span>}
-          </p>
-        </div>
-        {role && <span className="shrink-0 pt-1.5"><RoleText role={role.role} reason={role.reason} /></span>}
-      </div>
-
+    <Tile
+      title="Graph context"
+      meta={
+        <>
+          <span className="num">{totalSignals}</span> signals
+          {data.sector && (
+            <span>
+              {" "}· {data.sector}
+              {data.theme ? ` · ${data.theme}` : ""}
+            </span>
+          )}
+          {data.community?.label && <span> · Cluster: {data.community.label}</span>}
+        </>
+      }
+      actions={role ? <RoleText role={role.role} reason={role.reason} /> : undefined}
+    >
       <MiniGraphSvg ticker={ticker} groups={svgGroups} />
 
       {keyFacts.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <div className="text-sm font-semibold text-text-primary">Key facts</div>
+          <div className="text-xs font-semibold text-text-secondary">Key facts</div>
           <ul className="flex flex-col gap-2 max-w-[72ch]">
             {keyFacts.map((f, i) => (
               <li key={i} className="flex gap-2.5 text-sm leading-relaxed text-text-secondary">
@@ -283,6 +282,6 @@ export function GraphContextCard({ ticker }: Props) {
           </Row>
         )}
       </div>
-    </section>
+    </Tile>
   );
 }

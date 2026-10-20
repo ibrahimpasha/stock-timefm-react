@@ -11,6 +11,7 @@ import { useTickerMap, type BayAreaCompany } from "../api/map";
 import { useTickerTaxonomy } from "../api/tickerTaxonomy";
 import { useAppStore } from "../store/useAppStore";
 import { Segmented } from "../components/Glass";
+import { TileGrid, Tile, KpiTile, BarRow } from "../components/Cockpit";
 
 type HeatPoint = [number, number, number];
 
@@ -167,6 +168,10 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
       total: all.length,
       bull: scored.filter((c) => (c.score ?? 0) > 8).length,
       bear: scored.filter((c) => (c.score ?? 0) < -8).length,
+      cap: filtered.reduce((sum, c) => sum + (c.market_cap || 0), 0),
+      bay: filtered.filter((c) => c.is_bay_area || c.is_campus).length,
+      topBull: [...scored].filter((c) => (c.score ?? 0) > 0).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 8),
+      topBear: [...scored].filter((c) => (c.score ?? 0) < 0).sort((a, b) => (a.score ?? 0) - (b.score ?? 0)).slice(0, 8),
     };
   }, [filtered, all]);
 
@@ -211,49 +216,47 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
     <div className="flex flex-col gap-3">
       <style>{MAP_CSS}</style>
 
-      <div className="flex items-end justify-between flex-wrap gap-x-8 gap-y-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-end gap-x-10 gap-y-3" aria-live="polite">
-            <div className="flex flex-col gap-1">
-              <span className="text-sm text-text-muted">On the map</span>
-              <span className="num text-3xl font-semibold tracking-tight text-text-primary">
-                {stats.shown}
-                {stats.shown !== stats.total && <span className="text-lg text-text-muted">/{stats.total}</span>}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-sm text-text-muted">Bullish</span>
-              <span className="delta-up text-3xl font-semibold tracking-tight">{stats.bull}</span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-sm text-text-muted">Bearish</span>
-              <span className="delta-down text-3xl font-semibold tracking-tight">{stats.bear}</span>
-            </div>
-          </div>
-          <p className="text-sm leading-relaxed text-text-secondary max-w-[72ch]">
-            Every tracked ticker at its building. Size = market cap, color = bull/bear
-            (technical + momentum + flow). Search or filter to zero in.
-          </p>
-        </div>
-        <div className="max-sm:w-full">
-          <label htmlFor={searchId} className="sr-only">
-            Search mapped companies by ticker or name
-          </label>
-          <input
-            id={searchId}
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setFocusTicker(null);
-            }}
-            placeholder="Search ticker or name…"
-            className="control-surface min-h-8 w-56 rounded-full border px-3 py-1.5 text-sm text-text-primary transition-colors max-sm:min-h-11 max-sm:w-full"
-          />
-        </div>
-      </div>
+      <TileGrid>
+        <KpiTile
+          label="On the map"
+          value={<span aria-live="polite">{stats.shown}{stats.shown !== stats.total && <span className="text-base text-text-muted">/{stats.total}</span>}</span>}
+          sub={`${stats.bay} in the Bay Area`}
+        />
+        <KpiTile
+          label="Bullish"
+          value={<span className="delta-up">{stats.bull}</span>}
+          sub={stats.shown ? `${Math.round((stats.bull / stats.shown) * 100)}% of shown · score > 8` : "score > 8"}
+        />
+        <KpiTile
+          label="Bearish"
+          value={<span className="delta-down">{stats.bear}</span>}
+          sub={stats.shown ? `${Math.round((stats.bear / stats.shown) * 100)}% of shown · score < −8` : "score < −8"}
+        />
+        <KpiTile label="Market cap shown" value={fmtCap(stats.cap)} sub="sum of mapped companies" />
 
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)] gap-3 max-lg:grid-cols-1">
-      <div className="overflow-hidden border border-border relative" style={{ height: `calc(100dvh - ${heightOffset}px)`, minHeight: 460, borderRadius: "var(--radius-panel)" }}>
+        <Tile
+          span={9}
+          title="Company map"
+          meta="size = market cap · color = bull/bear (technical + momentum + flow)"
+          actions={
+            <>
+              <label htmlFor={searchId} className="sr-only">
+                Search mapped companies by ticker or name
+              </label>
+              <input
+                id={searchId}
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setFocusTicker(null);
+                }}
+                placeholder="Search ticker or name…"
+                className="control-surface min-h-8 w-56 rounded-full border px-3 py-1.5 text-sm text-text-primary transition-colors max-sm:min-h-11 max-sm:w-full"
+              />
+            </>
+          }
+        >
+      <div className="overflow-hidden relative rounded-lg" style={{ height: `calc(100dvh - ${heightOffset}px)`, minHeight: 460 }}>
         {/* Floating control bar — chrome only; the map surface below is untouched */}
         <div className="absolute top-3 left-3 right-3 z-[1000] rounded-[var(--radius-panel)] border border-border bg-[var(--card-bg)] shadow-lg px-3 py-2 flex items-center gap-2 flex-wrap text-xs">
           <div className="flex min-h-11 w-full items-center justify-between gap-2 lg:hidden">
@@ -423,16 +426,15 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
             ))}
         </MapContainer>
       </div>
-      <section
-        aria-labelledby={listHeadingId}
-        className="card flex max-h-[calc(100vh-220px)] min-h-0 flex-col overflow-hidden max-lg:max-h-80"
+        </Tile>
+      <Tile
+        span={3}
+        id={listHeadingId}
+        title="Companies"
+        meta={<span className="num">{filtered.length}</span>}
+        className="min-h-0 overflow-hidden lg:max-h-[calc(100dvh-220px)] max-lg:max-h-96"
+        bodyClassName="min-h-0 flex-1"
       >
-        <div className="mb-3 flex items-baseline justify-between gap-2">
-          <h2 id={listHeadingId} className="section-title">
-            Companies
-          </h2>
-          <span className="num text-sm text-text-muted">{filtered.length}</span>
-        </div>
         <QueryNotice queries={[mapQuery]} label="Company map" />
         {filtered.length === 0 ? (
           !mapQuery.isPending && !mapQuery.isError && mapQuery.fetchStatus !== "paused" && <p className="text-sm text-text-muted">No companies match the current filters.</p>
@@ -468,8 +470,31 @@ export function CompanyMapView({ heightOffset = 220 }: { heightOffset?: number }
             })}
           </ul>
         )}
-      </section>
-      </div>
+      </Tile>
+
+      <Tile span={6} title="Most bullish" meta="composite score, current filters">
+        {stats.topBull.length === 0 ? (
+          <p className="text-sm text-text-muted">No bullish names in view.</p>
+        ) : (
+          stats.topBull.map((c) => (
+            <BarRow key={`bull-${c.ticker}`} label={c.ticker} value={c.score ?? 0} max={100} diverging
+                    display={`+${c.score}`} trailing={fmtCap(c.market_cap)} title={c.name}
+                    onClick={() => selectCompany(c)} />
+          ))
+        )}
+      </Tile>
+      <Tile span={6} title="Most bearish" meta="composite score, current filters">
+        {stats.topBear.length === 0 ? (
+          <p className="text-sm text-text-muted">No bearish names in view.</p>
+        ) : (
+          stats.topBear.map((c) => (
+            <BarRow key={`bear-${c.ticker}`} label={c.ticker} value={c.score ?? 0} max={100} diverging
+                    display={String(c.score)} trailing={fmtCap(c.market_cap)} title={c.name}
+                    onClick={() => selectCompany(c)} />
+          ))
+        )}
+      </Tile>
+      </TileGrid>
       </div>
   );
 }
@@ -484,7 +509,7 @@ export function BayAreaMapPage() {
           <p>Tracked companies at their headquarters, colored by bull/bear signal</p>
         </div>
       </header>
-      <CompanyMapView heightOffset={370} />
+      <CompanyMapView heightOffset={300} />
     </div>
   );
 }

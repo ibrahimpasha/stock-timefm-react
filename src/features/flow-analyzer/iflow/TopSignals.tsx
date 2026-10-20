@@ -7,12 +7,13 @@ import {
   parsePremium,
   researchRank,
 } from "./utils";
-import { entryPnl, PnlBadge } from "./TopPicks";
+import { entryPnl } from "./TopPicks";
 import { setupScore } from "./EntryTape";
 import { useTickerMeta } from "../../../api/tickerMeta";
 import { useTickerTechnicals } from "../../../api/tickerTechnicals";
 import { useTickerGex } from "../../../api/tickerGex";
 import { GexWall, GexWallLegend } from "../../gex/GexWall";
+import { BarRow, Tile } from "../../../components/Cockpit";
 import { useTaxonomy } from "../../../api/taxonomy";
 import { useThemePulseScores } from "../../../api/intelGraph";
 import { formatPremium } from "../../../lib/utils";
@@ -151,67 +152,69 @@ export function TopSignals({ date, dteFilter }: { date: string; dteFilter: DteFi
   const priceMap = priceData?.prices ?? {};
 
   if (!signals.length) return null;
+  const premOf = (s: Signal) => parsePremium(s.entry.premium_usd ?? s.entry.premium);
+  const maxPrem = Math.max(...signals.map(premOf), 1);
   return (
-    <section className="min-w-0">
-      <h3 className="section-title flex items-baseline gap-2">
-        Top signals
-        <span className="num text-sm font-normal text-text-muted">{signals.length}</span>
-      </h3>
-      <p className="section-sub mb-3">
+    <Tile
+      span={6}
+      title={
+        <>
+          Top signals <span className="num text-xs font-normal text-text-muted">{signals.length}</span>
+        </>
+      }
+      meta="bar = premium · right = research rank"
+    >
+      <p className="m-0 text-xs text-text-muted">
         Best contract per ticker by research rank: evidence + directional setup, ML capped at ±3
       </p>
-      <GexWallLegend />
-      <div className="divide-y divide-border">
+      <div className="flex flex-col gap-2">
         {signals.map((s) => {
           const e = s.entry;
           const color = s.side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
           const dl = dteTag(e.dte);
           const pnl = entryPnl(e, priceMap, date);
           return (
-            <div
-              key={s.ticker}
-              className="data-row px-2 py-2.5 text-xs"
-              title={s.reasons.join(" · ")}
-            >
-              <div className="flex items-center gap-3">
-                <span
-                  className="num w-8 shrink-0 text-right text-base font-semibold text-text-primary"
-                  title={`Research Rank ${s.research}: NScore ${s.evidence}, Setup ${s.setup}, ML percentile ${s.ml} (${s.servingMode ?? "unknown"}).`}
-                >
-                  {s.research}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 items-baseline gap-2">
-                    <span className="ticker w-14 shrink-0 text-sm">{s.ticker}</span>
-                    <span className="num truncate text-sm" style={{ color }} title={s.side}>
-                      ${e.strike} {e.type || e.option_type}
+            <div key={s.ticker} className="min-w-0" title={s.reasons.join(" · ")}>
+              <BarRow
+                label={s.ticker}
+                value={premOf(s)}
+                max={maxPrem}
+                tone={s.side === "Bull" ? "up" : "down"}
+                display={formatPremium(premOf(s))}
+                trailing={
+                  <span
+                    className="font-semibold text-text-primary"
+                    title={`Research Rank ${s.research}: NScore ${s.evidence}, Setup ${s.setup}, ML percentile ${s.ml} (${s.servingMode ?? "unknown"}).`}
+                  >
+                    {s.research}
+                  </span>
+                }
+              />
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 pl-[4.875rem] text-xs text-text-muted">
+                <span className="num" style={{ color }} title={s.side}>${e.strike} {e.type || e.option_type}</span>
+                <span className="num">{e.expiry}</span>
+                {dl && <span>{dl.text.toLowerCase()}</span>}
+                {pnl != null && (
+                  <span
+                    className="num font-semibold"
+                    title="Estimated option P/L since the print (delta+theta model)"
+                    style={{ color: pnl >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}
+                  >
+                    {pnl >= 0 ? "+" : ""}{pnl.toFixed(0)}%
+                  </span>
+                )}
+                {s.theme && <span className="truncate text-text-secondary max-sm:hidden">{s.theme}</span>}
+                {s.pulse != null && (
+                  <span title={`Theme Pulse ${s.pulse}/100 is context only and does not change Research Rank.`}>
+                    context{" "}
+                    <span className={`num ${s.tilt > 0 ? "text-accent-orange" : "text-text-secondary"}`}>
+                      {s.tilt >= 0 ? "+" : ""}{s.tilt.toFixed(1)}
                     </span>
-                    {s.theme && (
-                      <span className="truncate text-text-secondary max-sm:hidden">{s.theme}</span>
-                    )}
-                  </div>
-                  <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-text-muted">
-                    <span className="num">{e.expiry}</span>
-                    {dl && <span>{dl.text.toLowerCase()}</span>}
-                    {s.pulse != null && (
-                      <span
-                        title={`Theme Pulse ${s.pulse}/100 is context only and does not change Research Rank.`}
-                      >
-                        context{" "}
-                        <span className={`num ${s.tilt > 0 ? "text-accent-orange" : "text-text-secondary"}`}>
-                          {s.tilt >= 0 ? "+" : ""}{s.tilt.toFixed(1)}
-                        </span>
-                      </span>
-                    )}
-                    <GexWall ticker={s.ticker} strike={Number(e.strike) || null} showLabel />
-                  </div>
-                </div>
-                <span className="num w-16 shrink-0 text-right text-sm font-semibold text-text-primary">
-                  {formatPremium(parsePremium(e.premium_usd ?? e.premium))}
-                </span>
-                {pnl != null ? <PnlBadge pnl={pnl} /> : <span className="w-14 shrink-0" aria-hidden="true" />}
+                  </span>
+                )}
+                <GexWall ticker={s.ticker} strike={Number(e.strike) || null} showLabel />
               </div>
-              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 pl-11 text-text-muted leading-relaxed md:hidden">
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 pl-[4.875rem] text-xs leading-relaxed text-text-muted md:hidden">
                 <span className="num">ML pctl {s.ml}</span>
                 <span className="num">NScore {s.evidence}</span>
                 <span className="num">Setup {s.setup}</span>
@@ -219,13 +222,14 @@ export function TopSignals({ date, dteFilter }: { date: string; dteFilter: DteFi
                   <span className="num">Calibrated P(2x / 10 sessions) {s.mlProbability}%</span>
                 )}
               </div>
-              <div className="mt-1 pl-11 text-text-muted leading-relaxed md:hidden">
+              <div className="mt-1 pl-[4.875rem] text-xs leading-relaxed text-text-muted md:hidden">
                 {s.reasons.join("  ·  ")}
               </div>
             </div>
           );
         })}
       </div>
-    </section>
+      <GexWallLegend />
+    </Tile>
   );
 }

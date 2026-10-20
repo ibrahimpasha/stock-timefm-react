@@ -55,14 +55,21 @@ export function TickerCard({
   const toggleWatchlist = useAppStore((s) => s.toggleWatchlist);
 
   const sideColor = net ? "var(--accent-green)" : "var(--accent-red)";
+  // Heat tint: fill strength encodes how one-sided the flow is (50/50 = faint,
+  // all one side = strong). Borderless — the card sits inside a Tile.
+  const sideTotal = t.bullish + t.bearish;
+  const lean = sideTotal > 0 ? Math.abs(t.bullish / sideTotal - 0.5) * 2 : 0;
+  const tint = Math.round(5 + lean * 15);
+  const bullPct = sideTotal > 0 ? Math.round((t.bullish / sideTotal) * 100) : null;
 
   return (
     <div
       title={highlightTitle}
-      className="card card-interactive relative flex min-h-[7rem] min-w-0 flex-col overflow-hidden px-3.5! py-3! text-left"
+      className="relative flex min-h-[6.5rem] min-w-0 flex-col overflow-hidden rounded-lg px-3 py-2.5 text-left transition-transform hover:-translate-y-px"
       style={{
-        borderColor: selected ? "var(--accent-blue)" : undefined,
-        background: selected ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)" : undefined,
+        background: `color-mix(in srgb, ${sideColor} ${tint}%, var(--bg-card-hover))`,
+        outline: selected ? "2px solid var(--accent)" : lit ? "1px solid color-mix(in srgb, var(--accent-green) 55%, transparent)" : undefined,
+        outlineOffset: selected ? 1 : 0,
       }}
     >
       <button
@@ -96,7 +103,7 @@ export function TickerCard({
         }}
         aria-pressed={selected}
         aria-label={`Select ${t.ticker}, ${net ? "bullish" : "bearish"}, ${t.total_entries} entries`}
-        className="flex min-h-11 w-full min-w-0 flex-1 flex-col gap-2 text-left lg:min-h-6"
+        className="flex min-h-11 w-full min-w-0 flex-1 flex-col gap-1.5 text-left lg:min-h-6"
       >
         <div className="flex items-baseline justify-between gap-2 pl-5">
           <span className="flex min-w-0 items-center gap-1.5">
@@ -109,18 +116,22 @@ export function TickerCard({
               />
             )}
           </span>
-          <span className="text-xs text-text-muted" title={`${t.total_entries} entries`}>
-            <span className="num text-text-secondary">{t.total_entries}</span> prints
+          <span className="num text-xs text-text-muted" title={`${t.total_entries} entries`}>
+            {t.total_entries}
           </span>
         </div>
         <div className="flex items-baseline justify-between gap-2">
-          <span className="num text-xl font-semibold tracking-tight text-text-primary">{t.net_premium}</span>
-          <span className="flex items-center gap-1 text-xs font-medium" style={{ color: sideColor }}>
-            {net ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-            {net ? "Bullish" : "Bearish"}
+          <span className="num text-lg font-semibold tracking-tight text-text-primary">{t.net_premium}</span>
+          <span
+            className="num flex items-center gap-0.5 text-xs font-semibold"
+            style={{ color: sideColor }}
+            title={net ? "Bullish" : "Bearish"}
+          >
+            {net ? <TrendingUp size={12} aria-hidden="true" /> : <TrendingDown size={12} aria-hidden="true" />}
+            {bullPct != null ? `${net ? bullPct : 100 - bullPct}%` : net ? "Bull" : "Bear"}
           </span>
         </div>
-        <BullBearBar bull={t.bullish} total={t.bullish + t.bearish} height={4} showLabels={false} />
+        <BullBearBar bull={t.bullish} total={t.bullish + t.bearish} height={3} showLabels={false} />
         {(showReturn || hasAccum || esc || intel?.exitSignals || (voicesIntel && voicesIntel.mentions > 0)) && (
           <div className="mt-auto flex items-center justify-between gap-2 text-xs text-text-muted">
             <span className="flex min-w-0 items-center gap-2">

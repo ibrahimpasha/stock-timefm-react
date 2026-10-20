@@ -2,35 +2,7 @@ import { PickCard } from "../../components/PickCard";
 import { useFlowPicks, useClosePick } from "../../api/flow";
 import { formatPercentRaw } from "../../lib/utils";
 import { Loader2 } from "lucide-react";
-import { Stat } from "../../components/Glass";
-
-/* ── Summary Metrics Row ─────────────────────────────────── */
-
-function SummaryMetrics({
-  openCount,
-  closedCount,
-  winRate,
-  avgPnl,
-}: {
-  openCount: number;
-  closedCount: number;
-  winRate: number;
-  avgPnl: number;
-}) {
-  return (
-    <div className="mb-8 flex flex-wrap items-end gap-x-10 gap-y-4">
-      <div className="flex flex-col gap-0.5">
-        <span className="text-xs font-medium text-text-muted">Open picks</span>
-        <span className="num text-3xl font-semibold tracking-tight text-text-primary">{openCount}</span>
-      </div>
-      <div className="grid grid-cols-3 gap-6">
-        <Stat label="Closed" value={closedCount} />
-        <Stat label="Win rate" value={`${winRate.toFixed(0)}%`} tone={winRate >= 50 ? "green" : "red"} />
-        <Stat label="Avg P/L" value={formatPercentRaw(avgPnl)} tone={avgPnl >= 0 ? "green" : "red"} />
-      </div>
-    </div>
-  );
-}
+import { TileGrid, Tile, KpiTile, BarRow, toneOf } from "../../components/Cockpit";
 
 /* ── Main ActivePicks ────────────────────────────────────── */
 
@@ -43,16 +15,12 @@ export function ActivePicks() {
 
   if (isLoading) {
     return (
-      <div className="animate-pulse space-y-3">
-        <div className="grid grid-cols-4 gap-3">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="card h-16" />
-          ))}
-        </div>
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="card h-36" />
+      <TileGrid className="animate-pulse">
+        {[0, 1, 2, 3].map((i) => (
+          <Tile key={i} span={3}><div className="h-12" /></Tile>
         ))}
-      </div>
+        <Tile span={12}><div className="h-36" /></Tile>
+      </TileGrid>
     );
   }
 
@@ -64,40 +32,50 @@ export function ActivePicks() {
     closed.length > 0
       ? closed.reduce((sum, p) => sum + p.option_pnl_pct, 0) / closed.length
       : 0;
+  const openMax = Math.max(1, ...open.map((p) => Math.abs(p.option_pnl_pct ?? 0)));
 
   return (
-    <div>
-      <SummaryMetrics
-        openCount={open.length}
-        closedCount={closed.length}
-        winRate={winRate}
-        avgPnl={avgPnl}
-      />
+    <TileGrid>
+      <KpiTile label="Open picks" value={open.length} />
+      <KpiTile label="Closed" value={closed.length} />
+      <KpiTile label="Win rate" value={`${winRate.toFixed(0)}%`} delta={`${wins}/${closed.length}`} tone={winRate >= 50 ? "up" : "down"} />
+      <KpiTile label="Avg P/L (closed)" value={formatPercentRaw(avgPnl)} tone={toneOf(avgPnl)} />
 
       {open.length === 0 ? (
-        <div className="py-10 text-center">
-          <p className="section-title">No active picks</p>
-          <p className="mt-1 text-sm text-text-muted">
-            Analyze flow data to generate picks
-          </p>
-        </div>
+        <Tile span={12}>
+          <p className="py-8 text-center text-sm text-text-muted">No active picks. Analyze flow data to generate picks.</p>
+        </Tile>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <>
+          {open.length >= 4 && (
+            <Tile span={12} title="Open P/L" meta="option premium change">
+              {[...open]
+                .sort((a, b) => (b.option_pnl_pct ?? 0) - (a.option_pnl_pct ?? 0))
+                .map((p) => (
+                  <BarRow
+                    key={p.id}
+                    label={p.ticker}
+                    value={p.option_pnl_pct ?? 0}
+                    max={openMax}
+                    display={formatPercentRaw(p.option_pnl_pct ?? 0, 1)}
+                    diverging
+                    title={`$${p.strike} ${p.option_type} ${p.expiry}`}
+                  />
+                ))}
+            </Tile>
+          )}
           {open.map((pick) => (
-            <div key={pick.id} className="relative">
-              <PickCard
-                pick={pick}
-                onClose={(id) => closeMutation.mutate(id)}
-              />
+            <div key={pick.id} className="relative min-w-0 lg:col-span-6">
+              <PickCard pick={pick} onClose={(id) => closeMutation.mutate(id)} />
               {closeMutation.isPending && (
-                <div className="absolute inset-0 flex items-center justify-center bg-bg-card/60 rounded-xl">
-                  <Loader2 size={20} className="animate-spin text-accent-blue" />
+                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-bg-card/60">
+                  <Loader2 size={20} className="animate-spin text-accent" />
                 </div>
               )}
             </div>
           ))}
-        </div>
+        </>
       )}
-    </div>
+    </TileGrid>
   );
 }

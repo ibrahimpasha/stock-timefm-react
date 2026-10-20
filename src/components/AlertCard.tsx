@@ -3,7 +3,7 @@ import { ALERT_STATE_COLORS } from "../lib/constants";
 import { formatCurrency, formatPercentRaw } from "../lib/utils";
 import type { CSSProperties } from "react";
 import { Bell, Send, X } from "lucide-react";
-import { Stat } from "./Glass";
+import { Kpi } from "./Cockpit";
 
 interface AlertCardProps {
   alert: FlowAlert;
@@ -17,7 +17,7 @@ export function AlertCard({ alert, onDismiss, onSendDiscord }: AlertCardProps) {
     alert.side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
 
   return (
-    <div className="card flex flex-col gap-3">
+    <article className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-bg-card p-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -39,7 +39,7 @@ export function AlertCard({ alert, onDismiss, onSendDiscord }: AlertCardProps) {
           {onSendDiscord && (
             <button
               onClick={() => onSendDiscord(alert.id)}
-              className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-bg-card-hover hover:text-accent-blue"
+              className="rounded-md p-1.5 text-text-muted transition-colors hover:bg-bg-card-hover hover:text-accent"
               title="Send to Discord"
               aria-label="Send to Discord"
             >
@@ -61,16 +61,17 @@ export function AlertCard({ alert, onDismiss, onSendDiscord }: AlertCardProps) {
 
       {/* Price + dip info */}
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="Ref" value={formatCurrency(alert.ref_price)} />
-        <Stat label="Now" value={formatCurrency(alert.current_price)} />
+        <Kpi label="Ref" value={formatCurrency(alert.ref_price)} size="md" />
+        <Kpi label="Now" value={formatCurrency(alert.current_price)} size="md" />
         {alert.dip_pct !== 0 && (
-          <Stat
+          <Kpi
             label="Dip"
             value={
               <span style={{ color: alert.dip_pct < 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
                 {formatPercentRaw(alert.dip_pct)}
               </span>
             }
+            size="md"
           />
         )}
       </div>
@@ -79,6 +80,6 @@ export function AlertCard({ alert, onDismiss, onSendDiscord }: AlertCardProps) {
       {alert.reason && (
         <p className="text-sm leading-relaxed text-text-secondary">{alert.reason}</p>
       )}
-    </div>
+    </article>
   );
 }

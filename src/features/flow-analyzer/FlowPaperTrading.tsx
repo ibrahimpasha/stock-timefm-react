@@ -1,12 +1,12 @@
 import { useState, useMemo } from "react";
-import type { ReactNode } from "react";
 import { SystemRiskStatus } from "./SystemRiskStatus";
 import { TradeDecisionLog } from "./TradeDecisionLog";
 import { MissedOpportunities } from "./MissedOpportunities";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../../api/client";
 import { formatCurrency, changeColor } from "../../lib/utils";
-import { Chip, Stat } from "../../components/Glass";
+import { Chip } from "../../components/Glass";
+import { TileGrid, Tile, Kpi, BarRow, Gauge, CockpitButton, toneOf } from "../../components/Cockpit";
 import { premiumChange, markedExposure, signedPercent } from "../../lib/markFreshness";
 import { MarkFreshness } from "../../components/MarkFreshness";
 import { QueryNotice } from "../../components/QueryNotice";
@@ -255,19 +255,6 @@ function SynthesisReport({ report }: { report: string }) {
   );
 }
 
-/** v2 section heading: serif title, optional sub, actions to the right. */
-function SectionHead({ title, sub, actions }: { title: ReactNode; sub?: ReactNode; actions?: ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-      <div className="min-w-0">
-        <h2 className="section-title">{title}</h2>
-        {sub && <p className="section-sub">{sub}</p>}
-      </div>
-      {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>}
-    </div>
-  );
-}
-
 function PaperQueryError({ label, onRetry }: { label: string; onRetry: () => void }) {
   return (
     <div className="card flex items-center gap-2 py-2 px-3 text-xs text-accent-red">
@@ -368,10 +355,24 @@ export function FlowPaperTrading() {
   }
 
   const ret = summary.return_pct;
-  const retColor = changeColor(ret);
   const positions = summary.positions || [];
   const signedMoney = (v: number) => `${v >= 0 ? "+" : ""}${formatCurrency(v)}`;
   const exposure = markedExposure(positions);
+
+  const deployedPct = summary.total_value > 0 ? (summary.positions_value / summary.total_value) * 100 : 0;
+  const byTicker = new Map<string, number>();
+  let callValue = 0;
+  let putValue = 0;
+  for (const p of positions) {
+    const v = p.current_value ?? p.cost_basis;
+    byTicker.set(p.ticker, (byTicker.get(p.ticker) ?? 0) + v);
+    if (p.option_type === "CALL" || p.option_type === "C") callValue += v;
+    else putValue += v;
+  }
+  const alloc = [...byTicker.entries()].sort((a, b) => b[1] - a[1]);
+  const allocMax = alloc[0]?.[1] ?? 0;
+  const optValue = callValue + putValue;
+  const pnlMax = Math.max(1, ...positions.map((p) => Math.abs(p.pnl_pct ?? 0)));
 
   const watchRow = (w: IFlowWatchlistItem, idx: number, analysisOnly: boolean) => {
     const optColor =
@@ -383,7 +384,7 @@ export function FlowPaperTrading() {
     return (
       <div
         key={w.id ?? idx}
-        className="data-row flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-2 py-2.5"
+        className="data-row flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-2 py-2"
       >
         <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
           <ScoreBadge score={w.score} />
@@ -410,7 +411,7 @@ export function FlowPaperTrading() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <QueryNotice queries={[summaryQuery, statusQuery, watchlistQuery, synthesisQuery]} label="Flow trader feeds" />
       {(scanMutation.isError || resetMutation.isError || synthesisMutation.isError) && <p role="alert" className="callout" style={{ "--callout": "var(--accent-red)" } as React.CSSProperties}>Trader action failed. Reload before retrying; a timed-out action may have completed.</p>}
 
@@ -424,158 +425,82 @@ export function FlowPaperTrading() {
         <PaperQueryError label="Unable to load trader synthesis." onRetry={() => void synthesisQuery.refetch()} />
       )}
 
-      {/* Hero: book equity + return is the focal point; supporting stats beside it. */}
-      <section className="space-y-4" aria-label="Flow trader book summary">
-        <div className="grid items-start gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-          <div className="min-w-0">
-            <div className="text-sm text-text-muted">Flow trader equity</div>
-            <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <span className="num text-3xl font-semibold tracking-tight text-text-primary">
-                {formatCurrency(summary.total_value)}
-              </span>
-              <span className="num text-xl font-semibold" style={{ color: retColor }}>
-                {ret >= 0 ? "+" : ""}
-                {ret.toFixed(2)}%
-              </span>
-            </div>
-            <div className="mt-1 text-xs text-text-muted">
-              Unrealized{" "}
-              <span className="num" style={{ color: changeColor(summary.unrealized_pnl) }}>
-                {signedMoney(summary.unrealized_pnl)}
-              </span>
-            </div>
-            {/* Action buttons */}
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => scanMutation.mutate()}
-                disabled={scanMutation.isPending}
-                className="flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] bg-accent-blue px-3 text-sm font-medium text-bg-primary transition-all hover:brightness-110 disabled:opacity-40 md:min-h-8"
-              >
-                {scanMutation.isPending ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <RefreshCw size={14} />
-                )}
-                Scan and trade
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (confirm("Reset flow paper trader to $10K?"))
-                    resetMutation.mutate();
-                }}
-                className="flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-3 text-sm text-text-secondary transition-all hover:bg-bg-card-hover hover:text-accent-red md:min-h-8"
-              >
-                <RotateCcw size={12} />
-                Reset
-              </button>
-            </div>
+      {/* Actions */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <CockpitButton primary onClick={() => scanMutation.mutate()} disabled={scanMutation.isPending}>
+          {scanMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          Scan and trade
+        </CockpitButton>
+        <CockpitButton
+          onClick={() => {
+            if (confirm("Reset flow paper trader to $10K?"))
+              resetMutation.mutate();
+          }}
+        >
+          <RotateCcw size={14} />
+          Reset
+        </CockpitButton>
+      </div>
+
+      <TileGrid>
+        {/* KPI strip */}
+        <Tile span={3}>
+          <Kpi
+            size="xl"
+            label="Flow trader equity"
+            value={formatCurrency(summary.total_value, 0)}
+            delta={`${ret >= 0 ? "+" : ""}${ret.toFixed(2)}%`}
+            tone={toneOf(ret)}
+            sub={<>cash <span className="num">{formatCurrency(summary.cash, 0)}</span></>}
+          />
+        </Tile>
+        <Tile span={3}>
+          <Kpi
+            label="Unrealized P/L"
+            value={<span style={{ color: changeColor(summary.unrealized_pnl) }}>{signedMoney(summary.unrealized_pnl)}</span>}
+            sub={<>realized <span className="num" style={{ color: changeColor(summary.realized_pnl) }}>{signedMoney(summary.realized_pnl)}</span></>}
+          />
+        </Tile>
+        <Tile span={3}>
+          <Kpi
+            label="Deployed"
+            value={`${deployedPct.toFixed(0)}%`}
+            sub={<><span className="num">{formatCurrency(summary.positions_value, 0)}</span> in positions</>}
+          />
+          <div className="h-1.5 rounded-full" style={{ background: "var(--track)" }} aria-hidden="true">
+            <div className="h-1.5 rounded-full bg-accent" style={{ width: `${Math.min(100, deployedPct)}%` }} />
           </div>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4 min-[480px]:grid-cols-3">
-            <Stat label="Cash" value={formatCurrency(summary.cash)} />
-            <Stat label="In positions" value={formatCurrency(summary.positions_value)} />
-            <Stat
-              label="Realized"
-              tone={summary.realized_pnl >= 0 ? "green" : "red"}
-              value={signedMoney(summary.realized_pnl)}
-            />
-            <Stat label="Win rate" value={`${summary.win_rate.toFixed(0)}%`} sub={`${summary.closed_positions} closed`} />
-            <Stat label="Open" value={summary.open_positions} />
-            <Stat label="Watching" value={summary.watching} />
-          </div>
-        </div>
+        </Tile>
+        <Tile span={3}>
+          <Kpi
+            label="Open positions"
+            value={summary.open_positions}
+            sub={<><span className="num">{summary.watching}</span> watching · win <span className="num">{summary.win_rate.toFixed(0)}%</span> of <span className="num">{summary.closed_positions}</span></>}
+          />
+        </Tile>
 
         {exposure.count > 0 && (
-          <p className="callout max-w-[72ch]">
+          <p className="callout max-w-[90ch] lg:col-span-12">
             Recorded valuation: <span className="num">{exposure.count}</span> positions (<span className="num">{formatCurrency(exposure.value)}</span> carried exposure) have stale, incomplete, unverified or unknown marks. Return is not a live quote.
           </p>
         )}
 
-        {(macro || slots) && (
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border pt-3 text-sm text-text-muted">
-            {macro && (
-              <>
-                <span className="inline-flex items-center gap-1 text-xs">
-                  <Activity size={12} /> Macro
-                </span>
-                <span>
-                  SPY <span className="num text-text-primary">${macro.spy_price.toFixed(2)}</span>{" "}
-                  <span className={macro.spy_change_pct >= 0 ? "delta-up" : "delta-down"}>
-                    {macro.spy_change_pct >= 0 ? "+" : ""}
-                    {macro.spy_change_pct.toFixed(2)}%
-                  </span>
-                </span>
-                <span>
-                  VIX{" "}
-                  <span
-                    className="num"
-                    style={{
-                      color:
-                        macro.vix >= 35
-                          ? "var(--accent-red)"
-                          : macro.vix >= 25
-                            ? "var(--accent-orange)"
-                            : "var(--text-primary)",
-                    }}
-                  >
-                    {macro.vix.toFixed(1)}
-                  </span>
-                </span>
-                {macro.is_safe ? (
-                  <span className="inline-flex items-center gap-1 text-text-secondary">
-                    <Shield size={12} /> Safe
-                  </span>
-                ) : (
-                  <Chip tone="red">
-                    <Shield size={12} /> Unsafe
-                  </Chip>
-                )}
-                <span>{macro.market_status}</span>
-              </>
-            )}
-            {slots && (
-              <span className="inline-flex flex-wrap items-center gap-x-4 gap-y-1">
-                <span className="inline-flex items-center gap-1 text-xs">
-                  <Layers size={12} /> Slots
-                </span>
-                {([
-                  ["Day trade", slots.day_trade],
-                  ["Swing", slots.swing],
-                ] as const).map(([label, sl]) => (
-                  <span key={label} className="inline-flex items-center gap-1.5">
-                    {label}
-                    <span className="inline-flex items-center gap-1">
-                      {Array.from({ length: sl.max }, (_, i) => (
-                        <span
-                          key={i}
-                          className="h-2.5 w-2.5 rounded-sm border border-border"
-                          style={{ background: i < sl.used ? "var(--accent-blue)" : "transparent" }}
-                        />
-                      ))}
-                    </span>
-                    <span className="num text-text-primary">
-                      {sl.used}/{sl.max}
-                    </span>
-                  </span>
-                ))}
-              </span>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* System Risk Status (drawdown, circuit breaker, slots, sector warnings) */}
-      <SystemRiskStatus />
-
-      {/* Open Positions */}
-      {positions.length > 0 && (
-        <section className="space-y-3">
-          <SectionHead
-            title={<>Open positions <span className="num text-base text-text-muted">{positions.length}</span></>}
-            sub="Select a row for entry, targets and the analysis behind it."
-          />
-          <div className="card divide-y divide-border">
+        {/* Open positions (primary) */}
+        <Tile
+          span={8}
+          title={<>Open positions <span className="num font-normal text-text-muted">{positions.length}</span></>}
+          meta="Select a row for entry, targets and the analysis behind it"
+        >
+          {positions.length === 0 ? (
+            <p className="py-6 text-sm text-text-muted">No open positions.</p>
+          ) : (
+            <div className="divide-y divide-border">
+              <div className="hidden grid-cols-[minmax(0,1fr)_5.5rem_5.5rem_9rem] gap-3 px-2 pb-2 text-xs text-text-muted md:grid">
+                <span>Contract</span>
+                <span className="text-right">Cost</span>
+                <span className="text-right">Value</span>
+                <span className="text-right">P/L</span>
+              </div>
             {positions.map((pos) => {
               const pnlColor = pos.pnl_pct == null ? "var(--text-muted)" : changeColor(pos.pnl_pct);
               const sideColor =
@@ -591,11 +516,12 @@ export function FlowPaperTrading() {
               const tp1Target = pos.entry_premium * (1 + (policy?.tp1_pct ?? 0) / 100);
               const tp2Target = pos.entry_premium * (1 + (policy?.tp2_pct ?? 0) / 100);
               const slotLabel = pos.slot_type === "day_trade" ? "DT" : "SW";
+              const barPct = pos.pnl_pct ? Math.max(4, (Math.abs(pos.pnl_pct) / pnlMax) * 100) : 0;
 
               return (
                 <div
                   key={pos.id}
-                  className="data-row cursor-pointer px-2 py-3.5"
+                  className="data-row cursor-pointer px-2 py-2.5"
                   role="button"
                   tabIndex={0}
                   aria-expanded={isExpanded}
@@ -608,10 +534,10 @@ export function FlowPaperTrading() {
                     }
                   }}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 md:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem_9rem]">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
                       <SideIcon side={pos.side} />
-                      <span className="ticker text-base">{pos.ticker}</span>
+                      <span className="ticker text-sm">{pos.ticker}</span>
                       <span className="num text-sm text-text-primary">
                         ${pos.strike} {pos.option_type}
                       </span>
@@ -619,29 +545,21 @@ export function FlowPaperTrading() {
                         <span className="num">x{pos.contracts}</span>
                         {pos.scaled_out ? " (scaled)" : ""} · <span title={pos.slot_type === "day_trade" ? "Day trade slot" : "Swing slot"}>{slotLabel}</span>
                       </span>
+                      <MarkFreshness at={pos.last_marked_at ?? pos.updated_at} status={pos.mark_status} quality={pos.mark_quality} />
                     </div>
-                    <div className="flex items-end gap-6">
-                      <div className="text-right text-xs">
-                        <div className="text-text-muted">Cost</div>
-                        <div className="num text-sm text-text-primary">
-                          {formatCurrency(pos.cost_basis)}
-                        </div>
-                      </div>
-                      <div className="text-right text-xs">
-                        <div className="text-text-muted">Value</div>
-                        <div className="num text-sm text-text-primary">
-                          {pos.current_value == null ? "Unknown" : formatCurrency(pos.current_value)}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs text-text-muted">P/L</div>
-                        <div className="num text-lg font-semibold" style={{ color: pnlColor }}>
-                          {signedPercent(pos.pnl_pct)}
-                        </div>
-                      </div>
-                    </div>
+                    <span className="num hidden text-right text-sm text-text-secondary md:block">{formatCurrency(pos.cost_basis, 0)}</span>
+                    <span className="num hidden text-right text-sm text-text-primary md:block">
+                      {pos.current_value == null ? "Unknown" : formatCurrency(pos.current_value, 0)}
+                    </span>
+                    <span className="flex items-center justify-end gap-2">
+                      <span className="h-2 w-12 rounded-[2px]" style={{ background: "var(--track)" }} aria-hidden="true">
+                        <span className="block h-2 rounded-[2px]" style={{ width: `${barPct}%`, background: pnlColor }} />
+                      </span>
+                      <span className="num w-16 text-right text-sm font-semibold" style={{ color: pnlColor }}>
+                        {signedPercent(pos.pnl_pct)}
+                      </span>
+                    </span>
                   </div>
-                  <MarkFreshness at={pos.last_marked_at ?? pos.updated_at} status={pos.mark_status} quality={pos.mark_quality} />
 
                   {isExpanded && (
                     <div className="mt-3 space-y-3 border-t border-border pt-3">
@@ -687,7 +605,7 @@ export function FlowPaperTrading() {
                       </div>
 
                       {pos.analysis && (
-                        <p className="prose-read max-w-[72ch] text-text-secondary">
+                        <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">
                           {pos.analysis}
                         </p>
                       )}
@@ -738,106 +656,197 @@ export function FlowPaperTrading() {
               );
             })}
           </div>
-        </section>
-      )}
+          )}
+        </Tile>
 
-      {/* WL-A / WL-B Separated Watchlist */}
-      {(wla.length > 0 || wlb.length > 0) && (
-        <section className="space-y-3">
-          <SectionHead
-            title={<>Watchlist <span className="num text-base text-text-muted">{wla.length + wlb.length}</span></>}
-            sub="List A enters automatically at the gate price; list B is analysis only. P/L is the mark against the reference premium."
-          />
-          <div className="card space-y-6">
-            {/* WL-A — Auto-Entry */}
-            {wla.length > 0 && (
-              <div>
-                <h3 className="mb-1 inline-flex items-center gap-1.5 text-base font-semibold text-text-primary">
-                  <Zap size={14} className="text-text-muted" />List A: auto-entry <span className="num text-sm font-normal text-text-muted">{wla.length}</span>
-                </h3>
-                <div className="divide-y divide-border">
-                  {wla.map((w, idx) => watchRow(w, idx, false))}
+        {/* Market + allocation column */}
+        <div className="flex min-w-0 flex-col gap-3.5 lg:col-span-4">
+          <Tile title="Market" meta={macro?.market_status}>
+            {macro ? (
+              <>
+                <div className="flex items-baseline justify-between gap-3">
+                  <Kpi
+                    size="md"
+                    label="SPY"
+                    value={`$${macro.spy_price.toFixed(2)}`}
+                    delta={`${macro.spy_change_pct >= 0 ? "+" : ""}${macro.spy_change_pct.toFixed(2)}%`}
+                    tone={toneOf(macro.spy_change_pct)}
+                  />
+                  {macro.is_safe ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-text-secondary">
+                      <Shield size={12} /> Safe
+                    </span>
+                  ) : (
+                    <Chip tone="red">
+                      <Shield size={12} /> Unsafe
+                    </Chip>
+                  )}
                 </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="inline-flex items-center gap-1 text-xs text-text-muted">
+                    <Activity size={12} /> VIX <span className="num text-text-primary">{macro.vix.toFixed(1)}</span>
+                  </span>
+                  <Gauge value={macro.vix} min={10} max={40} ticks={["10", "20", "30", "40+"]} />
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-text-muted">Macro unavailable.</p>
+            )}
+            {slots && (
+              <div className="flex flex-col gap-2 border-t border-border pt-3">
+                <span className="inline-flex items-center gap-1 text-xs text-text-muted">
+                  <Layers size={12} /> Slots
+                </span>
+                {([
+                  ["Day trade", slots.day_trade],
+                  ["Swing", slots.swing],
+                ] as const).map(([label, sl]) => (
+                  <div key={label} className="flex items-center justify-between gap-3 text-sm text-text-secondary">
+                    <span>{label}</span>
+                    <span className="inline-flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1">
+                        {Array.from({ length: sl.max }, (_, i) => (
+                          <span
+                            key={i}
+                            className="h-3 w-3 rounded-[3px]"
+                            style={{ background: i < sl.used ? "var(--accent)" : "var(--track)" }}
+                          />
+                        ))}
+                      </span>
+                      <span className="num text-text-primary">
+                        {sl.used}/{sl.max}
+                      </span>
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
+          </Tile>
 
-            {/* WL-B — Analysis Only */}
-            {wlb.length > 0 && (
-              <div className={wla.length > 0 ? "border-t border-border pt-4" : undefined}>
-                <h3 className="mb-1 inline-flex items-center gap-1.5 text-base font-semibold text-text-primary">
-                  <Eye size={14} className="text-text-muted" />List B: analysis only <span className="num text-sm font-normal text-text-muted">{wlb.length}</span>
+          <Tile title="Exposure" meta="carried value">
+            {alloc.length === 0 ? (
+              <p className="text-sm text-text-muted">No open positions.</p>
+            ) : (
+              <>
+                {optValue > 0 && (
+                  <div className="flex flex-col gap-1.5 pb-1">
+                    <div className="flex h-3 overflow-hidden rounded-[3px]" style={{ background: "var(--track)" }} aria-hidden="true">
+                      <span style={{ width: `${(callValue / optValue) * 100}%`, background: "var(--accent-green)" }} />
+                      <span style={{ width: `${(putValue / optValue) * 100}%`, background: "var(--accent-red)" }} />
+                    </div>
+                    <div className="num flex justify-between text-xs">
+                      <span className="text-accent-green">Calls {formatCurrency(callValue, 0)}</span>
+                      <span className="text-accent-red">Puts {formatCurrency(putValue, 0)}</span>
+                    </div>
+                  </div>
+                )}
+                {alloc.map(([t, v]) => (
+                  <BarRow
+                    key={t}
+                    label={t}
+                    value={v}
+                    max={allocMax}
+                    tone="info"
+                    display={formatCurrency(v, 0)}
+                    trailing={summary.total_value > 0 ? `${((v / summary.total_value) * 100).toFixed(0)}%` : "—"}
+                  />
+                ))}
+              </>
+            )}
+          </Tile>
+        </div>
+
+        {/* System Risk Status (drawdown, circuit breaker, slots, sector warnings) */}
+        <div className="min-w-0 lg:col-span-12">
+          <SystemRiskStatus />
+        </div>
+
+        {/* WL-A / WL-B Separated Watchlist */}
+        {(wla.length > 0 || wlb.length > 0) && (
+          <Tile
+            span={12}
+            title={<>Watchlist <span className="num font-normal text-text-muted">{wla.length + wlb.length}</span></>}
+            meta="List A enters at the gate price; list B is analysis only. P/L is the mark against the reference premium."
+          >
+            <div className="grid gap-x-8 gap-y-6 lg:grid-cols-2">
+              <div className="min-w-0">
+                <h3 className="mb-1 inline-flex items-center gap-1.5 text-sm font-semibold text-text-primary">
+                  <Zap size={14} className="text-accent" />List A: auto-entry <span className="num font-normal text-text-muted">{wla.length}</span>
                 </h3>
                 <div className="divide-y divide-border">
-                  {wlb.map((w, idx) => watchRow(w, idx, true))}
+                  {wla.length ? wla.map((w, idx) => watchRow(w, idx, false)) : <p className="py-2 text-sm text-text-muted">Empty.</p>}
                 </div>
               </div>
-            )}
-          </div>
-        </section>
-      )}
+              <div className="min-w-0">
+                <h3 className="mb-1 inline-flex items-center gap-1.5 text-sm font-semibold text-text-primary">
+                  <Eye size={14} className="text-text-muted" />List B: analysis only <span className="num font-normal text-text-muted">{wlb.length}</span>
+                </h3>
+                <div className="divide-y divide-border">
+                  {wlb.length ? wlb.map((w, idx) => watchRow(w, idx, true)) : <p className="py-2 text-sm text-text-muted">Empty.</p>}
+                </div>
+              </div>
+            </div>
+          </Tile>
+        )}
 
-      {/* Trade Decision Log — closed positions with full scoring rationale + exit reason */}
-      <details className="group/log">
-        <summary className="flex cursor-pointer list-none items-center gap-2 marker:content-none">
-          <ChevronRight size={16} className="shrink-0 text-text-muted transition-transform group-open/log:rotate-90" aria-hidden="true" />
-          <span className="section-title">Closed trades and decision log</span>
-        </summary>
-        <div className="mt-3 text-xs"><TradeDecisionLog /></div>
-      </details>
+        {/* Trade Decision Log — closed positions with full scoring rationale + exit reason */}
+        <details className="group/log min-w-0 lg:col-span-12">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-border bg-bg-card px-4 text-[0.9375rem] font-semibold text-text-primary marker:content-none hover:bg-bg-card-hover">
+            <ChevronRight size={16} className="shrink-0 text-text-muted transition-transform group-open/log:rotate-90" aria-hidden="true" />
+            Closed trades and decision log
+          </summary>
+          <div className="mt-3 text-xs"><TradeDecisionLog /></div>
+        </details>
 
-      {/* Missed Opportunities — WL-A unfilled + WL-B high-score with what-if P/L */}
-      <details className="group/missed">
-        <summary className="flex cursor-pointer list-none items-center gap-2 marker:content-none">
-          <ChevronRight size={16} className="shrink-0 text-text-muted transition-transform group-open/missed:rotate-90" aria-hidden="true" />
-          <span className="section-title">Missed opportunities</span>
-        </summary>
-        <div className="mt-3 text-xs"><MissedOpportunities /></div>
-      </details>
+        {/* Missed Opportunities — WL-A unfilled + WL-B high-score with what-if P/L */}
+        <details className="group/missed min-w-0 lg:col-span-12">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-border bg-bg-card px-4 text-[0.9375rem] font-semibold text-text-primary marker:content-none hover:bg-bg-card-hover">
+            <ChevronRight size={16} className="shrink-0 text-text-muted transition-transform group-open/missed:rotate-90" aria-hidden="true" />
+            Missed opportunities
+          </summary>
+          <div className="mt-3 text-xs"><MissedOpportunities /></div>
+        </details>
 
-      {/* Synthesis Report + trigger */}
-      <section className="space-y-3">
-        <SectionHead
-          title={<>Daily synthesis {synthesis?.date && <span className="num text-sm text-text-muted">{synthesis.date}</span>}</>}
-          sub="Claude's read of today's flow, positions and research."
+        {/* Synthesis Report + trigger (long-form reading keeps the serif) */}
+        <Tile
+          span={12}
+          title={<>Daily synthesis {synthesis?.date && <span className="num font-normal text-text-muted">{synthesis.date}</span>}</>}
+          meta="Claude's read of today's flow, positions and research"
           actions={
-            <button
-              onClick={() => synthesisMutation.mutate()}
-              disabled={synthesisMutation.isPending}
-              type="button"
-              className="flex min-h-11 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary disabled:opacity-40 md:min-h-8"
-            >
+            <CockpitButton onClick={() => synthesisMutation.mutate()} disabled={synthesisMutation.isPending}>
               {synthesisMutation.isPending ? (
                 <>
-                  <Loader2 size={12} className="animate-spin" />
+                  <Loader2 size={14} className="animate-spin" />
                   Generating with Claude...
                 </>
               ) : (
                 <>
-                  <RefreshCw size={12} />
+                  <RefreshCw size={14} />
                   Generate
                 </>
               )}
-            </button>
+            </CockpitButton>
           }
-        />
-        {synthesisMutation.isPending && (
-          <div className="flex items-center gap-2 py-3 text-sm text-text-secondary">
-            <Loader2 size={14} className="animate-spin" />
-            Claude is analyzing flow data + research... this takes 30-60 seconds
-          </div>
-        )}
-        {synthesis?.report ? (
-          <SynthesisReport report={synthesis.report} />
-        ) : (
-          <p className="py-3 text-sm text-text-muted">
-            No synthesis report yet — click Generate to create one
-          </p>
-        )}
-      </section>
+        >
+          {synthesisMutation.isPending && (
+            <div className="flex items-center gap-2 py-3 text-sm text-text-secondary">
+              <Loader2 size={14} className="animate-spin" />
+              Claude is analyzing flow data + research... this takes 30-60 seconds
+            </div>
+          )}
+          {synthesis?.report ? (
+            <SynthesisReport report={synthesis.report} />
+          ) : (
+            <p className="py-3 text-sm text-text-muted">
+              No synthesis report yet — click Generate to create one
+            </p>
+          )}
+        </Tile>
+      </TileGrid>
 
       {/* Empty state */}
       {positions.length === 0 && wla.length === 0 && wlb.length === 0 && (
-        <p className="prose-read py-8 text-center text-text-muted">
+        <p className="py-8 text-center text-sm text-text-muted">
           Click <strong>Scan and trade</strong> to analyze flow entries and start
           watching for dip-buy opportunities.
         </p>

@@ -32,11 +32,11 @@ export function BullBearBar({
         </div>
       )}
       <div
-        className="w-full rounded-full overflow-hidden flex"
-        style={{ height: `${height}px`, background: "var(--text-muted)", opacity: 0.3 }}
+        className="flex w-full gap-0.5 overflow-hidden rounded-[3px]"
+        style={{ height: `${height}px`, background: "var(--track)" }}
       >
         <div
-          className="transition-all duration-300 rounded-l-full"
+          className="rounded-l-[3px] transition-all duration-300"
           style={{
             width: `${bullPct}%`,
             background: "var(--accent-green)",
@@ -45,7 +45,7 @@ export function BullBearBar({
           }}
         />
         <div
-          className="transition-all duration-300 rounded-r-full"
+          className="rounded-r-[3px] transition-all duration-300"
           style={{
             width: `${bearPct}%`,
             background: "var(--accent-red)",

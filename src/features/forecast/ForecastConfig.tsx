@@ -7,16 +7,16 @@ import {
 } from "lucide-react";
 import { MODEL_LABELS, MODEL_COLORS } from "../../lib/constants";
 import { todayLocalDate } from "../../lib/dateOnly";
+import { CockpitButton } from "../../components/Cockpit";
+import { Segmented } from "../../components/Glass";
 
-// 2026-10-19 backtest verdict: no learned model beats the random walk on
-// range accuracy (CRPS), and none calls direction better than "always up"
-// (best edge -1pp, itransformer/timemixer -14/-17pp at 10d; consensus is
-// worse). So the default view is the RW range only; learned models are
-// research overlays. timexer is removed while its checkpoint fails to load
-// (backend refuses it). Research order = CRPS rank vs RW.
-const PRIMARY_MODELS = ["rw"];
+// Default = one model, so the card shows a single call instead of six that
+// disagree. chronos2 is the best learned model on range accuracy (CRPS) in
+// the 2026-10-19 backtest. The random-walk baseline is NOT offered here at
+// all (user: "don't want to see Random Walk Baseline") — it stays a backend
+// benchmark only. timexer stays out while its checkpoint fails to load.
+const PRIMARY_MODELS = ["chronos2"];
 const RESEARCH_MODELS = [
-  "chronos2",
   "dlinear",
   "itransformer",
   "timemixer",
@@ -29,7 +29,7 @@ const RESEARCH_MODELS = [
 ];
 const AVAILABLE_MODELS = [...PRIMARY_MODELS, ...RESEARCH_MODELS];
 
-/** Default view: the calibrated random-walk range — no directional call. */
+/** Default view: chronos2 alone. */
 export const DEFAULT_MODELS = [...PRIMARY_MODELS];
 
 const INTERVALS = ["15m", "30m", "1h", "4h"] as const;
@@ -87,8 +87,8 @@ export const DEFAULT_SETTINGS: ForecastSettings = {
 const pill = (on: boolean) =>
   `min-h-8 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
     on
-      ? "border border-accent-blue/40 bg-accent-blue/10 text-text-primary"
-      : "border border-border text-text-muted hover:text-text-secondary"
+      ? "border border-accent bg-accent text-[var(--accent-ink)]"
+      : "border border-border text-text-muted hover:border-[var(--control-boundary)] hover:text-text-primary"
   }`;
 const fieldLabel = "text-xs font-medium text-text-muted mb-1.5 block";
 
@@ -148,41 +148,33 @@ export function ForecastConfig({
   };
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="section-title">Forecast</h3>
-          <p className="section-sub">
-            Random-walk range by default. Learned models are research overlays with no backtested edge.
-          </p>
-        </div>
-      </div>
+    <div className="flex flex-col gap-4">
+      <p className="text-xs leading-relaxed text-text-muted">
+        Chronos-2 by default. Add other models below to compare.
+      </p>
       {/* Row 1: Type + Horizon + History + Origin */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
         {/* Forecast Type */}
         <div>
           <span className={fieldLabel}>Type</span>
-          <div className="flex gap-1">
-            {(["daily", "intraday"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                aria-pressed={settings.forecastType === t}
-                onClick={() => update({
-                  forecastType: t,
-                  selectedModels:
-                    t === "intraday" && settings.selectedModels.includes("ensemble")
-                      ? settings.selectedModels.filter((model) => model !== "ensemble").concat(
-                          settings.selectedModels.some((model) => model !== "ensemble") ? [] : ["rw"],
-                        )
-                      : settings.selectedModels,
-                })}
-                className={`flex-1 capitalize ${pill(settings.forecastType === t)}`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
+          <Segmented<"daily" | "intraday">
+            ariaLabel="Forecast type"
+            className="w-full"
+            options={[
+              { value: "daily", label: "Daily" },
+              { value: "intraday", label: "Intraday" },
+            ]}
+            value={settings.forecastType}
+            onChange={(t) => update({
+              forecastType: t,
+              selectedModels:
+                t === "intraday" && settings.selectedModels.includes("ensemble")
+                  ? settings.selectedModels.filter((model) => model !== "ensemble").concat(
+                      settings.selectedModels.some((model) => model !== "ensemble") ? [] : PRIMARY_MODELS,
+                    )
+                  : settings.selectedModels,
+            })}
+          />
         </div>
 
         {/* Horizon */}
@@ -201,7 +193,7 @@ export function ForecastConfig({
                 onChange={(e) =>
                   update({ forecastDays: Number(e.target.value) })
                 }
-                className="flex-1 accent-[var(--accent-blue)]"
+                className="flex-1 accent-[var(--accent)]"
               />
               <span className="num text-sm font-semibold text-text-primary w-6 text-right">
                 {settings.forecastDays}
@@ -219,7 +211,7 @@ export function ForecastConfig({
                 onChange={(e) =>
                   update({ forecastMinutes: Number(e.target.value) })
                 }
-                className="flex-1 accent-[var(--accent-blue)]"
+                className="flex-1 accent-[var(--accent)]"
               />
               <span className="num text-sm font-semibold text-text-primary w-12 text-right">
                 {settings.forecastMinutes}m
@@ -244,7 +236,7 @@ export function ForecastConfig({
                 onChange={(e) =>
                   update({ historyDays: Number(e.target.value) })
                 }
-                className="flex-1 accent-[var(--accent-blue)]"
+                className="flex-1 accent-[var(--accent)]"
               />
               <span className="num text-sm font-semibold text-text-primary w-9 text-right">
                 {settings.historyDays}
@@ -286,14 +278,14 @@ export function ForecastConfig({
       {/* Row 2: Models */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-semibold text-text-primary">
+          <span className="text-xs font-semibold text-text-secondary">
             Models <span className="num font-normal text-text-muted">{settings.selectedModels.length}/{availableModels.length}</span>
           </span>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={selectAll}
-              className="text-xs text-accent-blue hover:underline"
+              className="text-xs font-medium text-accent hover:underline"
             >
               All
             </button>
@@ -315,14 +307,13 @@ export function ForecastConfig({
           onClick={() => setShowResearch(!showResearch)}
           className="mt-2 flex items-center gap-1 text-xs text-text-muted hover:text-text-secondary transition-colors"
         >
-          Research models
+          More models
           {showResearch ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </button>
         {showResearch && (
           <>
             <p className="max-w-[72ch] text-xs leading-relaxed text-text-muted mt-1 mb-2">
-              No directional edge in backtest: none beat the random-walk range or an
-              &ldquo;always up&rdquo; call. Overlays for research, not signals.
+              Backtests show no model reliably calls direction; treat overlays as context, not signals.
             </p>
             <div className="flex flex-wrap gap-1.5">
               {availableModels.filter((m) => !PRIMARY_MODELS.includes(m)).map(renderChip)}
@@ -343,12 +334,11 @@ export function ForecastConfig({
           {showAdvanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </button>
 
-        <button
-          type="button"
+        <CockpitButton
+          primary
           onClick={onRunForecast}
           disabled={runDisabled}
           title={disabledReason || "Run forecast across selected models"}
-          className="flex min-h-9 items-center gap-2 px-4 py-2 rounded-md bg-accent-blue text-bg-primary font-semibold text-sm transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isLoading ? (
             <>
@@ -361,7 +351,7 @@ export function ForecastConfig({
               Run forecast <span className="num">({settings.selectedModels.length})</span>
             </>
           )}
-        </button>
+        </CockpitButton>
       </div>
       {disabledReason && !isLoading && (
         <div className="text-xs text-text-muted text-right -mt-3">
@@ -384,7 +374,7 @@ export function ForecastConfig({
                 update({ useCovariates: !settings.useCovariates })
               }
               className={`w-9 h-5 rounded-full transition-all ${
-                settings.useCovariates ? "bg-accent-blue" : "bg-border"
+                settings.useCovariates ? "bg-accent" : "bg-border"
               }`}
             >
               <div
@@ -405,7 +395,7 @@ export function ForecastConfig({
                 update({ usePretrained: !settings.usePretrained })
               }
               className={`w-9 h-5 rounded-full transition-all ${
-                settings.usePretrained ? "bg-accent-blue" : "bg-border"
+                settings.usePretrained ? "bg-accent" : "bg-border"
               }`}
             >
               <div

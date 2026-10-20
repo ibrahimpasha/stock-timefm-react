@@ -78,9 +78,9 @@ export function RangeBar({ low, high, last, width = 100 }: RangeBarProps) {
     <div
       style={{
         width,
-        height: 4,
-        background: "var(--border)",
-        borderRadius: 2,
+        height: 8,
+        background: "var(--track)",
+        borderRadius: 3,
         position: "relative",
       }}
     >
@@ -91,20 +91,19 @@ export function RangeBar({ low, high, last, width = 100 }: RangeBarProps) {
           bottom: 0,
           left: `${fillStart}%`,
           width: `${fillEnd - fillStart}%`,
-          background: "var(--accent-blue)",
-          opacity: 0.35,
-          borderRadius: 2,
+          background: "color-mix(in srgb, var(--accent-blue) 45%, transparent)",
+          borderRadius: 3,
         }}
       />
       <div
         style={{
           position: "absolute",
-          top: -2,
-          bottom: -2,
-          left: `calc(${tickPct}% - 1px)`,
-          width: 2,
+          top: -3,
+          bottom: -3,
+          left: `calc(${tickPct}% - 2px)`,
+          width: 4,
+          borderRadius: 2,
           background: "var(--text-primary)",
-          boxShadow: "0 0 0 1px var(--bg-primary)",
         }}
       />
     </div>
@@ -186,7 +185,7 @@ export function Panel({ title, accent, right, children, padding = 10, className 
       style={{
         background: "var(--bg-card)",
         border: `1px solid ${borderColor || "var(--border)"}`,
-        borderRadius: "var(--radius-panel)",
+        borderRadius: "0.75rem",
         boxShadow: boxShadow || "none",
         display: "flex",
         flexDirection: "column",
@@ -199,13 +198,13 @@ export function Panel({ title, accent, right, children, padding = 10, className 
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "10px 12px 0",
+          padding: "14px 16px 0",
           gap: 12,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {accent && <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: accent }} />}
-          <span className="text-sm font-semibold text-text-primary">{title}</span>
+          <span className="text-[0.9375rem] font-semibold text-text-primary">{title}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{right}</div>
       </header>

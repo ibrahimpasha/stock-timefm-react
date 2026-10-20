@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Direction C - Action inbox</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=Martian+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#121417}
+a{color:#8fb0ff}a:hover{color:#b9ceff}
+</style>
+</helmet>
+<div style="min-height: 1180px; display: flex; flex-wrap: wrap; background: #121417; color: #e9ebee; font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 15px;">
+  <nav aria-label="Primary" style="flex: 0 0 72px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 0; border-right: 1px solid #23272c;">
+    <span style="display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: #8fb0ff; color: #121417; font-weight: 700; margin-bottom: 14px;">T</span>
+    <sc-for list="{{ nav }}" as="n" hint-placeholder-count="9">
+      <a href="#" aria-label="{{ n.label }}" style="display: flex; flex-direction: column; align-items: center; gap: 3px; width: 56px; padding: 8px 0; border-radius: 10px; font-size: 11px; text-decoration: none; color: {{ n.color }}; background: {{ n.bg }};">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{ n.d }}"></path></svg>
+        {{ n.label }}
+      </a>
+    </sc-for>
+  </nav>
+
+  <section style="flex: 999 1 560px; min-width: 0; padding: 28px 36px 48px; display: flex; flex-direction: column; gap: 26px; max-width: 860px;">
+    <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;">
+      <div>
+        <div style="font-size: 13px; color: #8d949e;">Monday, Oct 19 · after hours · market closed</div>
+        <h1 style="margin: 4px 0 0; font-size: 34px; font-weight: 700; letter-spacing: -0.025em;">4 things need you today</h1>
+      </div>
+      <label style="display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 10px; background: #1b1e22; width: 260px; color: #8d949e; font-size: 14px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <input aria-label="Jump to ticker" placeholder="Jump to ticker…" style="flex: 1; min-width: 0; border: 0; background: transparent; color: #e9ebee; font: inherit; outline: none;">
+      </label>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+      <span style="padding: 7px 12px; border-radius: 999px; background: #1b1e22; font-size: 13px;">SPY <b style="font-family: 'Martian Mono', monospace; font-weight: 500;">766.48</b> <span style="color: #4fd18b;">+0.69%</span></span>
+      <span style="padding: 7px 12px; border-radius: 999px; background: #1b1e22; font-size: 13px;">VIX <b style="font-family: 'Martian Mono', monospace; font-weight: 500;">18.44</b> moderate</span>
+      <span style="padding: 7px 12px; border-radius: 999px; background: #1b1e22; font-size: 13px;">Posture neutral · full size</span>
+    </div>
+
+    <sc-for list="{{ cards }}" as="c" hint-placeholder-count="4">
+      <article style="display: flex; flex-direction: column; gap: 14px; padding: 20px 22px; border-radius: 16px; background: {{ c.bg }}; border: 1px solid {{ c.border }};">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+          <span style="font-size: 13px; font-weight: 600; color: {{ c.kcolor }};">{{ c.kind }}</span>
+          <span style="font-size: 12px; color: #8d949e;">{{ c.when }}</span>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;">
+          <span style="font-family: 'Martian Mono', monospace; font-size: 24px; font-weight: 600;">{{ c.t }}</span>
+          <span style="font-family: 'Martian Mono', monospace; font-size: 18px; color: {{ c.dcolor }};">{{ c.delta }}</span>
+          <span style="font-size: 20px; font-weight: 600; letter-spacing: -0.01em;">{{ c.title }}</span>
+        </div>
+        <p style="margin: 0; font-size: 16px; line-height: 1.55; color: #b8bec6; max-width: 68ch;">{{ c.body }}</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+          <sc-for list="{{ c.actions }}" as="a" hint-placeholder-count="2">
+            <a href="#" style="padding: 8px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; background: {{ a.bg }}; color: {{ a.color }};">{{ a.label }}</a>
+          </sc-for>
+        </div>
+      </article>
+    </sc-for>
+
+    <details style="border-top: 1px solid #23272c; padding-top: 16px;">
+      <summary style="cursor: pointer; font-size: 15px; font-weight: 600; color: #b8bec6;">Everything else today · 12 movers, 8 flow prints, 9 earnings, theme heat</summary>
+    </details>
+  </section>
+
+  <aside style="flex: 1 1 320px; min-width: 0; padding: 28px 28px 48px; border-left: 1px solid #23272c; display: flex; flex-direction: column; gap: 22px; max-width: 460px;">
+    <section style="display: flex; flex-direction: column; gap: 8px;">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 600; color: #8d949e;">TraderJoe</h2>
+      <div style="font-family: 'Martian Mono', monospace; font-size: 36px; font-weight: 600; letter-spacing: -0.03em;">$18,860</div>
+      <div style="font-family: 'Martian Mono', monospace; font-size: 15px; color: #ff6b6b;">−$1,140 · −5.7%</div>
+      <svg viewBox="0 0 300 70" width="100%" height="70" role="img" aria-label="Equity trending down over 60 days">
+        <polyline points="0,18 30,14 60,20 90,16 120,26 150,30 180,28 210,40 240,44 270,52 300,50" fill="none" stroke="#ff6b6b" stroke-width="2"></polyline>
+      </svg>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; font-size: 13px; color: #8d949e;">
+        <div>Open<div style="font-family: 'Martian Mono', monospace; font-size: 17px; color: #e9ebee;">15</div></div>
+        <div>Deployed<div style="font-family: 'Martian Mono', monospace; font-size: 17px; color: #e9ebee;">55%</div></div>
+        <div>Near stop<div style="font-family: 'Martian Mono', monospace; font-size: 17px; color: #e9ebee;">0</div></div>
+      </div>
+    </section>
+    <section style="display: flex; flex-direction: column; gap: 4px;">
+      <h2 style="margin: 0 0 6px; font-size: 15px; font-weight: 600; color: #8d949e;">All books</h2>
+      <sc-for list="{{ books }}" as="b" hint-placeholder-count="7">
+        <div style="display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #1f2327; font-size: 14px;">
+          <span>{{ b.name }}</span><span style="font-family: 'Martian Mono', monospace; color: {{ b.color }};">{{ b.pct }}</span>
+        </div>
+      </sc-for>
+    </section>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const up = '#4fd18b', dn = '#ff6b6b';
+    const icons = { Today: 'M3 12h18M12 3v18', Flow: 'M3 17l6-6 4 4 8-8', Books: 'M4 5h16v14H4zM4 10h16', Intel: 'M5 4h14v16H5zM8 8h8M8 12h8M8 16h5', Traders: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-3 3-5 6-5s6 2 6 5M17 11a3 3 0 1 0 0-6', Pillars: 'M4 20V9M10 20V5M16 20v-8M22 20H2', Rotation: 'M12 3a9 9 0 1 0 9 9M12 7v5l3 3', GEX: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z', Map: 'M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z' };
+    const nav = Object.keys(icons).map((label, i) => ({ label, d: icons[label], color: i===0?'#e9ebee':'#8d949e', bg: i===0?'#1f2329':'transparent' }));
+    const ghost = { bg: '#262a30', color: '#e9ebee' };
+    const primary = { bg: '#8fb0ff', color: '#121417' };
+    const cards = [
+      { kind: 'Avoid · rule watch', when: 'from the after-hours brief', t: 'IRON', delta: '+38.9%', dcolor: up, title: 'Big move, no verified catalyst', body: 'No flow, not on radar, and no contract, acquisition or guidance change in intel. Do not chase above $78.93 until a dated press release confirms the reason.', bg: '#1d1a1a', border: '#3a2626', kcolor: '#ff8f8f', actions: [ { label: 'Open analysis', ...primary }, { label: 'Snooze', ...ghost } ] },
+      { kind: 'Avoid · earnings gap', when: 'reported this morning', t: 'CLF', delta: '+16.3%', dcolor: up, title: 'Beat, but idled operations buried in the print', body: 'Q3 adj EBITDA $612M drove the gap. Fade setup only if it prints below $13.00 on volume; steel upgrades above $15 invalidate.', bg: '#1d1a1a', border: '#3a2626', kcolor: '#ff8f8f', actions: [ { label: 'Open analysis', ...primary }, { label: 'Set alert at $13', ...ghost } ] },
+      { kind: 'Reports tomorrow', when: 'Tue Oct 20', t: 'NFLX · UAL · HAL', delta: '', dcolor: up, title: '', body: 'All three have flow and are rules-blocked for new options. Gap direction at the open sets the tone for media and airlines.', bg: '#181b1f', border: '#262a30', kcolor: '#f2c14e', actions: [ { label: 'See flow', ...ghost } ] },
+      { kind: 'Flow worth a look', when: 'largest prints today', t: 'QQQ', delta: '$2.5M bear', dcolor: dn, title: 'Pre-FOMC hedging, with VRT $2.0M bear', body: 'Macro-hedge positioning rather than a single-name thesis. ML 96.', bg: '#181b1f', border: '#262a30', kcolor: '#8fb0ff', actions: [ { label: 'Open tape', ...ghost } ] },
+    ];
+    const bk = [['Gem Finder',3.34],['Supercycle',1.21],['Aggressive',-3.19],['Smart',-5.70],['Conviction',-17.97],['Builder',-18.58],['Ruby',-23.77]];
+    const books = bk.map(([name,p]) => ({ name, pct: (p>0?'+':'−')+Math.abs(p).toFixed(2)+'%', color: p>0?up:dn }));
+    return { nav, cards, books };
+  }
+}
+</script>
+</body>
+</html>

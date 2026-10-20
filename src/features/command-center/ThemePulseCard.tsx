@@ -3,7 +3,7 @@ import { useIntelGraphContext, useThemePulse } from "../../api/intelGraph";
 import { useAppStore } from "../../store/useAppStore";
 import type { ThemePulseTicker } from "../../lib/types";
 import { ChevronDown, ChevronRight, Download } from "lucide-react";
-import { Stat } from "../../components/Glass";
+import { BarRow, Kpi, Tile } from "../../components/Cockpit";
 
 interface Props {
   ticker: string;
@@ -19,9 +19,8 @@ const ROLE_LABEL: Record<string, string> = {
   PLATFORM: "platform", ENABLER: "enabler", BOTTLENECK: "bottleneck", CONSUMER: "consumer", NEUTRAL: "neutral",
 };
 
-/** One ticker row: clickable ticker + play-score + the LLM "why" + the signals
- *  that drove the score (accumulation / earnings / 30d), so the ranking stays
- *  auditable at a glance. */
+/** One ticker row: play-score bar (click = make active) + the LLM "why" and
+ *  the signals that drove the score, so the ranking stays auditable. */
 function PulseRow({
   r,
   active,
@@ -32,38 +31,39 @@ function PulseRow({
   onClick: (t: string) => void;
 }) {
   const accum = (r.accum_label || "").replace(/_/g, " ").toLowerCase();
+  const meta = [
+    r.role ? ROLE_LABEL[r.role] ?? "" : "",
+    accum,
+    typeof r.days_to_earnings === "number" ? `earnings in ${r.days_to_earnings}d` : "",
+  ].filter(Boolean);
   return (
-    <div className={`data-row flex items-start gap-3 px-2 py-2.5 ${active ? "bg-bg-card-hover" : ""}`}>
-      <button
-        type="button"
-        onClick={() => onClick(r.ticker)}
-        className="shrink-0 w-16 text-left cursor-pointer hover:text-accent-blue"
-      >
-        <span className="ticker block text-sm">{r.ticker}</span>
-        {r.role && <span className="block text-xs text-text-muted">{ROLE_LABEL[r.role] ?? ""}</span>}
-      </button>
-      <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-        {r.why && <div className="text-sm leading-relaxed text-text-secondary">{r.why}</div>}
-        <div className="flex flex-wrap gap-x-1.5 text-xs text-text-muted">
-          {accum && <span>{accum}</span>}
-          {typeof r.days_to_earnings === "number" && <span>· earnings in <span className="num">{r.days_to_earnings}d</span></span>}
-          {typeof r.ret_30d === "number" && (
-            <span>
-              ·{" "}
-              <span className="num" style={{ color: r.ret_30d >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
-                {r.ret_30d >= 0 ? "+" : ""}{r.ret_30d.toFixed(0)}%
-              </span>{" "}
-              30d
+    <div className={`flex flex-col gap-0.5 rounded-md py-1 ${active ? "bg-bg-card-hover" : ""}`}>
+      <BarRow
+        label={r.ticker}
+        value={r.play_score}
+        max={100}
+        tone="info"
+        display={r.play_score}
+        trailing={
+          typeof r.ret_30d === "number" ? (
+            <span style={{ color: r.ret_30d >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
+              {r.ret_30d >= 0 ? "+" : ""}
+              {r.ret_30d.toFixed(0)}%
             </span>
-          )}
-        </div>
-      </div>
-      <div
-        className="num shrink-0 text-base font-semibold text-text-primary text-right w-9"
-        title="play score (flow + catalyst + technicals + momentum)"
-      >
-        {r.play_score}
-      </div>
+          ) : (
+            ""
+          )
+        }
+        onClick={() => onClick(r.ticker)}
+        title="play score (flow + catalyst + technicals + momentum) · 30d return"
+      />
+      {(r.why || meta.length > 0) && (
+        <p className="pl-[4.875rem] pr-1 text-xs leading-relaxed text-text-muted">
+          {r.why && <span className="text-text-secondary">{r.why}</span>}
+          {r.why && meta.length > 0 ? " · " : ""}
+          {meta.join(" · ")}
+        </p>
+      )}
     </div>
   );
 }
@@ -82,17 +82,16 @@ function Bucket({
   if (rows.length === 0) return null;
   const b = BUCKET[kind];
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center gap-2 px-2 pb-1.5 text-sm font-semibold text-text-primary">
-        <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: b.color }} />
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2 pt-2 text-xs font-semibold text-text-secondary">
+        <span aria-hidden className="h-2 w-2 rounded-sm" style={{ background: b.color }} />
         {b.label}
-        <span className="num text-xs font-normal text-text-muted">{rows.length}</span>
+        <span className="num font-normal text-text-muted">{rows.length}</span>
+        <span className="ml-auto font-normal text-text-muted">score · 30d</span>
       </div>
-      <div className="divide-y divide-border">
-        {rows.map((r) => (
-          <PulseRow key={r.ticker} r={r} active={r.ticker === active} onClick={onClick} />
-        ))}
-      </div>
+      {rows.map((r) => (
+        <PulseRow key={r.ticker} r={r} active={r.ticker === active} onClick={onClick} />
+      ))}
     </div>
   );
 }
@@ -108,7 +107,7 @@ export function ThemePulseCard({ ticker }: Props) {
   if (!ticker || !theme) return null;
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-3 animate-pulse">
+      <div className="flex animate-pulse flex-col gap-3 rounded-xl border border-border bg-bg-card p-4">
         <div className="h-5 w-40 rounded bg-text-muted/20" />
         <div className="h-12 w-full rounded bg-text-muted/10" />
         <div className="h-3 w-full rounded bg-text-muted/10" />
@@ -122,25 +121,27 @@ export function ThemePulseCard({ ticker }: Props) {
   const wait = data.wait ?? [];
   if (plays.length + watch.length + wait.length === 0) return null;
 
+  const total = plays.length + watch.length + wait.length;
+
   return (
-    <section className="flex flex-col gap-4" aria-label="Theme pulse">
-      {/* Header: the title toggles expand/collapse; the download icon pulls
-          every generated theme pulse as a CSV for manual analysis. */}
-      <div className="flex min-w-0 items-start justify-between gap-3">
-        <div className="min-w-0">
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            aria-expanded={expanded}
-            className="section-title flex min-h-11 min-w-0 cursor-pointer items-center gap-1.5 text-left transition-opacity hover:opacity-90 sm:min-h-0"
-          >
-            Theme pulse
-            {expanded ? <ChevronDown size={16} className="text-text-muted" /> : <ChevronRight size={16} className="text-text-muted" />}
-          </button>
-          <p className="section-sub truncate">
-            {theme} · <span className="num">{data.n}</span> names
-          </p>
-        </div>
+    <Tile
+      title={
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="flex min-h-11 cursor-pointer items-center gap-1.5 text-left hover:text-accent sm:min-h-0"
+        >
+          Theme pulse
+          {expanded ? <ChevronDown size={15} className="text-text-muted" /> : <ChevronRight size={15} className="text-text-muted" />}
+        </button>
+      }
+      meta={
+        <span className="truncate">
+          {theme} · <span className="num">{data.n}</span> names
+        </span>
+      }
+      actions={
         <a
           href="/api/intel-graph/theme-pulse/export?format=csv"
           download
@@ -150,59 +151,64 @@ export function ThemePulseCard({ ticker }: Props) {
         >
           <Download size={15} />
         </a>
+      }
+    >
+      {/* Bucket mix: one stacked bar + counts */}
+      <div className="flex h-2.5 overflow-hidden rounded-full" style={{ background: "var(--track)" }} aria-hidden>
+        {(["play", "watch", "wait"] as const).map((k) => {
+          const n = k === "play" ? plays.length : k === "watch" ? watch.length : wait.length;
+          return n > 0 ? <span key={k} style={{ width: `${(n / total) * 100}%`, background: BUCKET[k].color }} /> : null;
+        })}
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <Kpi label={BUCKET.play.label} value={plays.length} size="md" />
+        <Kpi label={BUCKET.watch.label} value={watch.length} size="md" />
+        <Kpi label={BUCKET.wait.label} value={wait.length} size="md" />
       </div>
 
       {!expanded ? (
-        // Collapsed: bucket tally + the top plays as plain ticker links.
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-3 gap-4">
-            <Stat label={BUCKET.play.label} value={plays.length} />
-            <Stat label={BUCKET.watch.label} value={watch.length} />
-            <Stat label={BUCKET.wait.label} value={wait.length} />
-          </div>
+        <>
           {plays.length > 0 && (
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5 text-sm">
-              <span className="text-xs text-text-muted">Top plays</span>
+            <div className="flex flex-col gap-1 pt-1">
+              <span className="text-xs text-text-muted">Top plays · score</span>
               {plays.slice(0, 5).map((r) => (
-                <button
+                <BarRow
                   key={r.ticker}
-                  type="button"
+                  label={r.ticker}
+                  value={r.play_score}
+                  max={100}
+                  tone="info"
+                  display={r.play_score}
                   onClick={() => setActiveTicker(r.ticker)}
                   title={r.why}
-                  className="inline-flex cursor-pointer items-baseline gap-1 hover:text-accent-blue"
-                >
-                  <span className="ticker">{r.ticker}</span>
-                  <span className="num text-xs text-text-muted">{r.play_score}</span>
-                </button>
+                />
               ))}
-              {plays.length > 5 && (
-                <span className="num text-xs text-text-muted">+{plays.length - 5}</span>
-              )}
+              {plays.length > 5 && <span className="num text-xs text-text-muted">+{plays.length - 5} more</span>}
             </div>
           )}
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="self-start text-sm font-medium text-accent-blue hover:underline cursor-pointer"
+            className="self-start text-sm font-medium text-accent hover:underline cursor-pointer"
           >
             Show theme read and all <span className="num">{data.n}</span> names
           </button>
-        </div>
+        </>
       ) : (
         <>
           {data.theme_read && (
-            <p className="prose-read max-w-[72ch] text-text-secondary">{data.theme_read}</p>
+            <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">{data.theme_read}</p>
           )}
 
           <Bucket kind="play" rows={plays} active={ticker} onClick={setActiveTicker} />
           <Bucket kind="watch" rows={watch} active={ticker} onClick={setActiveTicker} />
           <Bucket kind="wait" rows={wait} active={ticker} onClick={setActiveTicker} />
 
-          <div className="text-xs text-text-muted pt-3 border-t border-border">
+          <div className="border-t border-border pt-3 text-xs text-text-muted">
             Ranked by flow accumulation, catalyst proximity, technicals, momentum, and role. Score at right.
           </div>
         </>
       )}
-    </section>
+    </Tile>
   );
 }

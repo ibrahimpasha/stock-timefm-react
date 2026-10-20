@@ -13,6 +13,7 @@ import { RefreshCw, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { useAppStore } from "../../store/useAppStore";
 import { relativeAge, absoluteAge } from "../../lib/utils";
 import { Chip, Segmented } from "../../components/Glass";
+import { Tile, CockpitButton } from "../../components/Cockpit";
 import {
   useTraderBrief,
   useGenerateTraderBrief,
@@ -38,7 +39,7 @@ function PickTicker({ t }: { t: string }) {
     <button
       type="button"
       onClick={() => setActiveTicker(t)}
-      className="ticker inline-block text-sm transition-colors hover:text-accent-blue"
+      className="ticker inline-block text-sm transition-colors hover:text-accent"
     >
       {t}
     </button>
@@ -55,7 +56,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-2 border-t border-border pt-4">
+    <div className="space-y-2 border-t border-border pt-3">
       <div className="flex items-baseline gap-1.5">
         <h4 className="text-sm font-semibold text-text-primary">{title}</h4>
         {count !== undefined && (
@@ -69,7 +70,9 @@ function Section({
 
 function BriefBody({ content }: { content: TraderBriefContent }) {
   return (
-    <div className="space-y-5 max-w-[72ch]">
+    <div className="grid min-w-0 grid-cols-1 gap-x-8 gap-y-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+      {/* Left column: long-form read (serif only here, per v3 rule) */}
+      <div className="min-w-0 space-y-4">
       {/* Hero — current view + trading style */}
       <div>
         <div className="flex items-center gap-2 mb-1.5">
@@ -90,6 +93,18 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
         </Section>
       )}
 
+      {/* Style notes */}
+      {content.style_notes && (
+        <Section title="Style notes">
+          <p className="text-sm leading-relaxed text-text-secondary">
+            {content.style_notes}
+          </p>
+        </Section>
+      )}
+      </div>
+
+      {/* Right column: structured lists */}
+      <div className="min-w-0 space-y-4">
       {/* Sectors */}
       {content.sectors_focus.length > 0 && (
         <Section
@@ -99,12 +114,12 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
           <div className="space-y-1">
             {content.sectors_focus.map((s) => (
               <div key={s.sector} className="flex items-center gap-2">
-                <span className="text-sm text-text-primary capitalize w-40 truncate">
+                <span className="w-32 shrink-0 truncate text-sm text-text-primary capitalize" title={s.sector}>
                   {s.sector}
                 </span>
-                <div className="flex-1 h-1.5 rounded-full bg-bg-card-hover overflow-hidden">
+                <div className="h-3 min-w-0 flex-1 overflow-hidden rounded-[3px]" style={{ background: "var(--track)" }}>
                   <div
-                    className="h-full rounded-full"
+                    className="h-full rounded-[3px]"
                     style={{
                       width: `${Math.min(100, s.weight_pct)}%`,
                       background: sectorLeanColor(s.lean),
@@ -230,14 +245,7 @@ function BriefBody({ content }: { content: TraderBriefContent }) {
         </Section>
       )}
 
-      {/* Style notes */}
-      {content.style_notes && (
-        <Section title="Style notes">
-          <p className="prose-read">
-            {content.style_notes}
-          </p>
-        </Section>
-      )}
+      </div>
     </div>
   );
 }
@@ -261,45 +269,38 @@ export function TraderBrief({ author }: { author: string }) {
   const hasContent = !!content;
 
   return (
-    <section className="border-t border-border pt-5">
-      {/* Collapsed header */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="w-full flex items-center justify-between gap-2 text-left"
-      >
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="section-title">Trader brief</span>
-          <span className="text-sm text-text-muted">
-            Style, sectors, open thesis and watchlist
-          </span>
+    <Tile
+      title={
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="inline-flex items-center gap-1.5 text-left hover:text-accent"
+        >
+          {open ? (
+            <ChevronUp size={14} className="text-text-muted" />
+          ) : (
+            <ChevronDown size={14} className="text-text-muted" />
+          )}
+          Trader brief
+        </button>
+      }
+      meta={
+        <>
+          Style, sectors, open thesis and watchlist
           {data?.generated_at && (
-            <span
-              className="text-xs text-text-muted"
-              title={absoluteAge(data.generated_at) || ""}
-            >
-              {relativeAge(data.generated_at)}
+            <span className="ml-2" title={absoluteAge(data.generated_at) || ""}>
+              · {relativeAge(data.generated_at)}
             </span>
           )}
-          {!hasContent && !isFetching && !isError && (
-            <span className="text-xs text-text-muted">not generated yet</span>
-          )}
-        </div>
-        {open ? (
-          <ChevronUp size={16} className="text-text-muted" />
-        ) : (
-          <ChevronDown size={16} className="text-text-muted" />
-        )}
-      </button>
-
-      {/* Expanded body */}
-      {open && (
-        <div className="mt-5 space-y-5">
-          {/* Controls */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-text-muted">Window</span>
+          {!hasContent && !isFetching && !isError && <span className="ml-2">· not generated yet</span>}
+        </>
+      }
+      actions={
+        open ? (
+          <>
             <Segmented
+              ariaLabel="Brief window"
               options={WINDOW_OPTIONS.map((w) => ({
                 value: String(w.days),
                 label: w.label,
@@ -307,33 +308,29 @@ export function TraderBrief({ author }: { author: string }) {
               value={String(windowDays)}
               onChange={(v) => setWindowDays(Number(v))}
             />
-
             {data?.n_messages != null && (
-              <span className="num text-xs text-text-muted">
-                {data.n_messages} msgs
-              </span>
+              <span className="num text-xs text-text-muted">{data.n_messages} msgs</span>
             )}
-
-            <button
-              type="button"
-              disabled={generate.isPending}
-              onClick={handleGenerate}
-              className="desk-action ml-auto disabled:opacity-50"
-            >
+            <CockpitButton primary={!hasContent} disabled={generate.isPending} onClick={handleGenerate}>
               {generate.isPending ? (
                 <>
-                  <Loader2 size={11} className="animate-spin" />
+                  <Loader2 size={12} className="animate-spin" />
                   Generating…
                 </>
               ) : (
                 <>
-                  <RefreshCw size={11} />
+                  <RefreshCw size={12} />
                   {hasContent ? "Re-generate" : "Generate"}
                 </>
               )}
-            </button>
-          </div>
-
+            </CockpitButton>
+          </>
+        ) : undefined
+      }
+    >
+      {/* Expanded body */}
+      {open && (
+        <div className="space-y-4 pt-1">
           {/* Body */}
           {generate.isPending && !hasContent && (
             <div className="text-center py-6 text-sm text-text-muted">
@@ -378,6 +375,6 @@ export function TraderBrief({ author }: { author: string }) {
           {hasContent && content && <BriefBody content={content} />}
         </div>
       )}
-    </section>
+    </Tile>
   );
 }

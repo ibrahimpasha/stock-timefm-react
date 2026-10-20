@@ -37,7 +37,8 @@ import {
   X,
 } from "lucide-react";
 import apiClient from "../../api/client";
-import { Chip, Segmented, Stat } from "../../components/Glass";
+import { Chip, Segmented } from "../../components/Glass";
+import { KpiTile, Tile, TileGrid } from "../../components/Cockpit";
 import type { ChipTone } from "../../components/Glass";
 import { useAppStore } from "../../store/useAppStore";
 import { useDashboardFilters } from "../../store/useDashboardFilters";
@@ -71,6 +72,7 @@ import { ThemeSection } from "./iflow/ThemeSection";
 import { EntryTape } from "./iflow/EntryTape";
 
 type WatchView = "tickers" | "contracts" | "both";
+const CARD_GRID = "grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4";
 type GroupMode = "subcat" | "macro" | "flat";
 
 /** Clickable wrapper around the shared `Chip` primitive — used for every
@@ -85,11 +87,30 @@ function ChipButton({
   children,
 }: {
   active: boolean;
-  tone: ChipTone;
+  /** "accent" = amber interaction fill (date selection); other tones are
+   *  informational category hues (e.g. purple for traders). */
+  tone: ChipTone | "accent";
   onClick: () => void;
   title?: string;
   children: ReactNode;
 }) {
+  if (tone === "accent") {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        title={title}
+        aria-pressed={active}
+        className={`inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-2.5 text-xs font-semibold transition-colors lg:min-h-7 ${
+          active
+            ? "bg-accent text-[var(--accent-ink)]"
+            : "border border-border text-text-secondary hover:text-text-primary"
+        }`}
+      >
+        {children}
+      </button>
+    );
+  }
   return (
     <button
       type="button"
@@ -569,12 +590,6 @@ export function IFlowTracker() {
       : daySum.bear > daySum.bull
       ? "BEARISH"
       : "NEUTRAL";
-  const sentimentColor =
-    sentiment === "BULLISH"
-      ? "var(--accent-green)"
-      : sentiment === "BEARISH"
-      ? "var(--accent-red)"
-      : "var(--text-secondary)";
   const scopeLabel = isAllDates
     ? "All dates"
     : isSingleDate
@@ -592,7 +607,7 @@ export function IFlowTracker() {
         <div className="mobile-horizontal-strip flex w-full min-w-0 items-center gap-1 overflow-x-auto lg:w-auto lg:max-w-[46%]">
           <ChipButton
             active={isAllDates}
-            tone="blue"
+            tone="accent"
             onClick={() => {
               patchIFlow({ selectedDates: new Set() });
               setSelectedTicker(null);
@@ -604,7 +619,7 @@ export function IFlowTracker() {
             <ChipButton
               key={d.date}
               active={selectedDates.has(d.date)}
-              tone="blue"
+              tone="accent"
               title={`${d.entries} entries`}
               onClick={() => toggleDate(d.date)}
             >
@@ -613,7 +628,7 @@ export function IFlowTracker() {
           ))}
         </div>
         <div
-          className="relative flex min-h-11 w-full min-w-0 items-center gap-2 rounded-full border border-border px-3 py-1.5 transition-colors focus-within:border-accent-blue lg:min-h-0 lg:w-44"
+          className="relative flex min-h-11 w-full min-w-0 items-center gap-2 rounded-full border border-border px-3 py-1.5 transition-colors focus-within:border-accent lg:min-h-0 lg:w-44"
           style={{ background: "var(--glass-bg)" }}
         >
           <Search size={14} className="text-text-muted" />
@@ -703,7 +718,7 @@ export function IFlowTracker() {
             value={sort}
             disabled={viewMode === "tape"}
             onChange={(e) => patchIFlow({ sort: e.target.value as SortMode })}
-            className="min-h-11 rounded-full border border-border bg-bg-card px-3 text-xs text-text-primary outline-none focus:border-accent-blue disabled:opacity-40 lg:min-h-8"
+            className="min-h-11 rounded-full border border-border bg-bg-card px-3 text-xs text-text-primary outline-none focus:border-accent disabled:opacity-40 lg:min-h-8"
           >
             <option value="recent">Most recent</option>
             <option value="entries">Entries</option>
@@ -734,7 +749,7 @@ export function IFlowTracker() {
                 <SlidersHorizontal size={13} aria-hidden="true" />
                 Filters
                 {activeFilters > 0 && (
-                  <span className="num rounded-full bg-accent-blue/15 px-1.5 text-[10px] font-semibold text-accent-blue">
+                  <span className="num rounded-full bg-accent px-1.5 text-xs font-semibold text-[var(--accent-ink)]">
                     {activeFilters}
                   </span>
                 )}
@@ -935,7 +950,7 @@ export function IFlowTracker() {
         {sort === "returns" && viewMode !== "tape" && (returnsLoading || flowReturnsMeta?.earliest_date) && (
           <div className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
             {returnsLoading ? (
-              <span className="animate-pulse text-accent-blue">Loading returns…</span>
+              <span className="animate-pulse text-accent">Loading returns…</span>
             ) : (
               <span className="num">
                 flow since {flowReturnsMeta!.earliest_date} · {flowReturnsMeta!.days_covered}d ·{" "}
@@ -947,72 +962,71 @@ export function IFlowTracker() {
         {sort === "returns" && <><QueryNotice queries={[returnsQuery]} label="Flow return estimates" /><FlowCoverageNotice meta={flowReturnsMeta} /></>}
       </div>
 
-      {/* ── Day summary: the focal strip. One hero figure + three stats. ── */}
+      {/* ── KPI strip + ranked lists: one cockpit grid ── */}
       {!loading && !loadError && (
-        <section
-          aria-label="Flow summary"
-          className="mb-8 flex min-w-0 flex-wrap items-end gap-x-12 gap-y-5"
-        >
-          <div className="min-w-0">
-            <p className="text-sm text-text-muted">
-              {scopeLabel}
-              {earningsFilterOn && <> · earnings within {earningsWindow.toUpperCase()}</>}
-            </p>
-            <p className="mt-1 text-4xl font-semibold tracking-tight text-text-primary num max-sm:text-3xl">
-              {/* ponytail: formatPremium tops out at M; the all-dates total runs into billions */}
-              {daySum.prem >= 1e9 ? `$${(daySum.prem / 1e9).toFixed(1)}B` : formatPremium(daySum.prem)}
-            </p>
-            <p className="mt-1 text-sm text-text-secondary">
-              premium ·{" "}
-              <span className="font-medium" style={{ color: sentimentColor }}>
-                {sentiment.charAt(0) + sentiment.slice(1).toLowerCase()}
-              </span>
-              {bullShare != null && (
-                <>
-                  {" "}
-                  <span className="num">{bullShare}%</span> bull entries
-                </>
-              )}
-            </p>
-          </div>
-          <div className="grid min-w-0 grid-cols-3 gap-x-10 gap-y-3 max-sm:gap-x-6">
-            <Stat label="Tickers" value={filtered.length.toLocaleString()} />
-            <Stat label="Entries" value={daySum.entries.toLocaleString()} />
-            <Stat
-              label="Bull / bear"
-              value={
-                <>
-                  <span className="delta-up">{daySum.bull.toLocaleString()}</span>
-                  <span className="text-text-muted"> / </span>
-                  <span className="delta-down">{daySum.bear.toLocaleString()}</span>
-                </>
-              }
-              sub={
-                isSingleDate && summary && !earningsFilterOn
-                  ? `day ${summary.bull_count} / ${summary.bear_count}`
-                  : undefined
-              }
-            />
-          </div>
-        </section>
-      )}
-
-      {/* ── Top Picks + Top Signals (single date only) ───────────────── */}
-      {isSingleDate && singleDate && (
-        <div className="mb-8 grid min-w-0 gap-x-10 gap-y-8 xl:grid-cols-2 [&>*]:min-w-0">
-          <TopPicks date={singleDate} dteFilter={dte} />
-          <TopSignals date={singleDate} dteFilter={dte} />
-        </div>
+        <TileGrid className="mb-3.5">
+          <KpiTile
+            label={
+              <>
+                Premium · {scopeLabel}
+                {earningsFilterOn && <> · earnings within {earningsWindow.toUpperCase()}</>}
+              </>
+            }
+            /* ponytail: formatPremium tops out at M; the all-dates total runs into billions */
+            value={daySum.prem >= 1e9 ? `$${(daySum.prem / 1e9).toFixed(1)}B` : formatPremium(daySum.prem)}
+            delta={sentiment.charAt(0) + sentiment.slice(1).toLowerCase()}
+            tone={sentiment === "BULLISH" ? "up" : sentiment === "BEARISH" ? "down" : "neutral"}
+            sub={bullShare != null ? `${bullShare}% bull entries` : undefined}
+          />
+          <KpiTile
+            label="Tickers"
+            value={filtered.length.toLocaleString()}
+            sub={tickers.length !== filtered.length ? `of ${tickers.length.toLocaleString()} with flow` : "with flow"}
+          />
+          <KpiTile
+            label="Entries"
+            value={daySum.entries.toLocaleString()}
+            sub={filtered.length > 0 ? `${(daySum.entries / filtered.length).toFixed(1)} per ticker` : undefined}
+          />
+          <KpiTile
+            label="Bull / bear"
+            value={
+              <>
+                <span className="delta-up">{daySum.bull.toLocaleString()}</span>
+                <span className="text-text-muted"> / </span>
+                <span className="delta-down">{daySum.bear.toLocaleString()}</span>
+              </>
+            }
+            sub={
+              isSingleDate && summary && !earningsFilterOn ? (
+                `day ${summary.bull_count} / ${summary.bear_count}`
+              ) : bullShare != null ? (
+                <span className="inline-flex h-1.5 w-full max-w-40 overflow-hidden rounded-full align-middle" style={{ background: "var(--track)" }} aria-label={`${bullShare}% bull`}>
+                  <span style={{ width: `${bullShare}%`, background: "var(--accent-green)" }} />
+                  <span style={{ width: `${100 - bullShare}%`, background: "var(--accent-red)" }} />
+                </span>
+              ) : undefined
+            }
+          />
+          {/* Top Picks + Top Signals (single date only); each renders its own Tile or nothing */}
+          {isSingleDate && singleDate && (
+            <>
+              <TopPicks date={singleDate} dteFilter={dte} />
+              <TopSignals date={singleDate} dteFilter={dte} />
+            </>
+          )}
+        </TileGrid>
       )}
 
       {/* ── Loading skeleton ────────────────────────────────────────── */}
       {loading && (
         <div className="animate-pulse">
-          <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 md:grid-cols-5">
-            {[...Array(10)].map((_, i) => (
-              <div key={i} className="card h-20" />
+          <TileGrid className="mb-3.5">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-24 rounded-xl border border-border bg-bg-card lg:col-span-3" />
             ))}
-          </div>
+          </TileGrid>
+          <div className="h-80 rounded-xl border border-border bg-bg-card" />
         </div>
       )}
 
@@ -1040,15 +1054,15 @@ export function IFlowTracker() {
           style={{ height: "calc(100vh - 260px)", minHeight: 420 }}
         >
           <div
-            className={`${selectedTicker ? "col-span-7 max-lg:hidden" : "col-span-12"} min-w-0 max-w-full overflow-y-auto pr-1 max-lg:col-span-12 max-lg:overflow-visible max-lg:pr-0`}
+            className={`${selectedTicker ? "col-span-7 max-lg:hidden" : "col-span-12"} flex min-w-0 max-w-full flex-col gap-3.5 overflow-y-auto pr-1 max-lg:col-span-12 max-lg:overflow-visible max-lg:pr-0`}
           >
             {tradersOnly && coverageQuery.isLoading && (
-              <div className="card mb-3 flex items-center justify-center gap-2 py-6 text-xs text-text-muted">
+              <div className="card flex items-center justify-center gap-2 py-6 text-xs text-text-muted">
                 <Loader2 size={13} className="animate-spin" /> Loading trader coverage...
               </div>
             )}
             {tradersOnly && coverageQuery.isError && (
-              <div className="card mb-3 flex items-center justify-center gap-2 py-6 text-xs text-accent-red">
+              <div className="card flex items-center justify-center gap-2 py-6 text-xs text-accent-red">
                 <AlertTriangle size={13} />
                 <span>Unable to load trader coverage.</span>
                 <button
@@ -1062,7 +1076,7 @@ export function IFlowTracker() {
             )}
             {/* Watched-contracts surface: shown in "contracts" + "both" modes. */}
             {(watchView === "contracts" || watchView === "both") && (
-              <div className={`max-w-full overflow-x-auto overscroll-x-contain ${watchView === "both" ? "mb-4" : ""}`}>
+              <div className="min-w-0 max-w-full">
                 <ContractsView
                   onSelectTicker={openTicker}
                 />
@@ -1073,7 +1087,7 @@ export function IFlowTracker() {
                 and All Dates (defaults to today) all work — the merge
                 happens inside EntryTape via useMultiDateEntries. */}
             {coverageReady && watchView !== "contracts" && viewMode === "tape" && tapeDates.length > 0 && (
-              <div className="max-w-full overflow-x-auto overscroll-x-contain">
+              <div className="min-w-0 max-w-full">
                 <EntryTape
                   dates={tapeDates}
                   bias={bias}
@@ -1148,59 +1162,57 @@ export function IFlowTracker() {
 
               if (filtered.length === 0 && watchedShown.length === 0) {
                 return (
-                  <div className="py-12 text-center">
-                    <p className="section-title">No tickers match your filters</p>
-                    <p className="section-sub">Loosen bias, DTE or earnings in Filters, or pick another date.</p>
-                  </div>
+                  <Tile title="No tickers match your filters">
+                    <p className="m-0 text-sm text-text-muted">Loosen bias, DTE or earnings in Filters, or pick another date.</p>
+                  </Tile>
                 );
               }
 
               return (
                 <>
                   {watchlist.length > 0 && (
-                    <div className="mb-8">
-                      <h3 className="section-title mb-3 flex items-baseline gap-2">
-                        <Star size={14} className="self-center text-accent-orange" style={{ fill: "var(--accent-orange)" }} />
-                        Watchlist
-                        <span className="num text-sm font-normal text-text-muted">
-                          {watchedShown.length}
-                          {watchedShown.length < watchlist.length && <>/{watchlist.length}</>}
+                    <Tile
+                      title={
+                        <span className="inline-flex items-baseline gap-2">
+                          <Star size={13} className="self-center text-accent-orange" style={{ fill: "var(--accent-orange)" }} aria-hidden="true" />
+                          Watchlist
+                          <span className="num text-xs font-normal text-text-muted">
+                            {watchedShown.length}
+                            {watchedShown.length < watchlist.length && <>/{watchlist.length}</>}
+                          </span>
                         </span>
-                      </h3>
+                      }
+                    >
                       {watchedShown.length === 0 ? (
-                        <div className="px-1 text-sm text-text-muted">
+                        <div className="text-sm text-text-muted">
                           None of your watched tickers have flow on the selected dates.
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                          {watchedShown.map(renderCard)}
-                        </div>
+                        <div className={CARD_GRID}>{watchedShown.map(renderCard)}</div>
                       )}
-                    </div>
+                    </Tile>
                   )}
-                  {othersShown.length > 0 && (
-                    <>
-                      {watchlist.length > 0 && (
-                        <h3 className="section-title mb-3 flex items-baseline gap-2">
-                          All tickers
-                          <span className="num text-sm font-normal text-text-muted">{othersShown.length}</span>
-                        </h3>
-                      )}
-                      {groupMode !== "flat" && taxonomy ? (
-                        <ThemedGrid
-                          tickers={othersShown}
-                          taxonomy={taxonomy}
-                          renderCard={renderCard}
-                          subGroupBy={groupMode === "subcat" ? "theme" : "macro"}
-                          escMap={escMap}
-                        />
-                      ) : (
-                        <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                          {othersShown.map(renderCard)}
-                        </div>
-                      )}
-                    </>
-                  )}
+                  {othersShown.length > 0 &&
+                    (groupMode !== "flat" && taxonomy ? (
+                      <ThemedGrid
+                        tickers={othersShown}
+                        taxonomy={taxonomy}
+                        renderCard={renderCard}
+                        subGroupBy={groupMode === "subcat" ? "theme" : "macro"}
+                        escMap={escMap}
+                      />
+                    ) : (
+                      <Tile
+                        title={
+                          <>
+                            {watchlist.length > 0 ? "All tickers" : "Tickers"}{" "}
+                            <span className="num text-xs font-normal text-text-muted">{othersShown.length}</span>
+                          </>
+                        }
+                      >
+                        <div className={CARD_GRID}>{othersShown.map(renderCard)}</div>
+                      </Tile>
+                    ))}
                 </>
               );
             })()}
@@ -1265,7 +1277,7 @@ function ThemedGrid({
   const themeDescByCat = taxonomy.theme_descriptions || {};
 
   return (
-    <div>
+    <div className="flex min-w-0 flex-col gap-3.5">
       {categoryOrder.map((cat) => {
         const items = byCategory[cat];
         if (!items || items.length === 0) return null;

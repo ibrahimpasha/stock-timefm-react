@@ -25,6 +25,7 @@ import type { TaxonomyEntry, MacroDef, BottleneckDef } from "../../../api/taxono
 import type { EscRollup } from "./hooks";
 import { parsePremium } from "./utils";
 import { formatPremium } from "../../../lib/utils";
+import { Tile } from "../../../components/Cockpit";
 
 const NO_MACRO = "—";
 const NO_THEME = "—";
@@ -180,58 +181,67 @@ export function ThemeSection({
     return keys;
   }, [bySubGroup, subGroupBy]);
 
+  const sideTotal = bull + bear;
+  const bullShare = sideTotal > 0 ? bull / sideTotal : 0.5;
+
   return (
-    <section className="mb-8 min-w-0">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="data-row flex min-h-11 w-full min-w-0 items-baseline gap-2 border-b border-border px-1 pb-2 pt-1 text-left md:-mx-2 md:min-h-0 md:gap-3 md:px-2"
-        title={categoryDescription || ""}
-      >
-        {expanded ? (
-          <ChevronDown size={15} className="shrink-0 self-center text-text-muted" />
-        ) : (
-          <ChevronRight size={15} className="shrink-0 self-center text-text-muted" />
-        )}
-        <span className="section-title min-w-0 flex-1 truncate md:flex-none">
-          {sentenceCase(category)}
-        </span>
-        <span className="flex shrink-0 items-center gap-3 text-sm text-text-muted">
-          <span className="num">{tickerCount}</span>
-          <span className="num max-sm:hidden">
-            <span style={{ color: "var(--accent-green)" }}>{bull}</span>
-            {" / "}
-            <span style={{ color: "var(--accent-red)" }}>{bear}</span>
+    <Tile
+      title={
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="inline-flex min-h-11 min-w-0 items-center gap-1.5 text-left md:min-h-0"
+          title={categoryDescription || ""}
+          aria-expanded={expanded}
+        >
+          {expanded ? (
+            <ChevronDown size={15} className="shrink-0 text-text-muted" aria-hidden="true" />
+          ) : (
+            <ChevronRight size={15} className="shrink-0 text-text-muted" aria-hidden="true" />
+          )}
+          <span className="truncate">{sentenceCase(category)}</span>
+          <span className="num text-xs font-normal text-text-muted">{tickerCount}</span>
+        </button>
+      }
+      meta={
+        bnDef ? (
+          <span className="hidden max-w-[22rem] truncate sm:inline" title={`${topBottleneck}: ${bnDef.detail}`}>
+            Bottleneck <span className="text-text-secondary">{shortLabel(bnDef.label, 32)}</span>
           </span>
-          <span
-            className="num font-semibold"
-            style={{ color: netBull ? "var(--accent-green)" : "var(--accent-red)" }}
-          >
-            {formatPremium(premium)}
-          </span>
+        ) : undefined
+      }
+      actions={
+        <span className="flex shrink-0 items-center gap-3 text-xs text-text-muted">
           {catEsc.esc > 0 && (
             <span
               className="num inline-flex items-center gap-0.5"
               style={{ color: "var(--accent-green)" }}
               title={`${catEsc.esc} ticker${catEsc.esc === 1 ? "" : "s"} with strike-ladder escalation in last 14d (${catEsc.bullDom} bull-dominant, ${catEsc.bearDom} bear-dominant overall)`}
             >
-              <TrendingUp size={11} />
+              <TrendingUp size={11} aria-hidden="true" />
               {catEsc.esc}
             </span>
           )}
-        </span>
-        {bnDef && (
-          <span
-            className="ml-auto hidden min-w-0 truncate text-xs text-text-muted sm:block"
-            title={`${topBottleneck}: ${bnDef.detail}`}
-          >
-            Bottleneck: <span className="text-text-secondary">{shortLabel(bnDef.label, 32)}</span>
+          {/* Bull/bear split as a mini bar instead of a sentence */}
+          <span className="num flex items-center gap-1.5 max-sm:hidden" title={`${bull} bull / ${bear} bear entries`}>
+            <span style={{ color: "var(--accent-green)" }}>{bull}</span>
+            <span className="flex h-1.5 w-14 overflow-hidden rounded-full" style={{ background: "var(--track)" }} aria-hidden="true">
+              <span style={{ width: `${bullShare * 100}%`, background: "var(--accent-green)" }} />
+              <span style={{ width: `${(1 - bullShare) * 100}%`, background: "var(--accent-red)" }} />
+            </span>
+            <span style={{ color: "var(--accent-red)" }}>{bear}</span>
           </span>
-        )}
-      </button>
-
+          <span
+            className="num text-sm font-semibold"
+            style={{ color: netBull ? "var(--accent-green)" : "var(--accent-red)" }}
+          >
+            {formatPremium(premium)}
+          </span>
+        </span>
+      }
+    >
       {expanded && (
-        <div className="mt-4 min-w-0 space-y-5 pl-1 md:pl-6">
+        <div className="min-w-0 space-y-4">
           {subGroupOrder.map((key) => {
             const items = bySubGroup[key];
             if (!items.length) return null;
@@ -250,7 +260,7 @@ export function ThemeSection({
             return (
               <div key={key}>
                 <div
-                  className="mb-2 flex min-w-0 items-baseline gap-2 text-sm"
+                  className="mb-1.5 flex min-w-0 items-baseline gap-2 text-xs"
                   title={
                     isThemeMode
                       ? themeDesc || (isSentinel ? "Tickers with no theme tag" : "")
@@ -281,7 +291,7 @@ export function ThemeSection({
                     {secondary}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
                   {items.map((t) => (
                     <div key={t.ticker}>{renderCard(t)}</div>
                   ))}
@@ -291,6 +301,6 @@ export function ThemeSection({
           })}
         </div>
       )}
-    </section>
+    </Tile>
   );
 }

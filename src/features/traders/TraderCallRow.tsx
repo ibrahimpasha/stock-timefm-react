@@ -237,9 +237,9 @@ export function TraderCallRow({
             }}
             className="ticker shrink-0 text-sm cursor-pointer rounded-[var(--radius-control)]"
             style={{
-              color: tickerHi ? "var(--accent-blue)" : "var(--text-primary)",
+              color: tickerHi ? "var(--accent)" : "var(--text-primary)",
               background: tickerHi
-                ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)"
+                ? "color-mix(in srgb, var(--accent) 14%, transparent)"
                 : "transparent",
               border: "none",
               padding: tickerHi ? "1px 6px" : 0,
@@ -364,7 +364,7 @@ export function TraderCallRow({
           className="text-sm py-2 pr-3 pb-3 pl-14 text-text-secondary flex flex-col gap-2 leading-relaxed"
         >
           {call.rationale && (
-            <div className="font-display text-base leading-relaxed text-text-secondary max-w-[72ch]">
+            <div className="text-sm leading-relaxed text-text-secondary max-w-[72ch]">
               {call.rationale}
             </div>
           )}

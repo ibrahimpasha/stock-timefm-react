@@ -60,9 +60,9 @@ export function DataHealthStrip() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1.5 w-[min(21rem,calc(100vw-1rem))] rounded-lg border border-border bg-bg-card p-2" style={{ boxShadow: "var(--shadow-3)" }}>
+        <div className="absolute right-0 top-full z-50 mt-1.5 w-[min(21rem,calc(100vw-1rem))] rounded-xl border border-border bg-bg-card p-2" style={{ boxShadow: "var(--shadow-3)" }}>
           <div className="flex items-baseline justify-between gap-3 px-2 pb-2 pt-1">
-            <span className="font-display text-lg leading-tight text-text-primary">
+            <span className="text-[0.9375rem] font-semibold leading-tight text-text-primary">
               Data feeds
             </span>
             {data && (
@@ -79,7 +79,7 @@ export function DataHealthStrip() {
           {data?.sources.map((s) => (
             <div
               key={s.key}
-              className="data-row flex items-center gap-2.5 px-2 py-2"
+              className="data-row flex items-center gap-2.5 rounded-md px-2 py-1.5"
             >
               <Dot status={s.status} />
               <span className="text-sm text-text-primary flex-1 truncate">

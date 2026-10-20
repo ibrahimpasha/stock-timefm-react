@@ -17,6 +17,7 @@ import { ModelBreakdown } from "../features/command-center/ModelBreakdown";
 import type { OHLCV, ModelForecast } from "../lib/types";
 import { TickerSearch } from "../components/TickerSearch";
 import { Segmented } from "../components/Glass";
+import { Tile } from "../components/Cockpit";
 import IntelligencePanelV3 from "../features/command-center/IntelligencePanelV3";
 import { NarrativeTimeline } from "../features/command-center/NarrativeTimeline";
 import { ConvergenceGraph } from "../features/command-center/ConvergenceGraph";
@@ -220,8 +221,8 @@ export function DeskPage({ section }: { section: DeskSection }) {
   );
 
   // Forecast card: driven by the live /forecast/* endpoints, auto-runs once
-  // per ticker; re-run via the config's Run button. Advisory only — no model
-  // beats the random-walk baseline (see ForecastConfig).
+  // per ticker; re-run via the config's Run button. Advisory only (see
+  // ForecastConfig for the default-model rationale).
   const [forecastResult, setForecastResult] = useState<{
     ticker: string; settings: ForecastSettings; forecasts: ModelForecast[];
   } | null>(null);
@@ -355,9 +356,9 @@ export function DeskPage({ section }: { section: DeskSection }) {
                   <ArrowLeft size={17} aria-hidden="true" />
                   <span>Back</span>
                 </button>
-                <div className="flex min-w-0 flex-1 items-baseline gap-2.5">
-                  <h2 className="ticker truncate text-2xl leading-none tracking-tight">{ticker}</h2>
-                  <span className="hidden truncate text-sm text-text-muted sm:inline">Ticker analysis</span>
+                <div className="flex min-w-0 flex-1 items-baseline gap-3">
+                  <h2 className="ticker truncate text-3xl leading-none tracking-tight">{ticker}</h2>
+                  <span className="hidden truncate text-xs text-text-muted sm:inline">Ticker analysis</span>
                 </div>
                 <button
                   type="button"
@@ -379,40 +380,55 @@ export function DeskPage({ section }: { section: DeskSection }) {
               />
             </div>
 
-            <div className="command-detail-content" style={{ gap: "2.25rem", paddingTop: "0.5rem" }}>
+            <div className="command-detail-content" style={{ gap: "0.875rem", paddingTop: "0.25rem" }}>
               {activeDetailTab === "overview" ? (
               <>
                 <SignalAnalysisCard ticker={ticker} />
                 <ThemePulseCard ticker={ticker} />
                 <GraphContextCard ticker={ticker} />
-                <section className="flex flex-col gap-4" aria-label="Forecast">
-                  <ForecastConfig
-                    settings={settings}
-                    onChange={setSettings}
-                    onRunForecast={runForecast}
-                    isLoading={isRunningForecast}
-                    ticker={ticker}
-                  />
-                  {forecastError && (
-                    <p role="alert" className="callout" style={{ "--callout": "var(--accent-red)" } as CSSProperties}>
-                      {forecastError}
-                    </p>
-                  )}
-                  <ForecastChart
-                    historicalData={historicalData}
-                    forecasts={customForecasts}
-                    selectedModels={executedSettings.selectedModels}
-                    isLoading={historyLoading || isRunningForecast}
-                    forecastOrigin={executedSettings.forecastOrigin}
-                    intraday={executedSettings.forecastType === "intraday"}
-                    overlays={settings}
-                    height={300}
-                  />
-                  <QueryNotice queries={[historyQuery]} label="Price history" />
-                  <ModelBreakdown
-                    models={customForecasts}
-                    isLoading={isRunningForecast}
-                  />
+                <section className="flex flex-col gap-3.5" aria-label="Forecast">
+                  <Tile
+                    title="Price and forecast"
+                    meta={
+                      <>
+                        <span className="num">{executedSettings.selectedModels.length}</span>{" "}
+                        {executedSettings.selectedModels.length === 1 ? "model" : "models"} ·{" "}
+                        {executedSettings.forecastType === "intraday" ? "intraday" : <><span className="num">{executedSettings.forecastDays}</span>d horizon</>}
+                      </>
+                    }
+                  >
+                    {forecastError && (
+                      <p role="alert" className="callout" style={{ "--callout": "var(--accent-red)" } as CSSProperties}>
+                        {forecastError}
+                      </p>
+                    )}
+                    <ForecastChart
+                      historicalData={historicalData}
+                      forecasts={customForecasts}
+                      selectedModels={executedSettings.selectedModels}
+                      isLoading={historyLoading || isRunningForecast}
+                      forecastOrigin={executedSettings.forecastOrigin}
+                      intraday={executedSettings.forecastType === "intraday"}
+                      overlays={settings}
+                      height={300}
+                    />
+                    <QueryNotice queries={[historyQuery]} label="Price history" />
+                  </Tile>
+                  <Tile title="Model breakdown" meta="median change · 80% range">
+                    <ModelBreakdown
+                      models={customForecasts}
+                      isLoading={isRunningForecast}
+                    />
+                  </Tile>
+                  <Tile title="Forecast settings">
+                    <ForecastConfig
+                      settings={settings}
+                      onChange={setSettings}
+                      onRunForecast={runForecast}
+                      isLoading={isRunningForecast}
+                      ticker={ticker}
+                    />
+                  </Tile>
                 </section>
                 <IntelligencePanelV3 />
               </>

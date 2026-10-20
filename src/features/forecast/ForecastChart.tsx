@@ -436,12 +436,12 @@ export function ForecastChart({
   if (intraday ? forecasts.length === 0 : chartHistory.length === 0) {
     return (
       <div
-        className={`card flex items-center justify-center ${className}`}
-        style={{ minHeight: `${height + 50}px` }}
+        className={`flex items-center justify-center rounded-lg ${className}`}
+        style={{ minHeight: `${height + 50}px`, background: "var(--track)" }}
       >
         {isLoading ? (
           <div className="flex flex-col items-center gap-3 text-text-muted">
-            <div className="w-8 h-8 border-2 border-accent-blue/30 border-t-accent-blue rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
             <span className="text-sm">Loading chart data...</span>
           </div>
         ) : (
@@ -455,10 +455,9 @@ export function ForecastChart({
   }
 
   return (
-    <div className={`card ${className}`}>
-      <h3 className="text-sm font-semibold text-text-primary mb-2">Price and forecast</h3>
+    <div className={`flex min-w-0 flex-col gap-2.5 ${className}`}>
       {/* Chart legend */}
-      <div className="flex items-center gap-x-4 gap-y-1 mb-3 flex-wrap">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         {!intraday && showMA.includes("MA20") && <span className="text-xs text-text-muted flex items-center gap-1.5">
           <span className="w-4 h-0.5 inline-block" style={{ backgroundColor: "#ffa500" }} />
           MA20

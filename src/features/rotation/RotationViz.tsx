@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type Dispatch, type S
 import { Play, Pause } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Sparkline } from "../../components/CCPrimitives";
+import { HeatTile } from "../../components/Cockpit";
 import type { SectorRow, RotationInsight } from "../../api/rotation";
 
 /* Per-sector line colors for the timeline + map labels. Chart palettes are the
@@ -55,27 +56,30 @@ export const pct = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 /* ── sector strip ───────────────────────────────────────────────────────── */
 
 export function SectorStrip({ sectors }: { sectors: SectorRow[] }) {
+  // Heat grid: fill strength = |change| relative to the biggest mover on screen.
+  const maxAbs = Math.max(0.1, ...sectors.map((s) => Math.abs(s.change_pct)));
   return (
-    <div className="overflow-x-auto">
-      <div className="flex gap-8 min-w-max pb-1">
-        {sectors.map((s) => {
-          const up = s.change_pct >= 0;
-          return (
-            <div key={s.ticker} className="min-w-[104px] flex-1">
-              <div className="flex items-baseline gap-1.5">
-                <span className="ticker text-sm">{s.ticker}</span>
-                <span className="text-xs text-text-muted truncate">{s.short}</span>
-              </div>
-              <div className="mt-1 flex items-end justify-between gap-2">
-                <span className={`${up ? "delta-up" : "delta-down"} text-2xl font-semibold tracking-tight`}>
-                  {pct(s.change_pct)}
-                </span>
-                <Sparkline points={s.spark} width={48} height={20} color={seriesColor(s.ticker)} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+      {sectors.map((s) => (
+        <HeatTile
+          key={s.ticker}
+          label={
+            <span className="flex items-center gap-1.5" title={s.label}>
+              <span className="ticker text-text-primary">{s.ticker}</span>
+              <span className="truncate">{s.short}</span>
+            </span>
+          }
+          value={pct(s.change_pct)}
+          intensity={Math.abs(s.change_pct) / maxAbs}
+          tone={s.change_pct >= 0 ? "up" : "down"}
+          sub={
+            <span className="flex items-center justify-between gap-2">
+              <span className="num">score {s.score.toFixed(1)}</span>
+              <Sparkline points={s.spark} width={48} height={16} color={seriesColor(s.ticker)} />
+            </span>
+          }
+        />
+      ))}
     </div>
   );
 }
@@ -334,7 +338,7 @@ export function RotationScrubber({
         onClick={() => setPlaying((p) => (index >= last ? (onChange(0), true) : !p))}
         aria-label={playing ? "Pause rotation replay" : "Play rotation replay"}
         className="shrink-0 size-8 rounded-full flex items-center justify-center transition-colors
-                   bg-accent-blue/15 text-accent-blue hover:bg-accent-blue/25"
+                   bg-accent text-[var(--accent-ink)] hover:brightness-110"
       >
         {playing ? <Pause size={13} /> : <Play size={13} />}
       </button>
@@ -345,7 +349,7 @@ export function RotationScrubber({
         value={index}
         onChange={(e) => { setPlaying(false); onChange(Number(e.target.value)); }}
         aria-label="Scrub rotation history"
-        className="flex-1 accent-accent-blue h-1 cursor-pointer"
+        className="flex-1 accent-[var(--accent)] h-1 cursor-pointer"
       />
       <span className="num text-sm text-text-secondary w-[88px] text-right">
         {dates[index] ?? ""}
@@ -415,52 +419,52 @@ export function MomentumRanking({
   onSelect?: (key: string) => void;
   selected?: string;
 }) {
+  // Diverging bars around a zero score (-10..+10); label column is wider than
+  // BarRow's ticker column because theme keys reuse this view.
+  const cols = "1.25rem minmax(5rem,11rem) minmax(0,1fr) 2.75rem 3.75rem";
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-xs font-medium text-text-muted">
-            <th className="text-left font-medium py-2 pr-2">#</th>
-            <th className="text-left font-medium py-2">Sector</th>
-            <th className="text-left font-medium py-2 px-2">Momentum</th>
-            <th className="text-right font-medium py-2 px-2">Score</th>
-            <th className="text-right font-medium py-2 pl-2">Chg</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border border-t border-border">
-          {sectors.map((s) => {
-            const width = ((s.score + 10) / 20) * 100;
-            return (
-              <tr key={s.ticker}
-                  onClick={onSelect ? () => onSelect(s.ticker) : undefined}
-                  className={onSelect ? "data-row cursor-pointer" : "data-row"}
-                  style={selected === s.ticker
-                    ? { background: "color-mix(in srgb, var(--accent-blue) 10%, transparent)" }
-                    : undefined}>
-                <td className="py-2.5 pr-2 num text-xs text-text-muted">{s.rank}</td>
-                <td className="py-2.5 whitespace-nowrap">
-                  <span className="mr-1.5 inline-block size-2 rounded-full align-middle" style={{ background: seriesColor(s.ticker) }} aria-hidden="true" />
-                  <span className="ticker">{s.ticker}</span>
-                  <span className="text-xs text-text-muted ml-1.5">{s.label}</span>
-                </td>
-                <td className="py-2.5 px-2 w-[34%]">
-                  <div className="h-1.5 rounded-full bg-bg-card-hover overflow-hidden">
-                    <div className="h-full rounded-full"
-                         style={{ width: `${width}%`, background: scoreColor(s.score) }} />
-                  </div>
-                </td>
-                <td className="py-2.5 px-2 text-right num font-semibold"
-                    style={{ color: scoreColor(s.score) }}>
-                  {s.score.toFixed(1)}
-                </td>
-                <td className={`py-2.5 pl-2 text-right ${s.change_pct >= 0 ? "delta-up" : "delta-down"}`}>
-                  {pct(s.change_pct)}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="flex flex-col gap-0.5">
+      <div className="grid gap-2.5 px-1 pb-1 text-xs text-text-muted" style={{ gridTemplateColumns: cols }}>
+        <span>#</span>
+        <span>Name</span>
+        <span className="text-center">Momentum score</span>
+        <span className="text-right">Score</span>
+        <span className="text-right">Chg</span>
+      </div>
+      {sectors.map((s) => {
+        const w = `${Math.max(2, (Math.min(10, Math.abs(s.score)) / 10) * 100)}%`;
+        const fill = scoreColor(s.score);
+        const on = selected === s.ticker;
+        const body = (
+          <>
+            <span className="num text-xs text-text-muted">{s.rank}</span>
+            <span className="flex min-w-0 items-center gap-1.5" title={s.label}>
+              <span className="inline-block size-2 shrink-0 rounded-full" style={{ background: seriesColor(s.ticker) }} aria-hidden="true" />
+              <span className="ticker truncate text-[0.8125rem]">{s.ticker}</span>
+              {s.label !== s.ticker && <span className="truncate text-xs text-text-muted">{s.label}</span>}
+            </span>
+            <span className="grid grid-cols-2">
+              <span className="flex justify-end">{s.score < 0 && <span className="h-3 rounded-l-[3px]" style={{ width: w, background: fill }} />}</span>
+              <span className="flex border-l border-border">{s.score > 0 && <span className="h-3 rounded-r-[3px]" style={{ width: w, background: fill }} />}</span>
+            </span>
+            <span className="num text-right text-[0.8125rem] font-semibold" style={{ color: fill }}>{s.score.toFixed(1)}</span>
+            <span className={`text-right text-[0.8125rem] ${s.change_pct >= 0 ? "delta-up" : "delta-down"}`}>{pct(s.change_pct)}</span>
+          </>
+        );
+        const cls = "grid min-h-7 w-full items-center gap-2.5 rounded-md px-1 text-left";
+        const style: CSSProperties = {
+          gridTemplateColumns: cols,
+          background: on ? "color-mix(in srgb, var(--accent) 14%, transparent)" : undefined,
+        };
+        return onSelect ? (
+          <button key={s.ticker} type="button" aria-pressed={on} onClick={() => onSelect(s.ticker)}
+                  className={`${cls} data-row cursor-pointer`} style={style}>
+            {body}
+          </button>
+        ) : (
+          <div key={s.ticker} className={`${cls} data-row`} style={style}>{body}</div>
+        );
+      })}
     </div>
   );
 }

@@ -33,6 +33,7 @@ import { useTickerGex, type TickerGex } from "../../../api/tickerGex";
 import { wallTilt } from "../../gex/GexWall";
 import { useDashboardFilters } from "../../../store/useDashboardFilters";
 import { ChevronUp, ChevronDown, Activity, Sparkles } from "lucide-react";
+import { Tile } from "../../../components/Cockpit";
 
 /** Subset of the backend's INDEX_ETFS blacklist — must match
  *  src/notable_score.py::INDEX_ETFS so the frontend Kian filter agrees
@@ -261,7 +262,7 @@ function SortHeaderButton({
       type="button"
       onClick={() => onSort(sortKey)}
       className={`${className} flex shrink-0 items-center gap-0.5 select-none cursor-pointer whitespace-nowrap hover:text-text-primary transition-colors`}
-      style={{ color: active ? "var(--accent-blue)" : undefined }}
+      style={{ color: active ? "var(--accent)" : undefined }}
       title={`Sort by ${label}`}
     >
       <span>{label}</span>
@@ -347,13 +348,13 @@ function researchRankTextColor(score: number | null): string {
   return "var(--text-muted)";
 }
 
-/** Neutral filter pill; active = interaction accent (blue). */
+/** Neutral filter pill; active = interaction accent (amber). */
 function pillStyle(active: boolean) {
   return active
     ? {
-        color: "var(--accent-blue)",
-        background: "color-mix(in srgb, var(--accent-blue) 14%, transparent)",
-        border: "1px solid color-mix(in srgb, var(--accent-blue) 35%, transparent)",
+        color: "var(--accent-ink)",
+        background: "var(--accent)",
+        border: "1px solid var(--accent)",
       }
     : { color: "var(--text-secondary)", background: "transparent", border: "1px solid var(--border)" };
 }
@@ -1001,9 +1002,20 @@ export function EntryTape({
   );
 
   return (
-    <div className="text-xs">
+    <Tile
+      title={
+        <>
+          Tape{" "}
+          <span className="num text-xs font-normal text-text-muted">
+            {sortedRows.length} of {entries.length}
+          </span>
+        </>
+      }
+      meta={dates.length > 1 ? `${dates.length} dates` : dates[0]}
+      bodyClassName="text-xs"
+    >
       <QueryNotice queries={dateQueries} label="Flow entries" />
-      <div className="flex items-center justify-between gap-3 pb-4 max-md:flex-wrap max-md:gap-2">
+      <div className="flex items-center justify-between gap-3 max-md:flex-wrap max-md:gap-2">
         <div className="flex items-center gap-2 max-md:gap-1 max-md:overflow-x-auto max-md:flex-nowrap max-md:w-full">
           {(() => {
             // Notable button — cycles through:
@@ -1155,17 +1167,13 @@ export function EntryTape({
               </span>
             </span>
           )}
-          <span>
-            <span className="num font-semibold text-text-primary">{sortedRows.length}</span> of{" "}
-            <span className="num">{entries.length}</span> entries
-          </span>
-          {dates.length > 1 ? <span>{dates.length} dates</span> : null}
         </span>
       </div>
-      <div className="card min-w-fit p-0! overflow-clip">
+      <div className="-mx-4 max-w-[calc(100%+2rem)] overflow-x-auto overscroll-x-contain lg:-mx-5 lg:max-w-[calc(100%+2.5rem)]">
+      <div className="min-w-fit">
       <div
-        className="iflow-tape-header sticky top-0 z-10 flex items-center gap-3 border-b border-border px-3 py-2.5 text-xs font-medium text-text-muted max-md:gap-1.5 max-md:px-2"
-        style={{ background: "var(--card-bg)" }}
+        className="iflow-tape-header sticky top-0 z-10 flex items-center gap-3 border-y border-border px-4 py-2 text-xs font-medium text-text-muted max-md:gap-1.5 max-md:px-2 lg:px-5"
+        style={{ background: "var(--surface-inset)" }}
       >
         {renderHeader("Rank", "avg", "w-12 justify-end")}
         {renderHeader("NScore", "score", "w-12 justify-end max-md:hidden")}
@@ -1185,7 +1193,7 @@ export function EntryTape({
         {renderHeader("Est. P/L", "pnl", "w-16 justify-end")}
         {renderHeader("Wtd peak", "pred_peak", "w-20 justify-end pr-1 max-md:hidden")}
       </div>
-      <div className="divide-y divide-border px-1">
+      <div className="divide-y divide-border px-2 lg:px-3">
       {sortedRows.map((r) => {
         const sideColor =
           r.side === "Unknown" ? "var(--text-muted)" : r.side === "Bull" ? "var(--accent-green)" : "var(--accent-red)";
@@ -1239,7 +1247,7 @@ export function EntryTape({
             onClick={() => onSelectTicker(r.ticker)}
             className="iflow-tape-row data-row flex w-full items-center gap-3 px-2 py-2.5 text-left max-md:gap-1.5 max-md:px-1"
             style={{
-              background: isSelected ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)" : undefined,
+              background: isSelected ? "color-mix(in srgb, var(--accent) 12%, transparent)" : undefined,
             }}
           >
             {/* Evidence-first ordering score; it is not a probability. */}
@@ -1517,6 +1525,7 @@ export function EntryTape({
       })}
       </div>
       </div>
-    </div>
+      </div>
+    </Tile>
   );
 }

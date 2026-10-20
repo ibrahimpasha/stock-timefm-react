@@ -10,7 +10,8 @@
  */
 import { useMemo, useRef, useState } from "react";
 import { QueryNotice } from "../../components/QueryNotice";
-import { RefreshCw, TrendingUp, TrendingDown } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+import { TileGrid, Tile, KpiTile, BarRow, HeatTile, CockpitButton } from "../../components/Cockpit";
 import { Segmented } from "../../components/Glass";
 import { useAppStore } from "../../store/useAppStore";
 import {
@@ -29,70 +30,28 @@ function fmtPct(v: number | null | undefined, dp = 0): string {
   return `${(v * 100).toFixed(dp)}%`;
 }
 
-function scoreTone(score: number) {
-  return score >= 60
-    ? "var(--accent-green)"
-    : score < 25
-      ? "var(--accent-red)"
-      : "var(--accent-blue)";
-}
-
-/** Big 0-100 score with a thin meter underneath — green above 60, red below 25, blue between. */
-function ScoreMeter({ score }: { score: number }) {
-  const tone = scoreTone(score);
-  return (
-    <div className="flex w-16 shrink-0 flex-col items-end gap-1">
-      <span className="num text-2xl font-semibold leading-none tracking-tight" style={{ color: tone }}>
-        {score.toFixed(0)}
-      </span>
-      <div
-        className="h-1 w-full overflow-hidden rounded-full"
-        style={{ background: "color-mix(in srgb, var(--border) 60%, transparent)" }}
-      >
-        <div
-          className="h-full rounded-full"
-          style={{ width: `${Math.min(100, score)}%`, background: tone }}
-        />
-      </div>
-    </div>
-  );
-}
-
-/** Small labelled figure used in the secondary columns of a ranked row. */
-function Fig({ label, value, title, className = "" }: { label: string; value: React.ReactNode; title?: string; className?: string }) {
-  return (
-    <div className="flex w-16 flex-col items-end" title={title}>
-      <span className={`num text-sm ${className || "text-text-primary"}`}>{value}</span>
-      <span className="text-xs text-text-muted">{label}</span>
-    </div>
-  );
-}
+/** Score band as a cockpit tone: green above 60, red below 25, blue between. */
+const scoreBand = (score: number) => (score >= 60 ? "up" : score < 25 ? "down" : "info");
 
 function TickerRow({ r, rank }: { r: ResilienceTicker; rank: number }) {
   const setActiveTicker = useAppStore((s) => s.setActiveTicker);
   return (
-    <div
-      className="data-row flex cursor-pointer items-center gap-3 px-2 py-2.5"
+    <BarRow
+      label={r.ticker}
+      value={r.score}
+      max={100}
+      tone={scoreBand(r.score)}
+      display={r.score.toFixed(0)}
+      trailing={fmtPct(r.avg_bounce_5d)}
       onClick={() => setActiveTicker(r.ticker)}
-      title={`${r.n_events} events · avg own drawdown ${r.avg_own_dd_pct}%`}
-    >
-      <span className="num w-6 shrink-0 text-right text-xs text-text-muted">{rank}</span>
-      <div className="min-w-0 flex-1">
-        <div className="ticker text-sm">{r.ticker}</div>
-        <div className="truncate text-xs text-text-muted">{r.theme || r.category || "—"}</div>
-      </div>
-      <div className="hidden items-center gap-2 sm:flex">
-        <Fig label="Bounce 5d" value={fmtPct(r.avg_bounce_5d)} title="Share of its own drawdown recovered 5 sessions after its trough" />
-        <Fig label="Recovered" value={fmtPct(r.recovery_rate)} title="Share of events where it fully recovered its pre-crash price within 20 sessions" />
-        <Fig
-          label="vs SPY"
-          value={r.avg_rel_dd != null ? `${r.avg_rel_dd.toFixed(1)}x` : "—"}
-          title="Its drawdown vs SPY's — under 1x fell less than the market"
-          className="text-text-secondary"
-        />
-      </div>
-      <ScoreMeter score={r.score} />
-    </div>
+      title={
+        `#${rank} ${r.ticker} · ${r.theme || r.category || "—"}\n` +
+        `bounce 5d ${fmtPct(r.avg_bounce_5d)} (share of own drawdown recovered 5 sessions after its trough)\n` +
+        `recovered ${fmtPct(r.recovery_rate)} of events within 20 sessions\n` +
+        `drawdown vs SPY ${r.avg_rel_dd != null ? `${r.avg_rel_dd.toFixed(1)}x` : "—"} (under 1x fell less than the market)\n` +
+        `${r.n_events} events · avg own drawdown ${r.avg_own_dd_pct}%`
+      }
+    />
   );
 }
 
@@ -408,57 +367,63 @@ function DayRead({ days, onPick }: { days: string; onPick: (t: string) => void }
   if (!data || data.error || !data.spy) return null;
   const c = data.counts;
   const multi = (data.dates?.length ?? 1) > 1;
+  const tracked = Math.max(1, data.n_tracked ?? 0);
+  const buckets: { label: string; n: number; tone: "up" | "down"; sub: string }[] = [
+    { label: "Fell with it", n: c?.dropped ?? 0, tone: "down", sub: "dropped with the market" },
+    { label: "Barely reacted", n: c?.held_up ?? 0, tone: "up", sub: "held up" },
+    { label: "Already V-shaped", n: c?.recovered ?? 0, tone: "up", sub: "recovered the dip" },
+    { label: "Still down", n: c?.still_down ?? 0, tone: "down", sub: multi ? `as of ${data.latest}` : "at the close" },
+  ];
   return (
-    <section className="space-y-4">
-      <div>
-        <h3 className="section-title">
-          {multi
-            ? `Across ${data.dates.length} stress days (${data.dates
-                .map((d) => d.slice(5))
-                .join(", ")})`
-            : `${data.dates[0]} read`}
-        </h3>
-      </div>
-      <p className="prose-read max-w-[68ch] text-text-secondary">
-        SPY {multi ? "averaged a dip of" : "dipped"}{" "}
-        <span className="delta-down">{data.spy.spy_trough_pct}%</span> vs the
-        prior close and recovered{" "}
-        <span className="num text-text-primary">
-          {data.spy.spy_bounce_close != null
-            ? `${Math.round(data.spy.spy_bounce_close * 100)}%`
-            : "—"}
-        </span>{" "}
-        of it by the bell. Of <span className="num">{data.n_tracked}</span> tracked names:{" "}
-        <span className="num">{c?.dropped}</span> fell with it,{" "}
-        <span className="num">{c?.held_up}</span> barely reacted,{" "}
-        <span className="num">{c?.recovered}</span> already V-shaped,{" "}
-        <span className="num">{c?.still_down}</span> still down{multi ? ` as of ${data.latest}` : " at the close"}.
-      </p>
-      <div className="grid gap-3 text-sm sm:grid-cols-[10rem_1fr]">
-        {!!data.dropped?.length && (
-          <>
-            <span className="pt-0.5 text-text-secondary">Dropped with the market</span>
-            <InsightChips chips={data.dropped.slice(0, 10)} onPick={onPick} />
-          </>
-        )}
-        {!!data.held_up?.length && (
-          <>
-            <span className="pt-0.5 text-text-secondary">Barely reacted</span>
-            <InsightChips chips={data.held_up.slice(0, 8)} onPick={onPick} />
-          </>
-        )}
-        {!!data.recovered?.length && (
-          <>
-            <span className="pt-0.5 text-text-secondary">Already recovered</span>
-            <InsightChips chips={data.recovered.slice(0, 8)} onPick={onPick} showBounce />
-          </>
-        )}
-      </div>
+    <>
+      <Tile
+        span={data.watch?.length ? 7 : 12}
+        title={multi ? `Across ${data.dates.length} stress days` : `${data.dates[0]} read`}
+        meta={multi ? data.dates.map((d) => d.slice(5)).join(", ") : undefined}
+      >
+        <p className="m-0 max-w-[70ch] text-sm leading-relaxed text-text-secondary">
+          SPY {multi ? "averaged a dip of" : "dipped"}{" "}
+          <span className="num delta-down">{data.spy.spy_trough_pct}%</span> vs the prior close and recovered{" "}
+          <span className="num text-text-primary">
+            {data.spy.spy_bounce_close != null ? `${Math.round(data.spy.spy_bounce_close * 100)}%` : "—"}
+          </span>{" "}
+          of it by the bell, across <span className="num">{data.n_tracked}</span> tracked names.
+        </p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {buckets.map((bk) => (
+            <HeatTile
+              key={bk.label}
+              label={bk.label}
+              value={bk.n}
+              intensity={bk.n / tracked}
+              tone={bk.tone}
+              sub={`${Math.round((bk.n / tracked) * 100)}% · ${bk.sub}`}
+            />
+          ))}
+        </div>
+        <div className="grid gap-3 pt-1 text-sm sm:grid-cols-[10rem_1fr]">
+          {!!data.dropped?.length && (
+            <>
+              <span className="pt-0.5 text-text-secondary">Dropped with the market</span>
+              <InsightChips chips={data.dropped.slice(0, 10)} onPick={onPick} />
+            </>
+          )}
+          {!!data.held_up?.length && (
+            <>
+              <span className="pt-0.5 text-text-secondary">Barely reacted</span>
+              <InsightChips chips={data.held_up.slice(0, 8)} onPick={onPick} />
+            </>
+          )}
+          {!!data.recovered?.length && (
+            <>
+              <span className="pt-0.5 text-text-secondary">Already recovered</span>
+              <InsightChips chips={data.recovered.slice(0, 8)} onPick={onPick} showBounce />
+            </>
+          )}
+        </div>
+      </Tile>
       {!!data.watch?.length && (
-        <div className="space-y-2 border-t border-border pt-4">
-          <h4 className="text-sm font-semibold text-text-primary">
-            Watch: still down, but history says they snap back
-          </h4>
+        <Tile span={5} title="Watch" meta="still down, but history says they snap back">
           <div className="divide-y divide-border">
             {data.watch.map((w) => (
               <div key={w.ticker} className="flex items-baseline gap-3 py-2">
@@ -474,11 +439,17 @@ function DayRead({ days, onPick }: { days: string; onPick: (t: string) => void }
               </div>
             ))}
           </div>
-        </div>
+        </Tile>
       )}
-    </section>
+    </>
   );
 }
+
+const pillCls = "num min-h-8 rounded-full border px-3 py-1 text-xs transition-colors";
+const pillStyle = (on: boolean): React.CSSProperties =>
+  on
+    ? { borderColor: "var(--accent)", background: "var(--accent)", color: "var(--accent-ink)" }
+    : { borderColor: "var(--border)", background: "transparent" };
 
 function IntradayView() {
   const [selDays, setSelDays] = useState<string[]>([]);
@@ -528,10 +499,28 @@ function IntradayView() {
     return out;
   }, [picked, theme]);
 
+  // KPI strip: SPY on the selected session(s) + the fastest name.
+  const sel = days.filter((d) => activeDays.includes(d.date));
+  const spyDip = sel.length ? sel.reduce((t, d) => t + d.spy_trough_pct, 0) / sel.length : null;
+  const spyB = sel.filter((d) => d.spy_bounce_close != null);
+  const spyBounce = spyB.length ? spyB.reduce((t, d) => t + (d.spy_bounce_close as number), 0) / spyB.length : null;
+  const ranked = (data?.tickers ?? []).slice(0, 60);
+  const top = ranked[0];
+
   return (
-    <div className="space-y-8">
-      {/* Filter row — multi-select day chips, quick actions, theme line */}
-      <div className="flex items-center gap-2 flex-wrap">
+    <>
+      <KpiTile
+        label={activeDays.length > 1 ? `SPY avg dip · ${activeDays.length} sessions` : `SPY dip · ${activeDays[0] ?? "—"}`}
+        value={spyDip != null ? `${spyDip.toFixed(2)}%` : "—"}
+        tone="down"
+        sub="intraday trough vs prior close"
+      />
+      <KpiTile label="SPY recovered by close" value={fmtPct(spyBounce)} sub="share of the dip bought back" />
+      <KpiTile label="Fastest V-shape" value={top?.ticker ?? "—"} delta={top ? top.score.toFixed(0) : undefined} tone="up" sub={top ? `recovered ${fmtPct(top.avg_bounce_close)} of a ${top.avg_trough_pct}% dip` : undefined} />
+      <KpiTile label="Names ranked" value={data?.n_tickers ?? "—"} sub={`${days.length} stress days stored`} />
+
+      {/* Toolbar — multi-select day chips, quick actions, theme line */}
+      <Tile span={12} bodyClassName="flex-row! flex-wrap items-center">
         {days.map((d) => {
           const on = activeDays.includes(d.date);
           return (
@@ -540,16 +529,11 @@ function IntradayView() {
               type="button"
               onClick={() => toggleDay(d.date)}
               aria-pressed={on}
-              className="num min-h-8 rounded-full border px-3 py-1 text-xs"
-              style={{
-                borderColor: on ? "var(--accent-blue)" : "var(--border)",
-                background: on
-                  ? "color-mix(in srgb, var(--accent-blue) 12%, transparent)"
-                  : "transparent",
-              }}
+              className={pillCls}
+              style={pillStyle(on)}
               title={`SPY trough ${d.spy_trough_pct}% · bounce by close ${d.spy_bounce_close ?? "—"} · click to toggle`}
             >
-              {d.date.slice(5)} <span className="text-accent-red">{d.spy_trough_pct}%</span>
+              {d.date.slice(5)} <span className={on ? undefined : "text-accent-red"}>{d.spy_trough_pct}%</span>
             </button>
           );
         })}
@@ -557,14 +541,14 @@ function IntradayView() {
           <button
             type="button"
             onClick={() => setSelDays(days.map((d) => d.date))}
-            className="rounded px-1.5 py-0.5 text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
+            className="min-h-8 rounded px-2 text-text-secondary hover:bg-bg-card-hover hover:text-text-primary"
           >
             All
           </button>
           <button
             type="button"
             onClick={() => setSelDays([])}
-            className="rounded px-1.5 py-0.5 text-text-secondary hover:text-text-primary hover:bg-bg-card-hover"
+            className="min-h-8 rounded px-2 text-text-secondary hover:bg-bg-card-hover hover:text-text-primary"
             title="back to latest day only"
           >
             Latest
@@ -573,6 +557,7 @@ function IntradayView() {
         <select
           value={theme}
           onChange={(e) => setTheme(e.target.value)}
+          aria-label="Theme line"
           className="control-surface ml-auto min-h-8 rounded-full border px-3 py-1 text-xs text-text-secondary"
         >
           <option value="">No theme line</option>
@@ -580,22 +565,14 @@ function IntradayView() {
             <option key={t} value={t}>{t}</option>
           ))}
         </select>
-      </div>
+      </Tile>
 
-      <DayRead days={datesKey} onPick={toggle} />
-
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h3 className="section-title">Intraday path</h3>
-            <p className="section-sub">
-              {activeDays.length > 1
-                ? `${activeDays.length} sessions`
-                : activeDays[0] ?? ""}{" "}
-              — % vs previous close, 15m bars · click ranked rows to overlay (max {MAX_OVERLAY})
-            </p>
-          </div>
-          {/* legend — always present */}
+      <Tile
+        span={8}
+        className="self-start"
+        title="Intraday path"
+        meta={`${activeDays.length > 1 ? `${activeDays.length} sessions` : activeDays[0] ?? ""} · % vs previous close, 15m bars`}
+        actions={
           <span className="flex items-center gap-4 text-xs text-text-secondary">
             <span className="flex items-center gap-1.5">
               <span style={{ width: 14, borderTop: "2px solid var(--text-muted)" }} /> SPY
@@ -609,63 +586,44 @@ function IntradayView() {
               </span>
             )}
           </span>
-        </div>
-        <div className="card p-4">
-          <OverlayChart
-            segments={bars.data?.segments ?? []}
-            meta={chartMeta}
-            faded={bars.isFetching && !!bars.data}
-          />
-        </div>
-      </section>
+        }
+      >
+        <OverlayChart
+          segments={bars.data?.segments ?? []}
+          meta={chartMeta}
+          faded={bars.isFetching && !!bars.data}
+        />
+      </Tile>
 
-      {/* Ranked intraday table */}
-      <section className="space-y-3">
-        <div>
-          <h3 className="section-title">Fastest V-shapes</h3>
-          <p className="section-sub">Ranked by V-score. Click to overlay, double-click to open the ticker.</p>
-        </div>
-        <div className="card max-h-[56vh] divide-y divide-border overflow-y-auto p-2">
-          {(data?.tickers ?? []).slice(0, 60).map((r: IntradayTicker, idx: number) => {
-            const sel = picked.includes(r.ticker);
+      {/* Ranked intraday list */}
+      <Tile span={4} title="Fastest V-shapes" meta={`V-score · avg dip · overlay max ${MAX_OVERLAY}`}>
+        <span className="text-xs text-text-muted">Click to overlay, double-click to open the ticker.</span>
+        <div className="flex max-h-[18rem] flex-col gap-0.5 overflow-y-auto">
+          {ranked.map((r: IntradayTicker, idx: number) => {
+            const on = picked.includes(r.ticker);
+            const slot = SLOT_VARS[picked.indexOf(r.ticker) % SLOT_VARS.length];
             return (
               <div
                 key={r.ticker}
-                className="data-row flex cursor-pointer items-center gap-3 px-2 py-2.5"
-                style={{
-                  background: sel
-                    ? "color-mix(in srgb, var(--accent-blue) 8%, transparent)"
-                    : undefined,
-                }}
-                onClick={() => toggle(r.ticker)}
+                className="rounded-md"
+                style={{ background: on ? "color-mix(in srgb, var(--accent) 10%, transparent)" : undefined }}
                 onDoubleClick={() => setActiveTicker(r.ticker)}
-                title={`${r.n_days} stress days · double-click to open ticker`}
               >
-                <span className="num w-6 shrink-0 text-right text-xs text-text-muted">{idx + 1}</span>
-                <span
-                  className="shrink-0"
-                  style={{
-                    width: 12, height: 0,
-                    borderTop: sel
-                      ? `2px solid ${SLOT_VARS[picked.indexOf(r.ticker) % SLOT_VARS.length]}`
-                      : "2px solid transparent",
-                  }}
+                <BarRow
+                  label={<span style={{ color: on ? slot : undefined }}>{r.ticker}</span>}
+                  value={r.score}
+                  max={100}
+                  tone={scoreBand(r.score)}
+                  display={r.score.toFixed(0)}
+                  trailing={`${r.avg_trough_pct}%`}
+                  onClick={() => toggle(r.ticker)}
+                  title={
+                    `#${idx + 1} ${r.ticker} · ${r.theme || r.category || "—"}\n` +
+                    `avg dip ${r.avg_trough_pct}% vs prev close · recovered ${fmtPct(r.avg_bounce_close)} by the close\n` +
+                    `bounce vs SPY ${r.avg_rel_bounce >= 0 ? "+" : ""}${(r.avg_rel_bounce * 100).toFixed(0)}% · ${r.n_days} stress days\n` +
+                    `${on ? "click to remove from" : "click to add to"} overlay · double-click to open ticker`
+                  }
                 />
-                <div className="min-w-0 flex-1">
-                  <div className="ticker text-sm">{r.ticker}</div>
-                  <div className="truncate text-xs text-text-muted">{r.theme || r.category || "—"}</div>
-                </div>
-                <div className="hidden items-center gap-2 sm:flex">
-                  <Fig label="Avg dip" value={`${r.avg_trough_pct}%`} title="Average intraday dip vs prev close on stress days" className="text-accent-red" />
-                  <Fig label="Recovered" value={fmtPct(r.avg_bounce_close)} title="Fraction of the dip recovered by the close" />
-                  <Fig
-                    label="vs SPY"
-                    value={`${r.avg_rel_bounce >= 0 ? "+" : ""}${(r.avg_rel_bounce * 100).toFixed(0)}%`}
-                    title="Bounce vs SPY's bounce the same day"
-                    className="text-text-secondary"
-                  />
-                </div>
-                <ScoreMeter score={r.score} />
               </div>
             );
           })}
@@ -674,8 +632,10 @@ function IntradayView() {
             <div className="p-3 text-sm text-text-muted">No intraday data — refresh from the Daily view.</div>
           )}
         </div>
-      </section>
-    </div>
+      </Tile>
+
+      <DayRead days={datesKey} onPick={toggle} />
+    </>
   );
 }
 
@@ -691,41 +651,38 @@ export function BounceBoard() {
     view === "resilient" ? tickers.slice(0, 40) : [...tickers].slice(-40).reverse();
 
   return (
-    <div className="space-y-6 p-1">
-      {mode === "daily" && <QueryNotice queries={[dailyQuery]} label="Daily resilience" />}
-      {refresh.isError && <p role="alert" className="text-xs text-accent-red">Resilience refresh failed.</p>}
-      {/* Mode toggle (page header already names the view) */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 flex-wrap">
-            <Segmented
-              value={mode}
-              onChange={setMode}
-              options={[
-                { value: "intraday" as const, label: "Intraday V-shapes" },
-                { value: "daily" as const, label: "Multi-day events" },
-              ]}
-            />
-            <span className="text-sm text-text-muted">
-              {mode === "intraday"
-                ? "15m bars — who recovers the day's dip fastest"
-                : `${data?.events.length ?? 0} events, ${data?.n_tickers ?? 0} tickers ranked`}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => refresh.mutate()}
-            disabled={refresh.isPending}
-            className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-text-secondary hover:bg-bg-card-hover hover:text-text-primary"
-            title="Re-scan prices and rebuild both layers (~80s in the background)"
-          >
-            <RefreshCw size={12} className={refresh.isPending ? "animate-spin" : ""} />
-            {refresh.isPending ? "Rebuilding…" : "Refresh"}
-          </button>
+    <TileGrid>
+      {(mode === "daily" || refresh.isError) && (
+        <div className="min-w-0 lg:col-span-12">
+          {mode === "daily" && <QueryNotice queries={[dailyQuery]} label="Daily resilience" />}
+          {refresh.isError && <p role="alert" className="text-xs text-accent-red">Resilience refresh failed.</p>}
         </div>
-        {mode === "intraday" ? null : (
-          <EventStrip events={data?.events ?? []} />
-        )}
+      )}
+      {/* Mode toggle (page header already names the view) */}
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 lg:col-span-12">
+        <div className="flex flex-wrap items-center gap-3">
+          <Segmented
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "intraday" as const, label: "Intraday V-shapes" },
+              { value: "daily" as const, label: "Multi-day events" },
+            ]}
+          />
+          <span className="text-sm text-text-muted">
+            {mode === "intraday"
+              ? "15m bars — who recovers the day's dip fastest"
+              : `${data?.events.length ?? 0} events, ${data?.n_tickers ?? 0} tickers ranked`}
+          </span>
+        </div>
+        <CockpitButton
+          onClick={() => refresh.mutate()}
+          disabled={refresh.isPending}
+          title="Re-scan prices and rebuild both layers (~80s in the background)"
+        >
+          <RefreshCw size={14} className={refresh.isPending ? "animate-spin" : ""} />
+          {refresh.isPending ? "Rebuilding…" : "Refresh"}
+        </CockpitButton>
       </div>
 
       {mode === "intraday" ? (
@@ -735,43 +692,25 @@ export function BounceBoard() {
           view={view}
           setView={setView}
           shown={shown}
+          tickers={tickers}
+          events={data?.events ?? []}
           themes={data?.themes ?? []}
           isFetching={isFetching}
           hasData={!!data}
         />
       )}
-    </div>
+    </TileGrid>
   );
 }
 
-function EventStrip({
-  events,
-}: {
-  events: { id: number; peak_date: string; trough_date: string; spy_dd_pct: number; spy_bounce_5d: number | null }[];
-}) {
-  return (
-    <div className="flex gap-8 overflow-x-auto pb-1">
-      {events.map((e) => (
-        <div
-          key={e.id}
-          className="shrink-0"
-          title={`peak ${e.peak_date} → trough ${e.trough_date}`}
-        >
-          <div className="num text-xs text-text-muted">{e.trough_date}</div>
-          <div className="delta-down text-xl font-semibold tracking-tight">{e.spy_dd_pct}%</div>
-          <div className="num text-xs text-text-muted" title="SPY's own 5-session bounce off the trough">
-            SPY · ↩ {fmtPct(e.spy_bounce_5d)}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+type EventRow = { id: number; peak_date: string; trough_date: string; spy_dd_pct: number; spy_bounce_5d: number | null };
 
 function DailyView({
   view,
   setView,
   shown,
+  tickers,
+  events,
   themes,
   isFetching,
   hasData,
@@ -779,23 +718,36 @@ function DailyView({
   view: "resilient" | "laggards";
   setView: (v: "resilient" | "laggards") => void;
   shown: ResilienceTicker[];
+  tickers: ResilienceTicker[];
+  events: EventRow[];
   themes: { theme: string; category: string | null; n_tickers: number; score: number; avg_bounce_5d: number; top: string[] }[];
   isFetching: boolean;
   hasData: boolean;
 }) {
+  const worst = events.reduce<EventRow | null>((w, e) => (!w || e.spy_dd_pct < w.spy_dd_pct ? e : w), null);
+  const maxDd = Math.max(0.01, ...events.map((e) => Math.abs(e.spy_dd_pct)));
+  const top = tickers[0];
+  const strong = tickers.filter((t) => t.score >= 60).length;
   return (
-    <div className="grid gap-8 lg:grid-cols-[3fr_2fr]">
+    <>
+      <KpiTile label="SPY stress events" value={events.length} sub={`${tickers.length} tickers with 3+ events`} />
+      <KpiTile
+        label="Deepest SPY drawdown"
+        value={worst ? `${worst.spy_dd_pct}%` : "—"}
+        tone="down"
+        sub={worst ? `trough ${worst.trough_date} · bounced ${fmtPct(worst.spy_bounce_5d)} in 5d` : undefined}
+      />
+      <KpiTile label="Most resilient" value={top?.ticker ?? "—"} delta={top ? top.score.toFixed(0) : undefined} tone="up" sub={top?.theme || top?.category || undefined} />
+      <KpiTile label="Score 60+" value={strong} sub={`of ${tickers.length} ranked names`} />
+
       {/* Ranked tickers */}
-      <section className="min-w-0 space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h3 className="section-title">{view === "resilient" ? "Most resilient" : "Laggards"}</h3>
-            <p className="section-sub">0-100 composite of bounce, recovery and drawdown vs SPY.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {isFetching && !hasData && (
-              <span className="animate-pulse text-xs text-text-muted">loading…</span>
-            )}
+      <Tile
+        span={7}
+        title={view === "resilient" ? "Most resilient" : "Laggards"}
+        meta="0-100 composite of bounce, recovery and drawdown vs SPY · bounce 5d"
+        actions={
+          <>
+            {isFetching && !hasData && <span className="animate-pulse text-xs text-text-muted">loading…</span>}
             <Segmented
               value={view}
               onChange={setView}
@@ -804,9 +756,10 @@ function DailyView({
                 { value: "laggards" as const, label: "Laggards" },
               ]}
             />
-          </div>
-        </div>
-        <div className="card max-h-[64vh] divide-y divide-border overflow-y-auto p-2">
+          </>
+        }
+      >
+        <div className="flex max-h-[64vh] flex-col gap-0.5 overflow-y-auto">
           {shown.map((r, i) => (
             <TickerRow key={r.ticker} r={r} rank={i + 1} />
           ))}
@@ -816,50 +769,43 @@ function DailyView({
             </div>
           )}
         </div>
-      </section>
+      </Tile>
 
-      {/* Theme rollup */}
-      <section className="min-w-0 space-y-3">
-        <div>
-          <h3 className="section-title">Themes</h3>
-          <p className="section-sub">By average member resilience.</p>
-        </div>
-        <div className="max-h-[64vh] divide-y divide-border overflow-y-auto">
-          {themes.slice(0, 24).map((t) => (
-            <div key={t.theme} className="data-row flex items-center gap-3 px-2 py-2.5">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 truncate text-sm text-text-primary">
-                  {t.score >= 55 ? (
-                    <TrendingUp size={13} className="shrink-0 text-accent-green" />
-                  ) : t.score < 35 ? (
-                    <TrendingDown size={13} className="shrink-0 text-accent-red" />
-                  ) : null}
-                  <span className="truncate">{t.theme}</span>
-                </div>
-                <div className="num truncate text-xs text-text-muted">
-                  {t.top.slice(0, 3).join(" ")} · <span title="member tickers">{t.n_tickers} names</span>
-                </div>
-                <div
-                  className="mt-1.5 h-1 overflow-hidden rounded-full"
-                  style={{ background: "color-mix(in srgb, var(--border) 60%, transparent)" }}
-                >
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${Math.min(100, t.score)}%`,
-                      background:
-                        t.score >= 55 ? "var(--accent-green)" : "var(--accent-blue)",
-                    }}
-                  />
-                </div>
-              </div>
-              <span className="num w-10 text-right text-xl font-semibold text-text-primary">
-                {t.score.toFixed(0)}
-              </span>
-            </div>
+      {/* Right column: SPY stress events over the theme rollup */}
+      <div className="flex min-w-0 flex-col gap-3.5 lg:col-span-5">
+      <Tile title="SPY stress events" meta="drawdown · 5d bounce">
+        <div className="flex max-h-[24vh] flex-col gap-0.5 overflow-y-auto">
+          {events.map((e) => (
+            <BarRow
+              key={e.id}
+              label={e.trough_date.slice(2)}
+              value={e.spy_dd_pct}
+              max={maxDd}
+              tone="down"
+              display={`${e.spy_dd_pct}%`}
+              trailing={fmtPct(e.spy_bounce_5d)}
+              title={`peak ${e.peak_date} → trough ${e.trough_date} · SPY's own 5-session bounce off the trough ${fmtPct(e.spy_bounce_5d)}`}
+            />
           ))}
         </div>
-      </section>
-    </div>
+      </Tile>
+
+      {/* Theme rollup */}
+      <Tile title="Themes" meta="by average member resilience · top 24">
+        <div className="grid max-h-[48vh] grid-cols-2 gap-2 overflow-y-auto">
+          {themes.slice(0, 24).map((t) => (
+            <HeatTile
+              key={t.theme}
+              label={<span title={t.theme}>{t.theme}</span>}
+              value={t.score.toFixed(0)}
+              intensity={Math.abs(t.score - 45) / 45}
+              tone={t.score >= 45 ? "up" : "down"}
+              sub={<span title={`${t.n_tickers} member tickers`}>{t.top.slice(0, 3).join(" ")} · {t.n_tickers} names</span>}
+            />
+          ))}
+        </div>
+      </Tile>
+      </div>
+    </>
   );
 }

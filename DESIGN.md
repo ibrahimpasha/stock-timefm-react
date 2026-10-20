@@ -298,3 +298,36 @@ orange inline text with a ⚠ glyph.
 **Hard rules unchanged:** no hook/query/prop/route/behavior changes; no new
 deps; no emojis; no uppercase tracked eyebrows; no side stripes; no nested
 cards; `npx --no-install tsc -b` must pass.
+
+## 2026-10 v3 cockpit (CURRENT — supersedes v2 identity where they conflict)
+
+User rejected v1 and v2 as "maybe 10% changed": same skeleton with new fonts.
+They were shown three directions (docs/mockups/*.dc.html, static HTML with
+real data) and said "build everything". v3 = hybrid:
+- **A cockpit** (docs/mockups/A-cockpit.dc.html) is the base: horizontal top
+  nav (no sidebar), graphite panels, amber interaction accent, IBM Plex Sans +
+  IBM Plex Mono, pages as a 12-col grid of Tiles, numbers shown as bars,
+  heat tiles and gauges instead of sentences.
+- **C action inbox** (C-action-inbox.dc.html): the home page leads with
+  ActionCards — the few things that need a decision today.
+- **B morning paper** (B-morning-paper.dc.html): long-form reading (the full
+  brief text, pillar report, theses) uses the Newsreader serif `.headline` /
+  `.prose-read`, in columns, below the cockpit tiles.
+
+**Components:** src/components/Cockpit.tsx — `TileGrid`, `Tile` (span 3..12),
+`Kpi`, `KpiTile`, `BarRow` (plain or `diverging` for signed values),
+`HeatTile`, `Gauge`, `ActionCard`, `CockpitButton`, `toneOf`. Use these
+instead of hand-rolled cards. Existing `GlassPanel`/`Stat`/`Chip` still work
+and inherit the new tokens.
+
+**Page recipe:** desk header (title, tabs) → KPI strip (3-4 `KpiTile`s
+summarizing the page) → `TileGrid` of `Tile`s, primary dataset widest
+(span 7-8) with supporting tiles beside it → long text / history / settings
+below or behind `<details>`. Any list of (name, number) pairs with 4+ rows
+becomes `BarRow`s. Category ratios become `HeatTile`s.
+
+**Tokens:** `--accent` / `bg-accent` / `text-accent` (amber) = interaction
+(selected, primary buttons, active nav, focus). `--accent-blue` is now just an
+informational hue. `--track` = empty bar track. Ink on amber = `--accent-ink`.
+`.section-title` is sans 1.0625rem/600 now; serif only via `.headline`,
+`.prose-read`, `.font-display` for long-form reading.

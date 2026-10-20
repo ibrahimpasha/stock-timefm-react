@@ -2,7 +2,7 @@ import type { FlowPick } from "../lib/types";
 import { formatCurrency, formatPercentRaw, changeColor } from "../lib/utils";
 import { CONVICTION_COLORS } from "../lib/constants";
 import { TrendingUp, TrendingDown } from "lucide-react";
-import { Stat } from "./Glass";
+import { Kpi } from "./Cockpit";
 
 interface PickCardProps {
   pick: FlowPick;
@@ -31,7 +31,7 @@ export function PickCard({ pick, onClose }: PickCardProps) {
   const optPnl = pick.option_pnl_pct ?? 0;
 
   return (
-    <div className="card flex flex-col gap-4">
+    <article className="flex min-w-0 flex-col gap-4 rounded-xl border border-border bg-bg-card p-4">
       {/* Header: ticker + direction + conviction */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -67,11 +67,12 @@ export function PickCard({ pick, onClose }: PickCardProps) {
 
       {/* Option P/L — the number the card is about */}
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="Entry" value={formatCurrency(optEntry)} />
-        <Stat label="Current" value={formatCurrency(optCurrent)} />
-        <Stat
+        <Kpi label="Entry" value={formatCurrency(optEntry)} size="md" />
+        <Kpi label="Current" value={formatCurrency(optCurrent)} size="md" />
+        <Kpi
           label="P/L"
           value={<span style={{ color: pnlColor }}>{formatPercentRaw(optPnl)}</span>}
+          size="md"
         />
       </div>
 
@@ -88,6 +89,6 @@ export function PickCard({ pick, onClose }: PickCardProps) {
           {pick.rationale}
         </p>
       )}
-    </div>
+    </article>
   );
 }

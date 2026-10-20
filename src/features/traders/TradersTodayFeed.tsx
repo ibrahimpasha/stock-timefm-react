@@ -11,6 +11,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useTradersToday, type TraderTodayEvent } from "../../api/alerts";
 import { useAppStore } from "../../store/useAppStore";
+import { Tile, Kpi } from "../../components/Cockpit";
 
 const EVENT_LABELS: Record<string, string> = {
   open: "Open",
@@ -85,7 +86,7 @@ function EventRow({ ev }: { ev: TraderTodayEvent }) {
                   e.stopPropagation();
                   setActiveTicker(ev.ticker!);
                 }}
-                className="ticker text-sm transition-colors hover:text-accent-blue"
+                className="ticker text-sm transition-colors hover:text-accent"
               >
                 {ContractStr(ev)}
               </button>
@@ -104,9 +105,9 @@ function EventRow({ ev }: { ev: TraderTodayEvent }) {
         </div>
       </div>
       {open && (
-        <div className="mb-2 ml-7 mr-2 max-w-[72ch]">
+        <div className="mb-2 ml-6 mr-2 max-w-[72ch]">
           {ev.rationale && (
-            <p className="font-display text-base leading-relaxed text-text-secondary">
+            <p className="text-sm leading-relaxed text-text-secondary">
               {ev.rationale}
             </p>
           )}
@@ -134,65 +135,74 @@ export function TradersTodayFeed() {
   const { data, isFetching } = useTradersToday(localDay);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-  const heading = <h2 className="section-title">Today's activity</h2>;
-
   if (!data) {
     return (
-      <section className="flex flex-col gap-3">
-        {heading}
+      <Tile title="Today's activity" className="flex-1">
         <p className="text-sm text-text-muted">
           {isFetching ? "Loading today's activity…" : "No data."}
         </p>
-      </section>
+      </Tile>
     );
   }
 
   const authors = data.authors;
+  const maxCount = authors.reduce((m, a) => Math.max(m, a.count), 0) || 1;
   return (
-    <section className="flex flex-col gap-3">
-      <div>
-        {heading}
-        <p className="section-sub">
-          <span className="num">{data.date}</span> ·{" "}
-          <span className="num">{data.total_events}</span> event{data.total_events === 1 ? "" : "s"} ·{" "}
-          <span className="num">{authors.length}</span> trader{authors.length === 1 ? "" : "s"}
-          {isFetching && (
-            <span className="ml-2 animate-pulse">refreshing…</span>
-          )}
-        </p>
+    <Tile
+      title="Today's activity"
+      className="flex-1"
+      meta={
+        <>
+          <span className="num">{data.date}</span>
+          {isFetching && <span className="ml-2 animate-pulse">refreshing…</span>}
+        </>
+      }
+    >
+      <div className="grid grid-cols-2 gap-x-4 border-b border-border pb-3">
+        <Kpi label="Events" value={data.total_events} size="md" />
+        <Kpi label="Traders posting" value={authors.length} size="md" />
       </div>
 
       {authors.length === 0 ? (
         <p className="text-sm text-text-muted">No extracted events yet today.</p>
       ) : (
-        <div className="card max-h-[720px] overflow-auto" style={{ padding: "0.5rem 0.75rem" }}>
-          <div className="divide-y divide-border">
+        <div className="-mx-1 max-h-[560px] overflow-auto">
+          <div className="flex flex-col">
             {authors.map((a) => {
               const isCollapsed = collapsed[a.author];
               return (
-                <div key={a.author} className="py-2">
+                <div key={a.author} className="py-0.5">
                   <button
                     type="button"
                     onClick={() =>
                       setCollapsed((m) => ({ ...m, [a.author]: !m[a.author] }))
                     }
                     aria-expanded={!isCollapsed}
-                    className="flex min-h-11 w-full items-center gap-2 px-2 text-left transition-opacity hover:opacity-80 md:min-h-8"
+                    className="data-row grid min-h-11 w-full grid-cols-[0.75rem_minmax(0,9rem)_minmax(0,1fr)_2rem] items-center gap-2 rounded-md px-2 text-left md:min-h-8"
                   >
                     {isCollapsed ? (
                       <ChevronRight size={12} className="text-text-muted" />
                     ) : (
                       <ChevronDown size={12} className="text-text-muted" />
                     )}
-                    <span className="text-sm font-semibold text-text-primary">
+                    <span className="truncate text-sm font-semibold text-text-primary" title={a.author}>
                       {a.author}
                     </span>
-                    <span className="num ml-auto text-xs text-text-muted">
-                      {a.count} event{a.count === 1 ? "" : "s"}
+                    <span className="h-2.5 rounded-[3px]" style={{ background: "var(--track)" }}>
+                      <span
+                        className="block h-2.5 rounded-[3px]"
+                        style={{ width: `${(a.count / maxCount) * 100}%`, background: "var(--accent-blue)" }}
+                      />
+                    </span>
+                    <span
+                      className="num text-right text-xs text-text-secondary"
+                      title={`${a.count} event${a.count === 1 ? "" : "s"}`}
+                    >
+                      {a.count}
                     </span>
                   </button>
                   {!isCollapsed && (
-                    <div className="divide-y divide-border">
+                    <div className="ml-5 divide-y divide-border">
                       {a.events.map((ev) => (
                         <EventRow key={ev.alert_id} ev={ev} />
                       ))}
@@ -204,6 +214,6 @@ export function TradersTodayFeed() {
           </div>
         </div>
       )}
-    </section>
+    </Tile>
   );
 }

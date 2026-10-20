@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation } from "re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Activity,
-  BarChart3,
   Blocks,
   Grid3X3,
   MapPinned,
@@ -86,53 +85,42 @@ function isActivePath(path: string, pathname: string) {
   return path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(`${path}/`);
 }
 
-function Sidebar() {
-  const { pathname } = useLocation();
-  return (
-    <aside className="app-sidebar" aria-label="Primary navigation">
-      <NavLink to="/" className="app-brand" aria-label="Stock-TimeFM brief">
-        <span className="app-brand__mark" aria-hidden="true">
-          <BarChart3 size={15} />
-        </span>
-        <span className="app-brand__name">Stock-TimeFM</span>
-      </NavLink>
-      <nav className="app-sidebar__nav">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label} className="app-sidebar__group">
-            <span className="app-sidebar__label">{group.label}</span>
-            {group.items.map(({ path, label, icon: Icon }) => (
-              <NavLink
-                key={path}
-                to={path}
-                className={`app-nav-item ${isActivePath(path, pathname) ? "app-nav-item--active" : ""}`}
-              >
-                <Icon size={16} aria-hidden="true" />
-                <span>{label}</span>
-              </NavLink>
-            ))}
-          </div>
-        ))}
-      </nav>
-      <div className="app-sidebar__footer">
-        <DataHealthStrip />
-        <ThemeToggle />
-      </div>
-    </aside>
-  );
-}
-
 function TopBar() {
   const { pathname } = useLocation();
   const current = ALL_NAV.find((item) => isActivePath(item.path, pathname))?.label ?? "Brief";
   return (
     <>
-      <header className="app-topbar hidden lg:flex">
-        <MarketClock />
-        <TickerSearch inputWidth="w-72" />
+      <header className="app-topnav hidden lg:flex">
+        <NavLink to="/" className="app-brand" aria-label="Stock-TimeFM brief">
+          <span className="app-brand__mark" aria-hidden="true">TF</span>
+          <span className="app-brand__name">Stock-TimeFM</span>
+        </NavLink>
+        <nav className="app-topnav__nav" aria-label="Primary navigation">
+          {NAV_GROUPS.map((group, gi) => (
+            <div key={group.label} className="app-topnav__group" aria-label={group.label}>
+              {gi > 0 && <span className="app-topnav__divider" aria-hidden="true" />}
+              {group.items.map(({ path, label }) => (
+                <NavLink
+                  key={path}
+                  to={path}
+                  className={`app-nav-item ${isActivePath(path, pathname) ? "app-nav-item--active" : ""}`}
+                >
+                  {label}
+                </NavLink>
+              ))}
+            </div>
+          ))}
+        </nav>
+        <div className="app-topnav__tools">
+          <MarketClock />
+          <TickerSearch inputWidth="w-64" />
+          <DataHealthStrip />
+          <ThemeToggle />
+        </div>
       </header>
       <header className="mobile-app-bar lg:hidden">
         <NavLink to="/" className="mobile-brand" aria-label="Stock-TimeFM brief">
-          <BarChart3 size={18} className="shrink-0 text-accent-blue" aria-hidden="true" />
+          <span className="app-brand__mark" aria-hidden="true">TF</span>
           <span className="truncate text-sm font-semibold text-text-primary">{current}</span>
         </NavLink>
         <div className="flex shrink-0 items-center">
@@ -266,7 +254,6 @@ function AppLayout() {
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
-      <Sidebar />
       <div className="app-column">
         <TopBar />
         <main id="main-content" tabIndex={-1} className="app-main mobile-content">

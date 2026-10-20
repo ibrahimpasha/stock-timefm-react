@@ -30,6 +30,7 @@ import type {
   CalendarEvent,
 } from "../../api/intelV3";
 import { IntelligencePanel } from "./IntelligencePanel";
+import { Kpi, Tile } from "../../components/Cockpit";
 
 /* ── Constants / helpers ─────────────────────────────────── */
 
@@ -125,23 +126,6 @@ function dedupCalendarEvents(events: CalendarEvent[]): CalendarEvent[] {
   return Array.from(seen.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-/* ── Atomic UI bits ──────────────────────────────────────── */
-
-function SectionHeader({
-  label,
-  right,
-}: {
-  label: string;
-  right?: React.ReactNode;
-}) {
-  return (
-    <div className="mb-3">
-      <h3 className="section-title">{label}</h3>
-      {right ? <p className="section-sub">{right}</p> : null}
-    </div>
-  );
-}
-
 /* ── ForwardCalendar ─────────────────────────────────────── */
 
 function ForwardCalendar({
@@ -190,17 +174,32 @@ function ForwardCalendar({
   // Only today/tomorrow earn a warning tint; everything else stays muted.
   const urgencyTone = (days: number | null): string =>
     days != null && days <= 1 ? "var(--accent-orange)" : "var(--text-muted)";
+  const inLabelFor = (dn: number | null) =>
+    dn == null ? "" : dn === 0 ? "today" : dn === 1 ? "tomorrow" : dn < 0 ? `${Math.abs(dn)}d ago` : `in ${dn}d`;
+  const next = top.find((ev) => (daysUntil(ev.date) ?? -1) >= 0) ?? null;
+  const nextDays = next ? daysUntil(next.date) : null;
 
   return (
-    <section aria-label="Upcoming catalysts">
-      <SectionHeader
-        label="Upcoming catalysts"
-        right={
-          <>
-            Next <span className="num">14</span> days{scopedTicker ? <> · <span className="num">{scopedTicker}</span></> : null}
-          </>
-        }
-      />
+    <Tile
+      title="Upcoming catalysts"
+      meta={
+        <>
+          Next <span className="num">14</span> days{scopedTicker ? <> · <span className="num">{scopedTicker}</span></> : null}
+        </>
+      }
+    >
+      {top.length > 0 && (
+        <div className="grid grid-cols-2 gap-4 pb-1">
+          <Kpi
+            label="Next catalyst"
+            value={next ? inLabelFor(nextDays) : "—"}
+            tone={nextDays != null && nextDays <= 1 ? "warn" : "neutral"}
+            sub={next?.label}
+            size="md"
+          />
+          <Kpi label="Events in window" value={top.length} size="md" />
+        </div>
+      )}
       {isLoading && top.length === 0 ? (
         <div className="space-y-1 animate-pulse">
           <div className="h-3 w-full rounded bg-text-muted/15" />
@@ -224,70 +223,53 @@ function ForwardCalendar({
           </p>
         )
       ) : (
-        <div className="divide-y divide-border">
+        <div className="flex flex-col">
           {top.map((ev, i) => {
             const isTickerRow =
               !!scopedTicker && ev.ticker && ev.ticker.toUpperCase() === scopedTicker.toUpperCase();
             const dn = daysUntil(ev.date);
             const explainer = explainerFor(ev.label);
-            const inLabel =
-              dn == null
-                ? ""
-                : dn === 0
-                  ? "today"
-                  : dn === 1
-                    ? "tomorrow"
-                    : dn < 0
-                      ? `${Math.abs(dn)}d ago`
-                      : `in ${dn}d`;
+            const inLabel = inLabelFor(dn);
             return (
-              <div key={`${ev.date}-${i}`} className="data-row flex gap-3 px-2 py-2.5">
-                <span
-                  aria-hidden
-                  className="mt-[8px] h-2 w-2 shrink-0 rounded-full"
-                  style={{ background: categoryColor(ev.category) }}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="min-w-0 flex-1 text-sm font-medium text-text-primary">
-                      {ev.label}
-                      {ev.session && (
-                        <span
-                          className="font-normal text-text-muted"
-                          title={
-                            ev.session === "bmo"
-                              ? "Before market open (pre-market)"
-                              : "After market close (after-hours)"
-                          }
-                        >
-                          {" · "}
-                          {ev.session === "bmo" ? "before open" : "after close"}
-                        </span>
-                      )}
-                      {isTickerRow && (
-                        <Star size={12} fill="currentColor" className="ml-1.5 inline align-[-1px] text-text-secondary" aria-label="this ticker" />
-                      )}
-                    </span>
-                    <span className="shrink-0 text-xs text-text-muted" title={ev.source ? `Source: ${ev.source}` : undefined}>
-                      {ev.category || ev.source || ""}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-baseline gap-2 text-xs text-text-muted">
-                    <span className="num" title={fmtCalendarDateFull(ev.date)}>{fmtCalendarDate(ev.date)}</span>
-                    {inLabel && <span className="num font-medium" style={{ color: urgencyTone(dn) }}>{inLabel}</span>}
-                    {explainer && (
-                      <span className="min-w-0 flex-1 truncate" title={explainer}>
-                        {explainer}
-                      </span>
+              <div
+                key={`${ev.date}-${i}`}
+                className="data-row grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-baseline gap-3 rounded-md px-1 py-2"
+                title={explainer || undefined}
+              >
+                <span className="num text-xs text-text-secondary" title={fmtCalendarDateFull(ev.date)}>
+                  {fmtCalendarDate(ev.date)}
+                </span>
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-text-primary">
+                    <span aria-hidden className="h-2 w-2 shrink-0 rounded-sm" style={{ background: categoryColor(ev.category) }} />
+                    <span className="min-w-0 truncate">{ev.label}</span>
+                    {isTickerRow && (
+                      <Star size={12} fill="currentColor" className="shrink-0 text-accent" aria-label="this ticker" />
                     )}
                   </div>
+                  <div className="mt-0.5 truncate text-xs text-text-muted">
+                    {[
+                      ev.category || ev.source || "",
+                      ev.session ? (ev.session === "bmo" ? "before open" : "after close") : "",
+                      explainer,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </div>
                 </div>
+                <span
+                  className="num text-xs font-semibold"
+                  style={{ color: urgencyTone(dn) }}
+                  title={ev.source ? `Source: ${ev.source}` : undefined}
+                >
+                  {inLabel}
+                </span>
               </div>
             );
           })}
         </div>
       )}
-    </section>
+    </Tile>
   );
 }
 
@@ -299,27 +281,22 @@ function IntelDetailCollapsible({ ticker }: { ticker: string | null }) {
   // behind a click was wasted friction.
   const [open, setOpen] = useState(true);
   return (
-    <section aria-label="Intel">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            className="section-title flex items-center gap-1.5 text-left transition-opacity hover:opacity-90"
-          >
-            Intel
-            {open ? <ChevronDown size={16} className="text-text-muted" /> : <ChevronRight size={16} className="text-text-muted" />}
-          </button>
-          <p className="section-sub">Web-search research brief{open ? "" : " · 8 categories"}</p>
-        </div>
-      </div>
-      {open && (
-        <div className="mt-4">
-          <IntelligencePanel thesis={null} ticker={ticker || undefined} />
-        </div>
-      )}
-    </section>
+    <Tile
+      title={
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex items-center gap-1.5 text-left hover:text-accent"
+        >
+          Intel
+          {open ? <ChevronDown size={15} className="text-text-muted" /> : <ChevronRight size={15} className="text-text-muted" />}
+        </button>
+      }
+      meta={`Web-search research brief${open ? "" : " · 8 categories"}`}
+    >
+      {open && <IntelligencePanel thesis={null} ticker={ticker || undefined} />}
+    </Tile>
   );
 }
 
@@ -339,7 +316,7 @@ export default function IntelligencePanelV3() {
   const calendarQ = useCalendar(14, ticker || undefined);
 
   return (
-    <div className="flex flex-col gap-9">
+    <div className="flex flex-col gap-3.5">
       <QueryNotice queries={[calendarQ]} label="Catalyst calendar" />
       {!(calendarQ.isError || calendarQ.fetchStatus === "paused") || calendarQ.data ? <ForwardCalendar
         events={calendarQ.data?.events ?? []}

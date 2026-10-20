@@ -109,7 +109,8 @@ export function EntryRow({
           aria-controls={entry.analysis ? detailsId : undefined}
           className="flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 rounded text-left lg:min-h-6 lg:flex-nowrap"
         >
-          <span className="shrink-0 font-medium lg:w-10" style={{ color }}>
+          <span className="inline-flex shrink-0 items-center gap-1.5 font-medium lg:w-12" style={{ color }}>
+            <span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: color }} aria-hidden="true" />
             {side}
           </span>
           <span className="num shrink-0 text-sm font-semibold text-text-primary">
@@ -128,7 +129,7 @@ export function EntryRow({
               <span className="num" title="Filled at ask">{entry.ask_pct}% ask</span>
             )}
           </span>
-          <span className="num ml-auto shrink-0 text-right text-sm font-semibold text-text-primary">{entry.premium}</span>
+          <span className="num ml-auto w-16 shrink-0 text-right text-sm font-semibold text-text-primary">{entry.premium}</span>
           <span
             className="num w-20 shrink-0 text-right font-semibold"
             style={{ color: pnlColor }}
@@ -147,7 +148,8 @@ export function EntryRow({
       {expanded && entry.analysis && (
         <div
           id={detailsId}
-          className="prose-read mb-3 ml-12 mr-2 max-w-[68ch] pt-1 max-lg:ml-2"
+          className="mb-3 ml-12 mr-2 max-w-[68ch] rounded-md px-3 py-2 text-sm leading-relaxed text-text-secondary max-lg:ml-2"
+          style={{ background: "var(--surface-inset)" }}
         >
           {entry.analysis}
           {(entry.underlying_price || entry.avg_price) && (

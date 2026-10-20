@@ -23,6 +23,7 @@ import { formatPremium } from "../../../lib/utils";
 import { normExpiry, dteTag, parsePremium } from "./utils";
 import { expiryDte, optionType } from "../../../lib/optionContract";
 import { daysFromToday, todayLocalDate } from "../../../lib/dateOnly";
+import { Tile } from "../../../components/Cockpit";
 
 interface AggStats {
   hits: number;
@@ -164,31 +165,30 @@ export function ContractsView({
 
   if (watchedContracts.length === 0) {
     return (
-      <div className="py-12 text-center">
-        <Star size={22} className="mx-auto mb-3 text-text-muted opacity-60" aria-hidden="true" />
-        <p className="section-title">No watched contracts yet</p>
-        <p className="section-sub">
-          Click the star next to a flow row in the ticker detail to watch its contract.
-        </p>
-      </div>
+      <Tile title="Watched contracts">
+        <div className="py-8 text-center">
+          <Star size={22} className="mx-auto mb-3 text-text-muted opacity-60" aria-hidden="true" />
+          <p className="m-0 text-sm font-semibold text-text-primary">No watched contracts yet</p>
+          <p className="m-0 mt-1 text-xs text-text-muted">
+            Click the star next to a flow row in the ticker detail to watch its contract.
+          </p>
+        </div>
+      </Tile>
     );
   }
 
   return (
-    <div>
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <div>
-          <h3 className="section-title flex items-baseline gap-2">
-            <Star size={14} className="self-center text-accent-orange" style={{ fill: "var(--accent-orange)" }} />
-            Watched contracts
-            <span className="num text-sm font-normal text-text-muted">{watchedContracts.length}</span>
-          </h3>
-          <p className="section-sub">Hits from the last 30 days of flow, active expiries first</p>
-        </div>
-        {anyLoading && (
-          <span className="animate-pulse text-xs text-text-muted">Loading flow…</span>
-        )}
-      </div>
+    <Tile
+      title={
+        <span className="inline-flex items-baseline gap-2">
+          <Star size={13} className="self-center text-accent-orange" style={{ fill: "var(--accent-orange)" }} aria-hidden="true" />
+          Watched contracts
+          <span className="num text-xs font-normal text-text-muted">{watchedContracts.length}</span>
+        </span>
+      }
+      meta="Hits from the last 30 days of flow, active expiries first"
+      actions={anyLoading ? <span className="animate-pulse text-xs text-text-muted">Loading flow…</span> : undefined}
+    >
       <div className="divide-y divide-border">
         {sortedContracts.map((c) => {
           const key = contractKey(c);
@@ -261,7 +261,7 @@ export function ContractsView({
                       {Math.round(stats!.avg_ask)}% ask
                     </span>
                   )}
-                  <span className="num text-sm font-semibold text-text-primary">
+                  <span className="num w-16 text-right text-sm font-semibold text-text-primary">
                     {formatPremium(stats!.total_premium)}
                   </span>
                   {stats!.latest_pnl !== null && (
@@ -303,6 +303,6 @@ export function ContractsView({
           );
         })}
       </div>
-    </div>
+    </Tile>
   );
 }

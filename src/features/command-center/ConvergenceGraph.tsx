@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Info } from "lucide-react";
-import { Stat } from "../../components/Glass";
+import { Kpi, Tile } from "../../components/Cockpit";
 
 import { useConvergenceGraph } from "../../api/intelV3";
 import type {
@@ -212,18 +212,9 @@ export function ConvergenceGraph({
   const convergence = data?.summary.convergence;
 
   return (
-    <section aria-label="Convergence graph">
-      <div className="mb-5">
-        <h3 className="section-title">Convergence graph</h3>
-        <p className="section-sub">
-          Last <span className="num">{data?.window_hours ?? hours}h</span> ·{" "}
-          <span className="num">{data?.summary.node_count ?? data?.nodes.length ?? 0}</span> nodes ·{" "}
-          <span className="num">{data?.summary.edge_count ?? data?.edges.length ?? 0}</span> edges
-        </p>
-      </div>
-
+    <section className="flex flex-col gap-3.5" aria-label="Convergence graph">
       {isLoading ? (
-        <div className="space-y-3 animate-pulse">
+        <div className="flex animate-pulse flex-col gap-3 rounded-xl border border-border bg-bg-card p-4">
           <div className="h-56 rounded bg-text-muted/10" />
           <div className="h-4 rounded bg-text-muted/15" />
           <div className="h-4 w-2/3 rounded bg-text-muted/15" />
@@ -234,22 +225,31 @@ export function ConvergenceGraph({
           Convergence graph is unavailable for {ticker}. Overview and narrative tabs are unchanged.
         </div>
       ) : !data || data.nodes.length === 0 ? (
-        <div className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">
-          <p className="text-base font-semibold text-text-primary">No graph nodes in this window.</p>
-          <p className="mt-1">
+        <Tile title="No graph nodes in this window">
+          <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">
             The endpoint returned no source, event, or structural graph evidence for {ticker} over
             the last {data?.window_hours ?? hours} hours.
           </p>
-        </div>
+        </Tile>
       ) : (
         <>
-          <div className="mb-5 grid grid-cols-3 gap-4">
-            <Stat label="Score" value={scoreLabel(convergence?.score) ?? "n/a"} />
-            <Stat label="Alignment" value={<span className="font-sans">{convergence?.alignment ?? "unknown"}</span>} />
-            <Stat label="Events" value={data.summary.event_count ?? 0} />
-          </div>
+          <Tile bodyClassName="grid grid-cols-3 gap-4">
+            <Kpi label="Score" value={scoreLabel(convergence?.score) ?? "n/a"} size="md" />
+            <Kpi label="Alignment" value={<span className="font-sans">{convergence?.alignment ?? "unknown"}</span>} size="md" />
+            <Kpi label="Events" value={data.summary.event_count ?? 0} size="md" />
+          </Tile>
 
-          <div className="relative h-80 overflow-hidden border-y border-border">
+          <Tile
+            title="Convergence graph"
+            meta={
+              <>
+                Last <span className="num">{data.window_hours ?? hours}h</span> ·{" "}
+                <span className="num">{data.summary.node_count ?? data.nodes.length}</span> nodes ·{" "}
+                <span className="num">{data.summary.edge_count ?? data.edges.length}</span> edges
+              </>
+            }
+          >
+          <div className="relative h-80 overflow-hidden rounded-lg" style={{ background: "var(--bg-primary)" }}>
             <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full">
               {layout.edges.map((edge, idx) => {
                 const a = nodeById.get(edge.source);
@@ -307,7 +307,7 @@ export function ConvergenceGraph({
             })}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text-secondary">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-secondary">
             {sources.length > 0
               ? sources.map((source) => {
                   const color = SOURCE_COLOR[norm(source)] ?? "var(--text-secondary)";
@@ -335,6 +335,7 @@ export function ConvergenceGraph({
               <span className="text-text-muted">+{layout.hiddenCount} more hidden locally</span>
             )}
           </div>
+          </Tile>
         </>
       )}
     </section>

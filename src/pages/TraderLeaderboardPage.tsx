@@ -5,13 +5,13 @@ import { ArrowUpDown } from "lucide-react";
 
 import { useAppStore } from "../store/useAppStore";
 import { useLeaderboard, useAlertsPositions, useTradersToday } from "../api/alerts";
-import { Sparkline, RangeBar } from "../components/CCPrimitives";
-import { Segmented, Stat } from "../components/Glass";
+import { Sparkline } from "../components/CCPrimitives";
+import { Segmented } from "../components/Glass";
+import { TileGrid, Tile, Kpi, KpiTile, toneOf, toneColor } from "../components/Cockpit";
 import {
   formatPercentRaw,
   relativeAge,
   absoluteAge,
-  changeColor,
 } from "../lib/utils";
 import type {
   AlertPosition,
@@ -49,6 +49,10 @@ const SORT_OPTIONS: { value: SortMode; label: string }[] = [
   { value: "author", label: "A-Z" },
 ];
 
+/** Min exits before a trader can hold the "best win rate / mean" KPI —
+ *  one lucky close shouldn't headline the page. */
+const KPI_MIN_EXITS = 3;
+
 /**
  * Per-position headline P/L: realized cumulative when the position has been
  * trimmed/closed (status in {closed, stopped, partial}), otherwise the latest
@@ -72,13 +76,53 @@ function cmpTs(a: string | null, b: string | null): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+const TONE_FILL = {
+  up: "var(--accent-green)",
+  down: "var(--accent-red)",
+  neutral: "var(--text-muted)",
+} as const;
+
+/** Win-rate bar: fills from the left on the track, 50% tick marks breakeven. */
+function WinBar({ pct }: { pct: number }) {
+  const t = pct >= 50 ? "up" : "down";
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <div className="relative h-3 min-w-0 flex-1 rounded-[3px]" style={{ background: "var(--track)" }}>
+        <div className="h-3 rounded-[3px]" style={{ width: `${Math.max(2, Math.min(100, pct))}%`, background: toneColor(t) }} />
+        <span aria-hidden="true" className="absolute -top-0.5 left-1/2 h-4 w-px" style={{ background: "var(--text-muted)" }} />
+      </div>
+      <span className="num w-9 shrink-0 text-right text-[0.8125rem]" style={{ color: toneColor(t) }}>
+        {pct.toFixed(0)}%
+      </span>
+    </div>
+  );
+}
+
+/** Signed bar centered on zero. `max` = |value| that fills one half. */
+function SignedBar({ value, max }: { value: number; max: number }) {
+  const t = toneOf(value);
+  const pct = max > 0 ? Math.min(100, (Math.abs(value) / max) * 100) : 0;
+  const bar = { width: `${Math.max(pct, value ? 3 : 0)}%`, background: toneColor(t) };
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <div className="grid min-w-0 flex-1 grid-cols-2">
+        <div className="flex justify-end">{value < 0 && <span className="h-3 rounded-l-[3px]" style={bar} />}</div>
+        <div className="flex border-l border-border">{value > 0 && <span className="h-3 rounded-r-[3px]" style={bar} />}</div>
+      </div>
+      <span className="num w-14 shrink-0 text-right text-[0.8125rem]" style={{ color: toneColor(t) }}>
+        {formatPercentRaw(value, 1)}
+      </span>
+    </div>
+  );
+}
+
 /* ── Empty / loading states ──────────────────────────────── */
 
 function EmptyState({ title, body }: { title: string; body: string }) {
   return (
-    <div className="flex items-center justify-center min-h-80">
+    <div className="flex items-center justify-center min-h-60">
       <div className="max-w-lg text-center">
-        <h2 className="section-title mb-2">{title}</h2>
+        <h2 className="mb-2 text-[0.9375rem] font-semibold text-text-primary">{title}</h2>
         <p className="text-sm text-text-secondary leading-relaxed">{body}</p>
       </div>
     </div>
@@ -98,7 +142,7 @@ function SkeletonCard({ height = 96 }: { height?: number }) {
   );
 }
 
-/* ── Leaderboard table ───────────────────────────────────── */
+/* ── Leaderboard (bar rows) ──────────────────────────────── */
 
 interface LeaderboardTableProps {
   rows: LeaderboardRow[];
@@ -111,13 +155,18 @@ interface LeaderboardTableProps {
   todayMap?: Record<string, number>;
 }
 
-function LeaderboardHeader({
+/* rank | trader | N | today | win bar | mean bar | last */
+const LB_COLS =
+  "grid-cols-[1.5rem_minmax(0,1fr)_3.25rem_minmax(0,1fr)_minmax(0,1fr)] md:grid-cols-[1.5rem_minmax(7rem,1.1fr)_3.25rem_2.75rem_minmax(0,1fr)_minmax(0,1fr)_3.25rem]";
+
+function SortHead({
   mode,
   label,
   align = "left",
   sortMode,
   onSort,
   sortDesc,
+  className = "",
 }: {
   mode: SortMode;
   label: string;
@@ -125,32 +174,21 @@ function LeaderboardHeader({
   sortMode: SortMode;
   onSort: (mode: SortMode) => void;
   sortDesc: boolean;
+  className?: string;
 }) {
   const active = sortMode === mode;
   return (
-    <th
+    <button
+      type="button"
+      onClick={() => onSort(mode)}
       aria-sort={active ? (sortDesc ? "descending" : "ascending") : undefined}
-      className={`px-3 py-2 text-xs font-medium whitespace-nowrap select-none ${
-        active ? "text-text-primary" : "text-text-muted"
-      }`}
-      style={{
-        textAlign: align,
-        position: "sticky",
-        top: 0,
-        zIndex: 1,
-        background: "var(--card-bg)",
-        borderBottom: "1px solid var(--border)",
-      }}
+      className={`inline-flex min-h-6 items-center gap-1 rounded text-xs whitespace-nowrap ${
+        align === "right" ? "justify-end" : "justify-start"
+      } ${active ? "font-semibold text-accent" : "font-medium text-text-muted hover:text-text-primary"} ${className}`}
     >
-      <button
-        type="button"
-        onClick={() => onSort(mode)}
-        className={`inline-flex min-h-6 w-full items-center gap-1 rounded ${align === "right" ? "justify-end" : "justify-start"}`}
-      >
-        {label}
-        {active && <ArrowUpDown size={10} className="opacity-70" aria-hidden="true" />}
-      </button>
-    </th>
+      {label}
+      {active && <ArrowUpDown size={10} className="opacity-70" aria-hidden="true" />}
+    </button>
   );
 }
 
@@ -192,131 +230,104 @@ function LeaderboardTable({
     return copy;
   }, [rows, sortMode, sortDesc, todayMap]);
 
+  const maxMean = useMemo(
+    () => rows.reduce((m, r) => Math.max(m, Math.abs(r.mean_pl_pct ?? 0)), 0) || 1,
+    [rows],
+  );
+
+  const h = { sortMode, onSort, sortDesc };
   return (
-    <div className="overflow-auto" style={{ maxHeight: "calc(100vh - 240px)" }}>
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr>
-            <LeaderboardHeader mode="author" label="Trader" sortMode={sortMode} onSort={onSort} sortDesc={sortDesc} />
-            <LeaderboardHeader mode="n_calls" label="N" align="right" sortMode={sortMode} onSort={onSort} sortDesc={sortDesc} />
-            <LeaderboardHeader mode="today" label="Today" align="right" sortMode={sortMode} onSort={onSort} sortDesc={sortDesc} />
-            <LeaderboardHeader mode="win_rate" label="Win" align="right" sortMode={sortMode} onSort={onSort} sortDesc={sortDesc} />
-            <LeaderboardHeader mode="mean_pl_pct" label="Mean" align="right" sortMode={sortMode} onSort={onSort} sortDesc={sortDesc} />
-            <LeaderboardHeader mode="latest" label="Last" align="right" sortMode={sortMode} onSort={onSort} sortDesc={sortDesc} />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {sorted.map((r, i) => {
-            const isSel = selected === r.author;
-            const winPct = r.win_rate != null ? r.win_rate * 100 : null;
-            return (
-              <tr
-                key={r.author}
-                onClick={() => onSelect(r.author)}
-                className="cursor-pointer hover:bg-bg-card-hover transition-colors"
-                style={{
-                  background: isSel
-                    ? "color-mix(in srgb, var(--accent-blue) 10%, transparent)"
-                    : undefined,
-                }}
+    <div className="-mx-1 overflow-auto" style={{ maxHeight: "calc(100vh - 300px)", minHeight: 240 }}>
+      <div
+        className={`sticky top-0 z-[1] grid items-center gap-x-3 border-b border-border bg-bg-card px-2 pb-1.5 ${LB_COLS}`}
+      >
+        <span className="text-xs text-text-muted">#</span>
+        <SortHead mode="author" label="Trader" {...h} />
+        <SortHead mode="n_calls" label="Calls" align="right" {...h} />
+        <SortHead mode="today" label="Today" align="right" className="max-md:hidden" {...h} />
+        <SortHead mode="win_rate" label="Win rate" {...h} />
+        <SortHead mode="mean_pl_pct" label="Mean outcome" {...h} />
+        <SortHead mode="latest" label="Last" align="right" className="max-md:hidden" {...h} />
+      </div>
+      <div className="flex flex-col">
+        {sorted.map((r, i) => {
+          const isSel = selected === r.author;
+          const winPct = r.win_rate != null ? r.win_rate * 100 : null;
+          const today = todayMap[r.author] || 0;
+          return (
+            <button
+              key={r.author}
+              type="button"
+              onClick={() => onSelect(r.author)}
+              aria-pressed={isSel}
+              className={`grid min-h-11 w-full items-center gap-x-3 rounded-md px-2 py-1.5 text-left transition-colors ${LB_COLS} ${
+                isSel ? "" : "hover:bg-bg-card-hover"
+              }`}
+              style={{
+                background: isSel ? "color-mix(in srgb, var(--accent) 14%, transparent)" : undefined,
+              }}
+            >
+              <span
+                className={`num text-right text-[0.8125rem] ${
+                  isSel ? "font-semibold text-accent" : i < 3 ? "font-semibold text-text-primary" : "text-text-muted"
+                }`}
               >
-                <td className="px-3 py-2.5">
-                  <div className="flex min-w-0 items-baseline gap-2.5">
-                  <span className={`num w-5 shrink-0 text-right text-sm ${i < 3 ? "font-semibold text-text-primary" : "text-text-muted"}`}>
-                    {i + 1}
+                {i + 1}
+              </span>
+              <span className="min-w-0">
+                <span
+                  className={`block truncate text-sm text-text-primary ${isSel ? "font-semibold" : "font-medium"}`}
+                  title={r.author}
+                >
+                  {r.author}
+                </span>
+                {r.top_ticker && (
+                  <span className="block truncate text-xs text-text-muted">
+                    top <span className="ticker text-text-secondary">{r.top_ticker}</span>
                   </span>
-                  <div className="min-w-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelect(r.author);
-                    }}
-                    aria-pressed={isSel}
-                    className={`text-sm text-text-primary max-w-40 truncate ${
-                      isSel ? "font-semibold" : "font-medium"
-                    } block min-h-6 w-full rounded text-left`}
-                    title={r.author}
-                  >
-                    {r.author}
-                  </button>
-                  {r.top_ticker && (
-                    <div className="text-xs text-text-muted">
-                      top <span className="ticker text-text-secondary">{r.top_ticker}</span>
-                    </div>
-                  )}
-                  </div>
-                  </div>
-                </td>
-                <td
-                  className="num px-3 py-2.5 text-right text-sm text-text-secondary"
-                >
-                  {r.n_calls}
-                  {r.n_realized > 0 && (
-                    <span
-                      className="text-xs text-text-muted ml-1"
-                      title={`${r.n_realized} realized (closed)`}
-                    >
-                      /{r.n_realized}
-                    </span>
-                  )}
-                </td>
-                <td
-                  className={`num px-3 py-2.5 text-right text-sm ${
-                    (todayMap[r.author] || 0) > 0
-                      ? "font-semibold text-text-primary"
-                      : "text-text-muted"
-                  }`}
-                  title="Events extracted today (open/add/trim/close/stop/status/recap)"
-                >
-                  {todayMap[r.author] || 0}
-                </td>
-                <td className="px-3 py-2.5 min-w-24">
-                  {winPct != null ? (
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="num text-sm font-semibold min-w-9 text-right"
-                        style={{ color: changeColor(winPct - 50) }}
-                      >
-                        {winPct.toFixed(0)}%
-                      </span>
-                      <div className="flex-1 min-w-10">
-                        <RangeBar low={0} high={100} last={winPct} width="100%" />
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="num text-sm text-text-muted">—</span>
-                  )}
-                </td>
-                <td
-                  className="num px-3 py-2.5 text-right text-sm font-semibold"
-                  style={{
-                    color:
-                      r.mean_pl_pct != null
-                        ? changeColor(r.mean_pl_pct)
-                        : "var(--text-muted)",
-                  }}
-                >
-                  {r.mean_pl_pct != null
-                    ? formatPercentRaw(r.mean_pl_pct, 1)
-                    : "—"}
-                </td>
-                <td
-                  className="num px-3 py-2.5 text-right text-xs text-text-muted whitespace-nowrap"
-                  title={absoluteAge(r.latest_call_ts) || ""}
-                >
-                  {relativeAge(r.latest_call_ts) || "—"}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                )}
+              </span>
+              <span className="num text-right text-[0.8125rem] text-text-secondary">
+                {r.n_calls}
+                {r.n_realized > 0 && (
+                  <span className="text-xs text-text-muted" title={`${r.n_realized} realized (closed)`}>
+                    /{r.n_realized}
+                  </span>
+                )}
+              </span>
+              <span
+                className={`num text-right text-[0.8125rem] max-md:hidden ${
+                  today > 0 ? "font-semibold text-text-primary" : "text-text-muted"
+                }`}
+                title="Events extracted today (open/add/trim/close/stop/status/recap)"
+              >
+                {today}
+              </span>
+              {winPct != null ? (
+                <WinBar pct={winPct} />
+              ) : (
+                <span className="num text-[0.8125rem] text-text-muted">—</span>
+              )}
+              {r.mean_pl_pct != null ? (
+                <SignedBar value={r.mean_pl_pct} max={maxMean} />
+              ) : (
+                <span className="num text-[0.8125rem] text-text-muted">—</span>
+              )}
+              <span
+                className="num whitespace-nowrap text-right text-xs text-text-muted max-md:hidden"
+                title={absoluteAge(r.latest_call_ts) || ""}
+              >
+                {relativeAge(r.latest_call_ts) || "—"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-/* ── Trader profile (right column) ───────────────────────── */
+/* ── Trader profile (profile tile + positions tile + brief) ─ */
 
 interface TraderProfileProps {
   author: string | null;
@@ -335,33 +346,41 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
 
   if (!author) {
     return (
-      <EmptyState
-        title="Select a trader"
-        body="Pick a row on the left to see their recent positions, win rate, and P/L profile."
-      />
+      <Tile span={12}>
+        <EmptyState
+          title="Select a trader"
+          body="Pick a row in the leaderboard to see their recent positions, win rate, and P/L profile."
+        />
+      </Tile>
     );
   }
 
   if (isLoading || (isFetching && !data)) {
     return (
-      <div className="space-y-4">
-        <SkeletonCard height={120} />
-        <SkeletonCard height={300} />
-      </div>
+      <>
+        <Tile span={4}>
+          <SkeletonCard height={220} />
+        </Tile>
+        <Tile span={8}>
+          <SkeletonCard height={300} />
+        </Tile>
+      </>
     );
   }
 
   if (!data || data.ok === false) {
     return (
-      <div><QueryNotice queries={[positionsQuery]} label="Trader positions" />
-      <EmptyState
-        title="Trader profile unavailable"
-        body={
-          data && data.ok === false
-            ? `Backend returned: ${data.reason}.`
-            : "Could not load this trader's positions."
-        }
-      /></div>
+      <Tile span={12} title={author}>
+        <QueryNotice queries={[positionsQuery]} label="Trader positions" />
+        <EmptyState
+          title="Trader profile unavailable"
+          body={
+            data && data.ok === false
+              ? `Backend returned: ${data.reason}.`
+              : "Could not load this trader's positions."
+          }
+        />
+      </Tile>
     );
   }
 
@@ -429,125 +448,112 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
     return out.length >= 2 ? out : [];
   })();
 
-  const winPct =
-    winRate != null ? (winRate * 100).toFixed(0) + "%" : "—";
-  const meanPlStr =
-    meanPl != null ? formatPercentRaw(meanPl, 1) : "—";
-  const meanPlColor =
-    meanPl != null ? changeColor(meanPl) : "var(--text-muted)";
-
   const outcomeSum =
     sparkPoints.length >= 1 ? sparkPoints[sparkPoints.length - 1] : null;
+  const openCount = positions.filter((p) => !["closed", "stopped"].includes((p.status || "").toLowerCase())).length;
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-col gap-8">
-      <QueryNotice queries={[positionsQuery]} label="Trader positions" />
-
-      {/* Hero: who, and the one number that summarizes them. */}
-      <header className="flex flex-col gap-5">
-        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-          <div className="min-w-0 flex-1">
-            <h2 className="headline truncate" title={author}>
-              {author}
-            </h2>
-            <p className="mt-2 text-sm text-text-secondary">
-              {leaderboardRow?.top_ticker && (
-                <>
-                  Most traded{" "}
-                  <button
-                    type="button"
-                    onClick={() => setActiveTicker(leaderboardRow.top_ticker!)}
-                    aria-label={`Select ${leaderboardRow.top_ticker} ticker`}
-                    className="ticker cursor-pointer text-accent-blue hover:underline"
-                  >
-                    {leaderboardRow.top_ticker}
-                  </button>
-                  <span className="text-text-muted"> · </span>
-                </>
-              )}
-              <span className="text-text-muted">
-                Reported peak/exit outcomes, not fill-weighted realized or
-                portfolio returns.
-              </span>
-            </p>
+    <>
+      {/* Profile: who, the hero number, the curve, the 4 stats. */}
+      <Tile
+        span={4}
+        title={
+          <span className="block truncate" title={author}>
+            {author}
+          </span>
+        }
+        meta={
+          leaderboardRow?.top_ticker ? (
+            <>
+              most traded{" "}
+              <button
+                type="button"
+                onClick={() => setActiveTicker(leaderboardRow.top_ticker!)}
+                aria-label={`Select ${leaderboardRow.top_ticker} ticker`}
+                className="ticker cursor-pointer text-text-primary hover:text-accent"
+              >
+                {leaderboardRow.top_ticker}
+              </button>
+            </>
+          ) : undefined
+        }
+        bodyClassName="gap-4"
+      >
+        <QueryNotice queries={[positionsQuery]} label="Trader positions" />
+        <Kpi
+          label="Outcome sum, 60d"
+          value={
+            <span style={{ color: outcomeSum != null ? toneColor(toneOf(outcomeSum)) : "var(--text-muted)" }}>
+              {outcomeSum != null ? outcomeSum.toFixed(1) : "—"}
+              <span className="ml-1 text-base font-medium text-text-muted">pp</span>
+            </span>
+          }
+          size="xl"
+        />
+        {sparkPoints.length >= 2 && (
+          <div className="overflow-hidden">
+            <Sparkline
+              points={sparkPoints}
+              width={320}
+              height={64}
+              color={(outcomeSum ?? 0) >= 0 ? "var(--accent-green)" : "var(--accent-red)"}
+              fill
+            />
           </div>
-
-          {/* Cumulative outcome — the hero number of the panel */}
-          <div className="flex shrink-0 items-end gap-4">
-            {sparkPoints.length >= 2 && (
-              <Sparkline
-                points={sparkPoints}
-                width={160}
-                height={44}
-                color={
-                  (outcomeSum ?? 0) >= 0
-                    ? "var(--accent-green)"
-                    : "var(--accent-red)"
-                }
-                fill
-              />
-            )}
-            <div className="text-right">
-              <div className="text-xs text-text-muted">Outcome sum</div>
-              <div
-                className="num text-3xl font-semibold tracking-tight"
+        )}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border pt-3">
+          <Kpi label="Positions" value={nPositions} sub={`${openCount} not closed`} size="md" />
+          <Kpi
+            label="With exits"
+            value={nRealized}
+            sub={nPositions ? `${nRealized}/${nPositions}` : undefined}
+            size="md"
+          />
+          <Kpi
+            label="Positive exits"
+            value={
+              <span
                 style={{
-                  color:
-                    outcomeSum != null
-                      ? changeColor(outcomeSum)
-                      : "var(--text-muted)",
+                  color: winRate != null ? TONE_FILL[winRate >= 0.5 ? "up" : "down"] : undefined,
                 }}
               >
-                {outcomeSum != null ? `${outcomeSum.toFixed(1)}` : "—"}
-                <span className="ml-1 text-base font-medium text-text-muted">
-                  pp
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Metric strip — summary Stats (derived from positions) */}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border pt-4 sm:grid-cols-4">
-          <Stat label="Positions" value={String(nPositions)} />
-          <Stat
-            label="With exits"
-            value={String(nRealized)}
-            sub={nPositions ? `${nRealized}/${nPositions}` : undefined}
-          />
-          <Stat
-            label="Positive exits"
-            value={winPct}
-            tone={
-              winRate != null
-                ? winRate * 100 - 50 >= 0
-                  ? "green"
-                  : "red"
-                : undefined
+                {winRate != null ? (winRate * 100).toFixed(0) + "%" : "—"}
+              </span>
             }
+            size="md"
           />
-          <Stat
+          <Kpi
             label="Mean outcome"
-            value={<span style={{ color: meanPlColor }}>{meanPlStr}</span>}
+            value={
+              <span style={{ color: meanPl != null ? toneColor(toneOf(meanPl)) : "var(--text-muted)" }}>
+                {meanPl != null ? formatPercentRaw(meanPl, 1) : "—"}
+              </span>
+            }
+            size="md"
           />
         </div>
-      </header>
+        <p className="mt-auto text-xs leading-relaxed text-text-muted">
+          Reported peak/exit outcomes, not fill-weighted realized or portfolio returns.
+        </p>
+      </Tile>
 
-      {/* Trader Brief — collapsible LLM digest (style, sectors, watching). */}
-      <TraderBrief author={author} />
-
-      {/* Positions list */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-baseline gap-2">
-          <h3 className="section-title">Positions</h3>
-          <span className="num text-sm text-text-muted">{positions.length}</span>
-        </div>
-        <div className="card overflow-hidden" style={{ padding: 0 }}>
-          {positions.length === 0 ? (
-            <div className="py-6 text-center text-sm text-text-muted">
-              No positions in window.
+      {/* Positions table */}
+      <Tile span={8} title="Positions" meta={<span className="num">{positions.length} in 60d</span>}>
+        {positions.length === 0 ? (
+          <div className="py-6 text-center text-sm text-text-muted">No positions in window.</div>
+        ) : (
+          <div className="-mx-1 overflow-auto" style={{ maxHeight: 640 }}>
+            <div className="sticky top-0 z-[1] grid grid-cols-[3.25rem_minmax(0,1fr)_5rem_1.5rem] items-center gap-x-3 border-b border-border bg-bg-card px-2 pb-1.5 text-xs text-text-muted md:grid-cols-[3.25rem_4.75rem_minmax(0,1fr)_5rem_3.75rem_4.5rem_3rem_5.5rem_1.5rem]">
+              <span>Last</span>
+              <span className="max-md:hidden">Status</span>
+              <span>Contract</span>
+              <span className="max-md:hidden">DTE</span>
+              <span className="text-right max-md:hidden">Entry</span>
+              <span className="text-right max-md:hidden">Und</span>
+              <span className="text-right max-md:hidden">Ev</span>
+              <span className="text-right">P/L</span>
+              <span />
             </div>
-          ) : (
             <div className="flex flex-col divide-y divide-border">
               {positions.map((p) => {
                 const k = positionKeyString(p.position_key);
@@ -567,10 +573,15 @@ function TraderProfile({ author, leaderboardRow }: TraderProfileProps) {
                 );
               })}
             </div>
-          )}
-        </div>
-      </section>
-    </div>
+          </div>
+        )}
+      </Tile>
+
+      {/* Trader Brief — collapsible LLM digest (style, sectors, watching). */}
+      <div className="min-w-0 lg:col-span-12">
+        <TraderBrief author={author} />
+      </div>
+    </>
   );
 }
 
@@ -600,6 +611,29 @@ export function TraderLeaderboardPage() {
     return data.leaderboard;
   }, [data]);
 
+  // KPI strip — pure derivations off the leaderboard rows.
+  const kpis = useMemo(() => {
+    const calls = rows.reduce((s, r) => s + (r.n_calls || 0), 0);
+    const realized = rows.reduce((s, r) => s + (r.n_realized || 0), 0);
+    const pool = rows.filter((r) => r.n_realized >= KPI_MIN_EXITS);
+    const cand = pool.length > 0 ? pool : rows;
+    const best = (f: (r: LeaderboardRow) => number | null) =>
+      cand.reduce<LeaderboardRow | null>((b, r) => {
+        const v = f(r);
+        if (v == null) return b;
+        const bv = b ? f(b) : null;
+        return bv == null || v > bv ? r : b;
+      }, null);
+    return {
+      calls,
+      realized,
+      bestWin: best((r) => r.win_rate),
+      bestMean: best((r) => r.mean_pl_pct),
+      minNote: pool.length > 0 ? ` · ${KPI_MIN_EXITS}+ exits` : "",
+    };
+  }, [rows]);
+  const activeToday = Object.keys(todayMap).length;
+
   // Default-select: first row by n_calls desc (matches backend default order).
   // We use the backend's first row directly — it's already n_calls-desc.
   const defaultAuthor = rows.length > 0 ? rows[0].author : null;
@@ -624,6 +658,9 @@ export function TraderLeaderboardPage() {
       ? `Backend: ${data.reason}`
       : `Last ${lookback} days · ${nTraders} trader${nTraders === 1 ? "" : "s"}`;
 
+  const bestWinPct = kpis.bestWin?.win_rate != null ? kpis.bestWin.win_rate * 100 : null;
+  const bestMean = kpis.bestMean?.mean_pl_pct ?? null;
+
   return (
     <div className="desk-page">
       <header className="desk-header">
@@ -644,76 +681,93 @@ export function TraderLeaderboardPage() {
           body="Start the fetcher service (`stock-timefm-alerts.service`) and run `scripts/parse_and_score_alerts.py` to populate the alerts DB. This page will populate on the next refresh once the tables exist."
         />
       ) : isLoading || (isFetching && !data) ? (
-        <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 lg:col-span-5 xl:col-span-4 space-y-2">
-            <SkeletonCard height={48} />
-            <SkeletonCard height={48} />
-            <SkeletonCard height={48} />
-            <SkeletonCard height={48} />
-          </div>
-          <div className="col-span-12 lg:col-span-7 xl:col-span-8 space-y-3">
-            <SkeletonCard height={120} />
+        <TileGrid>
+          {[0, 1, 2, 3].map((i) => (
+            <Tile key={i} span={3}>
+              <SkeletonCard height={56} />
+            </Tile>
+          ))}
+          <Tile span={7}>
             <SkeletonCard height={360} />
-          </div>
-        </div>
+          </Tile>
+          <Tile span={5}>
+            <SkeletonCard height={360} />
+          </Tile>
+        </TileGrid>
       ) : rows.length === 0 ? (
         <EmptyState
           title={`No alerts in last ${lookback} days`}
           body="No parsed trade calls returned for this window."
         />
       ) : (
-        <div className="grid grid-cols-12 items-start gap-x-10 gap-y-8">
-          {/* Left: the ranking — the page's focal point */}
-          <section className="col-span-12 flex min-w-0 flex-col gap-3 lg:col-span-5 xl:col-span-4">
-            <div>
-              <h2 className="section-title">Leaderboard</h2>
-              <p className="section-sub inline-flex items-center gap-1">
-                Ranked by {SORT_LABELS[sortMode].toLowerCase()}
-                <ArrowUpDown size={11} className="opacity-70" aria-hidden="true" />
-                {sortDesc ? "high to low" : "low to high"}
-              </p>
-            </div>
-            <div className="overflow-x-auto">
-              <Segmented<SortMode>
-                ariaLabel="Leaderboard sort"
-                options={SORT_OPTIONS}
-                value={sortMode}
-                onChange={handleSort}
-              />
-            </div>
-            <div className="card overflow-hidden" style={{ padding: 0 }}>
-              <LeaderboardTable
-                rows={rows}
-                selected={activeSelected}
-                onSelect={setSelected}
-                sortMode={sortMode}
-                onSort={handleSort}
-                sortDesc={sortDesc}
-                todayMap={todayMap}
-              />
-            </div>
-          </section>
+        <TileGrid>
+          {/* KPI strip */}
+          <KpiTile label="Traders" value={nTraders} sub={`${activeToday} active today`} />
+          <KpiTile
+            label={`Calls, ${lookback}d`}
+            value={kpis.calls.toLocaleString()}
+            sub={`${kpis.realized.toLocaleString()} with exits`}
+          />
+          <KpiTile
+            label="Best win rate"
+            value={bestWinPct != null ? `${bestWinPct.toFixed(0)}%` : "—"}
+            sub={kpis.bestWin ? `${kpis.bestWin.author}${kpis.minNote}` : undefined}
+          />
+          <KpiTile
+            label="Best mean outcome"
+            value={
+              <span style={{ color: bestMean != null ? toneColor(toneOf(bestMean)) : undefined }}>
+                {bestMean != null ? formatPercentRaw(bestMean, 1) : "—"}
+              </span>
+            }
+            sub={kpis.bestMean ? `${kpis.bestMean.author}${kpis.minNote}` : undefined}
+          />
 
-          {/* Right: selected trader profile */}
-          <div className="col-span-12 min-w-0 lg:col-span-7 xl:col-span-8">
-            <TraderProfile
-              author={activeSelected}
-              leaderboardRow={selectedRow}
+          {/* Leaderboard — the page's primary dataset */}
+          <Tile
+            span={7}
+            title="Leaderboard"
+            meta={
+              <span className="inline-flex items-center gap-1">
+                by {SORT_LABELS[sortMode].toLowerCase()}, {sortDesc ? "high to low" : "low to high"}
+              </span>
+            }
+            actions={
+              <div className="max-w-full overflow-x-auto">
+                <Segmented<SortMode>
+                  ariaLabel="Leaderboard sort"
+                  options={SORT_OPTIONS}
+                  value={sortMode}
+                  onChange={handleSort}
+                />
+              </div>
+            }
+          >
+            <LeaderboardTable
+              rows={rows}
+              selected={activeSelected}
+              onSelect={setSelected}
+              sortMode={sortMode}
+              onSort={handleSort}
+              sortDesc={sortDesc}
+              todayMap={todayMap}
             />
-          </div>
-        </div>
-      )}
+          </Tile>
 
-      {/* Secondary band: cross-trader signals + today's raw feed (rail). */}
-      <div className="mt-4 grid grid-cols-12 items-start gap-x-10 gap-y-8 border-t border-border pt-8">
-        <div className="col-span-12 min-w-0 xl:col-span-8">
-          <SignalsView />
-        </div>
-        <div className="col-span-12 min-w-0 xl:col-span-4">
           {/* Today's raw chronological activity — straight from
               extracted_calls. No state derivation, no stitching. */}
-          <TradersTodayFeed />
-        </div>
+          <div className="flex min-w-0 flex-col lg:col-span-5">
+            <TradersTodayFeed />
+          </div>
+
+          {/* Selected trader: profile + positions + brief */}
+          <TraderProfile author={activeSelected} leaderboardRow={selectedRow} />
+        </TileGrid>
+      )}
+
+      {/* Cross-trader signals */}
+      <div className="mt-3.5 min-w-0">
+        <SignalsView />
       </div>
     </div>
   );

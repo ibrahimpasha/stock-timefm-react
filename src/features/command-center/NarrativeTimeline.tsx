@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, Info } from "lucide-react";
 import { useNarrative } from "../../api/intelV3";
 import type { NarrativeEvent } from "../../api/intelV3";
 import { parseTimestampMs } from "../../lib/utils";
+import { BarRow, Kpi, Tile } from "../../components/Cockpit";
 
 const SOURCE_COLOR: Record<string, string> = {
   news: "var(--accent-blue)",
@@ -109,7 +110,7 @@ function NarrativeEventRow({
 
         {expanded && hasExpansion && (
           <div className="mt-2 ml-5 space-y-2 text-xs">
-            {event.detail && <p className="prose-read max-w-[72ch] text-text-secondary">{event.detail}</p>}
+            {event.detail && <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">{event.detail}</p>}
             {(event.sentiment || event.strength != null) && (
               <div className="flex flex-wrap gap-x-3 text-text-muted">
                 {event.sentiment && (
@@ -164,62 +165,85 @@ export function NarrativeTimeline({
     [data?.events],
   );
 
+  const bySource = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of events) counts.set(e.source, (counts.get(e.source) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [events]);
+  const sourceMax = Math.max(1, ...bySource.map(([, n]) => n));
+  const windowH = data?.window_hours ?? hours;
+
   return (
-    <section aria-label="Narrative timeline">
-      <div className="mb-5">
-        <h3 className="section-title">Narrative timeline</h3>
-        <p className="section-sub">
-          <span className="num">{data?.summary.event_count ?? events.length}</span> events · last{" "}
-          <span className="num">{data?.window_hours ?? hours}h</span> · oldest first
-        </p>
-      </div>
+    <section className="flex flex-col gap-3.5" aria-label="Narrative timeline">
+      <Tile bodyClassName="grid grid-cols-3 gap-4">
+        <Kpi label="Events" value={data?.summary.event_count ?? events.length} size="md" />
+        <Kpi label="Sources" value={data?.summary.sources_seen?.length ?? bySource.length} size="md" />
+        <Kpi label="Window" value={`${windowH}h`} size="md" />
+      </Tile>
 
       {isLoading ? (
-        <div className="space-y-2 animate-pulse">
-          <div className="h-4 rounded bg-text-muted/15" />
-          <div className="h-4 w-5/6 rounded bg-text-muted/15" />
-          <div className="h-4 w-2/3 rounded bg-text-muted/15" />
-        </div>
+        <Tile>
+          <div className="space-y-2 animate-pulse">
+            <div className="h-4 rounded bg-text-muted/15" />
+            <div className="h-4 w-5/6 rounded bg-text-muted/15" />
+            <div className="h-4 w-2/3 rounded bg-text-muted/15" />
+          </div>
+        </Tile>
       ) : isError ? (
         <div role="alert" className="callout flex items-start gap-2">
           <Info size={14} className="mt-0.5 shrink-0" />
           Narrative events are unavailable for {ticker}. The rest of the analysis panel is unchanged.
         </div>
       ) : events.length === 0 ? (
-        <div className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">
-          <p className="text-base font-semibold text-text-primary">No strong narrative events in this window.</p>
-          <p className="mt-1">
+        <Tile title="No strong narrative events in this window">
+          <p className="max-w-[72ch] text-sm leading-relaxed text-text-secondary">
             Quiet tape is not bearish by itself. It means news, flow, voices, traders, forecasts,
             earnings, and macro inputs did not produce strong evidence for {ticker} over the last{" "}
-            {data?.window_hours ?? hours} hours.
+            {windowH} hours.
           </p>
-        </div>
+        </Tile>
       ) : (
         <>
-          {data?.summary.sources_seen && data.summary.sources_seen.length > 0 && (
-            <div className="mb-5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
-              {data.summary.sources_seen.map((source) => (
-                <span key={source} className="inline-flex items-center gap-1.5">
-                  <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: colorForSource(source) }} />
-                  {fmtSource(source)}
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="relative">
-            <div className="absolute bottom-1 left-[6px] top-1 w-px bg-border" />
-            {events.map((event, idx) => {
-              const key = eventKey(event, idx);
-              return (
-                <NarrativeEventRow
-                  key={key}
-                  event={event}
-                  expanded={expanded === key}
-                  onToggle={() => setExpanded(expanded === key ? null : key)}
+          {bySource.length > 0 && (
+            <Tile title="Events by source">
+              {bySource.map(([source, n]) => (
+                <BarRow
+                  key={source}
+                  label={
+                    <span className="inline-flex items-center gap-1.5">
+                      <span aria-hidden className="h-2 w-2 shrink-0 rounded-sm" style={{ background: colorForSource(source) }} />
+                      {fmtSource(source)}
+                    </span>
+                  }
+                  value={n}
+                  max={sourceMax}
+                  tone="info"
+                  display={n}
                 />
-              );
-            })}
-          </div>
+              ))}
+              {data?.summary.sources_seen && data.summary.sources_seen.length > bySource.length && (
+                <p className="text-xs text-text-muted">
+                  Also seen: {data.summary.sources_seen.filter((src) => !bySource.some(([k]) => k === src)).map(fmtSource).join(", ")}
+                </p>
+              )}
+            </Tile>
+          )}
+          <Tile title="Timeline" meta="oldest first">
+            <div className="relative">
+              <div className="absolute bottom-1 left-[6px] top-1 w-px bg-border" />
+              {events.map((event, idx) => {
+                const key = eventKey(event, idx);
+                return (
+                  <NarrativeEventRow
+                    key={key}
+                    event={event}
+                    expanded={expanded === key}
+                    onToggle={() => setExpanded(expanded === key ? null : key)}
+                  />
+                );
+              })}
+            </div>
+          </Tile>
         </>
       )}
     </section>
