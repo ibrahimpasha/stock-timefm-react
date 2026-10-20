@@ -21,7 +21,7 @@ export function GlassPanel({
       {(title || actions) && (
         <header className="glass-panel__header">
           {title && (
-            <h3 className="min-w-0 text-xs font-semibold uppercase tracking-[0.08em] text-text-secondary">
+            <h3 className="min-w-0 text-sm font-semibold text-text-primary">
               {title}
             </h3>
           )}

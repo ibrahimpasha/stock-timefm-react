@@ -1,18 +1,22 @@
-import { lazy, Suspense, type ElementType } from "react";
-import { BrowserRouter, Routes, Route, NavLink, useLocation } from "react-router-dom";
+import { lazy, Suspense, useEffect, useState, type ElementType } from "react";
+import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  Activity,
   BarChart3,
   Blocks,
-  Gauge,
   Grid3X3,
   MapPinned,
+  Menu,
   Moon,
+  Newspaper,
   Orbit,
   Sun,
+  Sunrise,
   Users,
+  Wallet,
 } from "lucide-react";
-import { NAV_ITEMS } from "./lib/constants";
+import { TickerSearch } from "./components/TickerSearch";
 import { useTheme } from "./store/useTheme";
 import { DataHealthStrip } from "./components/DataHealthStrip";
 import { DataConnectionBanner } from "./components/DataConnectionBanner";
@@ -20,8 +24,8 @@ import { DataConnectionBanner } from "./components/DataConnectionBanner";
 // Route-level code splitting — each page (and its heavy deps: leaflet on the
 // map, the flow-analyzer suite on command center) loads on first visit
 // instead of shipping one monolithic bundle to every visitor.
-const CommandCenterPage = lazy(() =>
-  import("./pages/CommandCenterPage").then((m) => ({ default: m.CommandCenterPage })),
+const DeskPage = lazy(() =>
+  import("./pages/CommandCenterPage").then((m) => ({ default: m.DeskPage })),
 );
 const TraderLeaderboardPage = lazy(() =>
   import("./pages/TraderLeaderboardPage").then((m) => ({ default: m.TraderLeaderboardPage })),
@@ -48,127 +52,143 @@ const queryClient = new QueryClient({
   },
 });
 
-const MOBILE_NAV = [
-  { path: "/", label: "Desk", icon: Gauge },
-  { path: "/pillars", label: "Pillars", icon: Blocks },
-  { path: "/rotation", label: "Rotate", icon: Orbit },
-  { path: "/gex", label: "GEX", icon: Grid3X3 },
-  { path: "/traders", label: "Traders", icon: Users },
-  { path: "/map", label: "Map", icon: MapPinned },
-] as const;
 
-const NAV_ICONS: Record<string, ElementType> = {
-  "/": Gauge,
-  "/command-center": Gauge,
-  "/pillars": Blocks,
-  "/rotation": Orbit,
-  "/gex": Grid3X3,
-  "/traders": Users,
-  "/map": MapPinned,
-};
+type NavItem = { path: string; label: string; icon: ElementType };
 
-function Navbar() {
-  const location = useLocation();
-  const currentSection =
-    MOBILE_NAV.find((item) =>
-      item.path === "/"
-        ? location.pathname === "/" || location.pathname === "/command-center"
-        : location.pathname.startsWith(item.path),
-    )?.label ?? "Desk";
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Desk",
+    items: [
+      { path: "/", label: "Brief", icon: Sunrise },
+      { path: "/flow", label: "Flow", icon: Activity },
+      { path: "/books", label: "Books", icon: Wallet },
+      { path: "/intel", label: "Intel", icon: Newspaper },
+      { path: "/traders", label: "Traders", icon: Users },
+    ],
+  },
+  {
+    label: "Markets",
+    items: [
+      { path: "/pillars", label: "Pillars", icon: Blocks },
+      { path: "/rotation", label: "Rotation", icon: Orbit },
+      { path: "/gex", label: "GEX", icon: Grid3X3 },
+      { path: "/map", label: "Map", icon: MapPinned },
+    ],
+  },
+];
 
+const ALL_NAV = NAV_GROUPS.flatMap((g) => g.items);
+// Phone bottom bar: the four daily destinations plus a sheet for the rest.
+const MOBILE_PRIMARY = ALL_NAV.slice(0, 4);
+const MOBILE_MORE = ALL_NAV.slice(4);
+
+function isActivePath(path: string, pathname: string) {
+  return path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(`${path}/`);
+}
+
+function Sidebar() {
+  const { pathname } = useLocation();
+  return (
+    <aside className="app-sidebar" aria-label="Primary navigation">
+      <NavLink to="/" className="app-brand" aria-label="Stock-TimeFM brief">
+        <BarChart3 size={18} className="text-accent-blue" aria-hidden="true" />
+        <span>Stock-TimeFM</span>
+      </NavLink>
+      <nav className="app-sidebar__nav">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label} className="app-sidebar__group">
+            <span className="app-sidebar__label">{group.label}</span>
+            {group.items.map(({ path, label, icon: Icon }) => (
+              <NavLink
+                key={path}
+                to={path}
+                className={`app-nav-item ${isActivePath(path, pathname) ? "app-nav-item--active" : ""}`}
+              >
+                <Icon size={16} aria-hidden="true" />
+                <span>{label}</span>
+              </NavLink>
+            ))}
+          </div>
+        ))}
+      </nav>
+      <div className="app-sidebar__footer">
+        <DataHealthStrip />
+        <ThemeToggle />
+      </div>
+    </aside>
+  );
+}
+
+function TopBar() {
+  const { pathname } = useLocation();
+  const current = ALL_NAV.find((item) => isActivePath(item.path, pathname))?.label ?? "Brief";
   return (
     <>
+      <header className="app-topbar hidden lg:flex">
+        <TickerSearch inputWidth="w-72" />
+      </header>
       <header className="mobile-app-bar lg:hidden">
-        <NavLink
-          to="/"
-          className="mobile-brand"
-          aria-label="Stock-TimeFM command center"
-        >
-          <BarChart3 size={19} className="shrink-0 text-accent-blue" aria-hidden="true" />
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-bold text-text-primary">
-              Stock-TimeFM
-            </span>
-            <span className="block truncate text-xs text-text-muted">{currentSection}</span>
-          </span>
+        <NavLink to="/" className="mobile-brand" aria-label="Stock-TimeFM brief">
+          <BarChart3 size={18} className="shrink-0 text-accent-blue" aria-hidden="true" />
+          <span className="truncate text-sm font-semibold text-text-primary">{current}</span>
         </NavLink>
-
         <div className="flex shrink-0 items-center">
           <DataHealthStrip />
           <ThemeToggle />
         </div>
-      </header>
-
-      <header className="desktop-app-header hidden lg:block">
-        <nav className="desktop-app-nav" aria-label="Primary navigation">
-          <NavLink to="/" className="desktop-brand" aria-label="Stock-TimeFM command center">
-            <BarChart3 size={20} className="text-accent-blue" aria-hidden="true" />
-            <span className="text-sm font-bold text-text-primary">
-              Stock-TimeFM
-            </span>
-          </NavLink>
-
-          <div className="desktop-route-list">
-            {NAV_ITEMS.map((item) => (
-              (() => {
-                const Icon = NAV_ICONS[item.path] ?? Gauge;
-                return (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    end={item.path === "/"}
-                    className={({ isActive }) =>
-                      `desktop-nav-item ${isActive ? "desktop-nav-item--active" : ""}`
-                    }
-                  >
-                    <Icon size={15} aria-hidden="true" />
-                    <span>{item.label}</span>
-                  </NavLink>
-                );
-              })()
-            ))}
-          </div>
-
-          <div className="ml-auto flex shrink-0 items-center">
-            <DataHealthStrip />
-            <ThemeToggle />
-          </div>
-        </nav>
       </header>
     </>
   );
 }
 
 function MobileNavigation() {
-  const location = useLocation();
+  const { pathname } = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => setMoreOpen(false), [pathname]);
+  const moreActive = MOBILE_MORE.some((item) => isActivePath(item.path, pathname));
   return (
-    <nav className="mobile-bottom-nav lg:hidden" aria-label="Primary navigation">
-      {MOBILE_NAV.map((item) => {
-        const Icon = item.icon;
-        return (
+    <>
+      {moreOpen && (
+        <div className="mobile-more-sheet lg:hidden" role="dialog" aria-label="More destinations">
+          {MOBILE_MORE.map(({ path, label, icon: Icon }) => (
+            <NavLink
+              key={path}
+              to={path}
+              className={`mobile-more-sheet__item ${isActivePath(path, pathname) ? "mobile-more-sheet__item--active" : ""}`}
+            >
+              <Icon size={18} aria-hidden="true" />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </div>
+      )}
+      <nav className="mobile-bottom-nav lg:hidden" aria-label="Primary navigation">
+        {MOBILE_PRIMARY.map(({ path, label, icon: Icon }) => (
           <NavLink
-            key={item.path}
-            to={item.path}
-            end={item.path === "/"}
-            className={({ isActive }) => {
-              const active = isActive || (
-                item.path === "/" && location.pathname === "/command-center"
-              );
-              return `mobile-bottom-nav__item ${active ? "mobile-bottom-nav__item--active" : ""}`;
-            }}
-            title={item.label}
+            key={path}
+            to={path}
+            className={`mobile-bottom-nav__item ${isActivePath(path, pathname) ? "mobile-bottom-nav__item--active" : ""}`}
           >
             <Icon size={18} aria-hidden="true" />
-            <span>{item.label}</span>
+            <span>{label}</span>
           </NavLink>
-        );
-      })}
-    </nav>
+        ))}
+        <button
+          type="button"
+          onClick={() => setMoreOpen((v) => !v)}
+          aria-expanded={moreOpen}
+          className={`mobile-bottom-nav__item ${moreActive || moreOpen ? "mobile-bottom-nav__item--active" : ""}`}
+        >
+          <Menu size={18} aria-hidden="true" />
+          <span>More</span>
+        </button>
+      </nav>
+    </>
   );
 }
 
 /** Light / dark switch — flips the data-theme attribute on <html>, which swaps
- *  every CSS-var-driven surface at once. Pinned to the right of the navbar. */
+ *  every CSS-var-driven surface at once. */
 function ThemeToggle() {
   const theme = useTheme((s) => s.theme);
   const toggle = useTheme((s) => s.toggle);
@@ -180,47 +200,50 @@ function ThemeToggle() {
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       aria-pressed={!isDark}
-      className="ml-auto flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary lg:min-h-0 lg:min-w-0 lg:p-2"
+      className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-bg-card-hover hover:text-text-primary lg:min-h-8 lg:min-w-8"
     >
-      {isDark ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
+      {isDark ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
     </button>
   );
 }
 
 function AppLayout() {
   return (
-    <div className="app-shell min-h-screen min-w-0 flex flex-col bg-bg-primary">
+    <div className="app-shell">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
-      <Navbar />
-      <main
-        id="main-content"
-        tabIndex={-1}
-        className="app-main mobile-content flex-1 min-w-0"
-      >
-        <DataConnectionBanner />
-        <Suspense
-          fallback={
-            <div className="page-loading" role="status" aria-live="polite">
-              <span className="page-loading__bar" />
-              <span className="page-loading__bar page-loading__bar--short" />
-              <span className="sr-only">Loading workspace</span>
-            </div>
-          }
-        >
-          <Routes>
-            <Route path="/" element={<CommandCenterPage />} />
-            {/* alias kept so old /command-center bookmarks still resolve */}
-            <Route path="/command-center" element={<CommandCenterPage />} />
-            <Route path="/pillars" element={<PillarsPage />} />
-            <Route path="/rotation" element={<RotationPage />} />
-            <Route path="/gex" element={<GexMatrixPage />} />
-            <Route path="/traders" element={<TraderLeaderboardPage />} />
-            <Route path="/map" element={<BayAreaMapPage />} />
-          </Routes>
-        </Suspense>
-      </main>
+      <Sidebar />
+      <div className="app-column">
+        <TopBar />
+        <main id="main-content" tabIndex={-1} className="app-main mobile-content">
+          <DataConnectionBanner />
+          <Suspense
+            fallback={
+              <div className="page-loading" role="status" aria-live="polite">
+                <span className="page-loading__bar" />
+                <span className="page-loading__bar page-loading__bar--short" />
+                <span className="sr-only">Loading workspace</span>
+              </div>
+            }
+          >
+            <Routes>
+              <Route path="/" element={<DeskPage section="brief" />} />
+              <Route path="/flow/:view?" element={<DeskPage section="flow" />} />
+              <Route path="/books/:view?" element={<DeskPage section="books" />} />
+              <Route path="/intel/:view?" element={<DeskPage section="intel" />} />
+              {/* old bookmarks */}
+              <Route path="/command-center" element={<Navigate to="/" replace />} />
+              <Route path="/pillars" element={<PillarsPage />} />
+              <Route path="/rotation" element={<RotationPage />} />
+              <Route path="/gex" element={<GexMatrixPage />} />
+              <Route path="/traders" element={<TraderLeaderboardPage />} />
+              <Route path="/map" element={<BayAreaMapPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </main>
+      </div>
       <MobileNavigation />
     </div>
   );

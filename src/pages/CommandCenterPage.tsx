@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense, type ReactNode } from "react";
+import { NavLink, Navigate, useParams } from "react-router-dom";
 import { useAppStore } from "../store/useAppStore";
 import { runForecastModels, useMarketHistory } from "../api/forecast";
 import { createLatestRequest } from "../lib/latestRequest";
@@ -16,22 +17,13 @@ import { ModelBreakdown } from "../features/command-center/ModelBreakdown";
 import type { OHLCV, ModelForecast } from "../lib/types";
 import { TickerSearch } from "../components/TickerSearch";
 import { Segmented } from "../components/Glass";
-import { IntelligencePanel } from "../features/command-center/IntelligencePanel";
 import IntelligencePanelV3 from "../features/command-center/IntelligencePanelV3";
 import { NarrativeTimeline } from "../features/command-center/NarrativeTimeline";
 import { ConvergenceGraph } from "../features/command-center/ConvergenceGraph";
-// Keep `IntelligencePanel` referenced so the fallback import survives
-// `noUnusedLocals`. Swap `<IntelligencePanelV3 />` below for `<IntelligencePanel ... />`
-// to revert the panel if V3 misbehaves.
-const _IntelligencePanelFallback = IntelligencePanel;
-void _IntelligencePanelFallback;
-
-// Flow Analyzer feature components. iFlow is the default tab so it loads
-// eagerly; the other six tabs are lazy chunks fetched on first click —
-// they were the bulk of this page's 900KB bundle.
 import { FlowAlerts } from "../features/flow-analyzer/FlowAlerts";
 import { IFlowTracker } from "../features/flow-analyzer/IFlowTracker";
 
+// Every tab besides the iFlow tape is a lazy chunk fetched on first visit.
 const FlowHeatmap = lazy(() =>
   import("../features/flow-analyzer/FlowHeatmap").then((m) => ({ default: m.FlowHeatmap })),
 );
@@ -54,130 +46,62 @@ const BounceBoard = lazy(() =>
   import("../features/flow-analyzer/BounceBoard").then((m) => ({ default: m.BounceBoard })),
 );
 
-import {
-  ArrowLeft,
-  Command,
-  Zap,
-  Eye,
-  Bell,
-  BarChart3,
-  Brain,
-  X,
-  SidebarOpen,
-  Mic2,
-  Globe,
-  Grid3x3,
-  GitBranch,
-  Network,
-  Activity,
-  ChevronDown,
-} from "lucide-react";
+import { ArrowLeft, Bell, PanelRightOpen, X } from "lucide-react";
 
-/* ── Tab definitions ─────────────────────────────────────── */
+/* ── Sections ────────────────────────────────────────────────
+ * Each desk section is its own route; its views are sub-routes rendered as
+ * tabs in the page header. The ticker analysis panel is shared by all. */
 
-type FlowTab =
-  | "picks"
-  | "iflow"
-  | "heatmap"
-  | "bounce"
-  | "flow-trader"
-  | "smart-trader"
-  | "flow-intel"
-  | "voices"
-  | "news";
+type View = { slug: string; label: string; render: () => ReactNode };
+export type DeskSection = "brief" | "flow" | "books" | "intel";
 
-const FLOW_TABS: { id: FlowTab; label: string; icon: React.ElementType }[] = [
-  { id: "iflow", label: "iFlow Tracker", icon: Eye },
-  { id: "heatmap", label: "Heat Map", icon: Grid3x3 },
-  { id: "bounce", label: "Bounce", icon: Activity },
-  { id: "flow-trader", label: "Flow Trader", icon: Zap },
-  { id: "smart-trader", label: "TraderJoe", icon: Brain },
-  { id: "flow-intel", label: "Flow Intel", icon: BarChart3 },
-  { id: "voices", label: "Voices", icon: Mic2 },
-  { id: "news", label: "News", icon: Globe },
-];
-
-/* Visual grouping only — same 7 tabs/keys, clustered by what they answer:
- * FLOW = live options tape, BOOKS = the paper books, INTEL = synthesis. */
-const FLOW_TAB_GROUPS: { label: string; tabs: FlowTab[] }[] = [
-  { label: "Flow", tabs: ["iflow", "heatmap", "bounce"] },
-  { label: "Books", tabs: ["smart-trader", "flow-trader"] },
-  { label: "Intel", tabs: ["flow-intel", "voices", "news"] },
-];
+const SECTIONS: Record<DeskSection, { title: string; base: string; summary: string; views: View[] }> = {
+  brief: {
+    title: "Brief",
+    base: "/",
+    summary: "What moved, why, and what to watch today",
+    views: [{ slug: "", label: "Brief", render: () => <DailyBrief /> }],
+  },
+  flow: {
+    title: "Flow",
+    base: "/flow",
+    summary: "Unusual options activity",
+    views: [
+      { slug: "", label: "Tape", render: () => <IFlowTracker /> },
+      { slug: "heatmap", label: "Heat map", render: () => <FlowHeatmap /> },
+      { slug: "bounce", label: "Bounce", render: () => <BounceBoard /> },
+    ],
+  },
+  books: {
+    title: "Books",
+    base: "/books",
+    summary: "Paper portfolios and their decisions",
+    views: [
+      { slug: "", label: "TraderJoe", render: () => <SmartTrader /> },
+      { slug: "flow-trader", label: "Flow Trader", render: () => <FlowPaperTrading /> },
+    ],
+  },
+  intel: {
+    title: "Intel",
+    base: "/intel",
+    summary: "Synthesis across flow, voices, and news",
+    views: [
+      { slug: "", label: "Flow intel", render: () => <FlowIntel /> },
+      { slug: "voices", label: "Voices", render: () => <VoicesTab /> },
+      { slug: "news", label: "News", render: () => <NewsTab /> },
+    ],
+  },
+};
 
 type DetailTab = "overview" | "narrative" | "graph";
 
-const DETAIL_TABS: { id: DetailTab; label: string; icon: React.ElementType }[] = [
-  { id: "overview", label: "Overview", icon: BarChart3 },
-  { id: "narrative", label: "Narrative", icon: GitBranch },
-  { id: "graph", label: "Graph", icon: Network },
+const DETAIL_TABS: { value: DetailTab; label: string }[] = [
+  { value: "overview", label: "Overview" },
+  { value: "narrative", label: "Narrative" },
+  { value: "graph", label: "Graph" },
 ];
 
-/* ── Flow Tab Bar ────────────────────────────────────────── */
-
-function FlowTabBar({
-  activeTab,
-  onTabChange,
-}: {
-  activeTab: FlowTab;
-  onTabChange: (tab: FlowTab) => void;
-}) {
-  const byId = new Map(FLOW_TABS.map((t) => [t.id, t]));
-  return (
-    <div className="min-w-0 flex-1">
-      <Segmented<FlowTab>
-        ariaLabel="Flow workspace"
-        className="w-full lg:hidden"
-        options={FLOW_TABS.map((tab) => {
-          const Icon = tab.icon;
-          return {
-            value: tab.id,
-            label: (
-              <>
-                <Icon size={13} />
-                {tab.label}
-              </>
-            ),
-          };
-        })}
-        value={activeTab}
-        onChange={onTabChange}
-      />
-
-      <div className="hidden flex-wrap items-end gap-3 lg:flex">
-        {FLOW_TAB_GROUPS.map((group) => (
-          <div key={group.label} className="flex flex-col gap-1">
-            <span className="pl-2 text-xs font-semibold uppercase tracking-[0.08em] text-text-muted leading-none">
-              {group.label}
-            </span>
-            <Segmented<FlowTab>
-              ariaLabel={`${group.label} flow views`}
-              options={group.tabs.map((id) => {
-                const tab = byId.get(id)!;
-                const Icon = tab.icon;
-                return {
-                  value: id,
-                  label: (
-                    <>
-                      <Icon size={13} />
-                      {tab.label}
-                    </>
-                  ),
-                };
-              })}
-              value={activeTab}
-              onChange={onTabChange}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ── Flow Tab Content ────────────────────────────────────── */
-
-function AlertBellInner({ onClick, isOpen }: { onClick: () => void; isOpen: boolean }) {
+function AlertBell({ onClick, isOpen }: { onClick: () => void; isOpen: boolean }) {
   const { data: alerts } = useFlowAlerts();
   const count = alerts?.length ?? 0;
   return (
@@ -186,55 +110,15 @@ function AlertBellInner({ onClick, isOpen }: { onClick: () => void; isOpen: bool
       onClick={onClick}
       aria-expanded={isOpen}
       aria-controls="flow-alerts-panel"
-      aria-label={`${isOpen ? "Hide" : "Show"} flow alerts${count > 0 ? `, ${count} available` : ""}`}
-      className="relative flex min-h-11 min-w-11 items-center justify-center rounded-full transition-colors hover:bg-bg-card-hover lg:min-h-0 lg:min-w-0 lg:p-1.5"
-      style={{ color: count > 0 ? "var(--accent-orange)" : "var(--text-muted)" }}
+      className="desk-action"
+      data-active={isOpen || undefined}
     >
-      <Bell size={16} fill={isOpen ? "currentColor" : "none"} aria-hidden="true" />
-      {count > 0 && (
-        <span className="num absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-accent-orange text-bg-primary text-[10px] font-bold flex items-center justify-center">
-          {count}
-        </span>
-      )}
+      <Bell size={15} aria-hidden="true" />
+      <span>Alerts</span>
+      {count > 0 && <span className="num desk-action__count">{count}</span>}
     </button>
   );
 }
-
-function FlowTabContent({ activeTab }: { activeTab: FlowTab }) {
-  const tab = (() => {
-    switch (activeTab) {
-      case "iflow":
-        return <IFlowTracker />;
-      case "heatmap":
-        return <FlowHeatmap />;
-      case "bounce":
-        return <BounceBoard />;
-      case "flow-intel":
-        return <FlowIntel />;
-      case "flow-trader":
-        return <FlowPaperTrading />;
-      case "smart-trader":
-        return <SmartTrader />;
-      case "voices":
-        return <VoicesTab />;
-      case "news":
-        return <NewsTab />;
-      default:
-        return null;
-    }
-  })();
-  return (
-    <Suspense
-      fallback={
-        <div className="p-6 text-sm text-text-muted animate-pulse">loading…</div>
-      }
-    >
-      {tab}
-    </Suspense>
-  );
-}
-
-/* ── Main Command Center Page ────────────────────────────── */
 
 function useDesktopViewport() {
   const [isDesktop, setIsDesktop] = useState(
@@ -249,26 +133,27 @@ function useDesktopViewport() {
   return isDesktop;
 }
 
-export function CommandCenterPage() {
+export function DeskPage({ section }: { section: DeskSection }) {
+  const { view = "" } = useParams();
+  const config = SECTIONS[section];
+  const active = config.views.find((v) => v.slug === view);
   const ticker = useAppStore((s) => s.activeTicker);
-  const [activeFlowTab, setActiveFlowTab] = useState<FlowTab>("iflow");
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>("overview");
   const [showAlerts, setShowAlerts] = useState(false);
-  const [mobileBriefOpen, setMobileBriefOpen] = useState(false);
   const isDesktop = useDesktopViewport();
   const [settings, setSettings] = useState<ForecastSettings>(DEFAULT_SETTINGS);
   const analysisTriggerRef = useRef<HTMLButtonElement>(null);
   const detailPanelRef = useRef<HTMLDivElement>(null);
 
-  // Detail panel slides in when the user picks a ticker (from a flow card,
-  // alert, anywhere). Closed by default so flow gets full width on first load.
+  // The analysis panel opens when the user picks a ticker anywhere on the
+  // page. Closed by default so the section gets full width on first load.
   const [detailOpen, setDetailOpen] = useState(false);
-  const firstRender = useRef(true);
+  const lastTicker = useRef(ticker);
   useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
-      return;
-    }
+    // Compare against the last seen ticker (not a first-render flag) so
+    // StrictMode's double effect run doesn't pop the panel open on load.
+    if (lastTicker.current === ticker) return;
+    lastTicker.current = ticker;
     // Phone flow uses its own list -> ticker detail transition. Automatically
     // opening this second analysis layer would replace the detail just chosen.
     if (window.matchMedia("(max-width: 1023px)").matches) return;
@@ -323,7 +208,6 @@ export function CommandCenterPage() {
   );
   const { data: history, isLoading: historyLoading } = historyQuery;
 
-  // Normalize history rows to OHLCV shape the chart expects.
   const historicalData: OHLCV[] = (history ?? []).map(
     (d) => ({
       date: String(d.date),
@@ -335,13 +219,9 @@ export function CommandCenterPage() {
     })
   );
 
-  // ── Forecast — restored multi-model forecast card (config + chart overlays +
-  //    per-model breakdown). Driven entirely by the live /forecast/* endpoints;
-  //    the deprecated /signals auto-source is NOT used. Auto-runs once per ticker
-  //    so the card populates without a manual click; re-run via the config's Run
-  //    button after changing models/horizon/origin. NOTE: the underlying 8-model
-  //    stack lost to a random-walk baseline on CRPS (2026-05-30) — the numbers
-  //    are advisory, not a tradable price target.
+  // Forecast card: driven by the live /forecast/* endpoints, auto-runs once
+  // per ticker; re-run via the config's Run button. Advisory only — no model
+  // beats the random-walk baseline (see ForecastConfig).
   const [forecastResult, setForecastResult] = useState<{
     ticker: string; settings: ForecastSettings; forecasts: ModelForecast[];
   } | null>(null);
@@ -377,112 +257,83 @@ export function CommandCenterPage() {
     }
   }, [ticker, settings]);
 
-  // Auto-run once per ticker (clears the prior ticker's forecast first). Settings
-  // edits don't re-trigger — the user re-runs explicitly via the config button.
+  // Only fetch forecasts while the panel is actually open.
   const runForecastRef = useRef(runForecast);
   useEffect(() => { runForecastRef.current = runForecast; }, [runForecast]);
   useEffect(() => {
     const current = requests.current;
-    if (ticker) void runForecastRef.current();
+    if (ticker && detailOpen) void runForecastRef.current();
     return () => current.cancel();
-  }, [ticker]);
+  }, [ticker, detailOpen]);
 
   const openDetail = () => {
     setDetailOpen(true);
     window.setTimeout(() => detailPanelRef.current?.focus(), 0);
   };
 
+  if (!active) return <Navigate to={config.base} replace />;
+
   return (
-    <div className="command-center-page">
-      {/* Page header + analyze bar */}
-      <header className="command-context-bar">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span className="command-context-mark" aria-hidden="true">
-            <Command size={17} />
-          </span>
-          <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold text-text-primary lg:text-lg">
-              Command Center
-            </h1>
-            <p className="truncate text-xs text-text-muted lg:hidden">
-              <span className="num font-semibold text-accent-blue">{ticker}</span>
-              <span aria-hidden="true"> · </span>
-              decision workspace
-            </p>
-          </div>
-          <span className="num hidden text-sm font-semibold text-accent-blue lg:inline">{ticker}</span>
+    <div className="desk-page" data-section={section}>
+      <header className="desk-header">
+        <div className="desk-header__title">
+          <h1>{config.title}</h1>
+          <p>{config.summary}</p>
         </div>
-        <TickerSearch className="command-ticker-search" inputWidth="w-44 max-sm:w-full" />
+        <div className="desk-header__actions">
+          {!detailOpen && ticker && (
+            <button
+              ref={analysisTriggerRef}
+              type="button"
+              onClick={openDetail}
+              aria-expanded={detailOpen}
+              aria-controls="command-center-analysis-panel"
+              className="desk-action"
+            >
+              <PanelRightOpen size={15} aria-hidden="true" />
+              <span className="num">{ticker}</span>
+            </button>
+          )}
+          {section === "flow" && (
+            <AlertBell onClick={() => setShowAlerts(!showAlerts)} isOpen={showAlerts} />
+          )}
+          <TickerSearch className="desk-search lg:hidden" inputWidth="w-full" />
+        </div>
+        {config.views.length > 1 && (
+          <nav className="desk-tabs" aria-label={`${config.title} views`}>
+            {config.views.map((v) => (
+              <NavLink
+                key={v.slug}
+                to={v.slug ? `${config.base}/${v.slug}` : config.base}
+                end
+                className={({ isActive }) => `desk-tab ${isActive ? "desk-tab--active" : ""}`}
+              >
+                {v.label}
+              </NavLink>
+            ))}
+          </nav>
+        )}
       </header>
 
-      {/* Daily Brief — JARVIS-style situational read at the very top: regime,
-          today's agenda, your paper books, cross-source convergence, theme heat,
-          plus a cached Claude "Read" that prioritises the day with a
-          capital-preservation stance. */}
-      <details
-        className="command-mobile-brief"
-        open={isDesktop || mobileBriefOpen}
-        onToggle={(event) => {
-          if (!isDesktop) setMobileBriefOpen(event.currentTarget.open);
-        }}
-      >
-        <summary className="lg:hidden">
-          <span className="flex min-w-0 items-center gap-2">
-            <Activity size={15} className="shrink-0 text-accent-green" aria-hidden="true" />
-            <span className="truncate text-xs font-semibold text-text-primary">Daily brief</span>
-          </span>
-          <ChevronDown className="command-mobile-brief__chevron" size={16} aria-hidden="true" />
-        </summary>
-        <div className="command-mobile-brief__content command-daily-brief">
-          <DailyBrief />
-        </div>
-      </details>
-
-      {/* Master/detail layout:
-            - Default state: Flow workspace takes the full width (col 12).
-            - Clicking any ticker (which updates activeTicker) auto-opens the
-              detail panel on the right with chart + analysis + intelligence.
-            - The detail panel can be dismissed via [X] to reclaim flow width.
-            - When closed and a ticker is set, a tiny "Show analysis" button
-              brings it back without forcing another ticker click. */}
-      <div className="command-center-workspace grid min-w-0 grid-cols-12 items-start gap-4">
-        <div
-          className={`${detailOpen ? "col-span-12 max-lg:hidden lg:col-span-7" : "col-span-12"} command-master-workspace min-w-0`}
-        >
-          <section className="command-workspace-surface min-w-0 overflow-hidden" aria-label="Flow workspace">
-            <div className="command-flow-toolbar flex min-w-0 items-start justify-between gap-2">
-              <FlowTabBar activeTab={activeFlowTab} onTabChange={setActiveFlowTab} />
-              <div className="flex shrink-0 items-center gap-1 self-end pb-0.5 md:gap-2">
-                {!detailOpen && ticker && (
-                  <button
-                    ref={analysisTriggerRef}
-                    type="button"
-                    onClick={openDetail}
-                    aria-expanded={detailOpen}
-                    aria-controls="command-center-analysis-panel"
-                    className="analysis-trigger"
-                    title="Open analysis panel for the current ticker"
-                  >
-                    <SidebarOpen size={14} />
-                    <span className="hidden sm:inline">Analysis</span>
-                    <span className="num">{ticker}</span>
-                  </button>
-                )}
-                <AlertBellInner onClick={() => setShowAlerts(!showAlerts)} isOpen={showAlerts} />
-              </div>
+      <div className={`desk-body ${detailOpen ? "desk-body--split" : ""}`}>
+        <section className="desk-main" aria-label={active.label}>
+          {showAlerts && section === "flow" && (
+            <div id="flow-alerts-panel" className="mb-4">
+              <FlowAlerts />
             </div>
-
-            {showAlerts && (
-              <div id="flow-alerts-panel" className="mt-3 mb-3">
-                <FlowAlerts />
+          )}
+          <Suspense
+            fallback={
+              <div className="page-loading" role="status" aria-live="polite">
+                <span className="page-loading__bar" />
+                <span className="page-loading__bar page-loading__bar--short" />
+                <span className="sr-only">Loading {active.label}</span>
               </div>
-            )}
-
-            <div className="command-flow-content mt-3">
-              <FlowTabContent activeTab={activeFlowTab} />
-            </div>
-          </section>
-        </div>
+            }
+          >
+            {active.render()}
+          </Suspense>
+        </section>
 
         {detailOpen && (
           <aside
@@ -491,8 +342,8 @@ export function CommandCenterPage() {
             tabIndex={-1}
             role={isDesktop ? "complementary" : "dialog"}
             aria-modal={isDesktop ? undefined : true}
-            aria-label={`${ticker} analysis workspace`}
-            className="command-detail-workspace col-span-12 min-w-0 lg:col-span-5"
+            aria-label={`${ticker} analysis`}
+            className="command-detail-workspace"
           >
             <div className="command-detail-sticky">
               <div className="command-detail-heading">
@@ -502,24 +353,14 @@ export function CommandCenterPage() {
                   className="command-detail-back lg:hidden"
                 >
                   <ArrowLeft size={17} aria-hidden="true" />
-                  <span>Back to desk</span>
+                  <span>Back</span>
                 </button>
-                <div className="hidden min-w-0 items-center gap-2 lg:flex">
-                  <BarChart3 size={16} className="shrink-0 text-accent-blue" aria-hidden="true" />
-                  <span className="num truncate font-semibold text-text-primary">{ticker}</span>
-                  <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-muted">
-                    analysis
-                  </span>
-                </div>
-                <div className="flex min-w-0 items-center gap-2 lg:hidden">
-                  <span className="num truncate text-sm font-semibold text-text-primary">{ticker}</span>
-                  <span className="text-xs text-text-muted">Analysis</span>
-                </div>
+                <h2 className="num truncate text-lg font-semibold text-text-primary">{ticker}</h2>
                 <button
                   type="button"
                   onClick={closeDetail}
                   className="command-detail-close"
-                  title="Hide analysis panel"
+                  title="Close analysis"
                   aria-label="Close analysis panel"
                 >
                   <X size={17} aria-hidden="true" />
@@ -528,19 +369,8 @@ export function CommandCenterPage() {
 
               <Segmented<DetailTab>
                 ariaLabel="Analysis view"
-                className="w-full justify-between"
-                options={DETAIL_TABS.map((tab) => {
-                  const Icon = tab.icon;
-                  return {
-                    value: tab.id,
-                    label: (
-                      <>
-                        <Icon size={13} />
-                        {tab.label}
-                      </>
-                    ),
-                  };
-                })}
+                className="w-full"
+                options={DETAIL_TABS}
                 value={activeDetailTab}
                 onChange={setActiveDetailTab}
               />
@@ -549,31 +379,9 @@ export function CommandCenterPage() {
             <div className="command-detail-content">
               {activeDetailTab === "overview" ? (
               <>
-                {/* Signal Analysis — reliable per-ticker read at the TOP, replacing
-                    the deprecated 8-model price forecast. Three auditable sources:
-                    deterministic Technical, cross-source Convergence, and the
-                    production ML peak-potential. No discredited price target. */}
                 <SignalAnalysisCard ticker={ticker} />
-
-                {/* Theme Pulse — zoom out from the active ticker to its whole
-                    taxonomy theme: which names are plays-now vs wait, ranked by an
-                    auditable quant score, with a one-paragraph theme read. Sits
-                    above Graph context as the "what's the play across this group"
-                    lead-in. Self-hides when the theme has no pulse yet. */}
                 <ThemePulseCard ticker={ticker} />
-
-                {/* Knowledge-graph context — competitors / supply-chain neighbors
-                    for the active ticker, pulled from the Understand-Anything graph.
-                    Self-hides when the graph isn't built or the ticker has no
-                    neighbors. Chip clicks swap activeTicker. */}
                 <GraphContextCard ticker={ticker} />
-
-                {/* Forecast — restored multi-model forecast card: config (model
-                    picker / horizon / origin / Run) + price chart with model
-                    overlays & quantile band + per-model breakdown. Auto-runs on
-                    ticker change; re-run after editing the config. Numbers come
-                    from the live /forecast/* engine (advisory — the 8-model stack
-                    lost to a random-walk baseline on CRPS). */}
                 <ForecastConfig
                   settings={settings}
                   onChange={setSettings}
@@ -601,13 +409,6 @@ export function CommandCenterPage() {
                   models={customForecasts}
                   isLoading={isRunningForecast}
                 />
-
-                {/* Intelligence prose under the analysis grid.
-                    V3 = convergence-first panel (news + iFlow + voices + traders
-                    + forecast merged into a single verdict + reaction timeline +
-                    forward calendar). Old IntelligencePanel embeds inside V3's
-                    bottom collapsible, so the 8-category view remains one click
-                    away. The original import is kept above as a fallback. */}
                 <IntelligencePanelV3 />
               </>
               ) : activeDetailTab === "narrative" ? (

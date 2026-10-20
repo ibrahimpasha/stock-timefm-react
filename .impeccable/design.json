@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-08T12:14:46-07:00",
+  "title": "Design System: Stock-TimeFM",
+  "extensions": {
+    "colorMeta": {
+      "canvas-dark": {
+        "role": "neutral",
+        "displayName": "Graphite Canvas",
+        "canonical": "#0b0d10",
+        "tonalRamp": ["#08090b", "#111419", "#1d2229", "#353d48", "#596474", "#85909e", "#bbc2cb", "#f1f3f5"]
+      },
+      "surface-dark": {
+        "role": "neutral",
+        "displayName": "Graphite Surface",
+        "canonical": "#13171c",
+        "tonalRamp": ["#090b0d", "#13171c", "#20262e", "#38414c", "#5b6675", "#87919e", "#bcc3cb", "#f1f3f5"]
+      },
+      "action-blue": {
+        "role": "primary",
+        "displayName": "Action Blue",
+        "canonical": "#65a9ff",
+        "tonalRamp": ["#061a33", "#0b315d", "#155191", "#2271c4", "#4b96ed", "#78b5ff", "#b8d8ff", "#edf6ff"]
+      },
+      "gain-green": {
+        "role": "secondary",
+        "displayName": "Gain Green",
+        "canonical": "#42cf83",
+        "tonalRamp": ["#071f14", "#0b3b25", "#11613a", "#1c8b55", "#35bd75", "#6bd99d", "#afeccc", "#edfbf4"]
+      },
+      "loss-red": {
+        "role": "secondary",
+        "displayName": "Loss Red",
+        "canonical": "#ff7278",
+        "tonalRamp": ["#30090c", "#571116", "#8b2028", "#bf3540", "#ec5962", "#ff8990", "#ffc1c5", "#fff0f1"]
+      },
+      "human-purple": {
+        "role": "tertiary",
+        "displayName": "Human Purple",
+        "canonical": "#bd91ff",
+        "tonalRamp": ["#200d3b", "#371866", "#592a99", "#7c48c3", "#a16fe9", "#c5a1ff", "#dfcdff", "#f6f0ff"]
+      },
+      "canvas-light": {
+        "role": "neutral",
+        "displayName": "Cloud Canvas",
+        "canonical": "#f2f4f7",
+        "tonalRamp": ["#16191d", "#282d34", "#414953", "#606a76", "#88919c", "#b3bac2", "#dce0e5", "#f7f8fa"]
+      }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Workspace Title", "purpose": "Page and primary workspace identity." },
+      "body": { "displayName": "Operational Body", "purpose": "Analysis prose, controls, and empty states." },
+      "label": { "displayName": "Functional Label", "purpose": "Panel and table headers." },
+      "numeric": { "displayName": "Market Numeric", "purpose": "Tickers, prices, percentages, dates, and aligned values." }
+    },
+    "shadows": [
+      { "name": "interactive-lift", "value": "0 4px 8px -4px rgba(0, 0, 0, 0.4)", "purpose": "Hover feedback on genuinely clickable cards." },
+      { "name": "chrome-separation", "value": "0 10px 24px -12px rgba(0, 0, 0, 0.62)", "purpose": "Persistent mobile navigation and temporary overlays." }
+    ],
+    "motion": [
+      { "name": "state-fast", "value": "160ms ease", "purpose": "Hover, focus, active, and selection feedback." },
+      { "name": "state-standard", "value": "180ms ease", "purpose": "Surface color and border transitions." },
+      { "name": "reduced-motion", "value": "0.01ms", "purpose": "Near-instant alternative under prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "phone-narrow", "value": "420px" },
+      { "name": "tablet", "value": "768px" },
+      { "name": "desktop-master-detail", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "A clear command with a stable mobile touch target.",
+      "html": "<button class=\"ds-button-primary\">Run analysis</button>",
+      "css": ".ds-button-primary { min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--radius-control); background: var(--accent-blue); color: var(--bg-primary); font: 600 0.75rem var(--font-sans); transition: filter 160ms ease; } .ds-button-primary:hover { filter: brightness(1.08); } .ds-button-primary:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary command used in compact operational toolbars.",
+      "html": "<button class=\"ds-button-ghost\">Back to desk</button>",
+      "css": ".ds-button-ghost { min-height: 44px; padding: 0 12px; border: 1px solid var(--control-boundary); border-radius: var(--radius-control); background: transparent; color: var(--text-secondary); font: 600 0.75rem var(--font-sans); transition: color 160ms ease, background 160ms ease; } .ds-button-ghost:hover { color: var(--text-primary); background: var(--bg-card-hover); } .ds-button-ghost:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "description": "Compact ticker search with a visible edge in both themes.",
+      "html": "<input class=\"ds-search\" aria-label=\"Search ticker\" placeholder=\"Search ticker\" />",
+      "css": ".ds-search { min-height: 44px; width: 180px; padding: 0 12px; border: 1px solid var(--control-boundary); border-radius: var(--radius-control); background: var(--control-bg); color: var(--text-primary); font: 500 0.75rem var(--font-mono); } .ds-search::placeholder { color: var(--text-muted); } .ds-search:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; border-color: var(--accent-blue); }"
+    },
+    {
+      "name": "Selected Chip",
+      "kind": "chip",
+      "refersTo": "chip-neutral",
+      "description": "Selected state for filters and segmented controls.",
+      "html": "<span class=\"ds-chip-selected\">Overview</span>",
+      "css": ".ds-chip-selected { display: inline-flex; min-height: 28px; align-items: center; padding: 0 10px; border-radius: var(--radius-chip); background: var(--control-selected-bg); color: var(--control-selected-text); font: 600 0.75rem var(--font-sans); }"
+    },
+    {
+      "name": "Data Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Flat repeated surface for dense market information.",
+      "html": "<section class=\"ds-data-panel\"><strong>Signal analysis</strong><p>Evidence remains readable without decorative depth.</p></section>",
+      "css": ".ds-data-panel { padding: 12px; border: 1px solid var(--glass-border); border-radius: var(--radius-panel); background: var(--card-bg); color: var(--text-primary); font: 400 0.875rem/1.5 var(--font-sans); } .ds-data-panel strong { display: block; margin-bottom: 8px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; } .ds-data-panel p { margin: 0; color: var(--text-secondary); }"
+    },
+    {
+      "name": "Desktop Navigation",
+      "kind": "nav",
+      "description": "Persistent route rail with an icon-and-label active state.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item ds-nav-item-active\" href=\"#\">Command Center</a><a class=\"ds-nav-item\" href=\"#\">Pillars</a></nav>",
+      "css": ".ds-nav { display: flex; min-height: 52px; align-items: center; gap: 4px; padding: 0 16px; border-bottom: 1px solid var(--glass-border); background: var(--glass-bg-strong); } .ds-nav-item { min-height: 36px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: var(--radius-control); color: var(--text-secondary); text-decoration: none; font: 600 0.8rem var(--font-sans); } .ds-nav-item:hover { color: var(--text-primary); background: var(--bg-card-hover); } .ds-nav-item:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; } .ds-nav-item-active { color: var(--accent-blue); background: color-mix(in srgb, var(--accent-blue) 13%, transparent); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Decision Observatory",
+    "overview": "Stock-TimeFM is a quiet operational instrument built for repeated scanning, comparison, and investigation. Neutral, high-contrast surfaces preserve distinct roles for price movement, risk state, human evidence, and interactive focus. Density is intentional on desktop; progressive disclosure carries the same workflows to a 320px phone.",
+    "keyCharacteristics": [
+      "Restrained graphite and neutral-white surfaces with one interaction accent.",
+      "Dense desktop master/detail and touch-native mobile list/detail.",
+      "Semantic color backed by text, icons, and labels.",
+      "Solid repeated panels; blur only on persistent navigation and sticky context.",
+      "Stable dimensions, tabular numerics, visible focus, and reduced motion."
+    ],
+    "rules": [
+      { "name": "The Semantic Rarity Rule", "body": "Action blue marks selection and action only. Green and red never decorate; they always communicate a signed or health state.", "section": "colors" },
+      { "name": "The Instrument Type Rule", "body": "Numeric information uses the mono role and aligned figures; headings never scale with viewport width or use negative letter spacing.", "section": "typography" },
+      { "name": "The Flat Data Rule", "body": "Repeated data panels do not use backdrop blur or resting shadows. Blur belongs only to persistent chrome with content moving beneath it.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep all primary mobile controls at least 44px and test from 320px portrait upward.",
+      "Do contain wide tables and tapes inside their workspace scroller rather than allowing viewport overflow.",
+      "Do use safe-area insets for the mobile top and bottom chrome.",
+      "Do preserve both themes through the existing compatibility tokens.",
+      "Do pair semantic color with a label, number sign, icon, or status text.",
+      "Do use list-to-detail navigation on phones and simultaneous master/detail on desktop."
+    ],
+    "donts": [
+      "Don't make a marketing site or oversized hero experience.",
+      "Don't make a generic SaaS card mosaic.",
+      "Don't make a decorative imitation of a financial terminal.",
+      "Don't scale a desktop table down until it technically fits a phone.",
+      "Don't add live-trading or order-entry controls.",
+      "Don't use decorative glass excess, backdrop blur on repeated cards, wide resting shadows, gradient text, or ornamental animation.",
+      "Don't use green or red as decoration, or rely on color as the only carrier of meaning.",
+      "Don't use side-stripe borders thicker than 1px, oversized rounded panels, or nested card framing."
+    ]
+  }
+}

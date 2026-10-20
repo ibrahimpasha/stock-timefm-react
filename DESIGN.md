@@ -199,3 +199,59 @@ The system is flat by default. Solid surface color and one-pixel boundaries orga
 - **Don't** use decorative glass excess, backdrop blur on repeated cards, wide resting shadows, gradient text, or ornamental animation.
 - **Don't** use green or red as decoration, or rely on color as the only carrier of meaning.
 - **Don't** use side-stripe borders thicker than 1px, oversized rounded panels, or nested card framing.
+
+## 2026-10 Redesign Rules (current; overrides anything above that conflicts)
+
+Diagnosis that drove this pass: one endless home page doing eleven jobs,
+11-12px monospace prose walls, uppercase tracked eyebrows on every block,
+colored chips everywhere, nested bordered boxes, and filter bars with ~40
+always-visible controls. Nothing had hierarchy, so nothing could be scanned.
+
+**Information architecture.** Left sidebar (desktop) / bottom bar + More
+sheet (phone). Desk: Brief `/`, Flow `/flow[/heatmap|/bounce]`, Books
+`/books[/flow-trader]`, Intel `/intel[/voices|/news]`, Traders. Markets:
+Pillars, Rotation, GEX, Map. `DeskPage` (src/pages/CommandCenterPage.tsx)
+renders the page title, summary, underline view tabs, and the shared ticker
+analysis side panel. Feature components must NOT render their own page-level
+title ("Daily Brief", "Smart Trader", "iFlow Tracker" banners) — the page
+header already says it.
+
+**Type.**
+- Section/panel titles: `text-sm font-semibold text-text-primary`, sentence
+  case. NO `uppercase tracking-[...]` eyebrows anywhere. Table column heads:
+  `text-xs font-medium text-text-muted`, no uppercase.
+- Prose: `text-sm leading-relaxed text-text-secondary`, measure capped with
+  `max-w-[72ch]`. Lead sentence/headline may be `text-base`/`text-lg`
+  `font-semibold text-text-primary`.
+- `num` (mono, tabular) ONLY for numbers, tickers, and contract strings —
+  never for sentences or labels.
+- Minimum size `text-xs` (no `text-[10px]`/`text-[11px]` except a numeric
+  count badge).
+
+**Color.** Restrained: neutral surfaces + one interaction accent (blue).
+Green/red only on signed values (P/L, % move, bull/bear direction). Chips
+default to `tone="neutral"`; give a tone only when the chip IS a state the
+user must notice (AVOID/STOP, a breach). A row of ten colored pills is noise
+— render it as plain text with colored numbers instead. Orange = warning,
+purple = human/trader events, used sparingly.
+
+**Structure.**
+- One container level. A `.card` / `GlassPanel` must not contain another
+  bordered/tinted box; inner groups separate by spacing (`gap-4`/`gap-6`) or a
+  single `border-t border-border pt-3` divider.
+- No side-stripe accents (`border-l-2`+ colored). Use a leading status dot,
+  a text tag, or a full background tint instead.
+- No `glass-strong` / backdrop blur inside page content; use `.card` or no
+  container. Blur is shell-chrome only.
+- Lists/tables: rows `py-2`, hover `bg-bg-card-hover`, dividers
+  `divide-y divide-border`, no zebra.
+- Filter bars: keep the 2-4 controls people use every visit visible; move the
+  rest into a `<details>` "Filters" disclosure (or a compact select). Never
+  wrap 3+ rows of controls.
+- Progressive disclosure over deletion: secondary detail goes behind
+  `<details>`, a "Show more", or a `title` tooltip — never dropped.
+
+**Hard rules for restyle passes.** Don't change hooks, queries, data flow,
+props contracts, routes, or behavior. JSX structure, classNames, and inline
+styles may change freely. Tokens only (CSS vars / mapped Tailwind classes);
+no new dependencies; no emojis. `npx --no-install tsc -b` must pass.
