@@ -36,7 +36,7 @@ import { Chip, Stat, Segmented } from "../../components/Glass";
 import { TileGrid, Tile, Kpi, BarRow, HeatTile, CockpitButton, toneOf, toneColor } from "../../components/Cockpit";
 import { GexWall } from "../gex/GexWall";
 
-type PersonaName = "smart" | "aggressive" | "builder" | "ruby" | "gemfinder" | "supercycle" | "conviction";
+type PersonaName = "steady" | "core" | "flowfollow" | "optionslab" | "smart" | "aggressive" | "builder" | "ruby" | "gemfinder" | "supercycle" | "conviction";
 
 interface PersonaRow {
   name: PersonaName;
@@ -47,6 +47,8 @@ interface PersonaRow {
   total_value: number;
   ml_threshold?: number | null;
   ml_serving_mode?: "disabled" | "rank_only" | "gate_and_rank";
+  retired?: boolean;
+  spy_return_pct?: number | null;
   error?: string;
 }
 
@@ -1722,9 +1724,7 @@ function TradeDecisionHistory({
         </>
       ) : (
         <p className="py-4 text-sm text-text-muted">
-          No closed trades yet. Positions exit when they hit the persona's
-          stop (-40% / -60% / -20%) or expire. The cron MTM runs at 06:30 /
-          10:30 / 13:30 PT each market day.
+          No closed trades yet. Positions exit on the book's own rules, shown in its description above.
         </p>
       )}
       {logical.length > 0 && (
@@ -2143,6 +2143,26 @@ const PERSONA_META: Record<
   PersonaName,
   { label: string; tagline: string; stopPct: number }
 > = {
+  steady: {
+    label: "Steady",
+    tagline: "Shares. 30 lowest-volatility flow names, equal weight, rebalanced weekly.",
+    stopPct: -100,
+  },
+  core: {
+    label: "Core",
+    tagline: "Shares. 70% SPY plus the 10 lowest-volatility flow names, rebalanced weekly.",
+    stopPct: -100,
+  },
+  flowfollow: {
+    label: "Flow Follow",
+    tagline: "Shares. Top 15 names by 5-day net bullish premium, 50% invested. The control for flow itself.",
+    stopPct: -100,
+  },
+  optionslab: {
+    label: "Options Lab",
+    tagline: "Small research book. Up to 3 buys a day, cheapest IV vs realized vol, 10% of book at risk at most, 4-week exit.",
+    stopPct: -100,
+  },
   smart: {
     label: "Smart",
     tagline: "Rule-compliant options. DTE 8-30, 5% size, -40% stop, multi-signal rank, 70% deployment.",
@@ -2183,7 +2203,7 @@ const PERSONA_META: Record<
 export function SmartTrader() {
   const queryClient = useQueryClient();
   const setActiveTicker = useAppStore((s) => s.setActiveTicker);
-  const [persona, setPersona] = useState<PersonaName>("smart");
+  const [persona, setPersona] = useState<PersonaName>("steady");
   const [showClosed, setShowClosed] = useState(false);
   // Open-positions layout: grouped cards (rich) vs dense sortable table
   // ("when was it added, at what price" — 2026-08-07 user ask).
@@ -2266,7 +2286,7 @@ export function SmartTrader() {
     (a, b) => b[1].length - a[1].length,
   );
 
-  const personas: PersonaName[] = ["smart", "aggressive", "builder", "ruby", "gemfinder", "supercycle", "conviction"];
+  const personas: PersonaName[] = ["steady", "core", "flowfollow", "optionslab", "gemfinder", "supercycle", "conviction", "smart", "aggressive", "builder", "ruby"];
   const personaRows = personaList?.personas ?? [];
   const personaRow = personaRows.find((r) => r.name === persona);
   const viewToggle = (
@@ -2308,7 +2328,7 @@ export function SmartTrader() {
             const pRet = row?.return_pct ?? 0;
             return {
               value: p,
-              label: PERSONA_META[p].label,
+              label: row?.retired ? `${PERSONA_META[p].label} (retired)` : PERSONA_META[p].label,
               badge: row ? (
                 <span className="num" style={{ color: changeColor(pRet) }}>
                   {pRet >= 0 ? "+" : ""}
@@ -2321,6 +2341,7 @@ export function SmartTrader() {
           onChange={setPersona}
         />
         <p className="line-clamp-2 max-w-[90ch] text-xs leading-relaxed text-text-muted md:line-clamp-none">
+          {personaRow?.retired && "Retired Nov 1, 2026: failed walk-forward testing. Opens nothing new; existing positions run off. "}
           {personaRow?.description || summary.persona_description || PERSONA_META[persona].tagline}
           {personaRow ? (
             <span>
@@ -2348,7 +2369,14 @@ export function SmartTrader() {
             value={formatCurrency(summary.total_value, 0)}
             delta={`${ret >= 0 ? "+" : ""}${ret.toFixed(2)}%`}
             tone={toneOf(ret)}
-            sub={<>from <span className="num">{formatCurrency(summary.starting_capital, 0)}</span> start</>}
+            sub={
+              <>
+                from <span className="num">{formatCurrency(summary.starting_capital, 0)}</span> start
+                {personaRow?.spy_return_pct != null && (
+                  <> · SPY <span className="num">{personaRow.spy_return_pct >= 0 ? "+" : ""}{personaRow.spy_return_pct.toFixed(2)}%</span> same period</>
+                )}
+              </>
+            }
           />
         </Tile>
         <Tile span={3}>
@@ -2546,7 +2574,7 @@ export function SmartTrader() {
         <CategoryTrendPanel />
 
         {/* iFlow-Trader-style WL-A / WL-B for every persona (options books) */}
-        <WatchlistPanel key={persona} persona={persona} />
+        {!["steady", "core", "flowfollow"].includes(persona) && <WatchlistPanel key={persona} persona={persona} />}
 
         {/* Today — what got rejected, grouped by rule */}
         {todayQuery.isError && !today && (
