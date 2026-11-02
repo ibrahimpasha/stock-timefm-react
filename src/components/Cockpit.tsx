@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 
 /* v3 "cockpit" building blocks (DESIGN.md "v3 cockpit"). Pages are a 12-col
  * grid of Tiles; numbers become bars/tiles/gauges instead of sentences.
@@ -23,7 +23,7 @@ export const toneColor = (t: Tone) => TONE_VAR[t];
 /** 12-column page grid. Children set their own `span`. Collapses to one
  *  column below lg. */
 export function TileGrid({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`grid min-w-0 grid-cols-1 gap-3.5 lg:grid-cols-12 ${className}`}>{children}</div>;
+  return <div className={`tile-grid grid min-w-0 grid-cols-1 gap-3.5 lg:grid-cols-12 ${className}`}>{children}</div>;
 }
 
 const SPAN: Record<number, string> = {
@@ -60,7 +60,7 @@ export function Tile({
   return (
     <section
       id={id}
-      className={`flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-bg-card p-4 lg:p-5 ${SPAN[span]} ${className}`}
+      className={`flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-bg-card p-4 lg:p-5 ${SPAN[span]} ${className}`}
     >
       {(title || meta || actions) && (
         <header className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -72,6 +72,28 @@ export function Tile({
       <div className={`flex min-w-0 flex-col gap-2 ${bodyClassName}`}>{children}</div>
     </section>
   );
+}
+
+/** Flashes when `value` changes, the way a trading screen marks a new tick: green
+ *  for up, red for down, then gone. Nothing on first paint, and digits never roll,
+ *  so a number is always readable the instant it arrives. */
+export function Tick({ value, children }: { value: string | number; children?: ReactNode }) {
+  const el = useRef<HTMLSpanElement>(null);
+  const previous = useRef(value);
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = value;
+    if (before === value || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const number = (v: string | number) => Number(String(v).replace(/[^0-9.-]/g, ""));
+    const delta = number(value) - number(before);
+    if (!delta) return;
+    const color = delta > 0 ? "--accent-green" : "--accent-red";
+    el.current?.animate(
+      [{ backgroundColor: `color-mix(in srgb, var(${color}) 32%, transparent)` }, { backgroundColor: "transparent" }],
+      { duration: 900, easing: "cubic-bezier(0.25, 1, 0.5, 1)" },
+    );
+  }, [value]);
+  return <span ref={el} className="tick">{children ?? value}</span>;
 }
 
 /** Big figure for KPI strips. */
@@ -95,7 +117,9 @@ export function Kpi({
     <div className="flex min-w-0 flex-col gap-1">
       <span className="truncate text-xs text-text-muted">{label}</span>
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5">
-        <span className={`num ${vs} font-semibold leading-tight tracking-tight text-text-primary`}>{value}</span>
+        <span className={`num ${vs} font-semibold leading-tight tracking-tight text-text-primary`}>
+          {typeof value === "string" || typeof value === "number" ? <Tick value={value} /> : value}
+        </span>
         {delta != null && (
           <span className="num text-sm font-semibold" style={{ color: TONE_VAR[tone] }}>
             {delta}
@@ -111,7 +135,7 @@ export function Kpi({
 export function KpiTile(props: Parameters<typeof Kpi>[0] & { span?: 3 | 4 | 6 }) {
   const { span = 3, ...kpi } = props;
   return (
-    <Tile span={span}>
+    <Tile span={span} className="kpi-tile">
       <Kpi {...kpi} />
     </Tile>
   );
@@ -130,7 +154,9 @@ export function BarRow({
   onClick,
   title,
   labelWidth = "4.25rem",
+  fill: fillOverride,
 }: {
+  fill?: string;
   labelWidth?: string;
   label: ReactNode;
   value: number;
@@ -144,7 +170,7 @@ export function BarRow({
 }) {
   const pct = max > 0 ? Math.min(100, (Math.abs(value) / max) * 100) : 0;
   const t = tone ?? toneOf(value);
-  const fill = TONE_VAR[t === "neutral" ? "info" : t];
+  const fill = fillOverride ?? TONE_VAR[t === "neutral" ? "info" : t];
   const bar: CSSProperties = { width: `${Math.max(pct, value ? 2 : 0)}%`, background: fill };
   const body = (
     <>

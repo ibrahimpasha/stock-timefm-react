@@ -26,7 +26,6 @@ interface ClosedPosition {
   source?: string;
   reasons?: string[];
   flags?: string[];
-  ml_label?: string;
   gex_regime?: string;
   accum_label?: string;
   trim_level?: number;
@@ -210,7 +209,6 @@ function TradeRow({ pos, max }: { pos: ClosedPosition; max: number }) {
             <div className="text-text-muted mb-1">Why entered (scoring rationale)</div>
             <ReasonChips reasons={pos.reasons} flags={pos.flags} />
             <div className="mt-1 flex items-center gap-3 text-xs text-text-muted">
-              {pos.ml_label && <span>ML: <span className="text-text-secondary">{pos.ml_label}</span></span>}
               {pos.gex_regime && pos.gex_regime !== "unknown" && (
                 <span>GEX: <span className="text-text-secondary">{pos.gex_regime}</span></span>
               )}

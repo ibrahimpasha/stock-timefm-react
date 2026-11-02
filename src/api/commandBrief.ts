@@ -49,7 +49,7 @@ export interface BriefMover {
   pct: number;
   earnings_in: number | null;
   has_flow: boolean;
-  flow_score: number | null;
+  flow_premium: number | null;
   in_book: boolean;
   on_radar: boolean;
   intel: string;
@@ -68,7 +68,7 @@ export interface BriefEarningsRow {
   weight: string | null;
   session: string | null;
   has_flow: boolean;
-  flow_score: number | null;
+  flow_premium: number | null;
 }
 
 export interface BriefEarnings {
@@ -79,8 +79,6 @@ export interface BriefEarnings {
 export interface BriefFlowStandout {
   ticker: string;
   side: string;
-  ml: number | null;
-  nscore: number | null;
   premium: number;
   earnings_in: number | null;
 }

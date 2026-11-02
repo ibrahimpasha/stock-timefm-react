@@ -331,3 +331,61 @@ becomes `BarRow`s. Category ratios become `HeatTile`s.
 informational hue. `--track` = empty bar track. Ink on amber = `--accent-ink`.
 `.section-title` is sans 1.0625rem/600 now; serif only via `.headline`,
 `.prose-read`, `.font-display` for long-form reading.
+
+## 2026-11 interaction layer (extends v3 cockpit)
+
+Patterns studied from 21st.dev, Magic UI, React Bits, Uiverse, Mobbin, Aceternity, Tremor Blocks,
+Origin UI, Animate UI, Motion Primitives and Nicelydone. Only state-carrying pieces were taken, and all
+are written here with no new dependencies. Don't paste library components: several have no standard license.
+
+**Motion must convey state.** Rejected for this product: marquee, meteors, aurora, particles, gradient
+or shiny text, spotlight cards, and count-up numbers (they delay reading a price).
+
+- `CommandPalette` (Ctrl/Cmd+K or `/`, native `<dialog>`): tickers, pages, books, recents. Phones reach it
+  from the app bar. It replaces the old inline ticker search.
+- `useSlidingPill`: one highlight slides between options. Used by `Segmented`, the top nav and desk tabs.
+  Mark the active child with `data-pill="on"`.
+- `Tick` (`Cockpit.tsx`): flashes green or red only when a value changes. Never rolls digits; silent on
+  first paint. `Kpi` applies it to string and number values.
+- `TopLoadBar`: first-load progress only; background refreshes stay silent.
+- `.skeleton`: shimmer placeholder shaped like the content it replaces.
+- New prints use a one-shot Web Animations slide-in, skipped on first paint and for reduced motion.
+
+**Page composition.** Flow opens on the latest session (never All dates): largest flow, sector lean, latest
+prints, then sectors by premium with only the top three expanded. Ticker tile tint encodes premium size on a
+log scale; hue encodes side. Unvalidated rankings sit behind a labeled collapse. Books opens on the
+Scoreboard: every book vs SPY, drawdown, one table, retired hidden until asked.
+
+**Top bar sheds detail before clipping a destination:** VIX and clock time below 1760px, the SPY pulse below
+1440px, the brand name below 1280px. Check every destination is visible down to 1024px after any change here.
+
+**Series colors** `--series-1..8` are validated for color-blind separation in both themes. A book keeps its color
+regardless of rank. Text never wears the series color.
+
+## 2026-11 data layer (from studying the 21st library in depth)
+
+The first interaction pass skimmed landing pages and threw out most of what it saw as decoration. Opening
+the pieces themselves (21st Dashboards, Tables, Charts, Stats; Vasnev.art's MIT Finance, Analytics and Web3
+Bentos) showed the opposite: their best visuals are data. Written natively here; no library code copied.
+
+- **KPIs are the control** (`KpiTabs`). Picking one drives what's below it, so a headline and its view can't
+  disagree. Flow: All, Bull, Bear, Side unknown size the map. Books: each book drives the page.
+- **Tiles move, they don't redraw** (`FlowTreemap`). Stable ids plus a 0.7s transition on position and size
+  let you watch money shift between lenses. Big tiles list their top names; click drills sector to ticker.
+- **Heat steps** (`--heat-*`, `[data-tone]`). Seven fixed diverging fills, each pair checked at 4.5:1 or better
+  in both themes. `lib/deskMath.ts` picks the step. Use these for any signed fill, not ad-hoc `color-mix`.
+- **Unknown is not a side.** Premium with no readable side dilutes the lean and shows gray. Never let a print
+  we can't read paint a tile red or green.
+- **Purpose-built forms**: `DivergingStrip` (up/down per period; its readout line works by touch), book-by-day
+  matrix, tick-arc drawdown gauge, holdings bar. Reach for these before another bar list.
+- **Faint context lines**: the picked book is bold, SPY dashed, other books thin and gray, all rebased to the
+  same start. Comparing different windows under a "vs SPY" label is a bug.
+- **One loud card per page, only while true** (`.accent-card`). It goes away when nothing is pending.
+- **Provenance beside the number.** A book with stale marks says so on its KPI, in Capital, and in the headline.
+- **Inbox over card wall** (`NeedsYou`): one row per item, the picked one in full. Phones expand in place.
+- **No model scores on screen.** ML and NScore failed walk-forward testing and were removed everywhere on
+  2026-11-01. Rank flow by premium. Retired-book descriptions still name their old ML rules, because that is
+  their history; never add a new score to a screen without held-out evidence behind it.
+
+Still rejected: gradient-mesh panels, dot-matrix figures, and greetings. They read well in a demo and carry
+no data here.

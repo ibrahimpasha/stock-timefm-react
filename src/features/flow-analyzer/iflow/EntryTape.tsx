@@ -14,16 +14,10 @@
  */
 import { useMemo } from "react";
 import { QueryNotice } from "../../../components/QueryNotice";
-import { modelMetadataLabel } from "../../../lib/modelMetadata";
 import { useMultiDateEntries, useTickerPricesBatch } from "./hooks";
 import { estimateOptionPnl } from "./estimator";
-import type { BiasFilter, DteFilter, NotableScore } from "./types";
-import {
-  canShowMlProbability,
-  dteTag,
-  parsePremium,
-  researchRank,
-} from "./utils";
+import type { BiasFilter, DteFilter } from "./types";
+import { dteTag, parsePremium } from "./utils";
 import { formatPremium } from "../../../lib/utils";
 import { daysFromToday } from "../../../lib/dateOnly";
 import { optionIntent, type OptionDirection } from "../../../lib/optionContract";
@@ -78,70 +72,9 @@ function passesKianFilter(entry: {
   return false;
 }
 
-/** Notable filter has 5 states cycled by clicking the button:
- *   "none"            → no filter
- *   "notable_nscore"  → NScore ≥ threshold (heuristic)
- *   "notable_ml"      → ML ≥ threshold (model)
- *   "notable_both"    → BOTH NScore AND ML ≥ threshold (intersection)
- *   "avg_sweet"       → Research Rank in [75, 85)
- * The Flowseidon "kian" filter remains mutually exclusive with all
- * Notable variants — clicking Flowseidon clears whichever Notable was on
- * and vice versa.
- */
-type FilterMode = "none" | "notable_nscore" | "notable_ml" | "notable_both" | "avg_sweet" | "kian" | "outliers";
-
-const NOTABLE_CYCLE: FilterMode[] = ["none", "notable_nscore", "notable_ml", "notable_both", "avg_sweet"];
-const NSCORE_THRESHOLD = 65;
-const ML_RANK_THRESHOLD = 90;
-const RESEARCH_RANK_MIN = 75;
-const RESEARCH_RANK_MAX_EXCLUSIVE = 85;
-
-/** Visual + label per Notable filter state. Picked so the operator
- *  always knows which lens is active without reading the tooltip. */
-const NOTABLE_STYLE: Record<FilterMode, { label: string; fg: string; bg: string; bd: string }> = {
-  none: {
-    label: "Notable",
-    fg: "var(--text-muted)",
-    bg: "transparent",
-    bd: "var(--border)",
-  },
-  notable_nscore: {
-    label: `NScore ${NSCORE_THRESHOLD}+`,
-    fg: "var(--accent-yellow)",
-    bg: "color-mix(in srgb, var(--accent-yellow) 18%, transparent)",
-    bd: "color-mix(in srgb, var(--accent-yellow) 50%, transparent)",
-  },
-  notable_ml: {
-    label: `ML pctl ${ML_RANK_THRESHOLD}+`,
-    fg: "var(--accent-cyan)",
-    bg: "color-mix(in srgb, var(--accent-cyan) 18%, transparent)",
-    bd: "color-mix(in srgb, var(--accent-cyan) 50%, transparent)",
-  },
-  notable_both: {
-    label: "N + ML",
-    fg: "var(--accent-purple)",
-    bg: "color-mix(in srgb, var(--accent-purple) 18%, transparent)",
-    bd: "color-mix(in srgb, var(--accent-purple) 50%, transparent)",
-  },
-  avg_sweet: {
-    label: `Rank ${RESEARCH_RANK_MIN}-${RESEARCH_RANK_MAX_EXCLUSIVE - 1}`,
-    fg: "var(--accent-green)",
-    bg: "color-mix(in srgb, var(--accent-green) 18%, transparent)",
-    bd: "color-mix(in srgb, var(--accent-green) 50%, transparent)",
-  },
-  kian: {  // unused for Notable button, defined for type completeness
-    label: "—",
-    fg: "var(--text-muted)",
-    bg: "transparent",
-    bd: "var(--border)",
-  },
-  outliers: {  // unused for Notable button, defined for type completeness
-    label: "—",
-    fg: "var(--text-muted)",
-    bg: "transparent",
-    bd: "var(--border)",
-  },
-};
+/** The Flowseidon "kian" rule filter and the deep-OTM outlier filter are mutually
+ *  exclusive; clicking either clears the other. */
+type FilterMode = "none" | "kian" | "outliers";
 
 /** % the strike sits out-of-the-money — positive = OTM for BOTH calls and
  *  puts, negative = in-the-money. The deeper OTM, the more convex / lottery-
@@ -169,58 +102,6 @@ function normalizeOptType(t: unknown): string {
   return s;
 }
 
-/** Recompute the Notable score for an aggregated-contract row.
- *
- *  Backend's score is per-print, so when we sum prints into one contract
- *  row the displayed score becomes wrong (it still reflects ONE print's
- *  premium and ask%). This re-applies the same formula client-side using
- *  the aggregated premium and best (most-extreme) ask%. Other components
- *  — convergence, catalyst, structural — come from the seed entry's
- *  score because they're per-ticker, identical across prints.
- *
- *  Approximation note: we don't have market_cap on the client, so the
- *  small-cap cap-multiplier from the backend's size formula is dropped.
- *  This makes the recomputed size slightly conservative — it can't
- *  reward small-cap unusual activity the way the backend does. Good
- *  enough for the Kian-mode display, where premium IS the headline. */
-function recomputeAggregateScore(
-  seed: { score: number; parts: { size: number; convergence: number; conviction: number; catalyst: number; structural: number } },
-  aggregatedPremium: number,
-  bestAskPct: number | null,
-  voiRatio: number | null,
-  dteVal: number | null,
-): { score: number; parts: { size: number; convergence: number; conviction: number; catalyst: number; structural: number } } {
-  // size — pure absolute-premium tier (no cap multiplier client-side)
-  const newSize = Math.min(1, aggregatedPremium / 3_000_000);
-  // conviction — recompute the ask-extremity slice from best ask%;
-  // keep voi/dte slices from the seed since they don't aggregate cleanly
-  const askExtremity = bestAskPct == null ? 0.5 : Math.min(1, Math.abs(bestAskPct - 50) / 50);
-  const voiScore = Math.min(1, Math.max(0, voiRatio ?? 0) / 3);
-  const dteScore = dteVal == null || dteVal <= 0 ? 0.5
-                 : dteVal <= 6 ? 0.3
-                 : dteVal > 365 ? 0.5
-                 : 1.0;
-  const newConv = 0.5 * askExtremity + 0.3 * voiScore + 0.2 * dteScore;
-  // Other 3 components ride seed.parts (per-ticker / per-contract structural)
-  const total = 100 * (
-    0.25 * newSize
-    + 0.30 * seed.parts.convergence
-    + 0.20 * newConv
-    + 0.15 * seed.parts.catalyst
-    + 0.10 * seed.parts.structural
-  );
-  return {
-    score: Math.round(total),
-    parts: {
-      size: Math.round(newSize * 100) / 100,
-      convergence: seed.parts.convergence,
-      conviction: Math.round(newConv * 100) / 100,
-      catalyst: seed.parts.catalyst,
-      structural: seed.parts.structural,
-    },
-  };
-}
-
 /** Sortable column keys. `time` is always lex-sorted on the raw timestamp
  *  string; everything else extracts the obvious comparable value (numeric
  *  where it makes sense, alphabetic otherwise). Headers expose all of
@@ -229,7 +110,7 @@ function recomputeAggregateScore(
 type SortKey =
   | "time" | "ticker" | "side" | "action" | "contract"
   | "dte" | "ern" | "voi" | "ask" | "atm" | "premium" | "pnl"
-  | "score" | "ml" | "setup" | "avg" | "pred_peak";
+  | "setup";
 type SortDir = "asc" | "desc";
 
 /** Default direction when first clicking a column. Numeric / time columns
@@ -237,7 +118,7 @@ type SortDir = "asc" | "desc";
 const DEFAULT_DIR: Record<SortKey, SortDir> = {
   time: "desc", ticker: "asc", side: "asc", action: "asc", contract: "asc",
   dte: "desc", ern: "asc", voi: "desc", ask: "desc", atm: "desc", premium: "desc",
-  pnl: "desc", score: "desc", ml: "desc", setup: "desc", avg: "desc", pred_peak: "desc",
+  pnl: "desc", setup: "desc",
 };
 
 function SortHeaderButton({
@@ -274,7 +155,7 @@ function SortHeaderButton({
 const _clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /** SETUP — does the *underlying's* fundamental/technical picture AGREE with
- *  the direction THIS options bet is making? Unlike NScore/ML (which grade the
+ *  the direction THIS options bet is making? Unlike a score that grades the
  *  option-contract quality, direction-agnostic), this is a per-ticker DIRECTIONAL
  *  agreement score, aligned to the entry's Bull/Bear side:
  *
@@ -285,8 +166,8 @@ const _clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, 
  *
  *  Weights: technical .40, chart pattern .35, analyst target .25 (target is
  *  lighter — it lags and has partial coverage). Heuristic CONTEXT, not an
- *  empirically-calibrated predictor like ML — read it as a convergence flag. */
-export function setupScore(
+ *  empirically-calibrated predictor — read it as a convergence flag. */
+function setupScore(
   side: OptionDirection | undefined,
   m: TickerMeta | undefined,
   t: TickerTechnical | undefined,
@@ -338,16 +219,6 @@ function setupTextColor(score: number | null): string {
   return "var(--accent-red)"; // underlying setup contradicts the trade
 }
 
-/** Research Rank color. The rank is a transparent ordering blend and carries
- * no calibrated outcome meaning. */
-function researchRankTextColor(score: number | null): string {
-  if (score == null) return "var(--text-muted)";
-  if (score >= 80) return "var(--accent-green)";
-  if (score >= 65) return "var(--accent-orange)";
-  if (score >= 50) return "var(--text-secondary)";
-  return "var(--text-muted)";
-}
-
 /** Neutral filter pill; active = interaction accent (amber). */
 function pillStyle(active: boolean) {
   return active
@@ -357,23 +228,6 @@ function pillStyle(active: boolean) {
         border: "1px solid var(--accent)",
       }
     : { color: "var(--text-secondary)", background: "transparent", border: "1px solid var(--border)" };
-}
-
-function scoreTextColor(score: number | null): string {
-  if (score == null) return "var(--text-muted)";
-  if (score >= 85) return "var(--accent-yellow)";
-  if (score >= 70) return "var(--accent-yellow)";
-  if (score >= 55) return "var(--accent-orange)";
-  return "var(--text-secondary)";
-}
-
-/** ML rank color. The value is a within-DTE percentile, not probability. */
-function mlTextColor(rank: number | null): string {
-  if (rank == null) return "var(--text-muted)";
-  if (rank >= 94) return "var(--accent-cyan)";
-  if (rank >= 80) return "var(--accent-blue)";
-  if (rank >= 50) return "var(--text-secondary)";
-  return "var(--text-muted)";
 }
 
 interface Props {
@@ -469,14 +323,6 @@ interface EntryRow {
   optFill: number;
   underlyingFill: number;
   flowDate: string;
-  /** Notable-flow score envelope from /flow/iflow/entries?include_notable=true.
-   *  Null when the backend wasn't asked to score (shouldn't happen in
-   *  EntryTape; included for safety). When this row is a Kian-aggregated
-   *  contract (printCount > 1), the `score` here has been recomputed
-   *  client-side via recomputeAggregateScore() — convergence/catalyst/
-   *  structural come from the seed print; size + conviction reflect the
-   *  aggregate. */
-  notable: NotableScore | null;
   /** Number of underlying prints aggregated into this row. 1 for normal
    *  per-print rows; >1 only in Kian mode when same-contract entries
    *  were merged. Drives the "×N" badge on the contract cell. */
@@ -499,7 +345,7 @@ export function EntryTape({
 }: Props) {
   // Fan out N parallel per-date queries (one per selected date). React
   // Query dedupes by (date, includeNotable), so re-renders don't re-fetch.
-  const dateQueries = useMultiDateEntries(dates, true);
+  const dateQueries = useMultiDateEntries(dates);
   const isLoading = dateQueries.length > 0 && dateQueries.some((q) => q.isLoading);
   // Per-ticker reference data for the SETUP column (analyst target + TA + pattern).
   const { data: tickerMeta } = useTickerMeta();
@@ -517,15 +363,15 @@ export function EntryTape({
     return out;
   }, [dateQueries]);
 
-  // Three filter modes:
+  // Filter modes:
   //   none    — show everything
-  //   notable — algorithmic score ≥ NOTABLE_THRESHOLD (auditable, multi-signal)
   //   kian    — boolean rule-based filter matching @kiantrades' Twitter logic
   //             (premium ≥ $300K, not ETF, DTE 7-400, directional clarity).
   //             ALSO aggregates same-contract entries (sum premium across
   //             prints) so the row count matches what he posts on Twitter
   //             — his $805K BWA 75C is our $233K + $572K + ... summed.
-  // The two are MUTUALLY EXCLUSIVE.
+  //   outliers — deep-OTM convexity bets.
+  // They are MUTUALLY EXCLUSIVE.
   // Filter + sort state lives in the shared Zustand store so it survives
   // tab/view switches (this component unmounts on Tape↔Grid toggle and the
   // whole tab unmounts on tab switch; local useState would reset on remount).
@@ -576,7 +422,7 @@ export function EntryTape({
 
   // (closest to the directional extreme) and the earliest timestamp.
   // Returns one row per CONTRACT, not per print. Only built in kian
-  // mode; default and notable modes use the raw per-print entries.
+  // mode; the other modes use the raw per-print entries.
   const aggregatedEntries = useMemo<Record<string, unknown>[]>(() => {
     if (filterMode !== "kian") return entries;
     type Agg = {
@@ -700,37 +546,6 @@ export function EntryTape({
       // Canonical parser handles numeric dollars and compact K/M/B strings.
       const premiumNum = parsePremium(e.premium_usd ?? e.premium);
 
-      const notable = (e.notable as NotableScore | null | undefined) ?? null;
-      // A score filter means the metric must exist and pass its own threshold.
-      // Missing values never qualify as high scores.
-      if (filterMode === "notable_nscore"
-          && (notable?.score == null || notable.score < NSCORE_THRESHOLD)) continue;
-      if (filterMode === "notable_ml") {
-        const ml = notable?.ml_score;
-        if (ml == null || ml < ML_RANK_THRESHOLD) continue;
-      }
-      if (filterMode === "notable_both") {
-        const ml = notable?.ml_score;
-        if (notable?.score == null || notable.score < NSCORE_THRESHOLD
-            || ml == null || ml < ML_RANK_THRESHOLD) continue;
-      }
-      if (filterMode === "avg_sweet") {
-        // Research Rank mirrors the evidence-first paper-book ordering policy.
-        const ml = notable?.ml_score;
-        const setup = setupScore(
-          side,
-          tickerMeta?.[ticker.toUpperCase()],
-          tickerTech?.[ticker.toUpperCase()],
-          tickerGex?.[ticker.toUpperCase()],
-        ).score;
-        const rank = researchRank(
-          setup,
-          ml,
-          notable?.score,
-          notable?.ml_serving_mode,
-        );
-        if (rank == null || rank < RESEARCH_RANK_MIN || rank >= RESEARCH_RANK_MAX_EXCLUSIVE) continue;
-      }
       if (filterMode === "outliers") {
         // Deep-OTM convexity bets — "someone knows something" prints.
         // Keep only strikes at least `outlierMin`% out-of-the-money.
@@ -747,20 +562,8 @@ export function EntryTape({
         if (!passes) continue;
       }
 
-      // In Kian mode the source rows carry a `_print_count` from the
-      // aggregator. Score + parts get re-derived against the aggregated
-      // premium + best ask% so BOTH the score column and the hover
-      // tooltip show numbers that reflect the WHOLE bet, not a seed print.
+      // In Kian mode the source rows carry a `_print_count` from the aggregator.
       const printCount = Number((e._print_count as number | string | undefined) ?? 1);
-      let rowNotable: NotableScore | null = notable;
-      if (filterMode === "kian" && notable && printCount > 1) {
-        const rescore = recomputeAggregateScore(notable, premiumNum, askPct, voi, dteNum > 0 ? dteNum : null);
-        rowNotable = {
-          ...notable,
-          score: rescore.score,
-          parts: rescore.parts,
-        };
-      }
 
       const baseId = String(e._msg_id ?? `${ticker}-${strike}-${type}-${expiry}-${tsRaw}`);
       const nSeen = seenIds.get(baseId) ?? 0;
@@ -785,12 +588,11 @@ export function EntryTape({
         optFill: Number(e.avg_price ?? 0),
         underlyingFill: underlying,
         flowDate: String(e._date ?? (e.flow_date ?? (dates[0] ?? ""))),
-        notable: rowNotable,
         printCount,
       });
     }
     return out;
-  }, [entries, aggregatedEntries, bias, dte, search, tradersOnly, authorTickerSet, categoryTickers, filterMode, outlierMin, dates, earningsWindow, earningsMap, earningsMaxDays, tickerMeta, tickerTech, tickerGex]);
+  }, [entries, aggregatedEntries, bias, dte, search, tradersOnly, authorTickerSet, categoryTickers, filterMode, outlierMin, dates, earningsWindow, earningsMap, earningsMaxDays]);
 
   // Batch-fetch current prices for every unique ticker in the visible
   // rows. Refetches every 60s via the hook's refetchInterval — so the
@@ -870,20 +672,10 @@ export function EntryTape({
         case "atm":      return numCmp(a.moneyness, b.moneyness, sortDir);
         case "premium":  return numCmp(a.premium, b.premium, sortDir);
         case "pnl":      return numCmp(pnlByMsg[a.msgId], pnlByMsg[b.msgId], sortDir);
-        case "score":    return numCmp(a.notable?.score ?? null, b.notable?.score ?? null, sortDir);
-        case "ml":       return numCmp(a.notable?.ml_score ?? null, b.notable?.ml_score ?? null, sortDir);
         case "setup":    return numCmp(
                            setupScore(a.side, tickerMeta?.[a.ticker], tickerTech?.[a.ticker], tickerGex?.[a.ticker]).score,
                            setupScore(b.side, tickerMeta?.[b.ticker], tickerTech?.[b.ticker], tickerGex?.[b.ticker]).score,
                            sortDir);
-        case "avg":      return numCmp(
-                           researchRank(setupScore(a.side, tickerMeta?.[a.ticker], tickerTech?.[a.ticker], tickerGex?.[a.ticker]).score, a.notable?.ml_score, a.notable?.score, a.notable?.ml_serving_mode),
-                           researchRank(setupScore(b.side, tickerMeta?.[b.ticker], tickerTech?.[b.ticker], tickerGex?.[b.ticker]).score, b.notable?.ml_score, b.notable?.score, b.notable?.ml_serving_mode),
-                           sortDir);
-        case "pred_peak": return numCmp(
-                            a.notable?.predicted_peak_pnl ?? null,
-                            b.notable?.predicted_peak_pnl ?? null,
-                            sortDir);
       }
     });
     return copy;
@@ -897,32 +689,6 @@ export function EntryTape({
     }
   };
 
-  // Counts for the Notable button — one per cycle state. Computed
-  // pre-filter so the badge always shows "how many would pass" no
-  // matter which mode is active. MUST be declared before any early
-  // return (Rules of Hooks).
-  const notableCounts = useMemo(() => {
-    let n = 0, m = 0, b = 0, rankBand = 0;
-    for (const e of entries as any[]) {
-      const ns = e?.notable?.score;
-      const ml = e?.notable?.ml_score;
-      const nsHit = ns != null && ns >= NSCORE_THRESHOLD;
-      const mlHit = ml != null && ml >= ML_RANK_THRESHOLD;
-      if (nsHit) n += 1;
-      if (mlHit) m += 1;
-      if (nsHit && mlHit) b += 1;
-      const ticker = String(e?.ticker || "").toUpperCase();
-      const setup = setupScore(
-        correctedSide(e),
-        tickerMeta?.[ticker],
-        tickerTech?.[ticker],
-        tickerGex?.[ticker],
-      ).score;
-      const rank = researchRank(setup, ml, e?.notable?.score, e?.notable?.ml_serving_mode);
-      if (rank != null && rank >= RESEARCH_RANK_MIN && rank < RESEARCH_RANK_MAX_EXCLUSIVE) rankBand += 1;
-    }
-    return { nscore: n, ml: m, both: b, rankBand };
-  }, [entries, tickerMeta, tickerTech, tickerGex]);
   // Kian-mode count must match the aggregated-contract semantics — same
   // grouping logic as `aggregatedEntries` so the badge number lines up
   // with the rows you'd see after toggling the filter on. Doesn't depend
@@ -1017,65 +783,13 @@ export function EntryTape({
       <QueryNotice queries={dateQueries} label="Flow entries" />
       <div className="flex items-center justify-between gap-3 max-md:flex-wrap max-md:gap-2">
         <div className="flex items-center gap-2 max-md:gap-1 max-md:overflow-x-auto max-md:flex-nowrap max-md:w-full">
-          {(() => {
-            // Notable button — cycles through:
-            //   none → Top NScore → Top ML → Top Both → none
-            // Distinct visual per state so the active lens is obvious
-            // at a glance (gold for NScore, cyan for ML, purple for
-            // intersection). Mutually exclusive with the Flowseidon
-            // button — clicking either resets the other.
-            const notableModes: FilterMode[] = ["notable_nscore", "notable_ml", "notable_both", "avg_sweet"];
-            const currentNotable: FilterMode = notableModes.includes(filterMode) ? filterMode : "none";
-            const style = NOTABLE_STYLE[currentNotable];
-            const count =
-              currentNotable === "notable_nscore" ? notableCounts.nscore
-              : currentNotable === "notable_ml"   ? notableCounts.ml
-              : currentNotable === "notable_both" ? notableCounts.both
-              : currentNotable === "avg_sweet"    ? notableCounts.rankBand
-              : notableCounts.both;
-            const onClick = () => {
-              const idx = NOTABLE_CYCLE.indexOf(currentNotable);
-              const next = NOTABLE_CYCLE[(idx + 1) % NOTABLE_CYCLE.length];
-              if (next === "notable_ml" && sortKey !== "ml") {
-                patchTape({ filterMode: next, sortKey: "ml", sortDir: "desc" });
-              } else if ((next === "notable_nscore" || next === "notable_both")
-                         && sortKey !== "score" && sortKey !== "ml") {
-                patchTape({ filterMode: next, sortKey: "score", sortDir: "desc" });
-              } else if (next === "avg_sweet" && sortKey !== "avg") {
-                patchTape({ filterMode: next, sortKey: "avg", sortDir: "desc" });
-              } else {
-                patchTape({ filterMode: next });
-              }
-            };
-            const tooltipFor: Record<FilterMode, string> = {
-              none: `Click to cycle: NScore ${NSCORE_THRESHOLD}+ (${notableCounts.nscore}) → ML percentile ${ML_RANK_THRESHOLD}+ (${notableCounts.ml}) → both (${notableCounts.both}) → Research Rank ${RESEARCH_RANK_MIN}-${RESEARCH_RANK_MAX_EXCLUSIVE - 1} (${notableCounts.rankBand}) → off`,
-              notable_nscore: `Heuristic NScore ≥ ${NSCORE_THRESHOLD}; missing NScore is excluded. Click → ML percentile.`,
-              notable_ml: `Within-DTE ML percentile ≥ ${ML_RANK_THRESHOLD}; missing ML is excluded. Click → intersection.`,
-              notable_both: `NScore ≥ ${NSCORE_THRESHOLD} and ML percentile ≥ ${ML_RANK_THRESHOLD}; both must exist. Click → Research Rank.`,
-              avg_sweet: `Research Rank ${RESEARCH_RANK_MIN}-${RESEARCH_RANK_MAX_EXCLUSIVE - 1}: evidence + directional Setup, with quarantined ML capped at ±3. Click → off.`,
-              kian: "",
-              outliers: "",
-            };
-            return (
-              <button
-                type="button"
-                onClick={onClick}
-                className="flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs font-medium transition-colors"
-                style={pillStyle(currentNotable !== "none")}
-                title={tooltipFor[currentNotable]}
-              >
-                {style.label}
-                {count > 0 && <span className="num text-text-muted">{count}</span>}
-              </button>
-            );
-          })()}
           <button
             type="button"
             onClick={() => {
               const next: FilterMode = filterMode === "kian" ? "none" : "kian";
               // Kian filter is rule-based pass/fail — premium sort
               // matches how he visually surfaces "biggest single bets".
-              if (next === "kian" && sortKey !== "premium" && sortKey !== "score") {
+              if (next === "kian" && sortKey !== "premium") {
                 patchTape({ filterMode: next, sortKey: "premium", sortDir: "desc" });
               } else {
                 patchTape({ filterMode: next });
@@ -1175,9 +889,6 @@ export function EntryTape({
         className="iflow-tape-header sticky top-0 z-10 flex items-center gap-3 border-y border-border px-4 py-2 text-xs font-medium text-text-muted max-md:gap-1.5 max-md:px-2 lg:px-5"
         style={{ background: "var(--surface-inset)" }}
       >
-        {renderHeader("Rank", "avg", "w-12 justify-end")}
-        {renderHeader("NScore", "score", "w-12 justify-end max-md:hidden")}
-        {renderHeader("ML", "ml", "w-10 justify-end max-md:hidden")}
         {renderHeader("Setup", "setup", "w-12 justify-end max-md:hidden")}
         {renderHeader("Time", "time", "w-12 justify-start pl-2 max-md:hidden")}
         {renderHeader("Ticker", "ticker", "w-16 justify-start")}
@@ -1191,7 +902,6 @@ export function EntryTape({
         {renderHeader("ATM%", "atm", "w-16 justify-end max-md:hidden")}
         {renderHeader("Premium", "premium", "w-20 justify-end max-md:hidden")}
         {renderHeader("Est. P/L", "pnl", "w-16 justify-end")}
-        {renderHeader("Wtd peak", "pred_peak", "w-20 justify-end pr-1 max-md:hidden")}
       </div>
       <div className="divide-y divide-border px-2 lg:px-3">
       {sortedRows.map((r) => {
@@ -1204,42 +914,6 @@ export function EntryTape({
               ? "var(--accent-green)"
               : "var(--accent-red)";
         const isSelected = selectedTicker === r.ticker;
-        const scoreNum = r.notable?.score ?? null;
-        // Top-pick marker: a small leading dot keyed to Notable score
-        // (replaces the old gold row border).
-        const topPick = scoreNum != null && scoreNum >= 70;
-        // Build the hover tooltip: breakdown of the 5 component scores
-        // + which convergence signals lit up. Same data that justifies
-        // the number — auditable, not editorial.
-        const scoreTitle = (() => {
-          if (!r.notable) return "Notable score unavailable";
-          const p = r.notable.parts;
-          const sf = r.notable.signals;
-          const isAggregated = r.printCount > 1;
-          // ALWAYS show the actual numeric breakdown. For aggregated
-          // rows, the size + conviction values are the re-derived ones
-          // (from recomputeAggregateScore) and we add a note about that.
-          const parts = [
-            `score ${r.notable.score} / 100${isAggregated ? ` (aggregated across ${r.printCount} prints)` : ""}`,
-            `size ${p.size.toFixed(2)}  convergence ${p.convergence.toFixed(2)}  conviction ${p.conviction.toFixed(2)}`,
-            `catalyst ${p.catalyst.toFixed(2)}  structural ${p.structural.toFixed(2)}`,
-          ];
-          const sigBits: string[] = [];
-          if (sf.intel_bias) sigBits.push(`intel ${sf.intel_bias}`);
-          if (sf.forecast_dir) sigBits.push(`forecast ${sf.forecast_dir}`);
-          if (sf.accumulation_label) sigBits.push(sf.accumulation_label);
-          if (sf.trader_calls_24h) {
-            const same = sf.trader_same_dir_24h ?? 0;
-            sigBits.push(`${sf.trader_calls_24h} trader call(s) 24h (${same} aligned)`);
-          }
-          if (sf.news_24h) sigBits.push(`${sf.news_24h} news 24h`);
-          if (sf.voices_7d) {
-            const sent = sf.voices_sentiment ? ` ${sf.voices_sentiment}` : "";
-            sigBits.push(`${sf.voices_7d} voices mentions 7d${sent}`);
-          }
-          if (sigBits.length) parts.push("signals: " + sigBits.join(" · "));
-          return parts.join("\n");
-        })();
         return (
           <button
             key={r.msgId}
@@ -1250,87 +924,9 @@ export function EntryTape({
               background: isSelected ? "color-mix(in srgb, var(--accent) 12%, transparent)" : undefined,
             }}
           >
-            {/* Evidence-first ordering score; it is not a probability. */}
-            {(() => {
-              const su = setupScore(r.side, tickerMeta?.[r.ticker], tickerTech?.[r.ticker], tickerGex?.[r.ticker]).score;
-              const ml = r.notable?.ml_score;
-              const evidence = r.notable?.score;
-              const mode = r.notable?.ml_serving_mode;
-              const rank = researchRank(su, ml, evidence, mode);
-              const missing = [su == null ? "Setup" : null, evidence == null ? "NScore" : null]
-                .filter(Boolean)
-                .join(" and ");
-              const title = rank == null
-                ? `Research Rank unavailable: missing ${missing || "components"}.`
-                : `Research Rank ${rank}/100 = evidence ${evidence}, Setup ${su}, ML percentile ${ml}.\n` +
-                  `ML mode ${mode ?? "unknown"}; rank-only influence is capped at ±3.\n` +
-                  `Use for ordering only; it is not an outcome probability.`;
-              return (
-                <span
-                  className="relative w-12 shrink-0 text-right text-sm font-semibold num"
-                  style={{ color: researchRankTextColor(rank) }}
-                  title={title}
-                  aria-label={title}
-                >
-                  {topPick && (
-                    <span
-                      className="absolute left-0 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full max-md:hidden"
-                      style={{
-                        background: "var(--accent-yellow)",
-                        opacity: (scoreNum ?? 0) >= 85 ? 1 : 0.55,
-                      }}
-                      title={`Top pick: NScore ${scoreNum}`}
-                    />
-                  )}
-                  {rank != null ? rank : "—"}
-                </span>
-              );
-            })()}
-            {/* NScore — heuristic 5-component blend (notable_score.py)
-                with empirically-recalibrated weights. Component breakdown
-                in the hover tooltip. */}
-            <span
-              className={`w-12 shrink-0 text-right num max-md:hidden ${scoreNum != null && scoreNum >= 85 ? "font-bold" : "font-medium"}`}
-              style={{ color: scoreTextColor(scoreNum) }}
-              title={scoreTitle}
-            >
-              {scoreNum != null ? scoreNum : "—"}
-            </span>
-            {/* ML percentile. Probability is disclosed only with explicit
-                approved + calibrated metadata. */}
-            {(() => {
-              const ml = r.notable?.ml_score ?? null;
-              const probabilityAllowed = canShowMlProbability(
-                r.notable?.ml_gate_approved,
-                r.notable?.ml_calibration_status,
-              );
-              const prob = probabilityAllowed ? r.notable?.ml_prob ?? null : null;
-              const provenance = [
-                r.notable?.ml_model_version ? `model ${r.notable.ml_model_version}` : null,
-                r.notable?.ml_model_status ? `status ${r.notable.ml_model_status}` : null,
-                r.notable?.ml_cohort ? `cohort ${r.notable.ml_cohort.replaceAll("_", " ")}` : null,
-                r.notable?.ml_horizon_sessions != null ? `${r.notable.ml_horizon_sessions} session horizon` : null,
-                r.notable?.ml_validation_sample_size != null ? `validation n=${r.notable.ml_validation_sample_size}` : null,
-              ].filter(Boolean);
-              const mlTitle = ml == null
-                ? "ML percentile unavailable (model bundle not loaded server-side)"
-                : `ML percentile ${ml}/100 among similar-DTE recent prints.\n` +
-                  `${prob != null ? `Calibrated P(2x within the model horizon): ${prob}%.\n` : ""}` +
-                  `${r.notable?.ml_prob != null && !probabilityAllowed ? "Probability hidden: this response does not confirm an approved, calibrated artifact.\n" : ""}` +
-                  `${provenance.length ? provenance.join(" · ") : modelMetadataLabel(r.notable?.metadata)}`;
-              return (
-                <span
-                  className="w-10 shrink-0 text-right font-semibold num max-md:hidden"
-                  style={{ color: mlTextColor(ml) }}
-                  title={mlTitle}
-                >
-                  {ml != null ? ml : "—"}
-                </span>
-              );
-            })()}
             {/* SETUP — does the underlying's analyst target + chart pattern +
                 technical trend AGREE with this trade's direction? Per-ticker,
-                direction-aware (vs NScore/ML which grade the contract). */}
+                direction-aware. */}
             {(() => {
               const s = setupScore(r.side, tickerMeta?.[r.ticker], tickerTech?.[r.ticker], tickerGex?.[r.ticker]);
               const t = tickerTech?.[r.ticker];
@@ -1385,7 +981,7 @@ export function EntryTape({
               {r.printCount > 1 && (
                 <span
                   className="shrink-0 num text-xs text-text-muted"
-                  title={`Aggregated from ${r.printCount} prints (same ticker/strike/type/expiry). Premium and score reflect the sum; ask% is the most directional across prints.`}
+                  title={`Aggregated from ${r.printCount} prints (same ticker/strike/type/expiry). Premium reflects the sum; ask% is the most directional across prints.`}
                 >
                   ×{r.printCount}
                 </span>
@@ -1475,48 +1071,6 @@ export function EntryTape({
                   title={cur > 0 ? `current ${r.ticker} $${cur.toFixed(2)} vs entry $${r.underlyingFill.toFixed(2)}` : "price loading…"}
                 >
                   {label}
-                </span>
-              );
-            })()}
-            {/* Weighted peak is shown only when the response explicitly
-                confirms an approved, calibrated classifier probability. */}
-            {(() => {
-              const raw = r.notable?.predicted_peak_pnl;
-              const probabilityAllowed = canShowMlProbability(
-                r.notable?.ml_gate_approved,
-                r.notable?.ml_calibration_status,
-              );
-              const probability = probabilityAllowed ? r.notable?.ml_prob ?? null : null;
-              if (raw == null || probability == null) {
-                const unavailableReason = raw == null
-                  ? "Weighted peak unavailable: the peak regressor was not served."
-                  : "Weighted peak hidden: approved, calibrated probability metadata is required.";
-                return (
-                  <span className="w-20 shrink-0 pr-1 text-right num text-text-muted max-md:hidden" title={unavailableReason}>
-                    —
-                  </span>
-                );
-              }
-              const weight = Math.max(0, Math.min(1, probability / 100));
-              const effective = raw * weight;
-              const color = effective >= 0
-                ? "var(--accent-cyan)" : "var(--accent-red)";
-              const display = effective >= 999 ? "+999%"
-                            : effective <= -100 ? "-100%"
-                            : `${effective >= 0 ? "+" : ""}${Math.round(effective)}%`;
-              const title =
-                `Probability-weighted predicted peak: ${effective.toFixed(1)}%\n` +
-                `  raw regressor output: ${raw.toFixed(1)}%\n` +
-                `  x calibrated probability: ${probability}/100 (P[peak > +100%])\n` +
-                `\n` +
-                `Research estimate only; the ML percentile is not used as probability.`;
-              return (
-                <span
-                  className="w-20 shrink-0 pr-1 text-right font-semibold num max-md:hidden"
-                  style={{ color }}
-                  title={title}
-                >
-                  {display}
                 </span>
               );
             })()}

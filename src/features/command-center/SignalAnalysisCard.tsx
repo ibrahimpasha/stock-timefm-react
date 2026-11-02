@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { QueryNotice } from "../../components/QueryNotice";
-import { modelMetadataLabel } from "../../lib/modelMetadata";
 import { useSignalAnalysis, useMarketPrice, useMarketHistory } from "../../api/forecast";
 import { Sparkline, RangeBar } from "../../components/CCPrimitives";
 import { BarRow, Kpi, Tile, toneOf } from "../../components/Cockpit";
@@ -39,16 +38,6 @@ const CONV_COLOR: Record<string, string> = {
   QUIET: "var(--text-muted)",
 };
 
-function humanize(value: string | null | undefined): string {
-  return String(value || "").replaceAll("_", " ");
-}
-
-function formatRate(value: number | null | undefined): string | null {
-  if (value == null || !Number.isFinite(value)) return null;
-  const pct = Math.abs(value) <= 1 ? value * 100 : value;
-  return `${pct.toFixed(1)}%`;
-}
-
 function sourceStamp(value: string | null | undefined): string | null {
   if (!value) return null;
   const parsed = new Date(value.includes("T") ? value : value.replace(" ", "T") + "Z");
@@ -66,7 +55,7 @@ function sourceStamp(value: string | null | undefined): string | null {
 /**
  * Signal Analysis — reliable per-ticker read replacing the deprecated price
  * forecast. Price hero (live sparkline) + analyst-target range bar + three
- * auditable signal gauges: Technical, cross-source Convergence, ML contract research.
+ * auditable signal gauges: Technical and cross-source Convergence.
  */
 export function SignalAnalysisCard({ ticker }: Props) {
   const signalQuery = useSignalAnalysis(ticker);
@@ -80,8 +69,7 @@ export function SignalAnalysisCard({ ticker }: Props) {
   const profile = data?.profile ?? null;
   const tech = data?.technical ?? null;
   const conv = data?.convergence ?? null;
-  const ml = data?.ml ?? null;
-  const hasAny = !!(tech || conv || ml);
+  const hasAny = !!(tech || conv);
 
   const livePrice = mp?.price ?? tech?.price ?? null;
   const dayPct = typeof mp?.change_pct === "number" ? mp.change_pct : null;
@@ -105,40 +93,8 @@ export function SignalAnalysisCard({ ticker }: Props) {
   const convLabel = conv?.convergence?.label ?? "";
   const convCol = CONV_COLOR[convLabel] ?? "var(--text-muted)";
   const sig = conv?.signals ?? {};
-  const mlProbabilityVisible = !!ml
-    && ml.gate_approved === true
-    && ml.calibration_status === "calibrated"
-    && ml.peak_probability != null;
-  const hasMlProvenance = !!ml && [
-    ml.model_status,
-    ml.model_version,
-    ml.serving_mode,
-    ml.calibration_status,
-    ml.cohort,
-    ml.horizon_sessions,
-    ml.validation_sample_size,
-  ].some((value) => value != null && value !== "");
-  const bestContract = ml
-    ? [
-        ml.best?.type || null,
-        ml.best?.strike != null ? `$${ml.best.strike}` : null,
-        ml.best?.expiry || null,
-      ].filter(Boolean).join(" ")
-    : "";
-  const baseRate = formatRate(ml?.base_rate);
   const freshness = data?.source_freshness;
 
-  const mlMode = ml
-    ? ml.serving_mode === "gate_and_rank"
-      ? "Gate + rank"
-      : ml.serving_mode === "rank_only"
-        ? "Rank only"
-        : ml.serving_mode === "disabled"
-          ? "Disabled"
-          : ml.gate_approved
-            ? "Approved artifact"
-            : "Research only"
-    : "";
   const subline = [profile?.sector, profile?.industry].filter(Boolean).join(" · ");
   const techStamp = tech ? sourceStamp(freshness?.technical) : null;
   const convStamp = conv ? sourceStamp(freshness?.convergence) : null;
@@ -149,14 +105,6 @@ export function SignalAnalysisCard({ ticker }: Props) {
     { label: "Traders", n: sig.traders?.count ?? 0 },
   ];
   const srcMax = Math.max(1, ...srcCounts.map((c) => c.n));
-  const dist = ml?.score_distribution ?? null;
-  const distRows = dist
-    ? [
-        { label: "Median", v: dist.median },
-        { label: "p75", v: dist.p75 },
-        { label: "Max", v: dist.maximum ?? ml?.peak_score },
-      ]
-    : [];
 
   return (
     <section className="flex flex-col gap-3.5" aria-label={`${ticker} signal analysis`}>
@@ -282,7 +230,7 @@ export function SignalAnalysisCard({ ticker }: Props) {
 
       {!signalQuery.isPending && !signalQuery.isError && signalQuery.fetchStatus !== "paused" && !hasAny && (profile || mp) && (
         <p className="px-1 text-sm text-text-muted">
-          No technical, convergence, or ML research signal yet for <span className="num">{ticker}</span>.
+          No technical or convergence signal yet for <span className="num">{ticker}</span>.
         </p>
       )}
 
@@ -345,78 +293,6 @@ export function SignalAnalysisCard({ ticker }: Props) {
         </Tile>
       )}
 
-      {hasAny && (
-        <Tile
-          title="ML contract research"
-          meta={
-            ml ? (
-              <span title="Best within-DTE contract percentile, not ticker confidence">
-                percentile <span className="num font-semibold text-text-primary">{ml.peak_score}</span>
-              </span>
-            ) : undefined
-          }
-        >
-          {ml ? (
-            <>
-              <BarRow label="Peak" value={ml.peak_score} max={100} tone="info" display={ml.peak_score} title="Highest within-DTE percentile" />
-              {distRows.map((r) => (
-                <BarRow
-                  key={r.label}
-                  label={r.label}
-                  value={typeof r.v === "number" ? r.v : 0}
-                  max={100}
-                  tone="info"
-                  display={r.v ?? "—"}
-                />
-              ))}
-              {bestContract && (
-                <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 border-t border-border pt-2.5">
-                  <span className="text-xs text-text-muted">Highest-ranked contract</span>
-                  <span className="num text-sm font-semibold text-text-primary">
-                    {bestContract}
-                    {ml.best?.flow_date ? <span className="font-normal text-text-muted"> · {ml.best.flow_date}</span> : null}
-                  </span>
-                </div>
-              )}
-              {mlProbabilityVisible ? (
-                <div className="text-sm text-text-secondary">
-                  Calibrated P(2x within <span className="num">{ml.horizon_sessions ?? 10}</span> sessions):{" "}
-                  <span className="num font-semibold text-text-primary">{ml.peak_probability}%</span>
-                  {baseRate ? <span className="text-text-muted"> · validation base rate <span className="num">{baseRate}</span></span> : null}
-                </div>
-              ) : ml.peak_probability != null ? (
-                <p className="text-xs text-text-muted">Probability withheld because approved calibration metadata is not confirmed.</p>
-              ) : null}
-              <p className="text-xs leading-relaxed text-text-muted">
-                Highest within-DTE percentile across <span className="num">{ml.n_entries}</span> recent{" "}
-                <span className="num">{ticker}</span> flow {ml.n_entries === 1 ? "entry" : "entries"}; this is not ticker confidence.
-                {ml.as_of ? <> As of <span className="num">{ml.as_of}</span>.</> : null}
-              </p>
-              <details className="text-xs text-text-muted">
-                <summary className="cursor-pointer hover:text-text-secondary">
-                  {mlMode}
-                  {ml.model_status ? ` · ${humanize(ml.model_status)}` : ""}
-                  {ml.calibration_status ? ` · ${humanize(ml.calibration_status)}` : ""}
-                </summary>
-                <div className="mt-1.5 flex flex-col gap-1 leading-relaxed">
-                  {ml.model_version && <span>Model <span className="num">{ml.model_version}</span></span>}
-                  {ml.cohort && <span>Cohort {humanize(ml.cohort)}</span>}
-                  {ml.horizon_sessions != null && <span>Horizon <span className="num">{ml.horizon_sessions}</span> sessions</span>}
-                  {ml.validation_sample_size != null && <span>Validation <span className="num">n={ml.validation_sample_size}</span></span>}
-                  {ml.metadata && <span className="break-words">{modelMetadataLabel(ml.metadata)}</span>}
-                  {!hasMlProvenance && !ml.metadata && (
-                    <span>Model provenance is unavailable in this legacy response; percentile remains research-only context.</span>
-                  )}
-                  {ml.trained_at && <span>Trained <span className="num">{ml.trained_at}</span></span>}
-                  {dist?.scored_contracts != null && <span>Scored contracts <span className="num">{dist.scored_contracts}</span></span>}
-                </div>
-              </details>
-            </>
-          ) : (
-            <p className="text-sm text-text-muted">No recent options flow to score.</p>
-          )}
-        </Tile>
-      )}
     </section>
   );
 }

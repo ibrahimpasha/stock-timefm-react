@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { QueryNotice } from "../../components/QueryNotice";
 import { FlowCoverageNotice } from "../../components/FlowCoverageNotice";
 import { flowCoverage } from "../../lib/flowCoverage";
@@ -27,11 +27,11 @@ import { CompanyMapView } from "../../pages/BayAreaMapPage";
 import {
   useIFlowDates,
   useMultiDateSummaries,
-  useMultiDateEntries,
   useFlowReturns,
   useTickerEarningsBatch,
 } from "./iflow/hooks";
 import { squarify } from "./heatmap/squarify";
+import { useElementSize } from "../../lib/useElementSize";
 
 /* ── Encodings ───────────────────────────────────────────────
  * The whole point of this view is that the encoding is yours to pick. SIZE
@@ -41,7 +41,7 @@ import { squarify } from "./heatmap/squarify";
 type SizeMetric = "premium" | "entries" | "conviction" | "market_cap";
 type ColorMetric = "bias" | "pl" | "target" | "technical" | "pattern";
 type GroupBy = "none" | "sector" | "theme" | "subcategory";
-type Pulse = "off" | "earnings" | "ml" | "play" | "technical" | "pattern";
+type Pulse = "off" | "earnings" | "play" | "technical" | "pattern";
 
 const SIZE_OPTIONS: { id: SizeMetric; label: string; hint: string }[] = [
   { id: "premium", label: "Premium $", hint: "total option $ institutions put on the name today" },
@@ -68,7 +68,6 @@ const GROUP_OPTIONS: { id: GroupBy; label: string }[] = [
 const PULSE_OPTIONS: { id: Pulse; label: string; hint: string }[] = [
   { id: "off", label: "Off", hint: "no animation" },
   { id: "earnings", label: "Earnings", hint: "tiles breathe as an earnings date approaches within the window set by the Earnings filter slider (faster = sooner)" },
-  { id: "ml", label: "ML rank", hint: "tiles breathe when the day's best within-DTE ML percentile is high" },
   { id: "play", label: "Play score", hint: "tiles breathe when the Theme-Pulse play score is high" },
   { id: "technical", label: "TA setup", hint: "tiles breathe on a technical inflection (fib level / band edge / RSI extreme); ▲▼ = direction" },
   { id: "pattern", label: "Chart pattern", hint: "tiles breathe when a candlestick/chart pattern is detected; ▲▼ = pattern direction" },
@@ -107,31 +106,6 @@ interface GroupRect {
   n: number;
 }
 
-/* Hook: track a container's pixel box so the treemap can fill it. */
-function useElementSize() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => {
-      const r = el.getBoundingClientRect();
-      const w = Math.floor(r.width);
-      const h = Math.floor(r.height);
-      setSize((prev) => (prev.width === w && prev.height === h ? prev : { width: w, height: h }));
-    };
-    measure(); // synchronous on mount — don't wait for RO's first async tick
-    const raf = requestAnimationFrame(measure); // catch post-layout size after a tab switch
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => {
-      cancelAnimationFrame(raf);
-      ro.disconnect();
-    };
-  }, []);
-  return [ref, size] as const;
-}
-
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const biasOf = (c: Cell) => (c.count ? (c.bull - c.bear) / c.count : 0);
 
@@ -165,12 +139,12 @@ export function FlowHeatmap() {
 
   // Filters live in the shared Zustand store so they survive tab switches
   // (this tab is unmounted on switch, which would otherwise reset local state).
-  // pulseThreshold = minimum 0-100 strength a ticker needs to pulse (ML / TA
+  // pulseThreshold = minimum 0-100 strength a ticker needs to pulse (play / TA
   // setup / pattern). pulseGroup = when on (and grouping is active), pulse the
   // whole sector/theme frame instead of individual tiles.
   const {
     selectedDates, sizeMetric, colorMetric, groupBy, pulse, pulseThreshold, pulseGroup,
-    mlOn, mlMin, playOn, playMin, earnOn, earnDays,
+    playOn, playMin, earnOn, earnDays,
   } = useDashboardFilters((s) => s.heatmap);
   const patchHeatmap = useDashboardFilters((s) => s.patchHeatmap);
   // Treemap (default) vs geographic Map view of the same companies.
@@ -238,28 +212,11 @@ export function FlowHeatmap() {
   const { data: playData } = useThemePulseScores();
   const playScores = playData?.scores;
 
-  // Earnings needed when the earnings pulse OR the earnings filter is active;
-  // ML entries when the ML pulse OR the ML filter is active. Reads the single
-  // source (ticker_earnings) via the batch endpoint — no recompute for cached.
+  // Earnings needed when the earnings pulse OR the earnings filter is active.
+  // Reads the single source (ticker_earnings) via the batch endpoint — no recompute for cached.
   const needEarnings = pulse === "earnings" || earnOn;
-  const needMl = pulse === "ml" || mlOn;
   const cellTickers = useMemo(() => cells.map((c) => c.ticker), [cells]);
   const { data: earnings } = useTickerEarningsBatch(needEarnings ? cellTickers : []);
-  const mlEntryQueries = useMultiDateEntries(needMl ? activeDates : [], true);
-  // Best (max) ML score per ticker across the selected dates' entries.
-  const mlByTicker = useMemo(() => {
-    const m = new Map<string, number>();
-    if (!needMl) return m;
-    for (const q of mlEntryQueries) {
-      for (const e of q.data?.entries ?? []) {
-        const tk = String(e.ticker || "").toUpperCase();
-        const ml = Number(e.notable?.ml_score ?? 0);
-        if (tk && ml > (m.get(tk) ?? 0)) m.set(tk, ml);
-      }
-    }
-    return m;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needMl, mlEntryQueries.map((q) => q.dataUpdatedAt).join(",")]);
 
   const sizeValue = useCallback(
     (c: Cell): number => {
@@ -290,10 +247,9 @@ export function FlowHeatmap() {
   );
 
   // Raw 0..100 strength + direction for the threshold-based pulse metrics
-  // (ML / TA setup / chart pattern). null when no data for this ticker.
+  // (play / TA setup / chart pattern). null when no data for this ticker.
   const pulseStrength = useCallback(
     (c: Cell): { val: number | null; dir?: "up" | "down" } => {
-      if (pulse === "ml") return { val: mlByTicker.get(c.ticker) ?? null };
       if (pulse === "play") return { val: playScores?.[c.ticker] ?? null };
       if (pulse === "technical") {
         const t = technicals?.[c.ticker];
@@ -307,7 +263,7 @@ export function FlowHeatmap() {
       }
       return { val: null };
     },
-    [pulse, mlByTicker, playScores, technicals]
+    [pulse, playScores, technicals]
   );
 
   const earningsDays = useCallback(
@@ -320,13 +276,12 @@ export function FlowHeatmap() {
     [earnings]
   );
 
-  // Visible cells after the ML / Play / Earnings slider filters (each gated on
+  // Visible cells after the Play / Earnings slider filters (each gated on
   // its toggle). These drive the layout, counts, and group aggregation — the
   // fetches above still cover all `cells` so the filter has data to act on.
   const vcells = useMemo(() => {
-    if (!mlOn && !playOn && !earnOn) return cells;
+    if (!playOn && !earnOn) return cells;
     return cells.filter((c) => {
-      if (mlOn && (mlByTicker.get(c.ticker) ?? -1) < mlMin) return false;
       if (playOn && (playScores?.[c.ticker] ?? -1) < playMin) return false;
       if (earnOn) {
         const d = earningsDays(c.ticker);
@@ -334,10 +289,10 @@ export function FlowHeatmap() {
       }
       return true;
     });
-  }, [cells, mlOn, mlMin, mlByTicker, playOn, playMin, playScores, earnOn, earnDays, earningsDays]);
-  const filtersActive = mlOn || playOn || earnOn;
+  }, [cells, playOn, playMin, playScores, earnOn, earnDays, earningsDays]);
+  const filtersActive = playOn || earnOn;
 
-  // Per-tile pulse. Earnings is window-gated; ML/TA/pattern gate on the
+  // Per-tile pulse. Earnings is window-gated; play/TA/pattern gate on the
   // adjustable `pulseThreshold`. Suppressed on tiles when group-pulse is on.
   const pulseOf = useCallback(
     (c: Cell): { on: boolean; intensity: number; dir?: "up" | "down" } => {
@@ -545,7 +500,7 @@ export function FlowHeatmap() {
       <KpiTile
         label="Tickers"
         value={filtersActive ? <>{vcells.length}<span className="text-lg font-normal text-text-muted">/{cells.length}</span></> : cells.length}
-        sub={filtersActive ? "after ML / Play / ER filters" : "with flow in range"}
+        sub={filtersActive ? "after Play / ER filters" : "with flow in range"}
       />
       <KpiTile
         label="Bull share of entries"
@@ -641,13 +596,13 @@ export function FlowHeatmap() {
           </summary>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <MetricSelect label="Pulse" icon={Radio} value={pulse} onChange={(v) => patchHeatmap({ pulse: v as Pulse })} options={PULSE_OPTIONS} />
-            {/* Threshold for the score-based pulses (ML / TA / pattern).
+            {/* Threshold for the score-based pulses (play / TA / pattern).
                 Earnings pulses gate on the ER window instead. */}
-            {(pulse === "ml" || pulse === "play" || pulse === "technical" || pulse === "pattern") && (
+            {(pulse === "play" || pulse === "technical" || pulse === "pattern") && (
               <label
                 className="control-surface flex items-center gap-1.5 border px-2 py-1.5"
                 style={{ borderRadius: "var(--radius-control)" }}
-                title="Minimum 0–100 strength a ticker needs to pulse (e.g. ML ≥ 80)"
+                title="Minimum 0–100 strength a ticker needs to pulse (e.g. Play ≥ 80)"
               >
                 <span className="text-xs text-text-muted">Pulse ≥</span>
                 <input
@@ -690,11 +645,6 @@ export function FlowHeatmap() {
             )}
 
             {/* Tile filters — hide tiles below/over the slider value when toggled on. */}
-            <FilterSlider
-              label="ML ≥" on={mlOn} value={mlMin} min={0} max={100} step={5}
-              onToggle={(v) => patchHeatmap({ mlOn: v })} onValue={(v) => patchHeatmap({ mlMin: v })}
-              title="Hide tiles whose best within-DTE ML percentile is below this"
-            />
             <FilterSlider
               label="Play ≥" on={playOn} value={playMin} min={0} max={100} step={5}
               onToggle={(v) => patchHeatmap({ playOn: v })} onValue={(v) => patchHeatmap({ playMin: v })}

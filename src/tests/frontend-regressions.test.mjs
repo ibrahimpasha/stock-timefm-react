@@ -32,8 +32,6 @@ const { optionIntent, canonicalExpiry, expiryDte } = source("lib/optionContract.
 const { marketDate, activeFlowInterval } = source("lib/liveFeeds.ts");
 const { activityWindow, markFreshness, premiumChange, markedExposure, signedPercent } = source("lib/markFreshness.ts");
 const { flowCoverage } = source("lib/flowCoverage.ts");
-const { modelMetadataLabel } = source("lib/modelMetadata.ts");
-const { canShowMlProbability } = source("features/flow-analyzer/iflow/utils.ts");
 const { observationGain, observationAge, observationHasEvaluation, sortObservations } = source("lib/watchlist.ts");
 const { estimateOptionPnl } = source("features/flow-analyzer/iflow/estimator.ts");
 const { toLocalDateOnly } = source("lib/dateOnly.ts");
@@ -181,13 +179,6 @@ test("return ranking requires >=90% coverage and all liquid benchmarks", () => {
   assert.equal(flowCoverage().reliable, false); assert.equal(flowCoverage({ price_coverage_pct: 75 }).reliable, false);
   assert.equal(flowCoverage({ price_coverage_pct: 100, benchmark_missing: ["SPY"] }).reliable, false);
   assert.equal(flowCoverage({ price_coverage_pct: 90, benchmark_missing: [] }).reliable, true);
-});
-test("metadata display never grants probability/trading approval", () => {
-  const label = modelMetadataLabel({ version: "5.1", serving_mode: "rank_only", deployment_approved: false });
-  assert.match(label, /rank only/); assert.match(label, /not approved for trading/);
-  assert.equal(canShowMlProbability(false, "calibrated"), false);
-  assert.equal(canShowMlProbability(true, "uncalibrated"), false);
-  assert.equal(canShowMlProbability(true, "calibrated"), true);
 });
 test("estimator mirrors _flow_valuation: sold prints negate, expired -> null, 0DTE uses 5d floor", () => {
   const today = toLocalDateOnly(new Date()), ago = n => toLocalDateOnly(new Date(Date.now() - n * 86400000));

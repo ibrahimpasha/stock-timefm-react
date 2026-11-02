@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type ElementType } from "react";
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useIsFetching, useQuery } from "@tanstack/react-query";
 import {
   Activity,
   Blocks,
@@ -10,12 +10,18 @@ import {
   Moon,
   Newspaper,
   Orbit,
+  Search,
   Sun,
   Sunrise,
   Users,
   Wallet,
 } from "lucide-react";
-import { TickerSearch } from "./components/TickerSearch";
+import { CommandPalette, PALETTE_SHORTCUT } from "./components/CommandPalette";
+import { Tick } from "./components/Cockpit";
+import { useCommandPalette } from "./store/useCommandPalette";
+import { useSlidingPill } from "./lib/useSlidingPill";
+import apiClient from "./api/client";
+import { useAppStore } from "./store/useAppStore";
 import { useTheme } from "./store/useTheme";
 import { DataHealthStrip } from "./components/DataHealthStrip";
 import { DataConnectionBanner } from "./components/DataConnectionBanner";
@@ -85,9 +91,57 @@ function isActivePath(path: string, pathname: string) {
   return path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(`${path}/`);
 }
 
+function SearchTrigger() {
+  const setOpen = useCommandPalette((s) => s.setOpen);
+  const ticker = useAppStore((s) => s.activeTicker);
+  return (
+    <button type="button" className="cmdk-trigger" onClick={() => setOpen(true)} aria-keyshortcuts="Control+K Meta+K /">
+      <Search size={14} aria-hidden="true" className="shrink-0" />
+      <span className="cmdk-trigger__text">{ticker || "Search"}</span>
+      <kbd>{PALETTE_SHORTCUT}</kbd>
+    </button>
+  );
+}
+
+/** SPY and VIX on every page, so context never needs a trip to the Brief. */
+function MarketPulse() {
+  const { data } = useQuery<{ spy_price?: number; spy_change_pct?: number; vix?: number }>({
+    queryKey: ["market-pulse"],
+    queryFn: () => apiClient.get("/market/macro").then((r) => r.data),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+  if (data?.spy_price == null) return null;
+  const change = data.spy_change_pct ?? 0;
+  return (
+    <div className="market-pulse">
+      <span>SPY</span>
+      <Tick value={data.spy_price.toFixed(2)}><span className="num text-text-primary">{data.spy_price.toFixed(2)}</span></Tick>
+      <span className="num" style={{ color: change >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
+        {change >= 0 ? "+" : "−"}{Math.abs(change).toFixed(2)}%
+      </span>
+      {data.vix != null && (
+        <span className="market-pulse__vix">
+          <span className="ml-2">VIX</span>
+          <Tick value={data.vix.toFixed(2)}><span className="num text-text-primary">{data.vix.toFixed(2)}</span></Tick>
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Thin bar while a page's data is loading for the first time. Background refreshes
+ *  stay silent, and the CSS delay keeps fast loads from flickering it. */
+function TopLoadBar() {
+  const loading = useIsFetching({ predicate: (q) => q.state.data === undefined }) > 0;
+  return <div className="top-load" data-on={loading || undefined} aria-hidden="true" />;
+}
+
 function TopBar() {
   const { pathname } = useLocation();
   const current = ALL_NAV.find((item) => isActivePath(item.path, pathname))?.label ?? "Brief";
+  const setPaletteOpen = useCommandPalette((s) => s.setOpen);
+  const { container, pill } = useSlidingPill<HTMLElement>(pathname);
   return (
     <>
       <header className="app-topnav hidden lg:flex">
@@ -95,7 +149,8 @@ function TopBar() {
           <span className="app-brand__mark" aria-hidden="true">TF</span>
           <span className="app-brand__name">Stock-TimeFM</span>
         </NavLink>
-        <nav className="app-topnav__nav" aria-label="Primary navigation">
+        <nav ref={container} className="app-topnav__nav" aria-label="Primary navigation">
+          <span ref={pill} className="sliding-pill nav-pill" aria-hidden="true" />
           {NAV_GROUPS.map((group, gi) => (
             <div key={group.label} className="app-topnav__group" aria-label={group.label}>
               {gi > 0 && <span className="app-topnav__divider" aria-hidden="true" />}
@@ -103,6 +158,7 @@ function TopBar() {
                 <NavLink
                   key={path}
                   to={path}
+                  data-pill={isActivePath(path, pathname) ? "on" : undefined}
                   className={`app-nav-item ${isActivePath(path, pathname) ? "app-nav-item--active" : ""}`}
                 >
                   {label}
@@ -112,8 +168,9 @@ function TopBar() {
           ))}
         </nav>
         <div className="app-topnav__tools">
+          <MarketPulse />
           <MarketClock />
-          <TickerSearch inputWidth="w-64" />
+          <SearchTrigger />
           <DataHealthStrip />
           <ThemeToggle />
         </div>
@@ -124,6 +181,14 @@ function TopBar() {
           <span className="truncate text-sm font-semibold text-text-primary">{current}</span>
         </NavLink>
         <div className="flex shrink-0 items-center">
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            aria-label="Search tickers, pages and books"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-text-secondary hover:bg-bg-card-hover hover:text-text-primary"
+          >
+            <Search size={17} aria-hidden="true" />
+          </button>
           <DataHealthStrip />
           <ThemeToggle />
         </div>
@@ -254,6 +319,8 @@ function AppLayout() {
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
+      <TopLoadBar />
+      <CommandPalette />
       <div className="app-column">
         <TopBar />
         <main id="main-content" tabIndex={-1} className="app-main mobile-content">

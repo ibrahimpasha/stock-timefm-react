@@ -30,6 +30,7 @@ export function TickerCard({
   voicesIntel,
   highlightOn,
   highlightTitle,
+  heat,
 }: {
   t: TrackedTicker;
   selected: boolean;
@@ -39,9 +40,11 @@ export function TickerCard({
   retEntries?: number;
   voicesIntel?: VoicesCardIntel;
   /** When provided, drives the green border instead of `esc` — lets the grid's
-   *  Highlight selector re-point the border at play / ML / accumulation. */
+   *  Highlight selector re-point the border at play / accumulation. */
   highlightOn?: boolean;
   highlightTitle?: string;
+  /** 0-1 premium size within the visible set; replaces the one-sidedness tint. */
+  heat?: number;
 }) {
   const net = t.bullish > t.bearish;
   const esc = intel?.escalating;
@@ -55,17 +58,17 @@ export function TickerCard({
   const toggleWatchlist = useAppStore((s) => s.toggleWatchlist);
 
   const sideColor = net ? "var(--accent-green)" : "var(--accent-red)";
-  // Heat tint: fill strength encodes how one-sided the flow is (50/50 = faint,
-  // all one side = strong). Borderless — the card sits inside a Tile.
+  // Heat tint: hue is the side; strength is premium size when the grid supplies it,
+  // else how one-sided the flow is. Borderless — the card sits inside a Tile.
   const sideTotal = t.bullish + t.bearish;
   const lean = sideTotal > 0 ? Math.abs(t.bullish / sideTotal - 0.5) * 2 : 0;
-  const tint = Math.round(5 + lean * 15);
+  const tint = Math.round(heat != null ? 2 + heat * 30 : 5 + lean * 15);
   const bullPct = sideTotal > 0 ? Math.round((t.bullish / sideTotal) * 100) : null;
 
   return (
     <div
       title={highlightTitle}
-      className="relative flex min-h-[6.5rem] min-w-0 flex-col overflow-hidden rounded-lg px-3 py-2.5 text-left transition-transform hover:-translate-y-px"
+      className="relative flex min-h-[5.25rem] min-w-0 flex-col overflow-hidden rounded-lg px-3 py-2.5 text-left transition-transform hover:-translate-y-px"
       style={{
         background: `color-mix(in srgb, ${sideColor} ${tint}%, var(--bg-card-hover))`,
         outline: selected ? "2px solid var(--accent)" : lit ? "1px solid color-mix(in srgb, var(--accent-green) 55%, transparent)" : undefined,

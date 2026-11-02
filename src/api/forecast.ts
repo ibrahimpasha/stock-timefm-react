@@ -209,43 +209,6 @@ export interface SignalConvergence {
   convergence: { score: number; alignment: string; label: string };
 }
 
-export interface SignalML {
-  metadata?: import("../lib/modelMetadata").ModelMetadata | null;
-  peak_score: number;
-  peak_probability?: number | null;
-  gate_approved?: boolean;
-  n_entries: number;
-  as_of: string | null;
-  metric_id?: string | null;
-  metric_label?: string | null;
-  aggregation?: string | null;
-  model_status?: string | null;
-  model_version?: string | null;
-  trained_at?: string | null;
-  serving_mode?: "disabled" | "rank_only" | "gate_and_rank" | string | null;
-  ranking_allowed?: boolean | null;
-  gating_allowed?: boolean | null;
-  calibration_status?: "calibrated" | "uncalibrated" | string | null;
-  cohort?: string | null;
-  horizon_sessions?: number | null;
-  validation_sample_size?: number | null;
-  base_rate?: number | null;
-  oos_brier?: number | null;
-  score_distribution?: {
-    scored_contracts?: number | null;
-    median?: number | null;
-    p75?: number | null;
-    maximum?: number | null;
-  } | null;
-  best: {
-    type: string;
-    strike: number | string | null;
-    expiry: string | null;
-    premium: number | string | null;
-    flow_date: string | null;
-  };
-}
-
 export interface SignalProfile {
   name: string | null;
   market_cap: number | null;
@@ -267,17 +230,15 @@ export interface SignalAnalysisResult {
   profile: SignalProfile | null;
   technical: SignalTechnical | null;
   convergence: SignalConvergence | null;
-  ml: SignalML | null;
   source_freshness?: {
     technical?: string | null;
     profile?: string | null;
     convergence?: string | null;
-    ml?: string | null;
   };
 }
 
 /** Reliable per-ticker signal panel: deterministic TA + cross-source
- *  convergence + ML peak-potential. No discredited price forecast. */
+ *  convergence. No discredited price forecast. */
 export function useSignalAnalysis(ticker: string) {
   return useQuery<SignalAnalysisResult>({
     queryKey: ["signal-analysis", ticker],

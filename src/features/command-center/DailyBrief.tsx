@@ -29,7 +29,6 @@ import {
   BarRow,
   HeatTile,
   Gauge,
-  ActionCard,
   CockpitButton,
   toneOf,
   toneColor,
@@ -199,7 +198,44 @@ function KpiStrip({ ctx, regime, isHistory }: { ctx: BriefContext; regime: Brief
   );
 }
 
-/* ── "Needs you today" — plays, heads-up, rule flags as ActionCards ──────── */
+/* ── "Needs you today" — every item one row, the picked one read in full. Nine tall cards
+ *  pushed the Read off the first two screens; a list keeps the whole queue in one view. ── */
+interface NeedItem {
+  key: string;
+  kind: string;
+  tone: Tone;
+  when: string;
+  text: string;
+  play?: BriefPlay;
+}
+
+function NeedDetail({ item }: { item: NeedItem }) {
+  const setTicker = useSetTicker();
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <span className="font-semibold" style={{ color: toneColor(item.tone) }}>{item.kind}</span>
+        <span className="text-text-muted">{item.when}</span>
+      </div>
+      {item.play && <span className="ticker text-2xl"><Tick t={item.play.ticker} /></span>}
+      <p className="m-0 max-w-[70ch] text-[0.9375rem] leading-relaxed text-text-primary">{item.text}</p>
+      {item.play && (
+        <>
+          <dl className="m-0 grid max-w-[70ch] grid-cols-[4rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm leading-relaxed text-text-secondary">
+            <dt className="font-medium text-text-muted">Trigger</dt>
+            <dd className="m-0">{item.play.trigger}</dd>
+            <dt className="font-medium text-text-muted">Risk</dt>
+            <dd className="m-0">{item.play.risk}</dd>
+          </dl>
+          <div>
+            <CockpitButton primary onClick={() => setTicker(item.play!.ticker)}>Open analysis</CockpitButton>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 function NeedsYou({
   plays,
   headsUp,
@@ -211,58 +247,45 @@ function NeedsYou({
   flags: string[];
   sessionLabel: string;
 }) {
-  const setTicker = useSetTicker();
-  const n = plays.length + headsUp.length + flags.length;
-  if (n === 0) return null;
+  const [picked, setPicked] = useState<string | null>(null);
+  const items: NeedItem[] = [
+    ...plays.map((p, i) => ({
+      key: `p${i}`,
+      kind: (p.action || "Play").toUpperCase(),
+      tone: PLAY_TONE[(p.action || "").toUpperCase()] ?? ("neutral" as Tone),
+      when: `from the ${sessionLabel} brief`,
+      text: p.thesis,
+      play: p,
+    })),
+    ...headsUp.map((text, i) => ({ key: `h${i}`, kind: "Heads up", tone: "warn" as Tone, when: "from the brief", text })),
+    ...flags.map((text, i) => ({ key: `f${i}`, kind: "Rule watch", tone: "warn" as Tone, when: "deterministic rule check", text })),
+  ];
+  if (items.length === 0) return null;
+  const current = items.find((item) => item.key === picked) ?? items[0];
   return (
     <section className="flex flex-col gap-3.5" aria-label="Needs you today">
       <h2 className="m-0 text-2xl font-semibold tracking-tight text-text-primary">
-        {n} {n === 1 ? "thing needs" : "things need"} you today
+        {items.length} {items.length === 1 ? "thing needs" : "things need"} you today
       </h2>
-      <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
-        {plays.map((p, i) => {
-          const action = (p.action || "").toUpperCase();
-          return (
-            <ActionCard
-              key={`p${i}`}
-              kind={<>{p.action} · play</>}
-              tone={PLAY_TONE[action] ?? "neutral"}
-              when={`from the ${sessionLabel} brief`}
-              ticker={<Tick t={p.ticker} />}
-              actions={
-                <CockpitButton primary onClick={() => setTicker(p.ticker)}>
-                  Open analysis
-                </CockpitButton>
-              }
-            >
-              <p className="m-0 text-text-primary">{p.thesis}</p>
-              <dl className="mt-2.5 grid grid-cols-[4rem_minmax(0,1fr)] gap-x-3 gap-y-1.5">
-                <dt className="font-medium text-text-muted">Trigger</dt>
-                <dd className="m-0">{p.trigger}</dd>
-                <dt className="font-medium text-text-muted">Risk</dt>
-                <dd className="m-0">{p.risk}</dd>
-              </dl>
-            </ActionCard>
-          );
-        })}
-        {headsUp.length > 0 && (
-          <ActionCard kind="Heads up" tone="warn" when="from the brief" title={`${headsUp.length} ${headsUp.length === 1 ? "note" : "notes"}`}>
-            <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5">
-              {headsUp.map((a, i) => (
-                <li key={i}>{a}</li>
-              ))}
-            </ul>
-          </ActionCard>
-        )}
-        {flags.length > 0 && (
-          <ActionCard kind="Rule watch" tone="warn" when="deterministic rule checks" title={`${flags.length} rule ${flags.length === 1 ? "flag" : "flags"}`}>
-            <ul className="m-0 flex list-disc flex-col gap-1 pl-5">
-              {flags.map((f, i) => (
-                <li key={i}>{f}</li>
-              ))}
-            </ul>
-          </ActionCard>
-        )}
+      <div className="inbox">
+        <ul className="inbox__list">
+          {items.map((item) => (
+            <li key={item.key}>
+              <button type="button" className="inbox__row" aria-pressed={item === current} onClick={() => setPicked(item.key)}>
+                <span className="inbox__kind" style={{ color: toneColor(item.tone) }}>{item.kind}</span>
+                <span className="ticker">{item.play?.ticker ?? ""}</span>
+                <span className="min-w-0 truncate text-sm text-text-secondary">{item.text}</span>
+              </button>
+              {item === current && <div className="inbox__detail inbox__detail--inline"><NeedDetail item={item} /></div>}
+            </li>
+          ))}
+        </ul>
+        <article
+          className="inbox__detail inbox__detail--pane"
+          style={{ background: current.tone === "neutral" ? undefined : `color-mix(in srgb, ${toneColor(current.tone)} 7%, var(--bg-card))` }}
+        >
+          <NeedDetail item={current} />
+        </article>
       </div>
     </section>
   );
@@ -313,7 +336,7 @@ function FlowTile({ ctx }: { ctx: BriefContext }) {
   if (!ctx.flow || ctx.flow.length === 0) return null;
   const max = absMax(ctx.flow.map((f) => f.premium));
   return (
-    <Tile span={5} title="Unusual flow today" meta="premium · ML score">
+    <Tile span={5} title="Largest flow today" meta="premium">
       <div className="flex flex-col gap-1">
         {ctx.flow.map((f) => (
           <BarRow
@@ -328,11 +351,9 @@ function FlowTile({ ctx }: { ctx: BriefContext }) {
             max={max}
             display={formatPremium(f.premium)}
             tone={f.side === "Bull" ? "up" : "down"}
-            trailing={f.ml != null ? f.ml : "—"}
+            fill={f.side === "Bull" || f.side === "Bear" ? undefined : "var(--text-muted)"}
             onClick={() => setTicker(f.ticker)}
-            title={`${f.side} · ML ${f.ml ?? "?"}${f.nscore != null ? ` · NScore ${f.nscore}` : ""} · $${Math.round(
-              f.premium
-            ).toLocaleString()} premium${f.earnings_in != null ? ` · reports in ${f.earnings_in}d` : ""}`}
+            title={`${f.side} · $${Math.round(f.premium).toLocaleString()} premium${f.earnings_in != null ? ` · reports in ${f.earnings_in}d` : ""}`}
           />
         ))}
       </div>
@@ -342,6 +363,9 @@ function FlowTile({ ctx }: { ctx: BriefContext }) {
         </span>
         <span>
           <span className="inline-block h-2.5 w-2.5 rounded-sm align-middle" style={{ background: "var(--accent-red)" }} /> Bear
+        </span>
+        <span>
+          <span className="inline-block h-2.5 w-2.5 rounded-sm align-middle" style={{ background: "var(--text-muted)" }} /> Side unknown
         </span>
       </p>
     </Tile>

@@ -15,7 +15,7 @@ import { ForecastChart } from "../features/forecast/ForecastChart";
 import { ForecastConfig, DEFAULT_SETTINGS, type ForecastSettings } from "../features/forecast/ForecastConfig";
 import { ModelBreakdown } from "../features/command-center/ModelBreakdown";
 import type { OHLCV, ModelForecast } from "../lib/types";
-import { TickerSearch } from "../components/TickerSearch";
+import { useSlidingPill } from "../lib/useSlidingPill";
 import { Segmented } from "../components/Glass";
 import { Tile } from "../components/Cockpit";
 import IntelligencePanelV3 from "../features/command-center/IntelligencePanelV3";
@@ -27,6 +27,9 @@ import { IFlowTracker } from "../features/flow-analyzer/IFlowTracker";
 // Every tab besides the iFlow tape is a lazy chunk fetched on first visit.
 const FlowHeatmap = lazy(() =>
   import("../features/flow-analyzer/FlowHeatmap").then((m) => ({ default: m.FlowHeatmap })),
+);
+const BooksScoreboard = lazy(() =>
+  import("../features/flow-analyzer/BooksScoreboard").then((m) => ({ default: m.BooksScoreboard })),
 );
 const FlowPaperTrading = lazy(() =>
   import("../features/flow-analyzer/FlowPaperTrading").then((m) => ({ default: m.FlowPaperTrading })),
@@ -78,7 +81,8 @@ const SECTIONS: Record<DeskSection, { title: string; base: string; summary: stri
     base: "/books",
     summary: "Paper portfolios and their decisions",
     views: [
-      { slug: "", label: "TraderJoe", render: () => <SmartTrader /> },
+      { slug: "", label: "Scoreboard", render: () => <BooksScoreboard /> },
+      { slug: "traderjoe", label: "TraderJoe", render: () => <SmartTrader /> },
       { slug: "flow-trader", label: "Flow Trader", render: () => <FlowPaperTrading /> },
     ],
   },
@@ -136,6 +140,7 @@ function useDesktopViewport() {
 
 export function DeskPage({ section }: { section: DeskSection }) {
   const { view = "" } = useParams();
+  const tabs = useSlidingPill<HTMLElement>(view);
   const config = SECTIONS[section];
   const active = config.views.find((v) => v.slug === view);
   const ticker = useAppStore((s) => s.activeTicker);
@@ -298,15 +303,16 @@ export function DeskPage({ section }: { section: DeskSection }) {
           {section === "flow" && (
             <AlertBell onClick={() => setShowAlerts(!showAlerts)} isOpen={showAlerts} />
           )}
-          <TickerSearch className="desk-search lg:hidden" inputWidth="w-full" />
         </div>
         {config.views.length > 1 && (
-          <nav className="desk-tabs" aria-label={`${config.title} views`}>
+          <nav ref={tabs.container} className="desk-tabs" aria-label={`${config.title} views`}>
+            <span ref={tabs.pill} className="sliding-pill tab-pill" aria-hidden="true" />
             {config.views.map((v) => (
               <NavLink
                 key={v.slug}
                 to={v.slug ? `${config.base}/${v.slug}` : config.base}
                 end
+                data-pill={v.slug === view ? "on" : undefined}
                 className={({ isActive }) => `desk-tab ${isActive ? "desk-tab--active" : ""}`}
               >
                 {v.label}

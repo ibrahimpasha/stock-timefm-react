@@ -56,7 +56,6 @@ import {
   useIFlowDates,
   useIFlowSummary,
   useMultiDateSummaries,
-  useMultiDateEntries,
   useTickerIntelBatch,
   useTickerEarningsBatch,
   useFlowReturns,
@@ -65,14 +64,14 @@ import {
 import type { EscRollup } from "./iflow/hooks";
 import { TickerCard } from "./iflow/TickerCard";
 import { TopPicks } from "./iflow/TopPicks";
-import { TopSignals } from "./iflow/TopSignals";
 import { TickerDetail } from "./iflow/TickerDetail";
 import { ContractsView } from "./iflow/ContractsView";
 import { ThemeSection } from "./iflow/ThemeSection";
 import { EntryTape } from "./iflow/EntryTape";
+import { FlowOverview } from "./iflow/FlowOverview";
 
 type WatchView = "tickers" | "contracts" | "both";
-const CARD_GRID = "grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4";
+const CARD_GRID = "ticker-grid";
 type GroupMode = "subcat" | "macro" | "flat";
 
 /** Clickable wrapper around the shared `Chip` primitive — used for every
@@ -146,7 +145,8 @@ export function IFlowTracker() {
     tradersOnly,
     selectedAuthors,
     search,
-    selectedDates,
+    selectedDates: pickedDates,
+    datesTouched,
     watchView,
     groupMode,
     categoryFilter,
@@ -182,6 +182,13 @@ export function IFlowTracker() {
   const datesQuery = useIFlowDates();
   const { data: datesData } = datesQuery;
   const dates = useMemo(() => datesData?.dates ?? [], [datesData?.dates]);
+  // Open on the latest session, not the whole corpus: today's flow is the question,
+  // and "All dates" loads a summary per day. Follows new sessions until a date is picked.
+  const latestDate = dates[0]?.date;
+  const selectedDates = useMemo(
+    () => (datesTouched || !latestDate ? pickedDates : new Set([latestDate])),
+    [datesTouched, latestDate, pickedDates],
+  );
   const isAllDates = selectedDates.size === 0;
   const isSingleDate = selectedDates.size === 1;
   const singleDate = isSingleDate ? [...selectedDates][0] : "";
@@ -206,7 +213,7 @@ export function IFlowTracker() {
     const next = new Set(selectedDates);
     if (next.has(d)) next.delete(d);
     else next.add(d);
-    patchIFlow({ selectedDates: next });
+    patchIFlow({ selectedDates: next, datesTouched: true });
     setSelectedTicker(null);
   };
 
@@ -340,37 +347,11 @@ export function IFlowTracker() {
 
   // ── Grid-card highlight data ───────────────────────────────────────────────
   // The Highlight selector re-points the green border at one of: escalating
-  // (default, uses intelMap/escMap above), bullish accumulation, the Theme-Pulse
-  // play score, or the best ML score. Play scores are one tiny shared endpoint
-  // (cheap, cached with the heat map). ML needs per-entry data, so it's gated on
-  // the "ml" mode and bounded to recent dates in All-Dates view.
+  // (default, uses intelMap/escMap above), bullish accumulation, or the Theme-Pulse
+  // play score. Play scores are one tiny shared endpoint (cheap, cached with the
+  // heat map).
   const { data: playScoreData } = useThemePulseScores();
   const playScores = playScoreData?.scores;
-
-  // Dates whose entries we walk for the per-ticker best ML score. Mirror the
-  // grid's visible-date set, but cap All-Dates to the 10 most-recent so we don't
-  // fire ~40 include_notable entry fetches just to light a border.
-  const mlDates: string[] = useMemo(() => {
-    if (highlightMode !== "ml") return [];
-    if (useSingleDateView) return singleDate ? [singleDate] : [];
-    if (isAllDates) return dates.slice(0, 10).map((d) => d.date);
-    return [...selectedDates].sort().reverse();
-  }, [highlightMode, useSingleDateView, singleDate, isAllDates, dates, selectedDates]);
-  const mlEntryQueries = useMultiDateEntries(mlDates, true);
-  const mlByTicker = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const q of mlEntryQueries) {
-      for (const e of q.data?.entries ?? []) {
-        const tk = String(e.ticker || "").toUpperCase();
-        // ml lives inside `notable` (v5: 0-100 percentile), so the 80
-        // default threshold means "top 20% of recent prints".
-        const ml = Number(e.notable?.ml_score ?? 0);
-        if (tk && ml > (m.get(tk) ?? 0)) m.set(tk, ml);
-      }
-    }
-    return m;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mlEntryQueries.map((q) => q.dataUpdatedAt).join(",")]);
 
   // Flow P/L per ticker — only fetched when "Highest Returns" sort is on.
   // Server walks all available flow JSON and premium-weights P/L estimates.
@@ -541,13 +522,6 @@ export function IFlowTracker() {
           ? { on: true, title: `Play score ${v} ≥ ${highlightMin} — flow accumulation + catalyst + technicals (capital-preservation tuned)` }
           : { on: false, title: `Play score ${v}` };
       }
-      case "ml": {
-        const v = mlByTicker.get(tk);
-        if (v == null) return { on: false };
-        return v >= highlightMin
-          ? { on: true, title: `Best contract ML rank ${v} ≥ ${highlightMin}; not a ticker probability` }
-          : { on: false, title: `Best ML score ${v}` };
-      }
       case "accum": {
         const lbl = (intelMap?.[tk]?.accumLabel || "").toUpperCase();
         const e = escMap?.[tk];
@@ -604,12 +578,12 @@ export function IFlowTracker() {
     >
       {/* ── Toolbar: everyday controls in one row; the rest behind Filters ── */}
       <div className="mobile-workspace-controls glass-strong sticky z-20 mb-4 flex min-w-0 flex-wrap items-center gap-2 overflow-y-auto p-2 md:static md:z-auto md:max-h-none md:overflow-visible md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
-        <div className="mobile-horizontal-strip flex w-full min-w-0 items-center gap-1 overflow-x-auto lg:w-auto lg:max-w-[46%]">
+        <div className="mobile-horizontal-strip flex w-full min-w-0 items-center gap-1 overflow-x-auto lg:w-auto lg:max-w-[27%]">
           <ChipButton
             active={isAllDates}
             tone="accent"
             onClick={() => {
-              patchIFlow({ selectedDates: new Set() });
+              patchIFlow({ selectedDates: new Set(), datesTouched: true });
               setSelectedTicker(null);
             }}
           >
@@ -846,10 +820,9 @@ export function IFlowTracker() {
                         { value: "escalating", label: <span title="Strikes escalating (original default)">Esc</span> },
                         { value: "accum", label: <span title="Bullish accumulation (accumulation label / escalating bull side)">Accum</span> },
                         { value: "play", label: <span title="Theme-Pulse play score ≥ threshold — capital-preservation tuned">Play</span> },
-                        { value: "ml", label: <span title="Best within-DTE ML percentile ≥ threshold on recent flow">ML</span> },
                       ]}
                     />
-                    {(highlightMode === "play" || highlightMode === "ml") && (
+                    {highlightMode === "play" && (
                       <label
                         className="flex items-center gap-1.5 text-xs text-text-muted"
                         title="Minimum 0–100 score a ticker needs to be highlighted"
@@ -965,68 +938,81 @@ export function IFlowTracker() {
       {/* ── KPI strip + ranked lists: one cockpit grid ── */}
       {!loading && !loadError && (
         <TileGrid className="mb-3.5">
-          <KpiTile
-            label={
-              <>
-                Premium · {scopeLabel}
-                {earningsFilterOn && <> · earnings within {earningsWindow.toUpperCase()}</>}
-              </>
-            }
-            /* ponytail: formatPremium tops out at M; the all-dates total runs into billions */
-            value={daySum.prem >= 1e9 ? `$${(daySum.prem / 1e9).toFixed(1)}B` : formatPremium(daySum.prem)}
-            delta={sentiment.charAt(0) + sentiment.slice(1).toLowerCase()}
-            tone={sentiment === "BULLISH" ? "up" : sentiment === "BEARISH" ? "down" : "neutral"}
-            sub={bullShare != null ? `${bullShare}% bull entries` : undefined}
-          />
-          <KpiTile
-            label="Tickers"
-            value={filtered.length.toLocaleString()}
-            sub={tickers.length !== filtered.length ? `of ${tickers.length.toLocaleString()} with flow` : "with flow"}
-          />
-          <KpiTile
-            label="Entries"
-            value={daySum.entries.toLocaleString()}
-            sub={filtered.length > 0 ? `${(daySum.entries / filtered.length).toFixed(1)} per ticker` : undefined}
-          />
-          <KpiTile
-            label="Bull / bear"
-            value={
-              <>
-                <span className="delta-up">{daySum.bull.toLocaleString()}</span>
-                <span className="text-text-muted"> / </span>
-                <span className="delta-down">{daySum.bear.toLocaleString()}</span>
-              </>
-            }
-            sub={
-              isSingleDate && summary && !earningsFilterOn ? (
-                `day ${summary.bull_count} / ${summary.bear_count}`
-              ) : bullShare != null ? (
-                <span className="inline-flex h-1.5 w-full max-w-40 overflow-hidden rounded-full align-middle" style={{ background: "var(--track)" }} aria-label={`${bullShare}% bull`}>
-                  <span style={{ width: `${bullShare}%`, background: "var(--accent-green)" }} />
-                  <span style={{ width: `${100 - bullShare}%`, background: "var(--accent-red)" }} />
-                </span>
-              ) : undefined
-            }
-          />
+          {viewMode === "grid" && watchView !== "contracts" && filtered.length > 0 ? (
+            <FlowOverview
+              tickers={filtered}
+              taxonomy={taxonomy}
+              latestDate={tapeDates[0]}
+              sessionDate={isSingleDate ? singleDate : undefined}
+              scope={earningsFilterOn ? `${scopeLabel} · earnings within ${earningsWindow.toUpperCase()}` : scopeLabel}
+              onPick={openTicker}
+            />
+          ) : (
+            <>
+                <KpiTile
+                  label={
+                    <>
+                      Premium · {scopeLabel}
+                      {earningsFilterOn && <> · earnings within {earningsWindow.toUpperCase()}</>}
+                    </>
+                  }
+                  /* ponytail: formatPremium tops out at M; the all-dates total runs into billions */
+                  value={daySum.prem >= 1e9 ? `$${(daySum.prem / 1e9).toFixed(1)}B` : formatPremium(daySum.prem)}
+                  delta={sentiment.charAt(0) + sentiment.slice(1).toLowerCase()}
+                  tone={sentiment === "BULLISH" ? "up" : sentiment === "BEARISH" ? "down" : "neutral"}
+                  sub={bullShare != null ? `${bullShare}% bull entries` : undefined}
+                />
+                <KpiTile
+                  label="Tickers"
+                  value={filtered.length.toLocaleString()}
+                  sub={tickers.length !== filtered.length ? `of ${tickers.length.toLocaleString()} with flow` : "with flow"}
+                />
+                <KpiTile
+                  label="Entries"
+                  value={daySum.entries.toLocaleString()}
+                  sub={filtered.length > 0 ? `${(daySum.entries / filtered.length).toFixed(1)} per ticker` : undefined}
+                />
+                <KpiTile
+                  label="Bull / bear"
+                  value={
+                    <>
+                      <span className="delta-up">{daySum.bull.toLocaleString()}</span>
+                      <span className="text-text-muted"> / </span>
+                      <span className="delta-down">{daySum.bear.toLocaleString()}</span>
+                    </>
+                  }
+                  sub={
+                    isSingleDate && summary && !earningsFilterOn ? (
+                      `day ${summary.bull_count} / ${summary.bear_count}`
+                    ) : bullShare != null ? (
+                      <span className="inline-flex h-1.5 w-full max-w-40 overflow-hidden rounded-full align-middle" style={{ background: "var(--track)" }} aria-label={`${bullShare}% bull`}>
+                        <span style={{ width: `${bullShare}%`, background: "var(--accent-green)" }} />
+                        <span style={{ width: `${100 - bullShare}%`, background: "var(--accent-red)" }} />
+                      </span>
+                    ) : undefined
+                  }
+                />
+            </>
+          )}
           {/* Top Picks + Top Signals (single date only); each renders its own Tile or nothing */}
           {isSingleDate && singleDate && (
-            <>
-              <TopPicks date={singleDate} dteFilter={dte} />
-              <TopSignals date={singleDate} dteFilter={dte} />
-            </>
+            <details className="research-rankings min-w-0 lg:col-span-12">
+              <summary>Research rankings <span>unvalidated scores, not trade signals</span></summary>
+              <TileGrid className="mt-3.5">
+                <TopPicks date={singleDate} dteFilter={dte} />
+              </TileGrid>
+            </details>
           )}
         </TileGrid>
       )}
 
       {/* ── Loading skeleton ────────────────────────────────────────── */}
       {loading && (
-        <div className="animate-pulse">
+        <div aria-busy="true">
           <TileGrid className="mb-3.5">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 rounded-xl border border-border bg-bg-card lg:col-span-3" />
-            ))}
+            <div className="skeleton h-[32rem] lg:col-span-8" />
+            <div className="skeleton h-[32rem] lg:col-span-4" />
           </TileGrid>
-          <div className="h-80 rounded-xl border border-border bg-bg-card" />
         </div>
       )}
 
@@ -1050,11 +1036,10 @@ export function IFlowTracker() {
           height changes, adjust the 260px offset. */}
       {!loading && !loadError && (
         <div
-          className="grid min-w-0 grid-cols-12 gap-4 max-lg:gap-2 max-lg:!h-auto max-lg:!min-h-0"
-          style={{ height: "calc(100vh - 260px)", minHeight: 420 }}
+          className="flow-split grid min-w-0 grid-cols-12 items-start gap-4 max-lg:gap-2"
         >
           <div
-            className={`${selectedTicker ? "col-span-7 max-lg:hidden" : "col-span-12"} flex min-w-0 max-w-full flex-col gap-3.5 overflow-y-auto pr-1 max-lg:col-span-12 max-lg:overflow-visible max-lg:pr-0`}
+            className={`${selectedTicker ? "col-span-7 max-lg:hidden" : "col-span-12"} flex min-w-0 max-w-full flex-col gap-3.5 max-lg:col-span-12`}
           >
             {tradersOnly && coverageQuery.isLoading && (
               <div className="card flex items-center justify-center gap-2 py-6 text-xs text-text-muted">
@@ -1114,6 +1099,13 @@ export function IFlowTracker() {
                 (t) => watchSet.has(t.ticker) && (!tradersOnly || authorTickerSet.has(t.ticker.toUpperCase())),
               );
               const othersShown = filtered.filter((t) => !watchSet.has(t.ticker));
+              // Tile strength = premium size on a log scale, so big money stands out on a
+              // grid that would otherwise be uniformly green.
+              const premiums = filtered.map((t) => t.total_premium ?? 0).filter((p) => p > 0);
+              const lowLog = Math.log(Math.min(...premiums, 1e9));
+              const highLog = Math.log(Math.max(...premiums, 1));
+              const heatOf = (t: TrackedTicker) =>
+                t.total_premium && highLog > lowLog ? (Math.log(t.total_premium) - lowLog) / (highLog - lowLog) : 0;
               const renderCard = (t: TrackedTicker) => {
                 // Merge the rich top-20 intel with the universal 14d escalation
                 // rollup so the green border + ↗ icon work for every visible
@@ -1134,6 +1126,7 @@ export function IFlowTracker() {
                 const hl = highlightOf(t);
                 return (
                 <TickerCard
+                  heat={heatOf(t)}
                   key={t.ticker}
                   t={t}
                   selected={selectedTicker === t.ticker}
@@ -1218,7 +1211,7 @@ export function IFlowTracker() {
             })()}
           </div>
           {selectedTicker && selectedData && (
-            <div className="col-span-5 min-w-0 max-w-full overflow-y-auto pr-1 max-lg:col-span-12 max-lg:overflow-visible max-lg:pr-0">
+            <div className="flow-detail-rail col-span-5 min-w-0 max-w-full pr-1 max-lg:col-span-12 max-lg:pr-0">
               <button
                 type="button"
                 onClick={() => setSelectedTicker(null)}
@@ -1243,12 +1236,14 @@ export function IFlowTracker() {
   );
 }
 
+const EXPANDED_SECTIONS = 3;
+const categoryPremium = (items: TrackedTicker[]) => items.reduce((sum, t) => sum + (t.total_premium ?? 0), 0);
+
 // ── Themed grid (renders one collapsible section per sector category) ──────
 // Buckets `tickers` by `taxonomy.ticker_lookup[ticker].category` and emits one
 // ThemeSection per category. Categories with zero visible tickers are skipped.
 // Tickers that don't appear in the taxonomy fall into an UNCLASSIFIED section
-// rendered last. Iteration follows the JSON's natural key order (which the
-// taxonomy author curated as AI_INFRASTRUCTURE → AI_POWER → ... → SPECIAL_SITUATIONS).
+// rendered last. Sectors run largest premium first; only the top few start open.
 function ThemedGrid({
   tickers,
   taxonomy,
@@ -1278,9 +1273,11 @@ function ThemedGrid({
 
   return (
     <div className="flex min-w-0 flex-col gap-3.5">
-      {categoryOrder.map((cat) => {
+      {categoryOrder
+        .filter((cat) => byCategory[cat]?.length)
+        .sort((a, b) => categoryPremium(byCategory[b]) - categoryPremium(byCategory[a]))
+        .map((cat, rank) => {
         const items = byCategory[cat];
-        if (!items || items.length === 0) return null;
         return (
           <ThemeSection
             key={cat}
@@ -1290,7 +1287,7 @@ function ThemedGrid({
             lookupMap={lookup}
             macros={taxonomy.macros}
             bottlenecks={taxonomy.bottlenecks}
-            initiallyExpanded
+            initiallyExpanded={rank < EXPANDED_SECTIONS}
             renderCard={renderCard}
             subGroupBy={subGroupBy}
             themeDescriptions={themeDescByCat[cat]}

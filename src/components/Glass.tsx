@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useSlidingPill } from "../lib/useSlidingPill";
 
 /* Shared atoms for the glass design language. Consume tokens only — no
  * literal colors. See DESIGN.md (2026-10 Redesign Rules) for usage rules. */
@@ -141,12 +142,15 @@ export function Segmented<T extends string>({
   className?: string;
   ariaLabel?: string;
 }) {
+  const { container, pill } = useSlidingPill(value);
   return (
     <div
+      ref={container}
       role="group"
       aria-label={ariaLabel}
       className={`segmented-control mobile-horizontal-strip inline-flex items-center gap-0.5 rounded-full border p-0.5 ${className}`}
     >
+      <span ref={pill} className="sliding-pill segmented-pill" aria-hidden="true" />
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -154,6 +158,7 @@ export function Segmented<T extends string>({
             key={o.value}
             type="button"
             aria-pressed={active}
+            data-pill={active ? "on" : undefined}
             onClick={() => onChange(o.value)}
             className={`segmented-option flex min-h-7 shrink-0 touch-manipulation items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors max-lg:min-h-11 ${
               active

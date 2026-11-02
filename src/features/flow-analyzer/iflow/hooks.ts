@@ -72,13 +72,12 @@ export function useMultiDateSummaries(dates: string[], dte: DteFilter) {
  * Returns an array of query results — one per date. Caller merges as
  * needed. Mirrors useMultiDateSummaries so any per-date caching that's
  * already warm gets reused. */
-export function useMultiDateEntries(dates: string[], includeNotable = false) {
-  const n = includeNotable ? "&include_notable=true" : "";
+export function useMultiDateEntries(dates: string[]) {
   return useQueries({
     queries: dates.map((date) => ({
-      queryKey: ["iflow", "entries", date, "", includeNotable],
+      queryKey: ["iflow", "entries", date, ""],
       queryFn: () =>
-        apiClient.get<{ entries: any[] }>(`/flow/iflow/entries?date=${date}${n}`).then((r) => r.data),
+        apiClient.get<{ entries: any[] }>(`/flow/iflow/entries?date=${date}`).then((r) => r.data),
       staleTime: STALE_TIMES.flow,
       refetchInterval: () => activeFlowInterval(date),
       enabled: !!date,
@@ -87,12 +86,11 @@ export function useMultiDateEntries(dates: string[], includeNotable = false) {
 }
 
 /* ── Raw entries for one date (optionally filtered by ticker) ────────── */
-export function useIFlowEntries(date: string, ticker?: string, includeNotable = false) {
+export function useIFlowEntries(date: string, ticker?: string) {
   const t = ticker ? `&ticker=${ticker}` : "";
-  const n = includeNotable ? "&include_notable=true" : "";
   return useQuery<{ entries: any[] }>({
-    queryKey: ["iflow", "entries", date, ticker || "", includeNotable],
-    queryFn: () => apiClient.get(`/flow/iflow/entries?date=${date}${t}${n}`).then((r) => r.data),
+    queryKey: ["iflow", "entries", date, ticker || ""],
+    queryFn: () => apiClient.get(`/flow/iflow/entries?date=${date}${t}`).then((r) => r.data),
     staleTime: STALE_TIMES.flow,
     refetchInterval: () => activeFlowInterval(date),
     enabled: !!date,

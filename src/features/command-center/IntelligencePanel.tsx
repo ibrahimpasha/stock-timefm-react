@@ -211,7 +211,7 @@ export function IntelligencePanel({ thesis, isLoading, ticker }: IntelligencePan
           {fromCache && (
             <span
               className="text-xs text-text-muted"
-              title="Showing cached web-search intel because no ML thesis exists yet. Click Analyze for a full ensemble-backed thesis."
+              title="Showing cached web-search intel because no generated thesis exists yet. Click Analyze for a full ensemble-backed thesis."
             >
               Web-search cache
             </span>

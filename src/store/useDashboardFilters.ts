@@ -25,7 +25,7 @@ export type HmSizeMetric = "premium" | "entries" | "conviction" | "market_cap";
 export type HmColorMetric = "bias" | "pl" | "target" | "technical" | "pattern";
 export type HmGroupBy = "none" | "sector" | "theme" | "subcategory";
 export type HmPulse =
-  | "off" | "earnings" | "ml" | "play" | "technical" | "pattern";
+  | "off" | "earnings" | "play" | "technical" | "pattern";
 
 export interface HeatmapFilters {
   selectedDates: Set<string>;
@@ -36,15 +36,13 @@ export interface HeatmapFilters {
   pulseThreshold: number;
   pulseGroup: boolean;
   // Tile filters — hide tiles below/over the slider value when the toggle is on.
-  mlOn: boolean;
-  mlMin: number;
   playOn: boolean;
   playMin: number;
   earnOn: boolean;
   earnDays: number; // also drives the "earnings" pulse window
 }
 
-const VALID_PULSE = new Set<HmPulse>(["off", "earnings", "ml", "play", "technical", "pattern"]);
+const VALID_PULSE = new Set<HmPulse>(["off", "earnings", "play", "technical", "pattern"]);
 
 // ── iFlow Tracker filter types (mirror IFlowTracker.tsx) ────────────
 export type IfBias = "all" | "bullish" | "bearish";
@@ -56,8 +54,8 @@ export type IfWatchView = "tickers" | "contracts" | "both";
 export type IfGroupMode = "subcat" | "macro" | "flat";
 // Which signal lights a grid card's green border. "escalating" preserves the
 // historical behavior (strikes escalating); the others let the user re-point
-// the highlight at bullish accumulation, the Theme-Pulse play score, or ML.
-export type IfHighlight = "off" | "escalating" | "accum" | "play" | "ml";
+// the highlight at bullish accumulation, or the Theme-Pulse play score.
+export type IfHighlight = "off" | "escalating" | "accum" | "play";
 
 export interface IFlowFilters {
   bias: IfBias;
@@ -69,6 +67,8 @@ export interface IFlowFilters {
   selectedAuthors: Set<string>;
   search: string;
   selectedDates: Set<string>;
+  /** False until the user picks dates; until then Flow shows the latest session. */
+  datesTouched: boolean;
   /** Taxonomy category (e.g. "AI_POWER"); "" = no theme filter. Set by
    *  clicking a theme in the rotation map, applies to Grid AND Tape. */
   categoryFilter: string;
@@ -76,19 +76,23 @@ export interface IFlowFilters {
   groupMode: IfGroupMode;
   // Grid-card green-border highlight (grid view only).
   highlightMode: IfHighlight;
-  highlightMin: number; // 0-100 threshold for the play / ml highlight modes
+  highlightMin: number; // 0-100 threshold for the play highlight mode
 }
 
-const VALID_HIGHLIGHT = new Set<IfHighlight>(["off", "escalating", "accum", "play", "ml"]);
+const VALID_HIGHLIGHT = new Set<IfHighlight>(["off", "escalating", "accum", "play"]);
 
 // ── EntryTape filter types (mirror EntryTape.tsx) ───────────────────
 export type TapeFilterMode =
-  | "none" | "notable_nscore" | "notable_ml" | "notable_both" | "avg_sweet" | "kian"
-  | "outliers";
+  | "none" | "kian" | "outliers";
 export type TapeSortKey =
   | "time" | "ticker" | "side" | "action" | "contract" | "dte" | "ern" | "voi" | "ask"
-  | "atm" | "premium" | "pnl" | "score" | "ml" | "setup" | "avg" | "pred_peak";
+  | "atm" | "premium" | "pnl" | "setup";
 export type TapeSortDir = "asc" | "desc";
+
+const VALID_TAPE_FILTER = new Set<TapeFilterMode>(["none", "kian", "outliers"]);
+const VALID_TAPE_SORT = new Set<TapeSortKey>([
+  "time", "ticker", "side", "action", "contract", "dte", "ern", "voi", "ask", "atm", "premium", "pnl", "setup",
+]);
 
 export interface TapeFilters {
   filterMode: TapeFilterMode;
@@ -118,8 +122,6 @@ const HEATMAP_DEFAULTS: HeatmapFilters = {
   pulse: "off",
   pulseThreshold: 60,
   pulseGroup: false,
-  mlOn: false,
-  mlMin: 80,
   playOn: false,
   playMin: 80,
   earnOn: false,
@@ -136,6 +138,7 @@ const IFLOW_DEFAULTS: IFlowFilters = {
   selectedAuthors: new Set<string>(),
   search: "",
   selectedDates: new Set<string>(),
+  datesTouched: false,
   categoryFilter: "",
   watchView: "tickers",
   groupMode: "subcat",
@@ -181,14 +184,17 @@ export const useDashboardFilters = create<DashboardFiltersStore>()(
         const heatmap = { ...current.heatmap, ...(p.heatmap ?? {}) };
         // Old persisted pulse values (earnings10/20/30) no longer exist — reset.
         if (!VALID_PULSE.has(heatmap.pulse)) heatmap.pulse = "off";
-        const iflow = { ...current.iflow, ...(p.iflow ?? {}) };
+        // A ticker search is a moment's question; a reload shouldn't reopen on one name.
+        const iflow = { ...current.iflow, ...(p.iflow ?? {}), search: "" };
         if (!VALID_HIGHLIGHT.has(iflow.highlightMode)) iflow.highlightMode = "escalating";
-        return {
-          ...current,
-          heatmap,
-          iflow,
-          tape: { ...current.tape, ...(p.tape ?? {}) },
-        };
+        // Score filters and sorts were removed; a saved one must not blank the tape.
+        const tape = { ...current.tape, ...(p.tape ?? {}) };
+        if (!VALID_TAPE_FILTER.has(tape.filterMode)) tape.filterMode = "none";
+        if (!VALID_TAPE_SORT.has(tape.sortKey)) {
+          tape.sortKey = "time";
+          tape.sortDir = "desc";
+        }
+        return { ...current, heatmap, iflow, tape };
       },
     },
   ),

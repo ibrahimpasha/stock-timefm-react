@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -45,8 +46,6 @@ interface PersonaRow {
   return_pct: number;
   open_positions: number;
   total_value: number;
-  ml_threshold?: number | null;
-  ml_serving_mode?: "disabled" | "rank_only" | "gate_and_rank";
   retired?: boolean;
   spy_return_pct?: number | null;
   error?: string;
@@ -63,8 +62,6 @@ interface RankBreakdown {
     weight: number;
     contribution: number;
   }>;
-  ml_score: number | null;
-  ml_serving_mode: string;
   setup_score: number | null;
   evidence_score?: number | null;
   evidence_adjustment?: number;
@@ -82,12 +79,6 @@ interface DecisionReceipt {
     fallback_used?: boolean;
   };
   intent?: { option_type?: string; action?: string; direction?: string };
-  ml?: {
-    serving_mode?: string;
-    model_version?: string | null;
-    score?: number | null;
-    gate_applied?: boolean;
-  };
   rank?: RankBreakdown;
   research_gate?: { approved: boolean; families: string[]; reasons: string[] };
   execution?: {
@@ -111,8 +102,6 @@ interface Position {
   entry_underlying: number | null;
   contracts: number;
   cost_basis: number;
-  ml_score: number | null;
-  n_score: number | null;
   graph_score: number | null;
   category: string | null;
   theme: string | null;
@@ -138,7 +127,6 @@ interface Position {
   reason: string | null;
   rank_score?: number | null;
   rank_breakdown?: RankBreakdown | null;
-  ml_serving_mode?: string | null;
   decision_receipt?: DecisionReceipt | null;
   last_marked_at?: string | null;
   mark_status?: string | null;
@@ -223,7 +211,6 @@ interface RejectedEntry {
   option_type: string | null;
   strike: number | null;
   dte: number | null;
-  ml_score: number | null;
   reason: string;
   rule_id: number;
 }
@@ -298,8 +285,6 @@ interface WatchlistRow {
   strike: number | null;
   expiry: string;
   dte: number | null;
-  ml_score: number | null;
-  n_score: number | null;
   note: string;
   added: string;
   pnl_pct: number | null;
@@ -452,7 +437,6 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
         <div className="space-y-2 pb-3 pl-5 text-xs">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-text-muted">
             {stateText(r, state)}
-            {r.ml_score != null && <span>ML <span className="num">{r.ml_score}</span></span>}
             {peak != null && <span className="num">peak +{peak.toFixed(0)}%</span>}
             <span>{age == null ? "Age unknown" : `${age}d on list`}</span>
             <span>{gain == null ? "No verified mark" : "Modeled gain"}</span>
@@ -478,7 +462,6 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
             <th className="py-2 pr-3 text-right font-medium" title="Modeled gain since added">P/L %</th>
             <th className="py-2 pr-3 text-right font-medium">Peak</th>
             <th className="py-2 pr-3 font-medium">State</th>
-            <th className="py-2 pr-3 text-right font-medium">ML</th>
             <th className="py-2 pr-3 text-right font-medium">On list</th>
             <th className="py-2 pr-3 font-medium">Added</th>
             <th className="py-2 pr-3 font-medium">Flow</th>
@@ -499,7 +482,6 @@ function WatchlistPanel({ persona }: { persona: PersonaName }) {
                 </td>
                 <td className="py-2 pr-3 text-right num text-text-muted">{peak != null ? `+${peak.toFixed(0)}%` : "—"}</td>
                 <td className="whitespace-nowrap py-2 pr-3">{stateText(r, state)}</td>
-                <td className="py-2 pr-3 text-right num text-text-secondary">{r.ml_score ?? "—"}</td>
                 <td className="py-2 pr-3 text-right num text-text-muted">{age == null ? "—" : `${age}d`}</td>
                 <td className="whitespace-nowrap py-2 pr-3 text-text-secondary">{watchlistTime(r.added_at ?? r.added)}</td>
                 <td className="whitespace-nowrap py-2 pr-3 num text-text-muted">{r.source_date ?? "—"}</td>
@@ -1137,10 +1119,9 @@ function WhyPick({ reason, compact = false }: { reason: string | null; compact?:
 function DecisionAudit({ p }: { p: Position }) {
   const rank = p.rank_breakdown ?? p.decision_receipt?.rank;
   const source = p.decision_receipt?.source;
-  const mode = p.ml_serving_mode ?? p.decision_receipt?.ml?.serving_mode;
   const quote = p.decision_receipt?.execution?.quote;
   const quality = p.decision_receipt?.research_gate;
-  if (!rank && !source && !mode && !quote) return null;
+  if (!rank && !source && !quote) return null;
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
       {rank?.validated === false && <span>Experimental policy</span>}
@@ -1160,7 +1141,6 @@ function DecisionAudit({ p }: { p: Position }) {
           Decision rank <strong className="num text-text-primary">{rank.total.toFixed(1)}</strong>
           <span className="num">
             {` = ${rank.base_name} ${rank.base_score.toFixed(1)}`}
-            {` ${(rank.model_adjustment ?? 0) >= 0 ? "+" : ""}${(rank.model_adjustment ?? 0).toFixed(1)} model`}
             {` ${rank.category_adjustment >= 0 ? "+" : ""}${rank.category_adjustment.toFixed(1)} category`}
             {` ${rank.pulse_adjustment >= 0 ? "+" : ""}${rank.pulse_adjustment.toFixed(1)} pulse`}
           </span>
@@ -1171,7 +1151,6 @@ function DecisionAudit({ p }: { p: Position }) {
           {rank.components.map((c) => `${c.name.toLowerCase()} ${Math.round(c.weight * 100)}%`).join(" · ")}
         </span>
       )}
-      {mode && <span>ML {mode === "gate_and_rank" ? "gate + rank" : mode.replaceAll("_", " ")}</span>}
       {source?.date && (
         <span>
           source <span className="num">{source.date}</span>
@@ -1239,9 +1218,7 @@ function PositionCard({
             <span className="text-xs text-text-muted"><span className="num">x{p.contracts}</span> {unitWord}</span>
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
-            {p.ml_score != null && <span>ML <span className="num text-text-secondary">{p.ml_score}</span></span>}
             {p.rank_score != null && <span>rank <span className="num text-text-secondary">{p.rank_score.toFixed(1)}</span></span>}
-            {p.n_score != null && <span>N <span className="num text-text-secondary">{p.n_score}</span></span>}
             {p.graph_score != null && (
               <span title="graph composite score">G <span className="num text-text-secondary">{p.graph_score.toFixed(0)}</span></span>
             )}
@@ -1533,7 +1510,6 @@ function ClosedRow({ p, trims = [] }: { p: Position; trims?: Position[] }) {
         <span>entry <span className="num">{p.entry_date}</span> @ <span className="num">${p.premium_at_entry.toFixed(2)}</span></span>
         <span>exit <span className="num">{p.exit_date}</span> @ <span className="num">${(p.exit_premium ?? 0).toFixed(2)}</span></span>
         {holdDays != null && <span>held <span className="num">{holdDays}d</span></span>}
-        {p.ml_score != null && <span>ML <span className="num">{p.ml_score}</span></span>}
       </div>
       <WhyPick reason={p.reason} compact />
       {trims.length > 0 && (
@@ -1588,7 +1564,6 @@ function RejectionBlock({
                 <span className="font-semibold text-text-primary">{e.ticker}</span>
                 {e.strike != null && <span className="text-text-secondary">${e.strike} {e.option_type}</span>}
                 {e.dte != null && <span className="text-text-muted">{e.dte}d</span>}
-                {e.ml_score != null && <span className="text-text-muted">ml {e.ml_score}</span>}
               </div>
               <span className="min-w-0 break-words text-text-muted md:flex-1 md:truncate" title={e.reason}>{e.reason}</span>
             </div>
@@ -1923,8 +1898,6 @@ function PositionsTable({
                     exit threshold <span className="num">{scaled ? "BE" : `${stopPct}%`}</span>
                   </span>
                   {trimmed && <span className="text-accent-green">booked trims</span>}
-                  {p.ml_score != null && <span>ML <span className="num">{p.ml_score}</span></span>}
-                  {p.n_score != null && <span>N <span className="num">{p.n_score}</span></span>}
                 </div>
                 <button
                   type="button"
@@ -2203,7 +2176,12 @@ const PERSONA_META: Record<
 export function SmartTrader() {
   const queryClient = useQueryClient();
   const setActiveTicker = useAppStore((s) => s.setActiveTicker);
-  const [persona, setPersona] = useState<PersonaName>("steady");
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [persona, setPersona] = useState<PersonaName>(() => {
+    const book = searchParams.get("book");
+    return book && book in PERSONA_META ? (book as PersonaName) : "steady";
+  });
   const [showClosed, setShowClosed] = useState(false);
   // Open-positions layout: grouped cards (rich) vs dense sortable table
   // ("when was it added, at what price" — 2026-08-07 user ask).
@@ -2286,7 +2264,22 @@ export function SmartTrader() {
     (a, b) => b[1].length - a[1].length,
   );
 
-  const personas: PersonaName[] = ["steady", "core", "flowfollow", "optionslab", "gemfinder", "supercycle", "conviction", "smart", "aggressive", "builder", "ruby"];
+  const personas: PersonaName[] = ["steady", "core", "flowfollow", "optionslab", "gemfinder", "supercycle", "conviction"];
+  const retiredPersonas: PersonaName[] = ["smart", "aggressive", "builder", "ruby"];
+  const personaOption = (p: PersonaName) => {
+    const row = personaList?.personas.find((r) => r.name === p);
+    const pRet = row?.return_pct ?? 0;
+    return {
+      value: p,
+      label: PERSONA_META[p].label,
+      badge: row ? (
+        <span className="num" style={{ color: changeColor(pRet) }}>
+          {pRet >= 0 ? "+" : ""}
+          {pRet.toFixed(2)}%
+        </span>
+      ) : undefined,
+    };
+  };
   const personaRows = personaList?.personas ?? [];
   const personaRow = personaRows.find((r) => r.name === persona);
   const viewToggle = (
@@ -2320,26 +2313,25 @@ export function SmartTrader() {
         className="mobile-workspace-controls sticky z-20 space-y-2 p-2 md:static md:z-auto md:p-0"
         style={{ background: "var(--bg-primary)" }}
       >
-        <Segmented<PersonaName>
-          ariaLabel="Choose paper book"
-          className="mobile-horizontal-strip w-full flex-nowrap md:w-auto md:flex-wrap"
-          options={personas.map((p) => {
-            const row = personaRows.find((r) => r.name === p);
-            const pRet = row?.return_pct ?? 0;
-            return {
-              value: p,
-              label: row?.retired ? `${PERSONA_META[p].label} (retired)` : PERSONA_META[p].label,
-              badge: row ? (
-                <span className="num" style={{ color: changeColor(pRet) }}>
-                  {pRet >= 0 ? "+" : ""}
-                  {pRet.toFixed(2)}%
-                </span>
-              ) : undefined,
-            };
-          })}
-          value={persona}
-          onChange={setPersona}
-        />
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+          <Segmented<PersonaName>
+            ariaLabel="Choose paper book"
+            className="mobile-horizontal-strip max-w-full flex-nowrap"
+            options={personas.map(personaOption)}
+            value={persona}
+            onChange={setPersona}
+          />
+          <div className="flex min-w-0 max-w-full items-center gap-2">
+            <span className="shrink-0 text-xs text-text-muted">Retired</span>
+            <Segmented<PersonaName>
+              ariaLabel="Choose retired paper book"
+              className="mobile-horizontal-strip max-w-full flex-nowrap"
+              options={retiredPersonas.map(personaOption)}
+              value={persona}
+              onChange={setPersona}
+            />
+          </div>
+        </div>
         <p className="line-clamp-2 max-w-[90ch] text-xs leading-relaxed text-text-muted md:line-clamp-none">
           {personaRow?.retired && "Retired Nov 1, 2026: failed walk-forward testing. Opens nothing new; existing positions run off. "}
           {personaRow?.description || summary.persona_description || PERSONA_META[persona].tagline}
@@ -2347,11 +2339,6 @@ export function SmartTrader() {
             <span>
               {" "}
               · <span className="num">{personaRow.open_positions}</span> open · <span className="num">${(personaRow.total_value / 1000).toFixed(1)}K</span>
-              {personaRow.ml_serving_mode === "gate_and_rank"
-                ? <> · ML gate <span className="num">{personaRow.ml_threshold ?? "?"}+</span> active</>
-                : personaRow.ml_serving_mode === "rank_only"
-                  ? " · ML research rank only; no ML rejection"
-                  : ""}
             </span>
           ) : null}
         </p>
@@ -2360,9 +2347,17 @@ export function SmartTrader() {
         )}
       </div>
 
+      {summary.positions.length === 0 && summary.closed.length === 0 ? (
+        <Tile title="No positions yet" actions={<CockpitButton onClick={() => navigate("/books")}>Compare all books</CockpitButton>}>
+          <p className="m-0 max-w-[65ch] text-sm leading-relaxed text-text-secondary">
+            {PERSONA_META[persona].tagline} Nothing has traded yet, so there is no equity curve or P/L to show.
+            Automated books act shortly after the next market open, and every trade lands here with its reason.
+          </p>
+        </Tile>
+      ) : (
       <TileGrid>
         {/* KPI strip */}
-        <Tile span={3}>
+        <Tile span={3} className="kpi-tile">
           <Kpi
             size="xl"
             label={`${PERSONA_META[persona].label} book equity`}
@@ -2379,14 +2374,14 @@ export function SmartTrader() {
             }
           />
         </Tile>
-        <Tile span={3}>
+        <Tile span={3} className="kpi-tile">
           <Kpi
             label="Total P/L"
             value={<span style={{ color: retColor }}>{signedMoney(pnlTotal)}</span>}
             sub={<>realized <span className="num">{signedMoney(summary.realized_pnl)}</span> · open <span className="num">{signedMoney(summary.unrealized_pnl)}</span></>}
           />
         </Tile>
-        <Tile span={3}>
+        <Tile span={3} className="kpi-tile">
           <Kpi
             label="Deployed"
             value={`${deployedPct.toFixed(0)}%`}
@@ -2396,7 +2391,7 @@ export function SmartTrader() {
             <div className="h-1.5 rounded-full bg-accent" style={{ width: `${Math.min(100, deployedPct)}%` }} />
           </div>
         </Tile>
-        <Tile span={3}>
+        <Tile span={3} className="kpi-tile">
           <Kpi
             label="Open positions"
             value={summary.open_positions}
@@ -2614,13 +2609,6 @@ export function SmartTrader() {
           </Tile>
         )}
       </TileGrid>
-
-      {/* Empty state — only when nothing has ever been picked */}
-      {summary.positions.length === 0 && summary.closed.length === 0 && (
-        <p className="py-8 text-center text-sm text-text-muted">
-          Book is empty. The daily cron opens positions automatically at
-          06:30 PT — check back after the next run.
-        </p>
       )}
     </div>
   );
